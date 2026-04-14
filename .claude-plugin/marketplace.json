@@ -1,9 +1,18 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "umiteknoloji-my-claude-lang",
+  "description": "The age of AI doesn't speak English. It speaks yours.",
+  "owner": {
+    "name": "umiteknoloji",
+    "email": "your@email.com"
+  },
   "plugins": [
     {
       "name": "my-claude-lang",
-      "description": "Semantic development bridge for non-English-speaking developers. The real AI age speaks your language.",
-      "source": "."
+      "description": "Semantic development bridge for non-English-speaking developers. Three-phase mutual understanding verification between developer and Claude Code. NOT a translator — a meaning verification system.",
+      "source": ".",
+      "category": "productivity",
+      "homepage": "https://github.com/umiteknoloji/my-claude-lang"
     }
   ]
 }
