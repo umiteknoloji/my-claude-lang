@@ -67,8 +67,8 @@ Download. Install. Done. No configuration. No language settings. It detects your
 ### As a Plugin
 
 ```bash
-/plugin marketplace add YOUR_GITHUB_USERNAME/my-claude-lang
-/plugin install my-claude-lang@YOUR_GITHUB_USERNAME
+/plugin marketplace add umiteknoloji/my-claude-lang
+/plugin install my-claude-lang@umiteknoloji
 ```
 
 ### As a Skill
