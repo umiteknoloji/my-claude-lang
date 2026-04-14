@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    {
+      "name": "my-claude-lang",
+      "description": "Semantic development bridge for non-English-speaking developers. The real AI age speaks your language.",
+      "source": "."
+    }
+  ]
+}
