@@ -50,9 +50,13 @@ If the developer's confirmation contains additional scope or modifications
 (e.g., "yes but also add...", "yes but change..."):
 
 - This is NOT a "yes" — it is a parameter change
-- Update the affected parameters
-- Re-summarize and re-confirm
-- Do NOT advance to the next phase
+- Check if the new request contradicts any existing confirmed parameter
+  - If contradiction → flag it: "This conflicts with [existing parameter].
+    Which one should I keep?"
+  - If no contradiction → accept the new parameter, add it to the existing ones
+- Run Phase 1-3 ONLY for the new addition — do NOT re-confirm already
+  confirmed parameters. They are done.
+- Previous work stays. New work gets added on top.
 
 ## Contradiction Detection
 
