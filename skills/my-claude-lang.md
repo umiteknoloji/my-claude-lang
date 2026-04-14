@@ -79,14 +79,44 @@ I understood the following:
 [what "done" means]
 
 **What I'm NOT sure about:**
-[any ambiguities — ask specific questions]
-
-Is this correct? (yes / no)
+[list of uncertainties — DO NOT ask "Is this correct?" yet]
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
 5. If the developer says "no" → ask "What did I get wrong?", re-summarize
 6. Do NOT move to Phase 2 until you receive explicit "yes"
+
+## Confirmation Timing Rule
+
+- If "What I'm NOT sure about" has ANY items:
+  → DO NOT ask "Is this correct? (yes / no)" yet
+  → First resolve ALL uncertainties using the Question Flow below
+  → Only after every uncertainty is resolved AND confirmed by all three parties
+  → THEN present the full summary and ask "Is this correct? (yes / no)"
+
+- If "What I'm NOT sure about" is empty:
+  → Ask "Is this correct? (yes / no)" immediately
+
+- If the developer says "yes" but open questions were NOT answered:
+  → Do NOT proceed. Say: "I still need answers to my questions before we continue."
+
+## Question Flow Rule
+
+At the start of the first conversation, ask the developer:
+"Would you prefer I ask questions one at a time?"
+
+If the developer says "yes":
+- Ask each uncertain question ONE AT A TIME
+- Wait for the answer
+- Confirm your understanding of that specific answer with the developer
+- Translate the confirmed answer to English for Claude Code
+- Get Claude Code's confirmation on that specific point
+- Only after all three parties agree on that answer → move to the next question
+- Repeat until all uncertainties are resolved
+
+If the developer says "no":
+- Ask all uncertain questions at once
+- Require explicit answers to ALL questions before proceeding
 
 ## Phase 2: Generate English Spec
 
@@ -200,6 +230,8 @@ When code review, test results, or completion reports come back:
 - ❌ Translating error messages literally — explain what they MEAN
 - ❌ Long paragraphs — use short, clear sentences
 - ❌ Mixing languages mid-sentence (except for technical terms in parentheses)
+- ❌ Asking "Is this correct?" when there are still open questions
+- ❌ Accepting "yes" as answers to unasked questions
 
 ## Integration with Other Skills
 
@@ -223,7 +255,9 @@ If at any point:
 
 - [ ] Developer stated their request in their language
 - [ ] I summarized my understanding in their language
-- [ ] Developer confirmed with explicit "yes"
+- [ ] ALL uncertainties were resolved with explicit answers
+- [ ] Each answer was confirmed by all three parties (developer → MCL → Claude Code)
+- [ ] Developer confirmed full summary with explicit "yes"
 - [ ] English spec was generated
 - [ ] Claude Code summarized its understanding
 - [ ] I translated Claude Code's summary to developer's language
