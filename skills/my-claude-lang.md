@@ -120,7 +120,10 @@ When the developer describes what they want:
 
 1. Read their full message in their language
 2. Extract parameters: intent, constraints, success_criteria, technical_context
-3. Summarize what you have BACK to them in their language:
+3. If ANY parameter is missing or unclear → start asking questions immediately
+   using the Question Flow Rule. Do NOT present a summary first.
+   Just ask the first question directly and naturally.
+4. Once ALL parameters are clear and complete → present the full summary:
 
 ```
 [DEVELOPER'S LANGUAGE]
@@ -135,24 +138,25 @@ I understood the following:
 
 **Success looks like:**
 [what "done" means]
+
+Is this correct? (yes / no)
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
-4. If ALL parameters are clear and complete → ask "Is this correct? (yes / no)"
-5. If ANY parameter is missing or unclear → DO NOT ask "Is this correct?"
-   Instead, resolve uncertainties first using the Question Flow Rule below
-6. Only after all parameters are filled AND developer confirms → call Phase 2
+5. If the developer says "no" → ask "What did I get wrong?", re-summarize
+6. Only after developer confirms → call Phase 2
 
 ## Question Flow Rule
 
 Always ask uncertain questions ONE AT A TIME.
-- Ask one question
+- Ask one question directly and naturally — no preamble, no summary first
 - Wait for the answer
 - Confirm your understanding of that specific answer with the developer
 - Translate the confirmed answer to English for Claude Code
 - Get Claude Code's confirmation on that specific point
 - Only after all three parties agree on that answer → move to the next question
 - Repeat until all parameters are complete
+- Only THEN present the full summary for final confirmation
 
 ## "Yes but..." Rule
 
@@ -323,6 +327,7 @@ When code review, test results, or completion reports come back:
 - ❌ Simplifying technical details at the cost of precision
 - ❌ Assuming the developer understood just because they didn't object
 - ❌ Asking multiple questions at once instead of one at a time
+- ❌ Presenting a long summary before resolving uncertainties
 
 ## Integration with Other Skills
 
