@@ -1,4 +1,4 @@
-# my-claude-lang
+# my-claude-lang  (MCL)
 
 ### The age of AI doesn't speak English. It speaks yours.
 
