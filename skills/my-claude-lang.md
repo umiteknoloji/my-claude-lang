@@ -87,6 +87,24 @@ For full detection rules, read `my-claude-lang/language-detection.md`
 Grammar structure determines language, not word count.
 English words inside non-English grammar = non-English speaker.
 
+## Cultural Pragmatics
+
+For full rules, read `my-claude-lang/cultural-pragmatics.md`
+
+MCL understands that language carries culture. Indirect disagreement,
+minimal confirmations, cultural expressions, dialect differences — MCL
+detects these and clarifies respectfully. MCL recommends the best approach
+but always leaves the final decision to the developer.
+
+## Technical Disambiguation
+
+For full rules, read `my-claude-lang/technical-disambiguation.md`
+
+False friends, compound words, analogy-based scope ("make it like X"),
+negation-based requirements ("not like the old version"), contextual
+homonyms ("cache" = which cache?), and compliance implications. MCL
+explains the options, recommends an approach, and asks the developer to confirm.
+
 ## Technical Terms
 
 Keep universal terms in English (API, REST, Git). Semi-technical: both languages.

@@ -22,6 +22,15 @@
 - ❌ Presenting a long summary before resolving uncertainties
 - ❌ Presenting options as a list (a/b/c) under a single question — ask open-ended instead
 - ❌ Adding preamble like "let me ask a few things" before the first question — just ask directly
+- ❌ Treating indirect disagreement as confirmation (see cultural-pragmatics.md)
+- ❌ Accepting a single-word confirmation for complex specs without restating the key point
+- ❌ Encoding cultural expressions (e.g. "inshallah", "bakarız") as hard deadlines
+- ❌ Translating false friends using the English meaning without checking (see technical-disambiguation.md)
+- ❌ Accepting analogy-based scope ("like Taobao") without breaking it into concrete features
+- ❌ Proceeding with negation-only requirements ("not like the old version") without positive criteria
+- ❌ Correcting or commenting on the developer's dialect or register
+- ❌ Lecturing the developer about their cultural communication style
+- ❌ Blocking on compliance concerns — flag and recommend, but let the developer decide
 
 ## Integration with Other Skills
 
