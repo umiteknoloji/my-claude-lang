@@ -67,8 +67,8 @@ Aşama 3: Claude Code spec'i okuyor ve NE anladığını açıklıyor.
 ### Plugin Olarak
 
 ```bash
-/plugin marketplace add YOUR_GITHUB_USERNAME/my-claude-lang
-/plugin install my-claude-lang@YOUR_GITHUB_USERNAME
+/plugin marketplace add umiteknoloji/my-claude-lang
+/plugin install my-claude-lang@umiteknoloji
 ```
 
 ### Skill Olarak
