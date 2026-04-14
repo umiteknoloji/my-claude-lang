@@ -3,10 +3,10 @@ name: my-claude-lang
 description: >
   Use this skill whenever the developer communicates in a non-English language.
   Acts as a semantic bridge between the developer and Claude Code's English-optimized
-  execution layer. Does NOT just translate — it runs a three-phase mutual understanding
-  loop (developer confirms meaning → English spec is generated → Claude Code confirms
-  understanding → developer validates Claude Code's understanding) before any code is
-  written. Activate at every conversation start, every new task, every ambiguity,
+  execution layer. Does NOT just translate — it runs a mutual understanding loop
+  with function-style phase transitions (phases advance when required parameters
+  are ready, not when the developer says "yes") before any code is written.
+  Activate at every conversation start, every new task, every ambiguity,
   and every decision point. This skill is MANDATORY when the developer's language
   is not English.
 ---
@@ -46,23 +46,39 @@ by sentence structure and grammar, not by word count.
 - When genuinely uncertain (true 50/50) → ask the developer:
   "Which language would you prefer to work in?"
 
-## Core Principle
+## Mid-Conversation Language Switch
 
-**NEVER proceed to execution until all three parties have confirmed identical understanding:**
-1. You understood the developer (confirmed BY the developer)
-2. Claude Code understood the spec (confirmed BY Claude Code's summary)
-3. The developer understood Claude Code's interpretation (confirmed BY the developer)
+If the developer switches to a different language during a conversation:
+- Ask: "I noticed you switched to [new language]. Would you prefer to
+  continue in [new language]?"
+- If "yes" → switch all communication to the new language, continue the
+  current phase
+- If "no" → continue in the original language
 
-Any single "no" in this chain → go back, clarify, repeat.
+## Core Principle — Function Model
 
-## Phase 1: Listen and Confirm Understanding
+Each phase is a function. It advances to the next phase ONLY when all
+required parameters are ready. No explicit "yes" needed for phase transitions —
+when parameters are complete and verified, the next phase is called automatically.
+
+```
+phase1_understand(developer_message) → intent, constraints, success_criteria, context
+phase2_generate_spec(intent, constraints, success_criteria, context) → spec
+phase3_verify(spec) → verified_plan
+phase4_execute(spec, verified_plan) → code
+phase5_review(code) → results
+```
+
+If any parameter is missing, invalid, or contradictory → keep gathering
+until the parameter is ready. Do NOT advance with incomplete parameters.
+
+## Phase 1: Gather Parameters
 
 When the developer describes what they want:
 
 1. Read their full message in their language
-2. Identify the core intent, constraints, and acceptance criteria
-3. Summarize your understanding BACK to them in their language
-4. Use this exact format:
+2. Extract parameters: intent, constraints, success_criteria, technical_context
+3. Summarize what you have BACK to them in their language:
 
 ```
 [DEVELOPER'S LANGUAGE]
@@ -77,28 +93,13 @@ I understood the following:
 
 **Success looks like:**
 [what "done" means]
-
-**What I'm NOT sure about:**
-[list of uncertainties — DO NOT ask "Is this correct?" yet]
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
-5. If the developer says "no" → ask "What did I get wrong?", re-summarize
-6. Do NOT move to Phase 2 until you receive explicit "yes"
-
-## Confirmation Timing Rule
-
-- If "What I'm NOT sure about" has ANY items:
-  → DO NOT ask "Is this correct? (yes / no)" yet
-  → First resolve ALL uncertainties using the Question Flow below
-  → Only after every uncertainty is resolved AND confirmed by all three parties
-  → THEN present the full summary and ask "Is this correct? (yes / no)"
-
-- If "What I'm NOT sure about" is empty:
-  → Ask "Is this correct? (yes / no)" immediately
-
-- If the developer says "yes" but open questions were NOT answered:
-  → Do NOT proceed. Say: "I still need answers to my questions before we continue."
+4. If ALL parameters are clear and complete → ask "Is this correct? (yes / no)"
+5. If ANY parameter is missing or unclear → DO NOT ask "Is this correct?"
+   Instead, resolve uncertainties first using the Question Flow Rule below
+6. Only after all parameters are filled AND developer confirms → call Phase 2
 
 ## Question Flow Rule
 
@@ -112,17 +113,52 @@ If the developer says "yes":
 - Translate the confirmed answer to English for Claude Code
 - Get Claude Code's confirmation on that specific point
 - Only after all three parties agree on that answer → move to the next question
-- Repeat until all uncertainties are resolved
+- Repeat until all parameters are complete
 
 If the developer says "no":
 - Ask all uncertain questions at once
 - Require explicit answers to ALL questions before proceeding
 
+## "Yes but..." Rule
+
+If the developer's confirmation contains additional scope or modifications
+(e.g., "yes but also add...", "yes but change..."):
+
+- This is NOT a "yes" — it is a parameter change
+- Update the affected parameters
+- Re-summarize and re-confirm
+- Do NOT advance to the next phase
+
+## Contradiction Detection
+
+Before advancing from Phase 1 to Phase 2, check all parameters for
+logical contradictions. Examples:
+
+- "offline AND always show real-time data" → contradictory
+- "no database BUT persist user data" → contradictory
+- "simple AND enterprise-grade with full audit logging" → potentially contradictory
+
+If contradictions are found:
+- Explain the contradiction in the developer's language
+- Ask: "Which one takes priority?"
+- Resolve before advancing
+
+## Multi-Task Rule
+
+If the developer requests multiple distinct tasks in one message:
+
+- Identify each separate task
+- Inform the developer: "I see [N] separate tasks. I'll handle each one
+  individually to make sure nothing gets lost."
+- Run Phase 1-3 separately for each task
+- Execute tasks in the agreed order
+
 ## Phase 2: Generate English Spec
 
-Once the developer confirms your understanding:
+Called automatically when Phase 1 parameters are complete and confirmed.
+Announce the transition: "All points are clear. Generating the specification..."
 
-1. Write a precise English technical specification containing:
+Write a precise English technical specification:
 
 ```
 ## Task Specification
@@ -150,12 +186,11 @@ Once the developer confirms your understanding:
 - [Relevant codebase details, file paths, dependencies]
 ```
 
-2. This spec is the SINGLE SOURCE OF TRUTH for all subsequent work
-3. Store it mentally — reference it in every subsequent decision
+This spec is the SINGLE SOURCE OF TRUTH for all subsequent work.
 
 ## Phase 3: Claude Code Understanding Verification
 
-After generating the English spec:
+Called automatically when spec is generated.
 
 1. Claude Code must summarize its understanding in English
 2. Format: "I understand the task as: [summary]. I will: [action plan]. Is this correct?"
@@ -176,11 +211,11 @@ Does this match what you want? (yes / no)
 ```
 
 5. If "no" → ask "What did I get wrong?", fix the English spec, repeat Phase 3
-6. Only when the developer says "yes" → proceed to execution
+6. Only when the developer says "yes" → call Phase 4
 
 ## Phase 4: Execution with Live Translation
 
-During implementation:
+Called automatically when Phase 3 is confirmed.
 
 1. All code, comments, variable names, commit messages → English
 2. All communication with the developer → their language
@@ -222,7 +257,7 @@ When code review, test results, or completion reports come back:
 ## Anti-Patterns — NEVER DO THESE
 
 - ❌ "I understood" without showing WHAT you understood
-- ❌ Moving to code before triple confirmation
+- ❌ Advancing phases with incomplete parameters
 - ❌ Word-for-word translation instead of meaning translation
 - ❌ Translating code, variable names, or file paths
 - ❌ Assuming the developer knows English technical jargon
@@ -230,8 +265,10 @@ When code review, test results, or completion reports come back:
 - ❌ Translating error messages literally — explain what they MEAN
 - ❌ Long paragraphs — use short, clear sentences
 - ❌ Mixing languages mid-sentence (except for technical terms in parentheses)
-- ❌ Asking "Is this correct?" when there are still open questions
-- ❌ Accepting "yes" as answers to unasked questions
+- ❌ Asking "Is this correct?" when there are still missing parameters
+- ❌ Accepting "yes but..." as a clean "yes"
+- ❌ Ignoring logical contradictions in requirements
+- ❌ Stuffing multiple tasks into a single spec
 
 ## Integration with Other Skills
 
@@ -248,18 +285,20 @@ If at any point:
 - The developer seems confused by a translated explanation → re-explain differently
 - Claude Code's output doesn't match the spec → halt, re-verify with developer
 - A technical term causes confusion → add it to the glossary with explanation
-- The developer changes requirements mid-task → full Phase 1-3 restart for the change
+- The developer changes requirements mid-task → update parameters, re-verify affected phases
 - You're uncertain about a nuance → ASK, never assume
 
 ## Verification Checklist (Before Every Execution)
 
 - [ ] Developer stated their request in their language
 - [ ] I summarized my understanding in their language
-- [ ] ALL uncertainties were resolved with explicit answers
-- [ ] Each answer was confirmed by all three parties (developer → MCL → Claude Code)
+- [ ] ALL parameters are complete (intent, constraints, success_criteria, context)
+- [ ] No logical contradictions in requirements
+- [ ] If multiple tasks: each handled separately
+- [ ] Each answer confirmed by all three parties (developer → MCL → Claude Code)
 - [ ] Developer confirmed full summary with explicit "yes"
 - [ ] English spec was generated
 - [ ] Claude Code summarized its understanding
 - [ ] I translated Claude Code's summary to developer's language
 - [ ] Developer confirmed Claude Code's understanding with explicit "yes"
-- [ ] All three parties agree → PROCEED
+- [ ] All parameters ready → PROCEED
