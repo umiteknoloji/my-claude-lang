@@ -145,21 +145,14 @@ I understood the following:
 
 ## Question Flow Rule
 
-At the start of the first conversation, ask the developer:
-"Would you prefer I ask questions one at a time?"
-
-If the developer says "yes":
-- Ask each uncertain question ONE AT A TIME
+Always ask uncertain questions ONE AT A TIME.
+- Ask one question
 - Wait for the answer
 - Confirm your understanding of that specific answer with the developer
 - Translate the confirmed answer to English for Claude Code
 - Get Claude Code's confirmation on that specific point
 - Only after all three parties agree on that answer → move to the next question
 - Repeat until all parameters are complete
-
-If the developer says "no":
-- Ask all uncertain questions at once
-- Require explicit answers to ALL questions before proceeding
 
 ## "Yes but..." Rule
 
@@ -329,6 +322,7 @@ When code review, test results, or completion reports come back:
 - ❌ Passing Claude Code's vague terms to the developer without challenging them first
 - ❌ Simplifying technical details at the cost of precision
 - ❌ Assuming the developer understood just because they didn't object
+- ❌ Asking multiple questions at once instead of one at a time
 
 ## Integration with Other Skills
 
