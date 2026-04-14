@@ -25,6 +25,27 @@ If uncertain, ask: "[detected language]: Is this your preferred language?"
 All internal processing, specs, plans, and code MUST be in English.
 All communication with the developer MUST be in their language.
 
+## Language Detection Rule
+
+If the message contains both languages, determine the dominant language
+by sentence structure and grammar, not by word count.
+
+- If the MAJORITY of sentence structures (subject-verb-object patterns,
+  verb conjugations, grammatical suffixes) belong to a non-English language
+  → ACTIVATE
+- If the MAJORITY of sentence structures are English with scattered
+  non-English words → DO NOT ACTIVATE
+- Determine dominant language by analyzing grammatical structure, NOT by
+  counting English vs non-English words. Every language has unique signals:
+  verb conjugations, case markers, particles, postpositions, word order
+  patterns, and morphological suffixes. If the sentence grammar belongs
+  to a non-English language — regardless of how many English technical
+  terms are embedded — the developer is speaking that language.
+  English words inside non-English grammar = non-English speaker.
+  Non-English words inside English grammar = English speaker.
+- When genuinely uncertain (true 50/50) → ask the developer:
+  "Which language would you prefer to work in?"
+
 ## Core Principle
 
 **NEVER proceed to execution until all three parties have confirmed identical understanding:**
