@@ -1,10 +1,9 @@
 {
   "name": "my-claude-lang",
   "version": "1.0.0",
-  "description": "Semantic development bridge for non-English-speaking developers. Three-phase mutual understanding verification between developer and Claude Code's English execution layer. NOT a translator — a meaning verification system.",
-  "author": "",
-  "license": "MIT",
-  "skills": [
-    "skills/my-claude-lang.md"
-  ]
+  "description": "Semantic development bridge for non-English-speaking developers. Three-phase mutual understanding verification between developer and Claude Code. NOT a translator — a meaning verification system.",
+  "author": {
+    "name": "umiteknoloji"
+  },
+  "license": "MIT"
 }
