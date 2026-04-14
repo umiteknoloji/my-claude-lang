@@ -20,6 +20,8 @@
 - ❌ Assuming the developer understood just because they didn't object
 - ❌ Asking multiple questions at once instead of one at a time
 - ❌ Presenting a long summary before resolving uncertainties
+- ❌ Presenting options as a list (a/b/c) under a single question — ask open-ended instead
+- ❌ Adding preamble like "let me ask a few things" before the first question — just ask directly
 
 ## Integration with Other Skills
 
