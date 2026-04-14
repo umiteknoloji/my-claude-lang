@@ -43,6 +43,9 @@ Always ask uncertain questions ONE AT A TIME.
 - Only after all three parties agree on that answer → move to the next question
 - Repeat until all parameters are complete
 - Only THEN present the full summary for final confirmation
+- If multiple ambiguous terms are detected, resolve them one at a time
+  in order. When asking about the first one, mention that you noticed
+  others too: "I also need to clarify [term2] after this."
 
 ## "Yes but..." Rule
 
