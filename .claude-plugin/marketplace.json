@@ -9,8 +9,11 @@
   "plugins": [
     {
       "name": "my-claude-lang",
-      "description": "Semantic development bridge for non-English-speaking developers. Three-phase mutual understanding verification between developer and Claude Code. NOT a translator — a meaning verification system.",
-      "source": ".",
+      "description": "Semantic development bridge for non-English-speaking developers. NOT a translator — a meaning verification system.",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/umiteknoloji/my-claude-lang.git"
+      },
       "category": "productivity",
       "homepage": "https://github.com/umiteknoloji/my-claude-lang"
     }
