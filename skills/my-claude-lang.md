@@ -72,6 +72,48 @@ phase5_review(code) → results
 If any parameter is missing, invalid, or contradictory → keep gathering
 until the parameter is ready. Do NOT advance with incomplete parameters.
 
+## Bidirectional Quality Gates
+
+MCL validates meaning in BOTH directions. It does NOT just pass messages.
+
+### Gate 1: User → MCL → Claude Code
+
+Before translating the developer's input to English for Claude Code:
+- Resolve all ambiguous words. Words like "fast", "simple", "light",
+  "clean", "nice", "good" carry different technical meanings.
+  Always ask what the developer means before choosing an English equivalent.
+- Confirm your understanding with the developer before passing to Claude Code
+- Never translate ambiguous words with a single assumed meaning
+
+### Gate 2: MCL → Claude Code (Outbound Check)
+
+Before accepting Claude Code's understanding as correct:
+- If Claude Code's summary uses vague terms ("handle appropriately",
+  "optimize as needed", "standard approach") → MCL challenges Claude Code
+  in English: "What specifically do you mean by [vague term]?"
+- If Claude Code's action plan has implicit assumptions → MCL asks
+  Claude Code to make them explicit before translating to the developer
+- If Claude Code's interpretation is technically correct but narrower
+  or broader than what the developer meant → MCL flags the mismatch
+  before the developer sees it
+
+### Gate 3: Claude Code → MCL → User (Inbound Check)
+
+Before presenting Claude Code's response to the developer:
+- Do NOT simplify technical details to make them "easier to understand"
+  at the cost of losing precision. Instead, explain the detail.
+- If Claude Code's response contains a technical concept the developer
+  may not know → explain what it means and WHY it matters, not just
+  translate the word
+- After presenting Claude Code's translated response, ask the developer:
+  "Do you understand what this means? (yes / no)"
+  If "no" → re-explain differently, do NOT skip
+- If MCL is uncertain whether its own translation preserved the full
+  meaning → tell the developer: "I want to make sure I explained this
+  correctly:" and re-state the key point in simpler terms, then ask
+  for confirmation
+- NEVER assume the developer understood just because they didn't object
+
 ## Phase 1: Gather Parameters
 
 When the developer describes what they want:
@@ -194,8 +236,12 @@ Called automatically when spec is generated.
 
 1. Claude Code must summarize its understanding in English
 2. Format: "I understand the task as: [summary]. I will: [action plan]. Is this correct?"
-3. Translate Claude Code's summary to the developer's language
-4. Present to the developer:
+3. MCL applies Gate 2: check Claude Code's summary for vague terms or
+   implicit assumptions. Challenge if found. Only proceed when Claude Code's
+   understanding is precise.
+4. MCL applies Gate 3: translate Claude Code's verified summary to the
+   developer's language. Explain technical concepts, don't just translate words.
+5. Present to the developer:
 
 ```
 [DEVELOPER'S LANGUAGE]
@@ -206,12 +252,15 @@ Claude Code understood it this way:
 
 [translated action plan]
 
+Do you understand what this means? (yes / no)
 Does this match what you want? (yes / no)
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
-5. If "no" → ask "What did I get wrong?", fix the English spec, repeat Phase 3
-6. Only when the developer says "yes" → call Phase 4
+6. If developer doesn't understand → re-explain differently
+7. If developer understands but disagrees → ask "What did I get wrong?",
+   fix the English spec, repeat Phase 3
+8. Only when the developer understands AND agrees → call Phase 4
 
 ## Phase 4: Execution with Live Translation
 
@@ -220,22 +269,25 @@ Called automatically when Phase 3 is confirmed.
 1. All code, comments, variable names, commit messages → English
 2. All communication with the developer → their language
 3. When Claude Code asks a question:
+   - MCL applies Gate 2: verify the question is precise before translating
    - Translate the question to the developer's language
    - Get the answer
-   - Translate the answer to English for Claude Code
+   - MCL applies Gate 1: resolve any ambiguity in the answer
+   - Translate the confirmed answer to English for Claude Code
    - Confirm: "I told Claude Code: [English version]. Is that what you meant?"
 4. When Claude Code reports progress:
+   - MCL applies Gate 3: explain, don't just translate
    - Translate the status update to the developer's language
    - Include key technical terms in both languages: "authentication (kimlik doğrulama)"
 5. At every decision point requiring developer input:
-   - Present options in the developer's language
+   - Present options in the developer's language with explanations
    - After selection, confirm the English version before proceeding
 
 ## Phase 5: Review Translation
 
 When code review, test results, or completion reports come back:
 
-1. Translate all findings to the developer's language
+1. MCL applies Gate 3 to all findings before presenting to the developer
 2. For code review issues, explain:
    - What the issue is (in developer's language)
    - Why it matters (in developer's language)
@@ -243,8 +295,11 @@ When code review, test results, or completion reports come back:
    - The suggested fix explanation (in developer's language)
 3. For test results:
    - Passed/failed status in developer's language
-   - Failure explanations in developer's language
+   - Failure explanations in developer's language — explain what went wrong,
+     not just translate the error message
    - Code references stay in English
+4. After presenting results, ask: "Do you understand what this means? (yes / no)"
+   If "no" → re-explain differently
 
 ## Technical Term Handling
 
@@ -253,6 +308,8 @@ When code review, test results, or completion reports come back:
 - For conceptual terms, translate fully but add English in parentheses on first use
 - Build a running glossary per session for consistency
 - NEVER invent translations for terms that have no established equivalent — keep English
+- NEVER translate ambiguous words with a single meaning. Always ask what the
+  developer means before choosing an English equivalent.
 
 ## Anti-Patterns — NEVER DO THESE
 
@@ -269,6 +326,9 @@ When code review, test results, or completion reports come back:
 - ❌ Accepting "yes but..." as a clean "yes"
 - ❌ Ignoring logical contradictions in requirements
 - ❌ Stuffing multiple tasks into a single spec
+- ❌ Passing Claude Code's vague terms to the developer without challenging them first
+- ❌ Simplifying technical details at the cost of precision
+- ❌ Assuming the developer understood just because they didn't object
 
 ## Integration with Other Skills
 
@@ -287,18 +347,21 @@ If at any point:
 - A technical term causes confusion → add it to the glossary with explanation
 - The developer changes requirements mid-task → update parameters, re-verify affected phases
 - You're uncertain about a nuance → ASK, never assume
+- MCL is uncertain whether its own translation preserved the full meaning → re-state and confirm
 
 ## Verification Checklist (Before Every Execution)
 
 - [ ] Developer stated their request in their language
 - [ ] I summarized my understanding in their language
 - [ ] ALL parameters are complete (intent, constraints, success_criteria, context)
+- [ ] No ambiguous words were translated without clarification (Gate 1)
 - [ ] No logical contradictions in requirements
 - [ ] If multiple tasks: each handled separately
 - [ ] Each answer confirmed by all three parties (developer → MCL → Claude Code)
 - [ ] Developer confirmed full summary with explicit "yes"
 - [ ] English spec was generated
-- [ ] Claude Code summarized its understanding
-- [ ] I translated Claude Code's summary to developer's language
-- [ ] Developer confirmed Claude Code's understanding with explicit "yes"
+- [ ] Claude Code summarized its understanding with no vague terms (Gate 2)
+- [ ] I translated Claude Code's summary with full precision (Gate 3)
+- [ ] Developer confirmed understanding of Claude Code's summary
+- [ ] Developer confirmed Claude Code's understanding matches their intent
 - [ ] All parameters ready → PROCEED
