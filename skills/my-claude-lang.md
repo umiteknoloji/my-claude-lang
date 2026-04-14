@@ -60,11 +60,11 @@ I understood the following:
 **What I'm NOT sure about:**
 [any ambiguities — ask specific questions]
 
-Is this correct? (yes / no / partially — please explain)
+Is this correct? (yes / no)
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
-5. If the developer says "no" or "partially" → ask targeted questions, re-summarize
+5. If the developer says "no" → ask "What did I get wrong?", re-summarize
 6. Do NOT move to Phase 2 until you receive explicit "yes"
 
 ## Phase 2: Generate English Spec
@@ -120,11 +120,11 @@ Claude Code understood it this way:
 
 [translated action plan]
 
-Does this match what you want? (yes / no / partially)
+Does this match what you want? (yes / no)
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
-5. If "no" or "partially" → identify the mismatch, update the English spec, repeat Phase 3
+5. If "no" → ask "What did I get wrong?", fix the English spec, repeat Phase 3
 6. Only when the developer says "yes" → proceed to execution
 
 ## Phase 4: Execution with Live Translation
