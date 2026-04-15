@@ -32,6 +32,7 @@
 - ❌ Assuming the developer understood just because they didn't object
 - ❌ Asking multiple questions at once instead of one at a time
 - ❌ Continuing to work after asking a question — if you asked a question, your response ENDS there. No file reading, no exploring, no tool calls, no summaries after the question
+- ❌ Presenting multiple summaries — there is exactly ONE summary at the end of Phase 1 when all parameters are ready. No intermediate summaries, no "here's what I have so far", no partial recaps during question gathering
 - ❌ Presenting a long summary before resolving uncertainties
 - ❌ Presenting options as a list (a/b/c) under a single question — ask open-ended instead
 - ❌ Adding preamble like "let me ask a few things", "I need to clarify a few things:", "let me understand better:" before asking — just ask the question directly. No introduction. No framing. The question IS the response.

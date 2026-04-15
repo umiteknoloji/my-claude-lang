@@ -9,8 +9,12 @@ When the developer describes what they want:
 3. If ANY parameter is missing or unclear → start asking questions immediately
    using the Question Flow Rule. Do NOT present a summary first.
    Just ask the first question directly and naturally.
-4. Once ALL parameters are clear and complete → present the full summary
-   AND ask "Is this correct? (yes / no)":
+4. Once ALL parameters are clear and complete → present ONE summary
+   AND ask "Is this correct? (yes / no)".
+   Do NOT present intermediate summaries during question gathering.
+   Do NOT summarize twice. There is exactly ONE summary — when all
+   parameters are ready. No partial summaries, no "here's what I
+   have so far" — just questions until done, then one final summary:
 
 ```
 [DEVELOPER'S LANGUAGE]
