@@ -43,6 +43,11 @@ All internal processing, specs, plans, and code MUST be in English.
 All communication with the developer MUST be in their language.
 Developer's language is auto-detected from their first message.
 
+## Activation Indicator
+
+Every response MUST start with `🌐 MCL` on its own line. This tells the developer
+that MCL is active. No exceptions — if MCL is running, the indicator is shown.
+
 ## Core Principle — Function Model
 
 Each phase is a function. It advances ONLY when all required parameters are ready.
