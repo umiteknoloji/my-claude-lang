@@ -145,12 +145,34 @@ Critical ones: never advance with incomplete parameters, never ask "Is this corr
 with missing parameters, never accept "yes but..." as clean "yes", never pass
 vague terms without challenging, never ask multiple questions at once.
 
+## Mandatory Phase Execution
+
+ALL phases MUST be executed. No phase can be skipped. This is the core principle:
+
+- **Phase 1**: MUST gather all parameters before advancing. No exceptions.
+- **Phase 2**: MUST generate an English spec internally. This is how meaning transfers
+  from the developer's language to English. Without this step, Claude Code is just
+  guessing from a Turkish/Japanese/etc. message — not working from a verified spec.
+- **Phase 3**: MUST verify understanding. Claude Code reads the spec and summarizes
+  what it understood. MCL checks this summary and explains it to the developer.
+  The developer MUST confirm before Phase 4.
+- **Phase 4**: All execution happens from the verified spec. Mid-execution questions
+  go through the bridge (English ↔ developer's language).
+- **Phase 5**: Results are explained, not just listed.
+
+Skipping any phase — especially Phase 2 and 3 — breaks the entire bridge.
+The three-way communication (User ↔ MCL ↔ Claude Code) only works when all
+phases run. Otherwise MCL is just a translator, not a meaning verification system.
+
 ## Test Mode
 
-Activated when the developer starts their message with `(mcl-test)`.
+Activated when the developer starts their message with `(mcl)`.
 
-When test mode is active, write a `mcl-test.log` file in the project root directory.
-Log EVERY phase of the conversation with this structure:
+When test mode is active, BEFORE doing anything else, create a `mcl-test.log` file
+in the project root directory. Write to this file FIRST, then respond to the developer.
+This is mandatory — do not skip the log.
+
+Log EVERY phase with this structure. Update the log after EVERY exchange:
 
 ```
 === MCL TEST LOG ===
@@ -176,21 +198,24 @@ Developer Language: [detected language]
 
 --- PHASE 2: Generate Spec ---
 [MCL → CLAUDE CODE] (English):
-  > (full spec sent to Claude Code)
+  > (full English spec — What, Why, Acceptance Criteria, Constraints)
+
+[CLAUDE CODE understanding] (English):
+  > (Claude Code's interpretation of the spec)
 
 --- PHASE 3: Verify Understanding ---
-[CLAUDE CODE → MCL] (English):
-  > (Claude Code's understanding summary)
-
 [Gate 3 applied]: yes/no — (what was explained vs just translated)
 
 [MCL → USER] (developer's language):
-  > (explanation sent to developer)
+  > (explanation of what will be built, sent to developer)
 
 [USER confirmation]: yes/no/correction
 
 --- PHASE 4: Execute ---
-[CLAUDE CODE questions] (English):
+[Execution from spec] (English):
+  > (what Claude Code is building, based on the spec)
+
+[CLAUDE CODE → MCL questions] (English):
   > (any questions during execution)
 
 [MCL → USER] (developer's language):
@@ -200,16 +225,16 @@ Developer Language: [detected language]
   > (developer's answer)
 
 [MCL → CLAUDE CODE] (English):
-  > (translated answer)
+  > (translated answer back to English)
 
 --- PHASE 5: Review ---
 [Results summary] (English):
-  > (what was built)
+  > (what was built, in English)
 
 [MCL → USER] (developer's language):
-  > (explained results)
+  > (explained results in developer's language)
 ```
 
-Update the log file after EVERY exchange. Each new interaction appends to the log.
-Test mode does NOT change MCL behavior — MCL works exactly the same, it just logs everything.
-The log makes the three-way communication visible: User↔MCL (developer's language) and MCL↔Claude Code (English).
+Test mode does NOT change MCL behavior — all phases run exactly the same.
+The only difference: the internal English processing (normally invisible) is written to the log.
+This makes the three-way bridge visible: User↔MCL (developer's language) and MCL↔Claude Code (English).
