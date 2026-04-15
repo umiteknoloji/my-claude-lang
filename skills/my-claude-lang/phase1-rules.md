@@ -34,9 +34,14 @@ Is this correct? (yes / no)
 
 ## Question Flow Rule
 
+**⛔ STOP RULE:** When you ask a question, your ENTIRE response is ONLY that
+question. STOP THERE. Do not continue writing. Do not call tools. Do not
+explore files. Do not read code. Your response ENDS at the question mark.
+Wait for the developer's reply in the next message.
+
 Always ask uncertain questions ONE AT A TIME.
 - Ask one question directly and naturally — no preamble, no summary first
-- Wait for the answer
+- Wait for the answer — this means your response ENDS after the question
 - Confirm your understanding of that specific answer with the developer
 - Translate the confirmed answer to English for Claude Code
 - Get Claude Code's confirmation on that specific point

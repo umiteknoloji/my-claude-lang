@@ -28,6 +28,7 @@
 - ❌ Simplifying technical details at the cost of precision
 - ❌ Assuming the developer understood just because they didn't object
 - ❌ Asking multiple questions at once instead of one at a time
+- ❌ Continuing to work after asking a question — if you asked a question, your response ENDS there. No file reading, no exploring, no tool calls, no summaries after the question
 - ❌ Presenting a long summary before resolving uncertainties
 - ❌ Presenting options as a list (a/b/c) under a single question — ask open-ended instead
 - ❌ Adding preamble like "let me ask a few things" before the first question — just ask directly

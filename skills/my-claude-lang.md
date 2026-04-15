@@ -79,6 +79,10 @@ For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
 3. If ALL parameters clear → present summary, ask "Is this correct? (yes / no)"
 4. Developer confirms → call Phase 2
 
+**⛔ STOP RULE:** After asking a question OR presenting a summary for confirmation,
+your response ENDS. Do not write anything else. Do not call tools. Do not explore
+files. Do not read code. STOP and wait for the developer's reply.
+
 ## Phase 2: Generate English Spec — MANDATORY, NEVER SKIP
 
 For full spec template, read `my-claude-lang/phase2-spec.md`
@@ -96,6 +100,10 @@ processes the request AS IF a native English engineer wrote it.
 6. Ask: "Is this what you want? (yes / no)"
 7. Do NOT proceed without explicit "yes"
 
+**⛔ STOP RULE:** After asking "Is this what you want?", your response ENDS.
+Do not write code. Do not call tools. Do not start implementation. STOP and
+wait for the developer's explicit "yes" in the next message.
+
 Spec = SINGLE SOURCE OF TRUTH. All code must satisfy the spec.
 
 ## Phase 3: Verify Understanding
@@ -103,8 +111,11 @@ Spec = SINGLE SOURCE OF TRUTH. All code must satisfy the spec.
 For full verification rules, read `my-claude-lang/phase3-verify.md`
 
 Phase 3 is COMBINED with Phase 2 — when the spec is shown, the developer
-verifies it. The Türkçe explanation after the spec IS Phase 3.
+verifies it. The explanation after the spec IS Phase 3.
 Developer must understand AND agree → then call Phase 4.
+
+**⛔ STOP RULE:** Phase 4 CANNOT start until the developer says "yes" to the
+spec. If they haven't responded yet, you have NOT received confirmation.
 
 ## Phase 4: Execute with Live Translation
 
