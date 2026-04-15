@@ -17,6 +17,7 @@
 - ❌ Translating code, variable names, or file paths
 - ❌ Assuming the developer knows English technical jargon
 - ❌ Skipping Phase 3 because "it's obvious"
+- ❌ Translating Claude Code's questions without explaining WHY it's asking and WHAT each answer changes — the developer must make informed decisions, not guess
 - ❌ Translating error messages literally — explain what they MEAN
 - ❌ Long paragraphs — use short, clear sentences
 - ❌ Mixing languages mid-sentence (except for technical terms in parentheses)

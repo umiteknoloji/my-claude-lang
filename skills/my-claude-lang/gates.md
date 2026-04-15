@@ -35,6 +35,14 @@ Before presenting Claude Code's response to the developer:
 - If Claude Code's response contains a technical concept the developer
   may not know → explain what it means and WHY it matters, not just
   translate the word
+- **QUESTION CONTEXT RULE:** When Claude Code asks a question (including
+  yes/no confirmations), MCL must add two things after translating:
+  1. **Why this is being asked** — one sentence: what Claude needs to decide
+  2. **What each answer changes** — brief: "If you say X → this happens.
+     If you say Y → that happens."
+  This does NOT apply to MCL's own questions (Phase 1 parameter gathering) —
+  those are already in the developer's language and MCL knows the context.
+  This ONLY applies to questions originating from Claude Code's execution.
 - After presenting Claude Code's translated response, ask the developer:
   "Do you understand what this means? (yes / no)"
   If "no" → re-explain differently, do NOT skip

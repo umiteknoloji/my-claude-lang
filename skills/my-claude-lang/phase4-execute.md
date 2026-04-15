@@ -7,6 +7,8 @@ Called automatically when Phase 3 is confirmed.
 3. When Claude Code asks a question:
    - MCL applies Gate 2: verify the question is precise before translating
    - Translate the question to the developer's language
+   - Add context: WHY Claude is asking this + WHAT each answer changes
+     (see Gate 3 Question Context Rule)
    - Get the answer
    - MCL applies Gate 1: resolve any ambiguity in the answer
    - Translate the confirmed answer to English for Claude Code

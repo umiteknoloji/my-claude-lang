@@ -125,6 +125,8 @@ For full execution rules, read `my-claude-lang/phase4-execute.md`
 
 All code in English. All communication in developer's language.
 Every question/answer goes through Gate 1, 2, 3.
+When Claude Code asks a question, MCL adds context: WHY it's asking +
+WHAT each answer changes. The developer decides with full information.
 
 ## Phase 5: Review Translation
 
