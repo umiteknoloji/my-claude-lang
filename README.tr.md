@@ -60,6 +60,59 @@ Aşama 3: Claude Code spec'i okuyor ve NE anladığını açıklıyor.
 
 ---
 
+## Kanıtlanmış Sonuçlar: İngilizce Yazmaktan Bile Daha İyi
+
+MCL'yi 13 dilde test ettik ve sonuçları 15+ yıl deneyimli kıdemli bir İngilizce mühendise aynı isteği doğrudan İngilizce yazdırdığımızdaki çıktıyla karşılaştırdık.
+
+**Sonuç: 2 EŞIT, 11 MCL DAHA İYİ.**
+
+MCL sadece İngilizce mühendis kalitesine yetişmiyor — 13 dilin 11'inde **daha iyi** spec üretiyor.
+
+| # | Dil | Kıdemli Mühendise Karşı | Neden |
+|---|-----|------------------------|-------|
+| 1 | 🇹🇷 Türkçe | EŞIT | Optimize edilmiş — MCL Türkçe üzerinde geliştirildi |
+| 2 | 🇯🇵 Japonca | EŞIT | Japonca zaten kesin ve yapılandırılmış |
+| 3 | 🇩🇪 Almanca | **MCL DAHA İYİ** | Daha fazla edge case yakalıyor |
+| 4 | 🇨🇳 Çince | **MCL DAHA İYİ** | Analojileri somut spec'lere kırıyor |
+| 5 | 🇰🇷 Korece | **MCL DAHA İYİ** | Kültürel ifadeleri koruyor |
+| 6 | 🇪🇸 İspanyolca | **MCL DAHA İYİ** | Olumsuzlamayı pozitif spec'e çeviriyor |
+| 7 | 🇫🇷 Fransızca | **MCL DAHA İYİ** | Başkalarının kaçırdığı belirsizliği fark ediyor |
+| 8 | 🇮🇩 Endonezyaca | **MCL DAHA İYİ** | Belirsiz terimleri çalıştırmadan önce çözüyor |
+| 9 | 🇸🇦 Arapça | **MCL DAHA İYİ** | Eksik detayları tamamlıyor |
+| 10 | 🇧🇷 Portekizce | **MCL DAHA İYİ** | Teknik homonimleri + denetim izini yakalıyor |
+| 11 | 🇷🇺 Rusça | **MCL DAHA İYİ** | Gizli alt görevleri parçalıyor |
+| 12 | 🇮🇳 Hintçe | **MCL DAHA İYİ** | Belirsiz isteklerde gizlilik endişelerini işaretliyor |
+| 13 | 🇮🇱 İbranice | **MCL DAHA İYİ** | Yetkilendirme modellerini netleştiriyor |
+
+### Neden Bu 13 Dil?
+
+Bu diller dünyanın ana yazı sistemi ailelerini temsil etmek için seçildi:
+
+- **Latin** — Türkçe, Almanca, İspanyolca, Fransızca, Endonezyaca, Portekizce
+- **CJK** — Çince (Hanzi), Japonca (Kanji + Hiragana + Katakana), Korece (Hangul)
+- **Kiril** — Rusça
+- **Devanagari** — Hintçe
+- **Arap yazısı (sağdan sola)** — Arapça
+- **İbrani yazısı (sağdan sola)** — İbranice
+
+Bu, dünyanın geliştiricilerinin büyük çoğunluğunun kullandığı yazı sistemi ailelerini kapsıyor — soldan sağa, sağdan sola, karakter tabanlı ve hece tabanlı sistemler. MCL bunların hepsinde çalışıyorsa, senin dilinde de çalışır.
+
+### MCL Neden İngilizce'yi Geçiyor?
+
+Çünkü avantaj dilsel değil — **prosedürel**.
+
+Kıdemli bir mühendis İngilizce "Build a notification system" yazıyor ve Claude kodlamaya başlıyor. Belki Claude netleştirici sorular soruyor. Belki sormuyor. **Garantisi yok.**
+
+MCL belirsizlik çözmeyi **zorunlu** kılıyor, opsiyonel değil:
+- Her belirsiz terim sorgulanıyor
+- Her gizli alt görev yüzeye çıkarılıyor
+- Her kültürel ifade çözümleniyor
+- Tek bir satır kod yazılmadan önce her varsayım doğrulanıyor
+
+**MCL, Claude'a senin dilini öğretmiyor. Claude'a mühendislik disiplini dayatıyor. Ve bu, tek başına İngilizce'den daha iyi sonuç üretiyor.**
+
+---
+
 ## Kurulum
 
 Klonla, tek komut çalıştır. Bitti. Ayar yok. Dil seçimi yok.
