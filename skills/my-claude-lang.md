@@ -77,11 +77,13 @@ For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
 1. Read developer's message, extract parameters
 2. If ANY parameter unclear → ask questions ONE AT A TIME, no summary first
 3. If ALL parameters clear → present summary, ask "Is this correct? (yes / no)"
-4. Developer confirms → call Phase 2
+4. Developer says "yes" → THEN call Phase 2. Not before.
 
 **⛔ STOP RULE:** After asking a question OR presenting a summary for confirmation,
 your response ENDS. Do not write anything else. Do not call tools. Do not explore
-files. Do not read code. STOP and wait for the developer's reply.
+files. Do not read code. Do not say "I'll prepare the spec now." STOP and wait
+for the developer's explicit "yes" in the next message. The summary is NOT
+permission to start Phase 2 — only the developer's "yes" is.
 
 ## Phase 2: Generate English Spec — MANDATORY, NEVER SKIP
 

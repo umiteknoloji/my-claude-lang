@@ -9,7 +9,8 @@ When the developer describes what they want:
 3. If ANY parameter is missing or unclear → start asking questions immediately
    using the Question Flow Rule. Do NOT present a summary first.
    Just ask the first question directly and naturally.
-4. Once ALL parameters are clear and complete → present the full summary:
+4. Once ALL parameters are clear and complete → present the full summary
+   AND ask "Is this correct? (yes / no)":
 
 ```
 [DEVELOPER'S LANGUAGE]
@@ -29,8 +30,13 @@ Is this correct? (yes / no)
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
+**⛔ STOP RULE:** After presenting this summary, your response ENDS.
+Do NOT read files. Do NOT explore code. Do NOT start writing the spec.
+Do NOT say "I'll prepare the spec now." STOP and wait for the developer
+to say "yes" or "no." The summary + "Is this correct?" is the ENTIRE response.
+
 5. If the developer says "no" → ask "What did I get wrong?", re-summarize
-6. Only after developer confirms → call Phase 2
+6. Only after developer explicitly confirms with "yes" → call Phase 2
 
 ## Question Flow Rule
 

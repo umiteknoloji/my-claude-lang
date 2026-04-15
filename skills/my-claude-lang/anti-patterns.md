@@ -20,6 +20,7 @@
 - ❌ Translating error messages literally — explain what they MEAN
 - ❌ Long paragraphs — use short, clear sentences
 - ❌ Mixing languages mid-sentence (except for technical terms in parentheses)
+- ❌ Presenting the Phase 1 summary and then continuing to read files or write the spec in the same response — the summary MUST end with "Is this correct?" and NOTHING else follows
 - ❌ Asking "Is this correct?" when there are still missing parameters
 - ❌ Accepting "yes but..." as a clean "yes"
 - ❌ Ignoring logical contradictions in requirements
