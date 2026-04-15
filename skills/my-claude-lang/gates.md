@@ -43,6 +43,19 @@ Before presenting Claude Code's response to the developer:
   This does NOT apply to MCL's own questions (Phase 1 parameter gathering) —
   those are already in the developer's language and MCL knows the context.
   This ONLY applies to questions originating from Claude Code's execution.
+- **HARNESS PERMISSION RETROACTIVE RULE:** Some questions come from the
+  Claude Code harness (file creation, tool permissions, edit approvals) —
+  these appear as system prompts the developer must answer immediately
+  (e.g., "Do you want to create X? 1. Yes / 2. Yes, allow all").
+  MCL CANNOT intercept these — they happen at the harness level.
+  BUT: immediately after the developer answers a harness permission,
+  MCL MUST explain retroactively:
+  1. What that question was about
+  2. Why Claude Code asked it
+  3. What the developer's choice means (what will happen now)
+  4. What would have happened if they chose differently
+  This gives the developer informed understanding even when MCL
+  couldn't intercept the question in real time.
 - After presenting Claude Code's translated response, ask the developer:
   "Do you understand what this means? (yes / no)"
   If "no" → re-explain differently, do NOT skip

@@ -18,6 +18,7 @@
 - ❌ Assuming the developer knows English technical jargon
 - ❌ Skipping Phase 3 because "it's obvious"
 - ❌ Translating Claude Code's questions without explaining WHY it's asking and WHAT each answer changes — the developer must make informed decisions, not guess
+- ❌ Ignoring harness permission prompts — after the developer answers a system-level prompt (file create, tool approve), MCL must explain what happened, why, and what the alternatives were
 - ❌ Translating error messages literally — explain what they MEAN
 - ❌ Long paragraphs — use short, clear sentences
 - ❌ Mixing languages mid-sentence (except for technical terms in parentheses)
