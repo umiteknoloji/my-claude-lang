@@ -144,3 +144,72 @@ Never translate ambiguous words without asking. Never invent translations.
 Critical ones: never advance with incomplete parameters, never ask "Is this correct?"
 with missing parameters, never accept "yes but..." as clean "yes", never pass
 vague terms without challenging, never ask multiple questions at once.
+
+## Test Mode
+
+Activated when the developer starts their message with `(mcl-test)`.
+
+When test mode is active, write a `mcl-test.log` file in the project root directory.
+Log EVERY phase of the conversation with this structure:
+
+```
+=== MCL TEST LOG ===
+Timestamp: [current date/time]
+Developer Language: [detected language]
+
+--- PHASE 1: Gather Parameters ---
+[USER → MCL] (developer's language):
+  > (exact developer message)
+
+[MCL internal understanding] (English):
+  > intent: ...
+  > constraints: ...
+  > success_criteria: ...
+  > context: ...
+  > missing_parameters: ...
+
+[MCL → USER] (developer's language):
+  > (question or summary sent to developer)
+
+[Gate 1 applied]: yes/no — (what was resolved)
+[Gate 2 applied]: yes/no — (what was challenged)
+
+--- PHASE 2: Generate Spec ---
+[MCL → CLAUDE CODE] (English):
+  > (full spec sent to Claude Code)
+
+--- PHASE 3: Verify Understanding ---
+[CLAUDE CODE → MCL] (English):
+  > (Claude Code's understanding summary)
+
+[Gate 3 applied]: yes/no — (what was explained vs just translated)
+
+[MCL → USER] (developer's language):
+  > (explanation sent to developer)
+
+[USER confirmation]: yes/no/correction
+
+--- PHASE 4: Execute ---
+[CLAUDE CODE questions] (English):
+  > (any questions during execution)
+
+[MCL → USER] (developer's language):
+  > (translated + explained question)
+
+[USER → MCL] (developer's language):
+  > (developer's answer)
+
+[MCL → CLAUDE CODE] (English):
+  > (translated answer)
+
+--- PHASE 5: Review ---
+[Results summary] (English):
+  > (what was built)
+
+[MCL → USER] (developer's language):
+  > (explained results)
+```
+
+Update the log file after EVERY exchange. Each new interaction appends to the log.
+Test mode does NOT change MCL behavior — MCL works exactly the same, it just logs everything.
+The log makes the three-way communication visible: User↔MCL (developer's language) and MCL↔Claude Code (English).
