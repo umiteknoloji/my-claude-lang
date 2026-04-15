@@ -62,30 +62,19 @@ Aşama 3: Claude Code spec'i okuyor ve NE anladığını açıklıyor.
 
 ## Kurulum
 
-İndir. Kur. Bitti. Ayar yok. Dil seçimi yok.
-
-### Plugin Olarak
+Klonla, tek komut çalıştır. Bitti. Ayar yok. Dil seçimi yok.
 
 ```bash
-/plugin marketplace add umiteknoloji/my-claude-lang
-/plugin install my-claude-lang@umiteknoloji
+git clone https://github.com/umiteknoloji/my-claude-lang.git
+bash my-claude-lang/setup.sh
 ```
 
-### Skill Olarak
+Bu her şeyi global olarak kurar:
+- **Skill dosyaları** → `~/.claude/skills/my-claude-lang/` (MCL kuralları, kapılar, fazlar)
+- **Otomatik aktivasyon hook'u** → `~/.claude/hooks/mcl-activate.sh` (İngilizce olmayan girdiyi algılar)
+- **Hook konfigürasyonu** → `~/.claude/settings.json` (hook'u Claude Code'a bağlar)
 
-```bash
-cp my-claude-lang/SKILL.md ~/.claude/skills/my-claude-lang/SKILL.md
-```
-
-### Otomatik Aktivasyon Hook'u (önerilen)
-
-Hook, İngilizce olmayan girdiyi otomatik algılayıp her mesajda MCL'i devreye sokar. Bir kere çalıştır — tüm projeler için geçerli:
-
-```bash
-bash my-claude-lang/hooks/setup.sh
-```
-
-Bu, her mesajı analiz eden bir `UserPromptSubmit` hook'u kurar. Unicode, aksanlı karakterler ve 14+ dildeki yaygın kelimeler üzerinden dil algılama yapar. Algılandığında Claude'a zorunlu MCL aktivasyon hatırlatması gönderir.
+Yeni bir Claude Code oturumu aç ve kendi dilinde yazmaya başla. Hepsi bu.
 
 ---
 

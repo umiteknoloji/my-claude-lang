@@ -62,30 +62,19 @@ During execution, every question Claude Code asks you goes through the bridge. E
 
 ## Installation
 
-Download. Install. Done. No configuration. No language settings.
-
-### As a Plugin
+Clone and run one command. Done. No configuration. No language settings.
 
 ```bash
-/plugin marketplace add umiteknoloji/my-claude-lang
-/plugin install my-claude-lang@umiteknoloji
+git clone https://github.com/umiteknoloji/my-claude-lang.git
+bash my-claude-lang/setup.sh
 ```
 
-### As a Skill
+This installs everything globally:
+- **Skill files** → `~/.claude/skills/my-claude-lang/` (MCL rules, gates, phases)
+- **Auto-activation hook** → `~/.claude/hooks/mcl-activate.sh` (detects non-English input)
+- **Hook config** → `~/.claude/settings.json` (wires the hook into Claude Code)
 
-```bash
-cp my-claude-lang/SKILL.md ~/.claude/skills/my-claude-lang/SKILL.md
-```
-
-### Auto-Activation Hook (recommended)
-
-The hook detects non-English input automatically and forces MCL activation on every message. Run once — works globally:
-
-```bash
-bash my-claude-lang/hooks/setup.sh
-```
-
-This installs a `UserPromptSubmit` hook that analyzes each prompt for non-English content (Unicode scripts, accented characters, and common function words across 14+ languages). When detected, Claude receives a mandatory MCL activation reminder.
+Open a new Claude Code session and start typing in your language. That's it.
 
 ---
 
