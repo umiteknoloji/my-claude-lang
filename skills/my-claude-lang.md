@@ -79,22 +79,32 @@ For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
 3. If ALL parameters clear → present summary, ask "Is this correct? (yes / no)"
 4. Developer confirms → call Phase 2
 
-## Phase 2: Generate English Spec
+## Phase 2: Generate English Spec — MANDATORY, NEVER SKIP
 
 For full spec template, read `my-claude-lang/phase2-spec.md`
 
-Called when Phase 1 parameters are complete. Announce: "All points are clear."
-Write English spec with: What, Why, Acceptance Criteria, Constraints, Out of Scope, Context.
-Spec = SINGLE SOURCE OF TRUTH.
+This is the most critical phase. Without it, the developer gets chatbot-quality
+output instead of senior-engineer-quality output. The spec ensures Claude Code
+processes the request AS IF a native English engineer wrote it.
+
+1. Announce: "All points are clear. Generating the specification..."
+2. Write the spec in a VISIBLE `📋 Spec:` block — the developer MUST see it
+3. Write it like a senior engineer with 15+ years experience
+4. Include: Objective, MUST/SHOULD requirements, Acceptance Criteria,
+   Edge Cases, Technical Approach, Out of Scope
+5. After the spec, explain in developer's language what it says
+6. Ask: "Is this what you want? (yes / no)"
+7. Do NOT proceed without explicit "yes"
+
+Spec = SINGLE SOURCE OF TRUTH. All code must satisfy the spec.
 
 ## Phase 3: Verify Understanding
 
 For full verification rules, read `my-claude-lang/phase3-verify.md`
 
-1. Claude Code summarizes understanding in English
-2. MCL applies Gate 2 (challenge vague terms)
-3. MCL applies Gate 3 (explain to developer, don't just translate)
-4. Developer must understand AND agree → then call Phase 4
+Phase 3 is COMBINED with Phase 2 — when the spec is shown, the developer
+verifies it. The Türkçe explanation after the spec IS Phase 3.
+Developer must understand AND agree → then call Phase 4.
 
 ## Phase 4: Execute with Live Translation
 
