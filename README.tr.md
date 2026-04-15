@@ -77,6 +77,16 @@ Aşama 3: Claude Code spec'i okuyor ve NE anladığını açıklıyor.
 cp my-claude-lang/SKILL.md ~/.claude/skills/my-claude-lang/SKILL.md
 ```
 
+### Otomatik Aktivasyon Hook'u (önerilen)
+
+Hook, İngilizce olmayan girdiyi otomatik algılayıp her mesajda MCL'i devreye sokar. Bir kere çalıştır — tüm projeler için geçerli:
+
+```bash
+bash my-claude-lang/hooks/setup.sh
+```
+
+Bu, her mesajı analiz eden bir `UserPromptSubmit` hook'u kurar. Unicode, aksanlı karakterler ve 14+ dildeki yaygın kelimeler üzerinden dil algılama yapar. Algılandığında Claude'a zorunlu MCL aktivasyon hatırlatması gönderir.
+
 ---
 
 ## Kullanım
@@ -95,9 +105,9 @@ Mesajının başına `/mcl` veya `@mcl` yaz:
 
 Bu **garanti** aktivasyon. Bir kere yaz, konuşma boyunca aktif kalır.
 
-### 2. Otomatik
+### 2. Otomatik (hook ile)
 
-Sadece kendi dilinde yaz. MCL otomatik algılar ve aktive olur. Eğer bir şekilde aktive olmazsa, `/mcl` yaz ve devam et.
+Sadece kendi dilinde yaz. Hook kuruluysa, MCL her İngilizce olmayan mesajda otomatik devreye girer — prefix gerekmez. Hook kurulu değilse, `/mcl` yazarak aktive et.
 
 ---
 

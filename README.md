@@ -77,6 +77,16 @@ Download. Install. Done. No configuration. No language settings.
 cp my-claude-lang/SKILL.md ~/.claude/skills/my-claude-lang/SKILL.md
 ```
 
+### Auto-Activation Hook (recommended)
+
+The hook detects non-English input automatically and forces MCL activation on every message. Run once — works globally:
+
+```bash
+bash my-claude-lang/hooks/setup.sh
+```
+
+This installs a `UserPromptSubmit` hook that analyzes each prompt for non-English content (Unicode scripts, accented characters, and common function words across 14+ languages). When detected, Claude receives a mandatory MCL activation reminder.
+
 ---
 
 ## Usage
@@ -95,9 +105,9 @@ Type `/mcl` or `@mcl` before your message:
 
 This **guarantees** activation. No ambiguity. Once activated, MCL stays active for the entire conversation — no need to type it again.
 
-### 2. Automatic
+### 2. Automatic (with hook)
 
-Just write in your language. MCL auto-detects and activates. If it doesn't activate for some reason, type `/mcl` to force it.
+Just write in your language. If you installed the hook, MCL auto-activates on every non-English message — no prefix needed. If you didn't install the hook, type `/mcl` once to force activation.
 
 ---
 
