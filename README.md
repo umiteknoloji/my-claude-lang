@@ -32,31 +32,48 @@ You could use a translator. But here's what happens when you translate your requ
 
 ## What my-claude-lang Actually Does
 
-It creates a **three-phase mutual understanding loop** before a single line of code is written:
+It runs a **five-phase mutual understanding loop** before a single line of code is written:
 
 ```
 You (your language)
   │
   ▼
-Phase 1: my-claude-lang listens, then tells you what it understood
-         in YOUR language. You confirm or correct.
+Phase 1: MCL gathers what you want — one question at a time.
+         No ambiguity passes. You confirm the summary.
   │
   ▼
-Phase 2: Your confirmed intent becomes a precise English
-         technical specification.
+Phase 2: Your confirmed intent becomes a visible English spec
+         (📋 Spec:) — written like a senior engineer with 15+ years
+         experience. You see it. You approve it.
   │
   ▼
-Phase 3: Claude Code reads the spec and explains what IT understood.
-         That explanation is translated back to you.
-         You confirm or correct.
+Phase 3: MCL explains the spec back to you in your language.
+         You verify Claude understood correctly.
   │
   ▼
-All three parties agree on the exact same thing → Code gets written.
+Phase 4: Code gets written. Every question Claude asks you during
+         execution goes through the bridge — with context explaining
+         WHY it's asking and WHAT each answer changes.
+  │
+  ▼
+Phase 5: Results are explained, not just listed.
+         You understand what was built and why.
 ```
 
-**No ambiguity survives this loop.** If you say "no" at any point, it goes back and tries again. It does not proceed until you say "yes."
+**No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit "yes."
 
-During execution, every question Claude Code asks you goes through the bridge. Every answer you give goes back through the bridge. Every status update, every code review result, every error message — explained to you in your language, not just translated.
+Every response starts with `🌐 MCL` so you always know the bridge is active.
+
+---
+
+## Informed Decisions, Not Blind Answers
+
+When Claude Code asks you a question during execution, MCL doesn't just translate it. It adds:
+
+1. **Why this question matters** — what Claude needs to decide
+2. **What each answer changes** — so you know the implications before you respond
+
+You're never guessing. You're deciding with full context — like having a senior engineer explain every decision point in your language.
 
 ---
 
@@ -163,7 +180,7 @@ And produces:
 
 > "redirect user to main page after login"
 
-my-claude-lang sees the same sentence and produces an English spec that asks:
+my-claude-lang sees the same sentence and asks you:
 
 - What authentication method? Session-based? JWT? OAuth?
 - Client-side redirect or server-side?
@@ -172,9 +189,9 @@ my-claude-lang sees the same sentence and produces an English spec that asks:
 - Where does a failed login redirect to?
 - What should the loading state look like?
 
-Then it translates all those questions back to you, gets your answers, translates those answers back to English, and only THEN lets Claude Code start building.
+Then it translates all those questions back to you — with context explaining why each question matters and what your answer will change. It gets your answers, translates them back to English, and only THEN lets Claude Code start building.
 
-**That's not translation. That's a senior engineer who happens to speak your language.**
+**That's not translation. That's a senior engineer who speaks your language.**
 
 ---
 

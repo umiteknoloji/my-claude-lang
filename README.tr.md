@@ -32,31 +32,48 @@ Ama İngilizce düşünüyor. Ve İngilizce bilmiyorsan, tüm bunların dışın
 
 ## my-claude-lang Gerçekte Ne Yapıyor
 
-Tek bir satır kod yazılmadan önce **üç aşamalı karşılıklı anlama döngüsü** kuruyor:
+Tek bir satır kod yazılmadan önce **beş aşamalı karşılıklı anlama döngüsü** kuruyor:
 
 ```
 Sen (kendi dilinde)
   │
   ▼
-Aşama 1: my-claude-lang dinliyor, sonra ne anladığını SENİN DİLİNDE
-         anlatıyor. Onaylıyorsun veya düzeltiyorsun.
+Aşama 1: MCL ne istediğini anlamak için tek tek soru soruyor.
+         Hiçbir belirsizlik geçemiyor. Özeti onaylıyorsun.
   │
   ▼
-Aşama 2: Onaylanan niyetin, kesin bir İngilizce teknik
-         spesifikasyona dönüşüyor.
+Aşama 2: Onaylanan niyetin, görünür bir İngilizce teknik
+         spesifikasyona (📋 Spec:) dönüşüyor — 15+ yıl deneyimli
+         kıdemli bir mühendis gibi yazılıyor. Görüyorsun. Onaylıyorsun.
   │
   ▼
-Aşama 3: Claude Code spec'i okuyor ve NE anladığını açıklıyor.
-         Bu açıklama sana çevriliyor.
-         Onaylıyorsun veya düzeltiyorsun.
+Aşama 3: MCL spec'i sana kendi dilinde açıklıyor.
+         Claude'un doğru anlayıp anlamadığını doğruluyorsun.
   │
   ▼
-Üç taraf da aynı şeyi anladığında → Kod yazılmaya başlıyor.
+Aşama 4: Kod yazılıyor. Claude Code'un çalışma sırasında sana
+         sorduğu her soru köprüden geçiyor — NEDEN sorduğunu
+         ve hangi cevabın NE değiştireceğini açıklayarak.
+  │
+  ▼
+Aşama 5: Sonuçlar sadece listelenmez, açıklanır.
+         Ne inşa edildiğini ve neden öyle yapıldığını anlıyorsun.
 ```
 
-**Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Herhangi bir noktada "hayır" dersen, geri dönüp tekrar deniyor. Sen "evet" deyene kadar ilerlemiyor.
+**Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Senin açık "evet"in olmadan hiçbir şey ilerlemez.
 
-Çalışma sırasında Claude Code'un sana sorduğu her soru köprüden geçiyor. Senin verdiğin her cevap köprüden geri dönüyor. Her durum güncellemesi, her kod inceleme sonucu, her hata mesajı — sana kendi dilinde sadece çevrilmiyor, açıklanıyor.
+Her yanıt `🌐 MCL` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+
+---
+
+## Kör Cevaplar Değil, Bilinçli Kararlar
+
+Claude Code sana çalışma sırasında bir soru sorduğunda, MCL sadece çevirmekle kalmıyor. Şunları da ekliyor:
+
+1. **Bu soru neden soruluyor** — Claude neye karar vermek istiyor
+2. **Hangi cevap ne değiştirir** — cevap vermeden önce sonuçlarını biliyorsun
+
+Asla tahmin etmiyorsun. Tam bağlamla karar veriyorsun — sanki kıdemli bir mühendis her karar noktasını senin dilinde açıklıyor.
 
 ---
 
@@ -172,7 +189,7 @@ my-claude-lang aynı cümleyi görür ve sana şunları sorar:
 - Başarısız giriş nereye yönlendirecek?
 - Yükleniyor durumu nasıl görünecek?
 
-Sonra tüm bu soruları sana çeviriyor, cevaplarını alıyor, cevaplarını İngilizce'ye çeviriyor ve ANCAK O ZAMAN Claude Code'un inşa etmeye başlamasına izin veriyor.
+Sonra tüm bu soruları sana çeviriyor — her sorunun neden sorulduğunu ve cevabının ne değiştireceğini açıklayarak. Cevaplarını alıyor, İngilizce'ye çeviriyor ve ANCAK O ZAMAN Claude Code'un inşa etmeye başlamasına izin veriyor.
 
 **Bu çeviri değil. Bu senin dilini konuşan bir kıdemli mühendis.**
 
