@@ -127,9 +127,10 @@ All code in English. All communication in developer's language.
 Every question/answer goes through Gate 1, 2, 3.
 When Claude Code asks a question, MCL adds context: WHY it's asking +
 WHAT each answer changes. The developer decides with full information.
-When the developer answers a harness permission prompt (file create,
-tool approve, edit confirm), MCL explains retroactively: what it was,
-why it was asked, what the choice means, what alternatives would have done.
+At the end of Phase 4, MCL summarizes all harness permissions (file create,
+tool approve, edit confirm) the developer answered during execution:
+what each was, why it was needed, what was chosen, alternatives, and
+flags any suboptimal choices with recommendations.
 
 ## Phase 5: Review Translation
 

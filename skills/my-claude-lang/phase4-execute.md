@@ -20,15 +20,19 @@ Called automatically when Phase 3 is confirmed.
 5. At every decision point requiring developer input:
    - Present options in the developer's language with explanations
    - After selection, confirm the English version before proceeding
-6. When the developer answers a harness-level permission prompt
+6. When harness-level permission prompts appear during execution
    (file creation, tool approval, edit confirmation):
-   - MCL cannot intercept these prompts — they happen at system level
-   - BUT immediately after the developer's choice, MCL explains:
+   - MCL cannot intercept these — they happen at system level
+   - MCL tracks all harness permissions the developer answered
+   - At the END of Phase 4 (after all code is written), MCL includes
+     a "Permission Summary" section that lists every harness permission:
      a) What the question was about
-     b) Why Claude Code needed this
-     c) What the developer's choice means
+     b) Why Claude Code needed it
+     c) What the developer chose and what it means
      d) What the other options would have done
-   - This applies to ALL harness prompts — they can appear at any time
+     e) If MCL thinks a choice was suboptimal, it flags it with a
+        recommendation (e.g., "You chose 'allow all' but a one-time
+        approval would have been safer here because...")
 6. If the developer introduces a NEW task during Phase 4 execution
    (scope creep, "by the way also fix...", "bu arada şunu da..."):
    - Do NOT fold the new task into the current spec
