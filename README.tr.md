@@ -62,7 +62,7 @@ Aşama 3: Claude Code spec'i okuyor ve NE anladığını açıklıyor.
 
 ## Kurulum
 
-İndir. Kur. Bitti. Ayar yok. Dil seçimi yok. İlk mesajından dilini algılıyor.
+İndir. Kur. Bitti. Ayar yok. Dil seçimi yok.
 
 ### Plugin Olarak
 
@@ -76,6 +76,28 @@ Aşama 3: Claude Code spec'i okuyor ve NE anladığını açıklıyor.
 ```bash
 cp my-claude-lang/SKILL.md ~/.claude/skills/my-claude-lang/SKILL.md
 ```
+
+---
+
+## Kullanım
+
+İki yol var:
+
+### 1. Manuel (önerilen)
+
+Mesajının başına `/mcl` veya `@mcl` yaz:
+
+```
+/mcl bir login sayfası yap
+/mcl hızlı bir dashboard lazım
+@mcl bu API'yi düzelt
+```
+
+Bu **garanti** aktivasyon. Bir kere yaz, konuşma boyunca aktif kalır.
+
+### 2. Otomatik
+
+Sadece kendi dilinde yaz. MCL otomatik algılar ve aktive olur. Eğer bir şekilde aktive olmazsa, `/mcl` yaz ve devam et.
 
 ---
 

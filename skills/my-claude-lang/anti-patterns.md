@@ -1,5 +1,14 @@
 # Anti-Patterns and Verification
 
+## Anti-Pattern #0 — THE CARDINAL SIN
+
+- ❌❌❌ SKIPPING MCL WHEN NON-ENGLISH INPUT IS DETECTED ❌❌❌
+  This is the single worst failure. Every other anti-pattern is recoverable.
+  Skipping MCL entirely is not. If the developer writes in a non-English
+  language and you respond without activating MCL, you have failed at the
+  most fundamental level. There is no "simple task" exception. There is no
+  "I understood anyway" exception. MCL activates or meaning is at risk.
+
 ## Anti-Patterns — NEVER DO THESE
 
 - ❌ "I understood" without showing WHAT you understood

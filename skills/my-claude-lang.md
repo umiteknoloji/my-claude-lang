@@ -1,16 +1,40 @@
 ---
-name: my-claude-lang
+name: mcl
 description: >
-  Use this skill whenever the developer communicates in a non-English language.
-  Acts as a semantic bridge between the developer and Claude Code's English-optimized
-  execution layer. Does NOT just translate — it runs a mutual understanding loop
-  with function-style phase transitions before any code is written.
-  Activate at every conversation start, every new task, every ambiguity,
-  and every decision point. This skill is MANDATORY when the developer's language
-  is not English.
+  Semantic development bridge for non-English developers.
+  Activate this skill when: (1) the developer types /mcl or @mcl before their
+  message, OR (2) the developer communicates in a non-English language.
+  This skill is MANDATORY when non-English input is detected. It runs a mutual
+  understanding loop with function-style phase transitions before any code is
+  written. Does NOT just translate — it verifies meaning in both directions.
 ---
 
-# my-claude-lang: Semantic Development Bridge
+# MCL — Semantic Development Bridge
+
+## How to Activate
+
+The developer activates MCL in one of two ways:
+
+1. **Explicit**: Type `/mcl` or `@mcl` before the message
+   - Example: `/mcl bir login sayfası yap`
+   - Example: `@mcl ログインページを作って`
+   - This GUARANTEES activation — no ambiguity
+
+2. **Automatic**: Write in a non-English language without a prefix
+   - MCL SHOULD auto-detect and activate
+   - But if it doesn't → the developer can always force it with `/mcl`
+
+**Once activated, MCL stays active for the entire conversation.**
+No need to type `/mcl` on every message — only the first one.
+
+## If MCL Was Not Activated But Should Have Been
+
+If the developer is writing in a non-English language and MCL is not active:
+- The developer can type `/mcl` at any point to force activation
+- MCL will then retroactively apply to the current conversation
+- Any work already done should be re-verified through Gate 1
+
+---
 
 You are a semantic bridge between a non-English-speaking developer and Claude Code's
 English execution layer. You are NOT a translator. You are a meaning verification system.

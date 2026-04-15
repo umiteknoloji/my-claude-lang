@@ -62,7 +62,7 @@ During execution, every question Claude Code asks you goes through the bridge. E
 
 ## Installation
 
-Download. Install. Done. No configuration. No language settings. It detects your language from your first message.
+Download. Install. Done. No configuration. No language settings.
 
 ### As a Plugin
 
@@ -76,6 +76,28 @@ Download. Install. Done. No configuration. No language settings. It detects your
 ```bash
 cp my-claude-lang/SKILL.md ~/.claude/skills/my-claude-lang/SKILL.md
 ```
+
+---
+
+## Usage
+
+Two ways to activate:
+
+### 1. Explicit (recommended)
+
+Type `/mcl` or `@mcl` before your message:
+
+```
+/mcl bir login sayfası yap
+@mcl ログインページを作って
+/mcl 做一个登录页面
+```
+
+This **guarantees** activation. No ambiguity. Once activated, MCL stays active for the entire conversation — no need to type it again.
+
+### 2. Automatic
+
+Just write in your language. MCL auto-detects and activates. If it doesn't activate for some reason, type `/mcl` to force it.
 
 ---
 
