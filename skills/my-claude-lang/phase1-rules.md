@@ -40,7 +40,9 @@ explore files. Do not read code. Your response ENDS at the question mark.
 Wait for the developer's reply in the next message.
 
 Always ask uncertain questions ONE AT A TIME.
-- Ask one question directly and naturally — no preamble, no summary first
+- Ask one question directly and naturally — the question IS your entire response
+- No introductory sentences ("I need to clarify...", "A few things...", "Let me understand...")
+- No framing, no context-setting before the question — just ask it
 - Wait for the answer — this means your response ENDS after the question
 - Confirm your understanding of that specific answer with the developer
 - Translate the confirmed answer to English for Claude Code
