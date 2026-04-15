@@ -75,6 +75,62 @@ If contradictions are found:
 - Ask: "Which one takes priority?"
 - Resolve before advancing
 
+## Nested Conditional Requirements
+
+If the developer describes a requirement with multiple conditions,
+branches, or exceptions in a single sentence:
+
+Examples:
+- German: "Wenn...und...soll...wobei...es sei denn..." (if...and...should...
+  where...unless...)
+- Any language: "If X and Y, then do Z, but if W, then do V instead"
+
+MCL response pattern:
+- Break each condition into a separate line item
+- Present the conditions back as a numbered list:
+  "I see these conditions: 1) If user is logged in AND has permission →
+  export data. 2) Format should be configurable. 3) UNLESS sensitive data
+  → restrict export. Is this correct?"
+- Confirm each branch before writing the spec
+- Do NOT try to handle nested conditionals as a single requirement
+
+## Hidden Sub-Tasks
+
+If a developer's request looks like a single task but actually contains
+multiple implicit sub-components:
+
+Examples:
+- "ユーザー管理画面を作って" (make a user management screen) = login +
+  CRUD + roles + permissions + search + UI
+- "Pura backend fix karo" (fix the entire backend) = multiple bugs +
+  deps + deploy
+- "Build a dashboard" = data source + charts + filters + export + permissions
+
+MCL response pattern:
+- Identify the likely sub-components
+- Ask: "This contains several parts. I see: [list sub-components].
+  Should I handle all of these, or is there a specific subset you want?"
+- Run Phase 1-3 for the confirmed sub-components
+- If the developer says "all of them" → prioritize order together
+
+## Multi-Rule Collision
+
+When multiple MCL rules trigger simultaneously on a single message
+(e.g., emotional frustration + authority reference + vague scope):
+
+MCL priority order:
+1. **Acknowledge emotion first** — if the developer is frustrated,
+   a brief acknowledgment before anything else
+2. **Gather the most critical missing parameter** — usually WHAT
+   (intent) before WHO said it or WHEN it's due
+3. **Then resolve secondary patterns** — urgency, authority, ambiguity
+4. **One question at a time still applies** — never stack multiple
+   pattern resolutions into one message
+
+Example: "Boss ne bola hai ye feature urgent hai" (authority + urgency
++ no spec) → MCL: "I understand this is urgent. What specifically
+should I build?" — addresses urgency, asks for intent, one question.
+
 ## Multi-Task Rule
 
 If the developer requests multiple distinct tasks in one message:

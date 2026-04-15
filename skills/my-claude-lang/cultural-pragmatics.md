@@ -108,6 +108,8 @@ Examples:
 - Chinese: "天衣无缝" (seamless like heavenly clothing)
 - Arabic: "على الطاير" (on the fly)
 - German: "das muss sitzen" (it must sit = it must be perfect)
+- Korean: "대충 해줘" (do it roughly) = "just get it done, don't overthink"
+- Hindi: "dekhte hain" (let's see) = often non-committal, not a plan
 
 MCL response pattern:
 - Understand the general meaning (urgency, quality, etc.)
@@ -115,6 +117,9 @@ MCL response pattern:
   done quickly — does that mean prioritize speed of delivery, or
   runtime performance, or both?"
 - Translate the INTENT, not the metaphor
+- For expressions that sound like quality instructions ("roughly",
+  "just get it done") → ask: "Should I aim for a quick working version
+  first, or do you want full quality from the start?"
 
 ## Dialect and Register
 
@@ -180,3 +185,59 @@ MCL response pattern:
 - Ask: "Would you like me to take a different approach? If so,
   what would work better for you?"
 - Let the developer guide the correction
+
+### High-Directness Cultures
+
+Some cultures communicate very directly. Their blunt feedback is
+face-value, NOT understatement and NOT rudeness:
+
+Examples:
+- Israeli Hebrew: "זה לא טוב" (this is not good) = literal feedback
+- Dutch: "Dit werkt niet" (this doesn't work) = literal feedback
+- Some German registers: direct and matter-of-fact
+
+MCL response pattern:
+- Do NOT apply the understatement clarification loop
+- Do NOT over-soften or add "are you sure?" when the feedback is clear
+- Take direct feedback at face value and act on it
+- Ask for specifics only about WHAT to change, not WHETHER they're sure
+
+## Authority References
+
+When a developer cites a third party (manager, client, team lead) as
+the source of a requirement without providing technical details:
+
+Examples:
+- Arabic: "المدير قال نعمل كده" (the manager said do it like this)
+- Hindi: "Boss ne bola hai ye feature urgent hai" (boss said this is urgent)
+- Hebrew: "המנהל אמר שצריך את זה מחר" (manager said we need it tomorrow)
+- Any language: "The client wants..." / "[person] said to..."
+
+MCL response pattern:
+- Do NOT challenge the authority or ask "are you sure?"
+- DO treat the requirement as unspecified until the developer fills
+  in the technical details
+- Separate urgency from specification: "I understand this is urgent.
+  To deliver it quickly, I need to know exactly what [it/this] means.
+  What specifically should I build?"
+- If a deadline is cited → accept it as a constraint but confirm:
+  "Is [date] a hard deadline or a target?"
+- The authority is noted, but the spec still needs complete parameters
+
+## Diminutive and Casual Speech
+
+Some languages use diminutives or casual forms that could be literal
+or just informal speech:
+
+Examples:
+- Russian: "кнопочку" (little button) — small button or casual speech?
+- Spanish: "una cosita" (a little thing) — trivial task or just polite?
+- Turkish: "bi buton" (a button, casual) — specific or casual?
+- Polish: "przycisk" vs "przyciszczek" — literal size or affection?
+
+MCL response pattern:
+- Do NOT assume the diminutive is a technical specification
+- Ask naturally: "When you say [diminutive], do you mean a specific
+  size/style, or is that just how you'd describe it?"
+- If the developer says "just casual" → drop it, move on
+- Never make the developer feel judged for informal language

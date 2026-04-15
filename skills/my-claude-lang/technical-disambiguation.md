@@ -146,6 +146,59 @@ MCL response pattern:
 - Recommend the most likely interpretation based on the conversation
   context, but let the developer confirm
 
+## Synonym Conflation
+
+When a developer uses two similar technical terms in one request that
+could mean the same operation or two distinct operations:
+
+Examples:
+- "rollback the migration and revert the schema" — same thing or two steps?
+- "restart the server and redeploy" — one operation or two?
+- "reset and clear the cache" — same action or different scopes?
+- "update and upgrade the dependencies" — patch update or major upgrade?
+
+MCL response pattern:
+- Ask: "Are [term1] and [term2] the same operation, or two separate
+  steps? For example, rollback could mean undo the DB migration, while
+  revert could mean restore the schema file in git — these are different."
+- If same → use one term in the spec for clarity
+- If different → spec each as a separate step with its own criteria
+
+## Double Negation
+
+When a developer's sentence contains multiple negations that make the
+actual intent ambiguous:
+
+Examples:
+- Arabic: "مش عايز الصفحة ما تكونش بطيئة" (don't want the page to not be slow)
+- French: "Je ne veux pas que ce ne soit pas rapide"
+- Any language: stacked negatives that could resolve to positive or negative
+
+MCL response pattern:
+- Do NOT guess the resolved meaning
+- Restate in positive terms and confirm: "I want to make sure —
+  do you want the page to be fast? Or is there a specific performance
+  concern you're describing?"
+- Let the developer state the positive requirement clearly
+
+## Time Duration Semantics
+
+When a requirement involves time durations, TTL, or expiry that could
+have different technical meanings:
+
+Examples:
+- "expire time 30min" = TTL from write? TTL from last access (sliding)?
+  absolute expiry timestamp?
+- "session timeout 1h" = idle timeout or absolute timeout?
+- "cache for 5 minutes" = hard TTL or soft TTL with stale-while-revalidate?
+- "retry after 3 seconds" = fixed delay, exponential backoff, or jitter?
+
+MCL response pattern:
+- Ask which semantic applies: "When you say 'expire in 30 minutes',
+  do you mean 30 minutes from creation, or 30 minutes from last access?"
+- Recommend the most common pattern for the technology in context
+  (e.g., Redis TTL is typically from write), but let the developer confirm
+
 ## Priority vs Dependency
 
 When developers specify task order without clarifying the relationship:

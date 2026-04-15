@@ -18,3 +18,13 @@ Called automatically when Phase 3 is confirmed.
 5. At every decision point requiring developer input:
    - Present options in the developer's language with explanations
    - After selection, confirm the English version before proceeding
+6. If the developer introduces a NEW task during Phase 4 execution
+   (scope creep, "by the way also fix...", "bu arada şunu da..."):
+   - Do NOT fold the new task into the current spec
+   - Acknowledge it: "I noted this as a separate task."
+   - Ask: "Should I finish the current task first, or pause and
+     switch to this new one?"
+   - If finish first → save the new task, continue current execution
+   - If switch → pause current task at a safe point, run Phase 1-3
+     for the new task
+   - Either way, the new task gets its own Phase 1-3 cycle
