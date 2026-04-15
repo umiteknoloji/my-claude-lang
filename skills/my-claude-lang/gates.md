@@ -49,17 +49,20 @@ Before presenting Claude Code's response to the developer:
   (e.g., "Do you want to create X? 1. Yes / 2. Yes, allow all").
   MCL CANNOT intercept these — they happen at the harness level.
   At the END of Phase 4 (after all code is written), MCL MUST include
-  a permission summary section listing ALL harness permissions that
-  were requested during execution:
-  1. What each permission was about
-  2. Why Claude Code needed it
-  3. What the developer chose and what it means
-  4. What the other options would have done
-  5. **If MCL believes a choice was suboptimal** (e.g., "allow all"
+  a permission summary section listing EACH harness permission
+  INDIVIDUALLY — not grouped, not summarized with a generic sentence.
+  For EACH permission, on its own line or block:
+  1. The specific file or tool name (e.g., "color-themes.ts oluşturma")
+  2. Why Claude Code needed it (one sentence)
+  3. What the developer chose (e.g., "Evet" or "Tümüne izin ver")
+  4. What that choice means concretely
+  5. What the other option(s) would have done
+  6. **If MCL believes a choice was suboptimal** (e.g., "allow all"
      when a one-time approval was safer), MCL flags it with a
      recommendation and explains why
-  This gives the developer full retroactive understanding of every
-  system-level decision they made during execution.
+  NEVER write a generic summary like "file permissions were granted,
+  these were correct choices." Each permission is a separate decision
+  the developer made — treat it that way.
 - After presenting Claude Code's translated response, ask the developer:
   "Do you understand what this means? (yes / no)"
   If "no" → re-explain differently, do NOT skip
