@@ -20,19 +20,46 @@ Called automatically when Phase 3 is confirmed.
 5. At every decision point requiring developer input:
    - Present options in the developer's language with explanations
    - After selection, confirm the English version before proceeding
-6. **PRE-ACTION EXPLANATION RULE:** Before Claude Code creates a file,
-   runs a tool, or makes an edit, MCL MUST explain what is about to
-   happen BEFORE the action occurs:
-   - What Claude Code is about to do (e.g., "X dosyasını oluşturacak")
-   - Why it needs to do this (one sentence)
-   - What will change if this action is taken
-   This explanation appears in the developer's language, in the same
-   response, BEFORE Claude Code calls the tool. The developer then
-   sees the harness permission prompt with full context — they already
-   know what it is and why.
-   When multiple actions happen in one step (e.g., creating 3 files),
-   explain each action as a numbered list before the tool calls:
-   "1. `config.ts` — yapılandırma ayarları için. 2. `types.ts` — ..."
+6. **EXECUTION PLAN — MANDATORY BEFORE ANY TOOL CALL:**
+   After spec is confirmed but BEFORE any code is written, MCL presents
+   an "Execution Plan" (Uygulama Planı) in the developer's language.
+   This plan lists EVERY file and tool action that will happen, with:
+
+   For EACH action:
+   a) **What** — file name and operation (create/edit/command)
+   b) **Why** — one sentence: why this is needed
+   c) **What the harness will ask** — the exact options translated
+      to the developer's language (e.g., "Sistem sana şunu soracak:
+      'config.ts dosyasını oluşturmak istiyor musun?'")
+   d) **What each option does** — explain every choice:
+      - "Yes" → sadece bu dosya için izin verir
+      - "Yes, allow all" → bu oturumdaki tüm düzenlemelere izin verir
+      - "No" → bu işlemi reddeder, dosya oluşturulmaz
+
+   Example format:
+   ```
+   📦 Uygulama Planı:
+
+   1. `mock-data.ts` düzenleme
+      Neden: Category tipi ve örnek veriler eklenecek
+      Sistem soracak: "Do you want to edit mock-data.ts?"
+      → "Yes" seçersen: sadece bu dosya düzenlenir
+      → "Yes, allow all" seçersen: bundan sonraki tüm düzenlemelere otomatik izin verilir
+      → "No" seçersen: bu dosya düzenlenmez, kategori verileri eklenmez
+
+   2. `categories/page.tsx` oluşturma
+      Neden: Kategori yönetim sayfasının ana dosyası
+      Sistem soracak: "Do you want to create categories/page.tsx?"
+      → "Yes" seçersen: sadece bu dosya oluşturulur
+      → "No" seçersen: sayfa oluşturulmaz
+   ```
+
+   After the plan, ask: "Bu plan uygun mu? Başlayayım mı?"
+   Wait for confirmation before executing.
+
+   ⛔ STOP RULE: After presenting the Execution Plan, STOP and wait
+   for the developer's confirmation. Do NOT start executing.
+
 7. When harness-level permission prompts appear during execution
    (file creation, tool approval, edit confirmation):
    - MCL tracks all harness permissions the developer answered

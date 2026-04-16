@@ -127,10 +127,11 @@ All code in English. All communication in developer's language.
 Every question/answer goes through Gate 1, 2, 3.
 When Claude Code asks a question, MCL adds context: WHY it's asking +
 WHAT each answer changes. The developer decides with full information.
-**PRE-ACTION EXPLANATION:** Before Claude Code creates a file, runs a
-tool, or makes an edit, MCL explains what is about to happen and why —
-in the developer's language, BEFORE the tool call. The developer sees
-the harness permission prompt with full context already in place.
+**EXECUTION PLAN:** After spec confirmation but before any code is written,
+MCL presents an Execution Plan listing every file/tool action. For each:
+what will happen, why, what the harness will ask (translated to developer's
+language), and what each option (Yes/Yes allow all/No) does. Developer
+confirms the plan before execution starts.
 At the end of Phase 4, MCL summarizes all harness permissions (file create,
 tool approve, edit confirm) the developer answered during execution:
 what each was, why it was needed, what was chosen, alternatives, and
