@@ -132,11 +132,19 @@ tool approve, edit confirm) the developer answered during execution:
 what each was, why it was needed, what was chosen, alternatives, and
 flags any suboptimal choices with recommendations.
 
-## Phase 5: Review Translation
+## Phase 5: Verification Report — MANDATORY
 
-For full review rules, read `my-claude-lang/phase5-review.md`
+For full rules, read `my-claude-lang/phase5-review.md`
 
-Explain results, don't just translate. Ask "Do you understand? (yes / no)"
+After ALL code is written, MCL produces a Verification Report with 5 sections:
+1. **Spec Compliance** — every MUST/SHOULD checked against the code (✅/❌/⚠️)
+2. **Missed Risks** — things nobody thought of but appeared during implementation
+3. **Impact Analysis** — what other parts of the project might be affected
+4. **Test Checklist** — specific steps the developer should test
+5. **Permission Summary** — each harness permission listed individually
+
+This report is NOT optional. It gives the developer confidence that the
+AI did the right thing. Ask "Do you understand everything? (yes / no)"
 
 ## Language Detection
 
