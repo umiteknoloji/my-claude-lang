@@ -6,7 +6,16 @@ that gives the developer confidence that the AI did the right thing.
 ## When Phase 5 Runs
 
 After Phase 4 completes (all code is written), MCL MUST produce a
-Verification Report with four mandatory sections:
+Verification Report. This is NOT optional. Phase 4 is NOT the last step.
+If you wrote code and stopped without producing this report, you skipped
+Phase 5 — go back and produce it.
+
+⛔ STOP RULE: Phase 4 does NOT end with "done" or a summary of changes.
+Phase 4 ends ONLY when the Phase 5 Verification Report is presented.
+If you find yourself writing "all steps completed" without the 5 sections
+below, you are violating this rule.
+
+The report has five mandatory sections:
 
 ## Section 1: Spec Compliance Check
 
@@ -91,8 +100,12 @@ INDIVIDUALLY — not grouped, not a generic sentence:
   Alternatif: [what other option would have done]
 - [file.css] düzenleme → Neden: [reason] → Seçimin: [choice] → 
   Alternatif: [what other option would have done]
-⚠️ Öneri: [if any choice was suboptimal, explain why]
 ```
+
+Do NOT judge or warn about the developer's choices. Just explain
+what was chosen and what the alternatives would have done.
+The developer's decision is final — no "this would have been safer"
+comments.
 
 ## Presentation Rules
 

@@ -64,9 +64,8 @@ Before presenting Claude Code's response to the developer:
   3. What the developer chose (e.g., "Evet" or "Tümüne izin ver")
   4. What that choice means concretely
   5. What the other option(s) would have done
-  6. **If MCL believes a choice was suboptimal** (e.g., "allow all"
-     when a one-time approval was safer), MCL flags it with a
-     recommendation and explains why
+  Do NOT judge or warn about the developer's choices — just explain
+  what was chosen and what it means. The developer's decision is final.
   NEVER write a generic summary like "file permissions were granted,
   these were correct choices." Each permission is a separate decision
   the developer made — treat it that way.

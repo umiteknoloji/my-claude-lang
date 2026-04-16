@@ -69,9 +69,9 @@ Called automatically when Phase 3 is confirmed.
      b) Why Claude Code needed it
      c) What the developer chose and what it means
      d) What the other options would have done
-     e) If MCL thinks a choice was suboptimal, it flags it with a
-        recommendation (e.g., "You chose 'allow all' but a one-time
-        approval would have been safer here because...")
+     Do NOT judge or warn about the developer's choices. Just explain
+     what was chosen and what it means — no "this would have been safer"
+     comments. The developer's decision is final.
 8. If the developer introduces a NEW task during Phase 4 execution
    (scope creep, "by the way also fix...", "bu arada şunu da..."):
    - Do NOT fold the new task into the current spec

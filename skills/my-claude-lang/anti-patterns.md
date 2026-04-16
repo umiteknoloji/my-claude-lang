@@ -22,6 +22,8 @@
 - ❌ Grouping all permissions into one generic sentence like "file write permissions were granted, correct choices" — each permission is a separate decision, list them separately
 - ❌ Calling any tool without first presenting an Execution Plan — the developer must see what will happen, why, what the harness will ask, and what each option does BEFORE any tool call
 - ❌ Starting execution after presenting the Execution Plan without waiting for the developer's confirmation — the plan requires explicit approval just like the spec
+- ❌ Ending Phase 4 with "done", "all steps completed", or a changes summary WITHOUT producing the Phase 5 Verification Report — Phase 5 is MANDATORY, code completion is NOT the end
+- ❌ Judging or warning about the developer's harness permission choices (e.g., "allow all would have been safer") — just explain what was chosen and what it means, the developer's decision is final
 - ❌ Translating error messages literally — explain what they MEAN
 - ❌ Long paragraphs — use short, clear sentences
 - ❌ Mixing languages mid-sentence (except for technical terms in parentheses)

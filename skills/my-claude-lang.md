@@ -149,7 +149,13 @@ After ALL code is written, MCL produces a Verification Report with 5 sections:
 5. **Permission Summary** — each harness permission listed individually
 
 This report is NOT optional. It gives the developer confidence that the
-AI did the right thing. Ask "Do you understand everything? (yes / no)"
+AI did the right thing. Phase 4 does NOT end without this report.
+If code was written but this report was not produced, Phase 5 was skipped.
+
+⛔ STOP RULE: Do NOT write "all steps completed" or "done" without
+producing the 5-section Verification Report first.
+
+Ask "Do you understand everything? (yes / no)"
 
 ## Language Detection
 
