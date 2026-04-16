@@ -20,9 +20,21 @@ Called automatically when Phase 3 is confirmed.
 5. At every decision point requiring developer input:
    - Present options in the developer's language with explanations
    - After selection, confirm the English version before proceeding
-6. When harness-level permission prompts appear during execution
+6. **PRE-ACTION EXPLANATION RULE:** Before Claude Code creates a file,
+   runs a tool, or makes an edit, MCL MUST explain what is about to
+   happen BEFORE the action occurs:
+   - What Claude Code is about to do (e.g., "X dosyasını oluşturacak")
+   - Why it needs to do this (one sentence)
+   - What will change if this action is taken
+   This explanation appears in the developer's language, in the same
+   response, BEFORE Claude Code calls the tool. The developer then
+   sees the harness permission prompt with full context — they already
+   know what it is and why.
+   When multiple actions happen in one step (e.g., creating 3 files),
+   explain each action as a numbered list before the tool calls:
+   "1. `config.ts` — yapılandırma ayarları için. 2. `types.ts` — ..."
+7. When harness-level permission prompts appear during execution
    (file creation, tool approval, edit confirmation):
-   - MCL cannot intercept these — they happen at system level
    - MCL tracks all harness permissions the developer answered
    - At the END of Phase 4 (after all code is written), MCL includes
      a "Permission Summary" section that lists every harness permission:
@@ -33,7 +45,7 @@ Called automatically when Phase 3 is confirmed.
      e) If MCL thinks a choice was suboptimal, it flags it with a
         recommendation (e.g., "You chose 'allow all' but a one-time
         approval would have been safer here because...")
-6. If the developer introduces a NEW task during Phase 4 execution
+8. If the developer introduces a NEW task during Phase 4 execution
    (scope creep, "by the way also fix...", "bu arada şunu da..."):
    - Do NOT fold the new task into the current spec
    - Acknowledge it: "I noted this as a separate task."

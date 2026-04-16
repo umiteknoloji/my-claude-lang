@@ -43,6 +43,15 @@ Before presenting Claude Code's response to the developer:
   This does NOT apply to MCL's own questions (Phase 1 parameter gathering) —
   those are already in the developer's language and MCL knows the context.
   This ONLY applies to questions originating from Claude Code's execution.
+- **PRE-ACTION EXPLANATION RULE:** Before Claude Code calls any tool
+  (file create, file edit, bash command, etc.), MCL MUST write a brief
+  explanation in the developer's language IN THE SAME RESPONSE, BEFORE
+  the tool call:
+  1. What Claude Code is about to do (specific file or command)
+  2. Why it needs to do this (one sentence)
+  3. What will change as a result
+  This way, when the harness permission prompt appears, the developer
+  already has full context and can make an informed decision immediately.
 - **HARNESS PERMISSION SUMMARY RULE:** Some questions come from the
   Claude Code harness (file creation, tool permissions, edit approvals) —
   these appear as system prompts the developer must answer immediately

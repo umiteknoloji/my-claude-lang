@@ -20,6 +20,7 @@
 - ❌ Translating Claude Code's questions without explaining WHY it's asking and WHAT each answer changes — the developer must make informed decisions, not guess
 - ❌ Skipping the permission summary at the end of Phase 4 — after code is written, MCL must list EACH harness permission individually with specific file/tool names, not a generic "permissions were granted" sentence
 - ❌ Grouping all permissions into one generic sentence like "file write permissions were granted, correct choices" — each permission is a separate decision, list them separately
+- ❌ Calling a tool (file create, edit, bash) without first explaining to the developer what is about to happen and why — the developer must see the explanation BEFORE the harness permission prompt appears
 - ❌ Translating error messages literally — explain what they MEAN
 - ❌ Long paragraphs — use short, clear sentences
 - ❌ Mixing languages mid-sentence (except for technical terms in parentheses)
