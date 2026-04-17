@@ -163,11 +163,16 @@ All code in English. All communication in developer's language.
 Every question/answer goes through Gate 1, 2, 3.
 When Claude Code asks a question, MCL adds context: WHY it's asking +
 WHAT each answer changes. The developer decides with full information.
-**EXECUTION PLAN:** After spec confirmation but before any code is written,
-MCL presents an Execution Plan listing every file/tool action. For each:
-what will happen, why, what the harness will ask (translated to developer's
-language), and what each option (Yes/Yes allow all/No) does. Developer
-confirms the plan before execution starts.
+**EXECUTION PLAN (since MCL 5.3.2 — deletion-only):** By default MCL
+proceeds silently WITHOUT an Execution Plan. The plan is required ONLY
+before shell `rm` / `rmdir` commands (including `rm -r`, `rm -rf`, and
+chained `&&`/`;` bash containing them). `git rm` is a git subcommand,
+NOT shell `rm`, and proceeds silently. All other actions — Read, Write,
+Edit (single or multi-file), git push/commit/reset/rebase/add, package
+installs, WebFetch/WebSearch, sudo/chmod/chown, writes under `~/.claude/`
+— proceed silently. On ambiguity, default to showing the plan. When the
+plan IS triggered, list every action with what/why/harness question
+(translated)/option meanings and wait for confirmation.
 
 ## Phase 4.5: Post-Code Risk Review — MANDATORY
 

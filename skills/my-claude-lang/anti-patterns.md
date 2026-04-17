@@ -21,8 +21,9 @@
 - ❌ Assuming the developer knows English technical jargon
 - ❌ Skipping Phase 3 because "it's obvious"
 - ❌ Translating Claude Code's questions without explaining WHY it's asking and WHAT each answer changes — the developer must make informed decisions, not guess
-- ❌ Calling any tool without first presenting an Execution Plan — the developer must see what will happen, why, what the harness will ask, and what each option does BEFORE any tool call
-- ❌ Starting execution after presenting the Execution Plan without waiting for the developer's confirmation — the plan requires explicit approval just like the spec
+- ❌ Calling a shell `rm` or `rmdir` command (including `rm -r`, `rm -rf`, or chained bash containing them) without first presenting an Execution Plan — file/directory deletion is the ONLY action class that still requires the plan (since MCL 5.3.2). All other tool calls proceed silently. `git rm` is a git subcommand, not shell `rm`, and does NOT require the plan
+- ❌ Starting a deletion after presenting the Execution Plan without waiting for the developer's confirmation — the plan requires explicit approval just like the spec
+- ❌ Emitting an Execution Plan for non-deletion tool calls (Edit, Write, git push, npm install, etc.) — since MCL 5.3.2 the plan is deletion-scoped; adding it for reversible or harness-gated actions is pure noise
 - ❌ Ending Phase 4 with "done", "all steps completed", or a changes summary WITHOUT running Phase 4.5 (Post-Code Risk Review) and then Phase 5 (Verification Report) — both are MANDATORY, code completion is NOT the end
 - ❌ Presenting Missed Risks inside Phase 5 — since MCL 5.3.0, Missed Risks is its own **Phase 4.5 (Post-Code Risk Review)** that runs BEFORE the Verification Report. Never embed risks in the Phase 5 report
 - ❌ Presenting Phase 4.5 risks as a one-shot bulleted list — Phase 4.5 is a sequential interactive dialog: ONE risk per turn, wait for developer reply, then next risk. Wall-of-text risk lists are forbidden
