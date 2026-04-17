@@ -53,6 +53,7 @@ Always ask uncertain questions ONE AT A TIME.
 - Ask one question directly and naturally — the question IS your entire response
 - No introductory sentences ("I need to clarify...", "A few things...", "Let me understand...")
 - No framing, no context-setting before the question — just ask it
+- **Language-agnostic**: never open with a greeting, apology, honorific, or courtesy softener in any language. The first word of your response is the first word of the question itself.
 - Wait for the answer — this means your response ENDS after the question
 - Confirm your understanding of that specific answer with the developer
 - Translate the confirmed answer to English for Claude Code
