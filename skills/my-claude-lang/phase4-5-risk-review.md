@@ -68,12 +68,8 @@ handled in Phase 1–3.
 
 ## Anti-Patterns
 
-- ❌ Presenting all risks as a single bulleted list in one turn
-- ❌ Skipping Phase 4.5 and going straight to Phase 5
-- ❌ Running Phase 5 before every Phase 4.5 risk is resolved
-- ❌ Continuing to the next risk without waiting for the developer's reply
-- ❌ Fabricating risks to make the section look thorough
-- ❌ Re-surfacing risks that were already decided in Phase 1 or Phase 3
+For Phase 4.5 anti-patterns, see `my-claude-lang/anti-patterns.md` —
+anti-patterns live in a single file to avoid drift.
 
 ## Handoff to Phase 5
 
