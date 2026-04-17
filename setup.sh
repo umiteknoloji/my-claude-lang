@@ -18,11 +18,35 @@ echo "my-claude-lang (MCL) Setup"
 echo "=========================="
 echo ""
 
+# 0. Version consistency check
+#    The MCL version appears in multiple files. If they drift, users see
+#    inconsistent banners (e.g. hook says 5.3.0 but README says 5.2.0).
+#    Anchor on the `🌐 MCL X.Y.Z` banner so historical references like
+#    "Since MCL 5.0.0" are NOT caught as the current version.
+HOOK_VERSION="$(grep -oE '🌐 MCL [0-9]+\.[0-9]+\.[0-9]+' "$HOOK_SRC" | head -1 | awk '{print $3}')"
+VERSION_MISMATCH=0
+for f in "$SCRIPT_DIR/README.md" "$SCRIPT_DIR/README.tr.md" "$SKILL_SRC"; do
+  [ -f "$f" ] || continue
+  FILE_VERSION="$(grep -oE '🌐 MCL [0-9]+\.[0-9]+\.[0-9]+' "$f" | head -1 | awk '{print $3}')"
+  if [ -n "$FILE_VERSION" ] && [ "$FILE_VERSION" != "$HOOK_VERSION" ]; then
+    echo "[WARN] Version drift: $f has $FILE_VERSION, hook has $HOOK_VERSION"
+    VERSION_MISMATCH=1
+  fi
+done
+if [ "$VERSION_MISMATCH" -eq 0 ]; then
+  echo "[OK] Version $HOOK_VERSION consistent across README.md, README.tr.md, skill file, hook"
+fi
+echo ""
+
 # 1. Install skill files
+#    Clean the destination first so renamed/removed files do NOT linger
+#    from prior MCL versions. Without this, stale files can shadow
+#    current behavior (seen during 5.2.0 → 5.3.0 upgrade).
+rm -rf "$SKILL_DST"
 mkdir -p "$SKILL_DST"
 cp "$SKILL_SRC" "$SKILL_DST/SKILL.md"
 cp "$SKILL_RULES_SRC"/*.md "$SKILL_DST/"
-echo "[OK] Skill files installed to $SKILL_DST"
+echo "[OK] Skill files installed to $SKILL_DST (clean copy)"
 
 # 2. Install hook script
 mkdir -p "$(dirname "$HOOK_DST")"
