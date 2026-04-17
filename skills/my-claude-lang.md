@@ -171,6 +171,8 @@ confirms the plan before execution starts.
 
 ## Phase 4.5: Post-Code Risk Review — MANDATORY
 
+For full Phase 4.5 rules, read `my-claude-lang/phase4-5-risk-review.md`
+
 After Phase 4 writes code but BEFORE Phase 5 emits the Verification Report,
 MCL runs an interactive Missed Risks dialog. This phase exists because
 the developer's decisions about missed risks can change the impact
