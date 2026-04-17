@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 4.9.0
+# my-claude-lang 🌐 MCL 5.0.0
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -9,6 +9,10 @@ Bugüne kadar dünyanın en iyi AI kodlama araçlarını kullanmak için İngili
 **my-claude-lang**, Claude Code için bir eklenti. Yazılımı kendi ana dilinde geliştirmeni sağlıyor — sıfır İngilizce bilgisiyle. Ayar yok. Dil seçimi yok. Sadece konuşmaya başla. O anlıyor.
 
 Bu bir çevirmen değil. Çevirmenler kelimeleri çevirir. my-claude-lang **anlamı** çevirir.
+
+### 5.0.0'dan itibaren — Evrensel Aktivasyon
+
+my-claude-lang artık sadece İngilizce bilmeyenler için değil. MCL **her** mesajda devreye giriyor — İngilizce dahil — çünkü anlam doğrulama, kıdemli mühendis kalitesinde spec üretimi ve anti-yalakalık, kaynak dilden bağımsız olarak değerli. İngilizce bilmeyen kullanıcı için çeviri köprüsü de çalışmaya devam ediyor; İngilizce kullanıcı için çeviri katmanı identity'ye düşüyor, ama diğer tüm katmanlar (faz kapıları, öz-eleştiri, disambiguation, Faz 5 doğrulama) tamamen çalışıyor.
 
 ---
 
@@ -62,7 +66,7 @@ Aşama 5: Sonuçlar sadece listelenmez, açıklanır.
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Senin açık "evet"in olmadan hiçbir şey ilerlemez.
 
-Her yanıt `🌐 MCL 4.9.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 5.0.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ---
 

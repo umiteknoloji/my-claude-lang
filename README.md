@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 4.9.0
+# my-claude-lang 🌐 MCL 5.0.0
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -9,6 +9,10 @@ Until now, the best AI coding tools required you to speak English. Not anymore.
 **my-claude-lang** is a plugin for Claude Code that lets you build software in your native language — with zero English knowledge required. No configuration. No language settings. Just start talking. It understands.
 
 This is not a translator. Translators convert words. my-claude-lang converts **meaning**.
+
+### Since 5.0.0 — Universal Activation
+
+my-claude-lang is no longer only for non-English speakers. MCL activates on **every** message — English included — because meaning verification, senior-engineer spec generation, and anti-sycophancy matter regardless of source language. For non-English developers the translation bridge also runs; for English developers it collapses to identity, and every other layer (phase gates, self-critique, disambiguation, Phase 5 verification) still applies in full.
 
 ---
 
@@ -62,7 +66,7 @@ Phase 5: Results are explained, not just listed.
 
 **No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit "yes."
 
-Every response starts with `🌐 MCL 4.9.0` so you always know the bridge is active.
+Every response starts with `🌐 MCL 5.0.0` so you always know the bridge is active.
 
 ---
 

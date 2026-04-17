@@ -142,6 +142,10 @@ and the cultural register is preserved. If no native equivalent
 exists in the developer's language, fall back to the English term
 `brown-nosing`.
 
+For **English-speaking developers**, the native term IS `sycophancy` or
+`brown-nosing` directly — no fallback needed; the concept is natively
+expressible in the response language. The filter runs identically.
+
 **The four forms of sycophancy — all forbidden:**
 
 1. **False agreement**: accepting as true what is not, without

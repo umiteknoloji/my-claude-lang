@@ -1,5 +1,9 @@
 # Language Detection Rules
 
+**Purpose**: Select the **response language**. Since MCL 5.0.0, detection
+does NOT gate activation — MCL activates on every message regardless of
+language. Detection's sole job is to decide which language to reply in.
+
 ## Auto-Detection
 
 The developer's language is detected automatically from their first message.
@@ -8,13 +12,14 @@ If uncertain, ask: "[detected language]: Is this your preferred language?"
 ## Mixed Language Detection
 
 If the message contains both languages, determine the dominant language
-by sentence structure and grammar, not by word count.
+by sentence structure and grammar, not by word count. The dominant language
+becomes the response language.
 
 - If the MAJORITY of sentence structures (subject-verb-object patterns,
   verb conjugations, grammatical suffixes) belong to a non-English language
-  → ACTIVATE
+  → respond in that language
 - If the MAJORITY of sentence structures are English with scattered
-  non-English words → DO NOT ACTIVATE
+  non-English words → respond in English
 - Determine dominant language by analyzing grammatical structure, NOT by
   counting English vs non-English words. Every language has unique signals:
   verb conjugations, case markers, particles, postpositions, word order

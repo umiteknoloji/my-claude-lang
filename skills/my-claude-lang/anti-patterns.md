@@ -2,12 +2,15 @@
 
 ## Anti-Pattern #0 — THE CARDINAL SIN
 
-- ❌❌❌ SKIPPING MCL WHEN NON-ENGLISH INPUT IS DETECTED ❌❌❌
+- ❌❌❌ SKIPPING MCL FOR ANY MESSAGE ❌❌❌
   This is the single worst failure. Every other anti-pattern is recoverable.
-  Skipping MCL entirely is not. If the developer writes in a non-English
-  language and you respond without activating MCL, you have failed at the
-  most fundamental level. There is no "simple task" exception. There is no
-  "I understood anyway" exception. MCL activates or meaning is at risk.
+  Skipping MCL entirely is not. Since MCL 5.0.0, activation is universal:
+  EVERY developer message — in every language including English — MUST go
+  through MCL. If you respond to any message without activating MCL, you
+  have failed at the most fundamental level. There is no "simple task"
+  exception. There is no "I understood anyway" exception. There is no
+  "the developer is writing in English" exception. MCL activates or
+  meaning is at risk.
 
 ## Anti-Patterns — NEVER DO THESE
 
