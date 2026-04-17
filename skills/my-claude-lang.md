@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.1.0` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 5.2.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## Self-Critique Loop — MANDATORY, ALL PHASES
@@ -167,30 +167,56 @@ MCL presents an Execution Plan listing every file/tool action. For each:
 what will happen, why, what the harness will ask (translated to developer's
 language), and what each option (Yes/Yes allow all/No) does. Developer
 confirms the plan before execution starts.
-At the end of Phase 4, MCL summarizes all harness permissions (file create,
-tool approve, edit confirm) the developer answered during execution:
-what each was, why it was needed, what was chosen, alternatives, and
-flags any suboptimal choices with recommendations.
 
 ## Phase 5: Verification Report — MANDATORY
 
 For full rules, read `my-claude-lang/phase5-review.md`
 
-After ALL code is written, MCL produces a Verification Report with 5 sections:
+After ALL code is written, MCL produces a Verification Report with 4 sections,
+in this order:
+
 1. **Spec Compliance** — every MUST/SHOULD checked against the code (✅/❌/⚠️)
-2. **Missed Risks** — things nobody thought of but appeared during implementation
-3. **Impact Analysis** — what other parts of the project might be affected
-4. **Test Checklist** — specific steps the developer should test
-5. **Permission Summary** — each harness permission listed individually
+2. **Impact Analysis** — what other parts of the project might be affected
+3. **`!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`** — an emphatically-titled list of
+   items the developer must verify in a running environment because Claude
+   (sandboxed) could not. The phrase is rendered in the developer's detected
+   language, wrapped in `!!! ... !!!`. Examples:
+   - Turkish: `!!! MUTLAKA TEST ETMENİZ GEREKENLER !!!`
+   - English: `!!! YOU MUST TEST THESE !!!`
+   - Spanish: `!!! DEBES PROBAR ESTO !!!`
+4. **Missed Risks — interactive dialog** (NOT a one-shot list). MCL presents
+   ONE risk at a time with a short explanation of why it is a risk, then
+   waits for the developer's reply in the next message before presenting
+   the next risk. Per risk the developer may respond with: (a) skip /
+   not important, (b) apply a specific fix, (c) make this a general rule
+   (which triggers the Rule Capture flow — see `my-claude-lang/rule-capture.md`).
+   The dialog ends when all risks are covered, or when the developer
+   explicitly moves on.
+
+The Permission Summary section has been removed — the developer already
+saw and approved each permission at the harness prompt; restating them
+in a report adds no decision-relevant information.
 
 This report is NOT optional. It gives the developer confidence that the
 AI did the right thing. Phase 4 does NOT end without this report.
 If code was written but this report was not produced, Phase 5 was skipped.
 
 ⛔ STOP RULE: Do NOT write "all steps completed" or "done" without
-producing the 5-section Verification Report first.
+producing the 4-section Verification Report first. The Missed Risks
+dialog is sequential — one risk per turn — so the report unfolds over
+multiple turns rather than a single wall-of-text.
 
-Ask "Do you understand everything? (yes / no)"
+## Rule Capture
+
+For full rules, read `my-claude-lang/rule-capture.md`
+
+During the Missed Risks dialog (or anywhere a generalizable pattern
+appears), the developer may ask MCL to turn a fix into a durable rule.
+MCL asks for scope — once only / this project / all my projects — then
+shows the exact English rule text plus a localized version for review.
+Only after explicit approval does MCL append the rule under
+`## MCL-captured rules` in `<CWD>/CLAUDE.md` (project scope) or
+`~/.claude/CLAUDE.md` (user scope). MCL never writes silently.
 
 ## Language Detection
 
