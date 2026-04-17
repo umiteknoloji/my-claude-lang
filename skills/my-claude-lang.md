@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.2.0` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 5.3.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## Self-Critique Loop — MANDATORY, ALL PHASES
@@ -92,7 +92,8 @@ phase1_understand(developer_message) → intent, constraints, success_criteria, 
 phase2_generate_spec(intent, constraints, success_criteria, context) → spec
 phase3_verify(spec) → verified_plan
 phase4_execute(spec, verified_plan) → code
-phase5_review(code) → results
+phase4_5_post_code_risk_review(code) → resolved_risks
+phase5_verification_report(code, resolved_risks) → report
 ```
 
 Missing, invalid, or contradictory parameter → keep gathering. Do NOT advance.
@@ -168,43 +169,62 @@ what will happen, why, what the harness will ask (translated to developer's
 language), and what each option (Yes/Yes allow all/No) does. Developer
 confirms the plan before execution starts.
 
+## Phase 4.5: Post-Code Risk Review — MANDATORY
+
+After Phase 4 writes code but BEFORE Phase 5 emits the Verification Report,
+MCL runs an interactive Missed Risks dialog. This phase exists because
+the developer's decisions about missed risks can change the impact
+analysis and must-test list in the final report — so the report comes
+AFTER the risk review, not around it.
+
+- MCL presents **one** missed risk per turn with a short explanation of
+  why it is a risk.
+- MCL then **waits** for the developer's reply in the next message before
+  presenting the next risk.
+- Per risk, the developer may reply with:
+  - **skip / not important** → risk noted, move on
+  - **apply a specific fix** → MCL implements the fix, then continues
+  - **make this a general rule** → triggers the Rule Capture flow
+    (see `my-claude-lang/rule-capture.md`)
+- If MCL detects **no missed risks**, Phase 4.5 emits a single localized
+  sentence ("No missed risks detected." / "Kaçırılmış risk yok.") and
+  advances to Phase 5 immediately — the phase is not padded.
+- The dialog ends when all risks are resolved, the developer says
+  "skip all", or the developer explicitly moves to a new topic
+  (open risks marked skipped).
+
+⛔ STOP RULE: Do NOT emit the Phase 5 Verification Report until Phase 4.5
+is complete. The final report reflects post-risk-decision state.
+
 ## Phase 5: Verification Report — MANDATORY
 
 For full rules, read `my-claude-lang/phase5-review.md`
 
-After ALL code is written, MCL produces a Verification Report with 4 sections,
-in this order:
+After Phase 4.5 resolves all missed-risk decisions, MCL produces a
+Verification Report with **3 sections** in this order:
 
-1. **Spec Compliance** — every MUST/SHOULD checked against the code (✅/❌/⚠️)
-2. **Impact Analysis** — what other parts of the project might be affected
-3. **`!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`** — an emphatically-titled list of
-   items the developer must verify in a running environment because Claude
-   (sandboxed) could not. The phrase is rendered in the developer's detected
-   language, wrapped in `!!! ... !!!`. Examples:
+1. **Spec Compliance** — **mismatches only** (⚠️/❌). If every MUST/SHOULD
+   is met, emit a single localized sentence: *"All MUST/SHOULD items
+   comply."* / *"Tüm MUST/SHOULD uyumlu."* Do NOT list ✅ items.
+2. **Impact Analysis** — what else in the project could be affected,
+   updated to reflect any decisions from Phase 4.5.
+3. **`!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`** — the developer's must-test
+   list, rendered in the developer's detected language, wrapped in
+   `!!! ... !!!`, updated to reflect any Phase 4.5 decisions. Examples:
    - Turkish: `!!! MUTLAKA TEST ETMENİZ GEREKENLER !!!`
    - English: `!!! YOU MUST TEST THESE !!!`
    - Spanish: `!!! DEBES PROBAR ESTO !!!`
-4. **Missed Risks — interactive dialog** (NOT a one-shot list). MCL presents
-   ONE risk at a time with a short explanation of why it is a risk, then
-   waits for the developer's reply in the next message before presenting
-   the next risk. Per risk the developer may respond with: (a) skip /
-   not important, (b) apply a specific fix, (c) make this a general rule
-   (which triggers the Rule Capture flow — see `my-claude-lang/rule-capture.md`).
-   The dialog ends when all risks are covered, or when the developer
-   explicitly moves on.
 
-The Permission Summary section has been removed — the developer already
-saw and approved each permission at the harness prompt; restating them
-in a report adds no decision-relevant information.
+Missed Risks is NOT part of Phase 5 — it is its own Phase 4.5 and has
+already run by the time Phase 5 emits. The Permission Summary section
+has also been removed; the developer already saw and approved each
+permission at the harness prompt.
 
 This report is NOT optional. It gives the developer confidence that the
-AI did the right thing. Phase 4 does NOT end without this report.
-If code was written but this report was not produced, Phase 5 was skipped.
+AI did the right thing. Phase 4.5 does NOT end without this report.
 
 ⛔ STOP RULE: Do NOT write "all steps completed" or "done" without
-producing the 4-section Verification Report first. The Missed Risks
-dialog is sequential — one risk per turn — so the report unfolds over
-multiple turns rather than a single wall-of-text.
+producing the 3-section Verification Report after Phase 4.5 finishes.
 
 ## Rule Capture
 
@@ -267,9 +287,13 @@ ALL phases MUST be executed. No phase can be skipped. This is the core principle
   The developer MUST confirm before Phase 4.
 - **Phase 4**: All execution happens from the verified spec. Mid-execution questions
   go through the bridge (English ↔ developer's language).
-- **Phase 5**: Results are explained, not just listed.
+- **Phase 4.5**: Interactive Missed Risks dialog — one risk per turn, developer
+  replies with skip / specific fix / general rule. Phase 5 cannot start until
+  Phase 4.5 completes (or confirms no risks exist).
+- **Phase 5**: Results are explained, not just listed. 3 sections: Spec Compliance
+  (mismatches only), Impact Analysis, `!!! <LOCALIZED-MUST-TEST> !!!`.
 
-Skipping any phase — especially Phase 2 and 3 — breaks the entire bridge.
+Skipping any phase — especially Phase 2, 3, 4.5 — breaks the entire bridge.
 The three-way communication (User ↔ MCL ↔ Claude Code) only works when all
 phases run. Otherwise MCL is just a translator, not a meaning verification system.
 

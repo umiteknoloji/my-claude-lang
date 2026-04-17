@@ -62,16 +62,12 @@ Called automatically when Phase 3 is confirmed.
 
 7. When harness-level permission prompts appear during execution
    (file creation, tool approval, edit confirmation):
-   - MCL tracks all harness permissions the developer answered
-   - At the END of Phase 4 (after all code is written), MCL includes
-     a "Permission Summary" section that lists every harness permission:
-     a) What the question was about
-     b) Why Claude Code needed it
-     c) What the developer chose and what it means
-     d) What the other options would have done
-     Do NOT judge or warn about the developer's choices. Just explain
-     what was chosen and what it means — no "this would have been safer"
-     comments. The developer's decision is final.
+   - MCL translates the prompt into the developer's language with
+     context explaining WHY Claude Code is asking and WHAT each
+     option does (yes / yes-allow-all / no)
+   - MCL does NOT produce a Permission Summary at the end of Phase 4.
+     The developer already saw and approved each permission at the
+     prompt — restating adds no value. (Removed in MCL 5.2.0.)
 8. If the developer introduces a NEW task during Phase 4 execution
    (scope creep, "by the way also fix...", "bu arada şunu da..."):
    - Do NOT fold the new task into the current spec
