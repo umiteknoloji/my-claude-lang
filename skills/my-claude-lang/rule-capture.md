@@ -11,8 +11,9 @@ verify.
 
 The capture flow may trigger in two situations:
 
-1. **During the Phase 5 Missed Risks dialog**: when the user says "make
-   this a general rule" for a risk being discussed.
+1. **During the Phase 4.5 Post-Code Risk Review dialog**: when the user
+   says "make this a general rule" for a risk being discussed. (Before
+   MCL 5.3.0 this dialog lived inside Phase 5; it is now its own phase.)
 2. **Anywhere MCL detects a generalizable pattern**: if during normal
    work MCL notices a recurring preference ("don't use try/catch
    fallback", "always use pnpm, not npm"), it may ask the user:
@@ -193,15 +194,15 @@ captured yet."* in the user's language.
 - Not irreversible — captured rules live in plain `CLAUDE.md` files.
   The user can edit or delete them with any text editor at any time.
 
-## Integration with Phase 5
+## Integration with Phase 4.5
 
-During the Missed Risks interactive dialog, when the user picks
-"make this a general rule" for a risk, MCL:
+During the Phase 4.5 Post-Code Risk Review interactive dialog, when the
+user picks "make this a general rule" for a risk, MCL:
 
 1. Triggers the rule capture flow immediately for that risk.
 2. After the flow completes (rule saved, saved+user-level, or cancelled),
    MCL moves to the next missed risk.
-3. If the user picks "once only" or "specific fix", the risk is
+3. If the user picks "skip" or "apply specific fix", the risk is
    resolved locally with no rule capture.
 
 ## Anti-Sycophancy in Rule Capture

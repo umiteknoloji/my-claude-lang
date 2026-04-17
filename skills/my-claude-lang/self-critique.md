@@ -15,8 +15,9 @@ The loop triggers at TWO transition points:
    content to Claude Code
 
 This covers everything — clarifying questions (Phase 1), specs (Phase 2),
-verification prompts (Phase 3), execution plans (Phase 4), verification
-reports (Phase 5), and every intermediate message.
+verification prompts (Phase 3), execution plans (Phase 4), every risk
+turn in the Post-Code Risk Review (Phase 4.5), verification reports
+(Phase 5), and every intermediate message.
 
 ## The Four Questions
 
