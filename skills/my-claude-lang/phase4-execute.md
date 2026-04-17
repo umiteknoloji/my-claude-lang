@@ -20,38 +20,41 @@ Called automatically when Phase 3 is confirmed.
 5. At every decision point requiring developer input:
    - Present options in the developer's language with explanations
    - After selection, confirm the English version before proceeding
-6. **EXECUTION PLAN — MANDATORY BEFORE ANY TOOL CALL:**
-   After spec is confirmed but BEFORE any code is written, MCL presents
-   an "Execution Plan" (Uygulama Planı) in the developer's language.
-   This plan lists EVERY file and tool action that will happen, with:
+6. **EXECUTION PLAN — DELETION-ONLY (since MCL 5.3.2):**
+   By default MCL proceeds silently WITHOUT emitting an Execution Plan.
+   The plan is required ONLY when the intended action deletes files or
+   directories — specifically `rm` or `rmdir` shell commands (including
+   `rm -r`, `rm -rf`, or any chained `&&`/`;` bash where `rm`/`rmdir`
+   appears).
 
-   For EACH action:
-   a) **What** — file name and operation (create/edit/command)
-   b) **Why** — one sentence: why this is needed
-   c) **What the harness will ask** — the exact options translated
-      to the developer's language (e.g., "Sistem sana şunu soracak:
-      'config.ts dosyasını oluşturmak istiyor musun?'")
-   d) **What each option does** — explain every choice:
-      - "Yes" → sadece bu dosya için izin verir
-      - "Yes, allow all" → bu oturumdaki tüm düzenlemelere izin verir
-      - "No" → bu işlemi reddeder, dosya oluşturulmaz
+   All other actions proceed silently: Read, Grep, Glob, Write, single-
+   or multi-file Edit, `git add`/`commit`/`push`/`reset`/`rebase`/
+   `checkout`/`clean`/`rm` (the git subcommand, NOT shell `rm`), package
+   installs (`npm install`, `pip install`, `brew install`), `WebFetch`,
+   `WebSearch`, `sudo`/`chmod`/`chown`, writes under `~/.claude/` or
+   system directories.
+
+   On ambiguity (unclear whether a command deletes), default to showing
+   the plan (safe side).
+
+   When the plan IS triggered, list every action with:
+
+   a) **What** — the exact `rm`/`rmdir` invocation and target path
+   b) **Why** — one sentence: why the deletion is needed
+   c) **What the harness will ask** — the permission prompt translated
+      to the developer's language
+   d) **What each option does** — "Yes" / "Yes, allow all" / "No"
 
    Example format:
    ```
-   📦 Uygulama Planı:
+   📦 Silme Planı:
 
-   1. `mock-data.ts` düzenleme
-      Neden: Category tipi ve örnek veriler eklenecek
-      Sistem soracak: "Do you want to edit mock-data.ts?"
-      → "Yes" seçersen: sadece bu dosya düzenlenir
-      → "Yes, allow all" seçersen: bundan sonraki tüm düzenlemelere otomatik izin verilir
-      → "No" seçersen: bu dosya düzenlenmez, kategori verileri eklenmez
-
-   2. `categories/page.tsx` oluşturma
-      Neden: Kategori yönetim sayfasının ana dosyası
-      Sistem soracak: "Do you want to create categories/page.tsx?"
-      → "Yes" seçersen: sadece bu dosya oluşturulur
-      → "No" seçersen: sayfa oluşturulmaz
+   1. `rm -rf build/` komutu
+      Neden: Eski derleme çıktısı temizlenecek, yeniden üretilecek
+      Sistem soracak: "Do you want to run: rm -rf build/?"
+      → "Yes" seçersen: sadece bu komut çalıştırılır
+      → "Yes, allow all" seçersen: oturumdaki tüm rm komutlarına izin verilir
+      → "No" seçersen: dizin silinmez
    ```
 
    After the plan, ask: "Bu plan uygun mu? Başlayayım mı?"

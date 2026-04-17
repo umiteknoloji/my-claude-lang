@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.3.1` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 5.3.2` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## Self-Critique Loop — MANDATORY, ALL PHASES

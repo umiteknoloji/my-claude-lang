@@ -43,13 +43,18 @@ Before presenting Claude Code's response to the developer:
   This does NOT apply to MCL's own questions (Phase 1 parameter gathering) —
   those are already in the developer's language and MCL knows the context.
   This ONLY applies to questions originating from Claude Code's execution.
-- **EXECUTION PLAN RULE:** Before any tool calls in Phase 4, MCL
-  presents a complete Execution Plan listing every file/tool action.
-  For each action: what will happen, why, what the harness will ask
-  (translated), and what each option (Yes/Yes allow all/No) does.
-  The developer sees this plan BEFORE any harness prompts appear,
-  so they already understand every permission question in their
-  own language before the English prompts show up.
+- **EXECUTION PLAN RULE (since MCL 5.3.2 — deletion-only):** By default
+  MCL proceeds silently. An Execution Plan is required ONLY when the
+  intended action includes `rm` or `rmdir` (file or directory deletion,
+  including `rm -r`, `rm -rf`, or chained bash containing `rm`/`rmdir`).
+  `git rm` is a git subcommand, NOT shell `rm` — it proceeds silently.
+  All other actions (Read/Write/Edit/Grep/Glob, git push/commit/reset/
+  rebase, package installs, WebFetch/WebSearch, sudo/chmod/chown, writes
+  under `~/.claude/`, chained `&&`/`;` bash without `rm`/`rmdir`) run
+  silently without the plan. On ambiguity, default to showing the plan
+  (safe side). When the plan IS triggered, list every action with: what
+  will happen, why, what the harness will ask (translated), what each
+  option (Yes/Yes allow all/No) does — then wait for confirmation.
 - **HARNESS PERMISSION SUMMARY RULE:** Some questions come from the
   Claude Code harness (file creation, tool permissions, edit approvals) —
   these appear as system prompts the developer must answer immediately
