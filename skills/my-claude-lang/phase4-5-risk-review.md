@@ -62,6 +62,17 @@ sentence in the developer's language and proceed to Phase 5:
 - Turkish: `Ek risk tespit edilmedi.`
 - English: `No additional risks identified.`
 - Spanish: `No se identificaron riesgos adicionales.`
+- Japanese: `追加のリスクは特定されませんでした。`
+- Korean: `추가 위험이 식별되지 않았습니다.`
+- Arabic: `لم يتم تحديد مخاطر إضافية.`
+- Hindi: `कोई अतिरिक्त जोखिम नहीं पहचाना गया।`
+- Portuguese: `Nenhum risco adicional identificado.`
+- French: `Aucun risque supplémentaire identifié.`
+- German: `Keine zusätzlichen Risiken festgestellt.`
+- Chinese: `未发现其他风险。`
+- Russian: `Дополнительных рисков не выявлено.`
+- Hebrew: `לא זוהו סיכונים נוספים.`
+- Indonesian: `Tidak ada risiko tambahan yang teridentifikasi.`
 
 Never fabricate risks to fill the section. Never present risks already
 handled in Phase 1–3.

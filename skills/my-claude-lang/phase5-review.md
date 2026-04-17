@@ -40,6 +40,17 @@ one sentence in the developer's language and nothing more:
 - Turkish: `Tüm MUST/SHOULD maddeleri karşılandı.`
 - English: `All MUST/SHOULD items comply.`
 - Spanish: `Todos los elementos MUST/SHOULD cumplen.`
+- Japanese: `すべての MUST/SHOULD 項目が満たされています。`
+- Korean: `모든 MUST/SHOULD 항목이 충족되었습니다.`
+- Arabic: `جميع عناصر MUST/SHOULD مستوفاة.`
+- Hindi: `सभी MUST/SHOULD आइटम अनुपालन करते हैं।`
+- Portuguese: `Todos os itens MUST/SHOULD estão em conformidade.`
+- French: `Tous les éléments MUST/SHOULD sont conformes.`
+- German: `Alle MUST/SHOULD-Punkte sind erfüllt.`
+- Chinese: `所有 MUST/SHOULD 项均符合要求。`
+- Russian: `Все пункты MUST/SHOULD соблюдены.`
+- Hebrew: `כל פריטי MUST/SHOULD עומדים בדרישות.`
+- Indonesian: `Semua item MUST/SHOULD terpenuhi.`
 
 Do NOT list satisfied items. Do NOT emit a table of ✅ lines. The
 developer reads the spec; they do not need every green check restated.
