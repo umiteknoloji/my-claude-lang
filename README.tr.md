@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.4.0
+# my-claude-lang 🌐 MCL 5.4.1
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -66,7 +66,7 @@ Aşama 5: Sonuçlar sadece listelenmez, açıklanır.
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Senin açık "evet"in olmadan hiçbir şey ilerlemez.
 
-Her yanıt `🌐 MCL 5.4.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 5.4.1` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ---
 
@@ -149,6 +149,26 @@ Bu her şeyi global olarak kurar:
 - **Hook konfigürasyonu** → `~/.claude/settings.json` (hook'u Claude Code'a bağlar)
 
 Yeni bir Claude Code oturumu aç ve kendi dilinde yazmaya başla. Hepsi bu.
+
+---
+
+## Güncelleme
+
+MCL, pasif bir güncelleme kontrolü ve tek kelimeyle self-update özelliğiyle gelir.
+
+Hook, 24 saatte bir arka planda repodaki `VERSION` dosyasını çeker. Yeni sürüm varsa, her yanıttaki banner'ın yanında senin dilinde lokalize bir uyarı belirir, örneğin:
+
+```
+🌐 MCL 5.4.1 (⚠️ 5.4.2 mevcut — mcl-update yaz)
+```
+
+Güncellemek için mesaj olarak sadece `mcl-update` yaz. MCL normal akışı (spec, fazlar) tamamen atlar ve şu komutu çalıştırır:
+
+```
+cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
+```
+
+`MCL_REPO_PATH` varsayılan olarak `$HOME/my-claude-lang`. Klonun başka bir yerdeyse environment variable ile ayarla. Güncelleme bitince yeni bir Claude Code oturumu aç — güncellenen hook ancak yeni oturumda devreye girer.
 
 ---
 

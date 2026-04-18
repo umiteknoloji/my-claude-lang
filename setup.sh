@@ -19,22 +19,33 @@ echo "=========================="
 echo ""
 
 # 0. Version consistency check
-#    The MCL version appears in multiple files. If they drift, users see
-#    inconsistent banners (e.g. hook says 5.3.0 but README says 5.2.0).
-#    Anchor on the `🌐 MCL X.Y.Z` banner so historical references like
-#    "Since MCL 5.0.0" are NOT caught as the current version.
-HOOK_VERSION="$(grep -oE '🌐 MCL [0-9]+\.[0-9]+\.[0-9]+' "$HOOK_SRC" | head -1 | awk '{print $3}')"
+#    The VERSION file at the repo root is the single source of truth.
+#    Every consumer (README.md, README.tr.md, skill file, hook banner)
+#    must carry the same `🌐 MCL X.Y.Z` banner. Historical references
+#    like "Since MCL 5.0.0" are NOT caught because the check is anchored
+#    on the banner emoji.
+VERSION_FILE="$SCRIPT_DIR/VERSION"
+if [ ! -f "$VERSION_FILE" ]; then
+  echo "[ERROR] VERSION file missing at $VERSION_FILE"
+  exit 1
+fi
+CANONICAL_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+if ! printf '%s' "$CANONICAL_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "[ERROR] VERSION file contains malformed semver: '$CANONICAL_VERSION'"
+  exit 1
+fi
+echo "MCL version: $CANONICAL_VERSION"
 VERSION_MISMATCH=0
-for f in "$SCRIPT_DIR/README.md" "$SCRIPT_DIR/README.tr.md" "$SKILL_SRC"; do
+for f in "$SCRIPT_DIR/README.md" "$SCRIPT_DIR/README.tr.md" "$SKILL_SRC" "$HOOK_SRC"; do
   [ -f "$f" ] || continue
   FILE_VERSION="$(grep -oE '🌐 MCL [0-9]+\.[0-9]+\.[0-9]+' "$f" | head -1 | awk '{print $3}')"
-  if [ -n "$FILE_VERSION" ] && [ "$FILE_VERSION" != "$HOOK_VERSION" ]; then
-    echo "[WARN] Version drift: $f has $FILE_VERSION, hook has $HOOK_VERSION"
+  if [ -n "$FILE_VERSION" ] && [ "$FILE_VERSION" != "$CANONICAL_VERSION" ]; then
+    echo "[WARN] Version drift: $f has $FILE_VERSION, VERSION says $CANONICAL_VERSION"
     VERSION_MISMATCH=1
   fi
 done
 if [ "$VERSION_MISMATCH" -eq 0 ]; then
-  echo "[OK] Version $HOOK_VERSION consistent across README.md, README.tr.md, skill file, hook"
+  echo "[OK] Version $CANONICAL_VERSION consistent across README.md, README.tr.md, skill file, hook"
 fi
 echo ""
 
