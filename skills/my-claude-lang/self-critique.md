@@ -1,3 +1,5 @@
+<mcl_constraint name="self-critique">
+
 # Self-Critique Loop
 
 The self-critique loop is a MANDATORY quality gate that wraps every MCL
@@ -214,3 +216,5 @@ With self-critique:
 - The developer gets the equivalent of a senior engineer who drafts,
   reviews, and revises before speaking
 - With `(mcl-oz)` the developer can audit the process when needed
+
+</mcl_constraint>

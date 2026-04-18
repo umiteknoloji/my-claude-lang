@@ -1,3 +1,5 @@
+<mcl_phase name="phase5-review">
+
 # Phase 5: Verification Report
 
 Phase 5 is NOT just a review translation. It is a comprehensive verification
@@ -131,3 +133,5 @@ When code review, test results, or completion reports come back
    - Code references stay in English
 4. After presenting results, ask: "Do you understand what this means? (yes / no)"
    If "no" → re-explain differently
+
+</mcl_phase>

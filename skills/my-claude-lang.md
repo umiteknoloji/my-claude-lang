@@ -54,8 +54,16 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.4.4` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 5.5.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
+
+## MCL Tag Schema
+
+For the full XML tag vocabulary MCL uses to wrap its own directives,
+read `my-claude-lang/mcl-tag-schema.md`. The schema defines 5 tags
+(`<mcl_core>`, `<mcl_phase>`, `<mcl_constraint>`, `<mcl_input>`,
+`<mcl_audit>`). Tags are input-only — never wrap Claude's output in
+them.
 
 ## Self-Critique Loop — MANDATORY, ALL PHASES
 

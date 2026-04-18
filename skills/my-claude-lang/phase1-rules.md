@@ -1,3 +1,5 @@
+<mcl_phase name="phase1-rules">
+
 # Phase 1: Gather Parameters — Detailed Rules
 
 ## Main Flow
@@ -158,3 +160,5 @@ If the developer requests multiple distinct tasks in one message:
   individually to make sure nothing gets lost."
 - Run Phase 1-3 separately for each task
 - Execute tasks in the agreed order
+
+</mcl_phase>

@@ -1,3 +1,5 @@
+<mcl_phase name="gates">
+
 # Bidirectional Quality Gates
 
 MCL validates meaning in BOTH directions. It does NOT just pass messages.
@@ -87,3 +89,5 @@ Before presenting Claude Code's response to the developer:
   and ask for confirmation once more. See `cultural-pragmatics.md`
 - If the developer's response uses indirect language that may signal
   disagreement → do not treat it as confirmation. See `cultural-pragmatics.md`
+
+</mcl_phase>

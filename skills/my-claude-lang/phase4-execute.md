@@ -1,3 +1,5 @@
+<mcl_phase name="phase4-execute">
+
 # Phase 4: Execution with Live Translation
 
 Called automatically when Phase 3 is confirmed.
@@ -81,3 +83,5 @@ Called automatically when Phase 3 is confirmed.
    - If switch → pause current task at a safe point, run Phase 1-3
      for the new task
    - Either way, the new task gets its own Phase 1-3 cycle
+
+</mcl_phase>

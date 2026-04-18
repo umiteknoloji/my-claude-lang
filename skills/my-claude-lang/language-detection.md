@@ -1,3 +1,5 @@
+<mcl_phase name="language-detection">
+
 # Language Detection Rules
 
 **Purpose**: Select the **response language**. Since MCL 5.0.0, detection
@@ -39,3 +41,5 @@ If the developer switches to a different language during a conversation:
 - If "yes" → switch all communication to the new language, continue the
   current phase
 - If "no" → continue in the original language
+
+</mcl_phase>

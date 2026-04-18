@@ -1,3 +1,5 @@
+<mcl_phase name="cultural-pragmatics">
+
 # Cultural Pragmatics
 
 MCL is a meaning verification system, not just a linguistic one. Language carries
@@ -241,3 +243,5 @@ MCL response pattern:
   size/style, or is that just how you'd describe it?"
 - If the developer says "just casual" → drop it, move on
 - Never make the developer feel judged for informal language
+
+</mcl_phase>

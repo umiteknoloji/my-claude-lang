@@ -1,3 +1,5 @@
+<mcl_phase name="phase3-verify">
+
 # Phase 3: Claude Code Understanding Verification
 
 Called automatically when spec is generated.
@@ -29,3 +31,5 @@ Does this match what you want? (yes / no)
 7. If developer understands but disagrees → ask "What did I get wrong?",
    fix the English spec, repeat Phase 3
 8. Only when the developer understands AND agrees → call Phase 4
+
+</mcl_phase>

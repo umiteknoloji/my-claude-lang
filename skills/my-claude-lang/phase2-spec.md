@@ -1,3 +1,5 @@
+<mcl_phase name="phase2-spec">
+
 # Phase 2: Generate English Spec
 
 Called automatically when Phase 1 parameters are complete and confirmed.
@@ -83,3 +85,5 @@ When the spec is visible:
 ## This spec is the SINGLE SOURCE OF TRUTH for all subsequent work.
 All code in Phase 4 must satisfy the spec. If implementation reveals
 the spec is incomplete, return to Phase 2 and update — do not improvise.
+
+</mcl_phase>

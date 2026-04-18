@@ -1,3 +1,5 @@
+<mcl_phase name="technical-disambiguation">
+
 # Technical Disambiguation
 
 Gate 1 catches vague adjectives ("fast", "simple", "clean"). But some
@@ -247,3 +249,5 @@ MCL response pattern:
   covered?"
 - The developer decides — MCL flags, does not block
 - If the developer says "I have it covered" → accept and proceed
+
+</mcl_phase>

@@ -1,3 +1,5 @@
+<mcl_constraint name="anti-patterns">
+
 # Anti-Patterns and Verification
 
 ## Anti-Pattern #0 — THE CARDINAL SIN
@@ -108,3 +110,5 @@ If at any point:
 - [ ] Developer confirmed understanding of Claude Code's summary
 - [ ] Developer confirmed Claude Code's understanding matches their intent
 - [ ] All parameters ready → PROCEED
+
+</mcl_constraint>

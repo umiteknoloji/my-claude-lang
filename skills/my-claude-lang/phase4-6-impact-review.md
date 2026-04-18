@@ -1,3 +1,5 @@
+<mcl_phase name="phase4-6-impact-review">
+
 # Phase 4.6: Post-Risk Impact Review
 
 Phase 4.6 is a **mandatory, sequential, interactive dialog** that runs
@@ -108,3 +110,5 @@ handled in Phase 4.5.
 
 For Phase 4.6 anti-patterns, see `my-claude-lang/anti-patterns.md` —
 anti-patterns live in a single file to avoid drift.
+
+</mcl_phase>

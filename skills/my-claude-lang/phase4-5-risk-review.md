@@ -1,3 +1,5 @@
+<mcl_phase name="phase4-5-risk-review">
+
 # Phase 4.5: Post-Code Risk Review
 
 Phase 4.5 is a **mandatory, sequential, interactive dialog** that runs
@@ -77,3 +79,5 @@ After every risk is resolved (skipped, fixed, or captured as a rule),
 Phase 5 emits the Verification Report. The report's Impact Analysis and
 must-test sections MUST reflect Phase 4.5 decisions — fixes applied,
 risks accepted, rules captured.
+
+</mcl_phase>

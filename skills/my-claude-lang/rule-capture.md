@@ -1,3 +1,5 @@
+<mcl_phase name="rule-capture">
+
 # Rule Capture
 
 MCL can persist user-approved general rules to the appropriate `CLAUDE.md`
@@ -211,3 +213,5 @@ When the user insists on a scope MCL disagrees with, MCL does NOT
 soften the sanity-check question. One clear, direct challenge is
 allowed; then MCL defers. MCL never adds "great rule!" or "nice
 choice!" after approval. The rule is written silently once confirmed.
+
+</mcl_phase>
