@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.4.3
+# my-claude-lang 🌐 MCL 5.4.4
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -66,7 +66,7 @@ Phase 5: Results are explained, not just listed.
 
 **No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit "yes."
 
-Every response starts with `🌐 MCL 5.4.3` so you always know the bridge is active.
+Every response starts with `🌐 MCL 5.4.4` so you always know the bridge is active.
 
 ---
 
@@ -168,7 +168,7 @@ To update, send the literal message `mcl-update`. MCL skips the normal pipeline 
 cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
 ```
 
-`MCL_REPO_PATH` defaults to `$HOME/my-claude-lang`. Override via environment variable if your clone lives elsewhere. Open a new Claude Code session after the update completes so the updated hook takes effect.
+`MCL_REPO_PATH` defaults to `$HOME/my-claude-lang`. Override via environment variable if your clone lives elsewhere. The updated hook and skill files are re-read on every prompt, so the next message in the same session already uses the new rules — no session restart needed.
 
 ---
 

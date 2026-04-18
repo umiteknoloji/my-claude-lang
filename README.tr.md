@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.4.3
+# my-claude-lang 🌐 MCL 5.4.4
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -66,7 +66,7 @@ Aşama 5: Sonuçlar sadece listelenmez, açıklanır.
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Senin açık "evet"in olmadan hiçbir şey ilerlemez.
 
-Her yanıt `🌐 MCL 5.4.3` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 5.4.4` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ---
 
@@ -168,7 +168,7 @@ Güncellemek için mesaj olarak sadece `mcl-update` yaz. MCL normal akışı (sp
 cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
 ```
 
-`MCL_REPO_PATH` varsayılan olarak `$HOME/my-claude-lang`. Klonun başka bir yerdeyse environment variable ile ayarla. Güncelleme bitince yeni bir Claude Code oturumu aç — güncellenen hook ancak yeni oturumda devreye girer.
+`MCL_REPO_PATH` varsayılan olarak `$HOME/my-claude-lang`. Klonun başka bir yerdeyse environment variable ile ayarla. Güncellenen hook ve skill dosyaları her prompt'ta yeniden okunduğu için aynı oturumdaki bir sonraki mesajın yeni kuralları kullanır — oturum yeniden başlatmaya gerek yok.
 
 ---
 
