@@ -56,26 +56,15 @@ When scanning code for Phase 4.5 risks, consider:
 
 ## When There Are No Risks
 
-If after an honest scan MCL finds no risks worth surfacing, emit a single
-sentence in the developer's language and proceed to Phase 5:
-
-- Turkish: `Ek risk tespit edilmedi.`
-- English: `No additional risks identified.`
-- Spanish: `No se identificaron riesgos adicionales.`
-- Japanese: `追加のリスクは特定されませんでした。`
-- Korean: `추가 위험이 식별되지 않았습니다.`
-- Arabic: `لم يتم تحديد مخاطر إضافية.`
-- Hindi: `कोई अतिरिक्त जोखिम नहीं पहचाना गया।`
-- Portuguese: `Nenhum risco adicional identificado.`
-- French: `Aucun risque supplémentaire identifié.`
-- German: `Keine zusätzlichen Risiken festgestellt.`
-- Chinese: `未发现其他风险。`
-- Russian: `Дополнительных рисков не выявлено.`
-- Hebrew: `לא זוהו סיכונים נוספים.`
-- Indonesian: `Tidak ada risiko tambahan yang teridentifikasi.`
+If after an honest scan MCL finds no risks worth surfacing, OMIT
+Phase 4.5 entirely from the response — no header, no placeholder
+sentence, no whitespace filler — and proceed silently to Phase 5.
+The scan still *happens*; only its output is suppressed when clean.
+"No news = good news" is the user-facing contract.
 
 Never fabricate risks to fill the section. Never present risks already
-handled in Phase 1–3.
+handled in Phase 1–3. Never emit a "No risks identified." sentence —
+silence is the correct signal.
 
 ## Anti-Patterns
 

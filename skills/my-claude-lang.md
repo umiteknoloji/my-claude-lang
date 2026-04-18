@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.3.2` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 5.4.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## Self-Critique Loop — MANDATORY, ALL PHASES
@@ -193,31 +193,63 @@ AFTER the risk review, not around it.
   - **apply a specific fix** → MCL implements the fix, then continues
   - **make this a general rule** → triggers the Rule Capture flow
     (see `my-claude-lang/rule-capture.md`)
-- If MCL detects **no missed risks**, Phase 4.5 emits a single localized
-  sentence ("No missed risks detected." / "Kaçırılmış risk yok.") and
-  advances to Phase 5 immediately — the phase is not padded.
+- If MCL detects **no missed risks**, Phase 4.5 is OMITTED entirely
+  from the response (no header, no placeholder sentence) and MCL
+  advances silently to Phase 4.6.
 - The dialog ends when all risks are resolved, the developer says
   "skip all", or the developer explicitly moves to a new topic
   (open risks marked skipped).
 
-⛔ STOP RULE: Do NOT emit the Phase 5 Verification Report until Phase 4.5
-is complete. The final report reflects post-risk-decision state.
+⛔ STOP RULE: Do NOT emit Phase 4.6 until Phase 4.5 is complete.
+
+## Phase 4.6: Post-Risk Impact Review — MANDATORY
+
+For full Phase 4.6 rules, read `my-claude-lang/phase4-6-impact-review.md`
+
+After Phase 4.5 resolves all missed-risk decisions and BEFORE Phase 5
+emits the Verification Report, MCL runs an interactive Impact Review
+dialog. An "impact" is a real downstream effect of the newly-written
+code on something OTHER than itself: files that import the changed
+module, shared utilities whose behavior shifted, API/contract
+breakage, shared state/cache invalidation, schema/migration effects,
+configuration changes affecting other components. An impact is
+NEVER meta-changelog ("we updated X"), self-reference to the task's
+deliverables, version/setup notes, or items already handled in
+Phase 4.5.
+
+- MCL presents **one** impact per turn with a short explanation:
+  which concrete downstream artifact is affected (file path,
+  function, consumer) and one-sentence why.
+- MCL then **waits** for the developer's reply in the next message
+  before presenting the next impact.
+- Per impact, the developer may reply with:
+  - **skip** → noted, move on
+  - **apply a specific fix** → MCL patches the consumer, then
+    continues
+  - **make this a general rule** → triggers Rule Capture
+- If MCL detects **no real impacts**, Phase 4.6 is OMITTED entirely
+  from the response (no header, no placeholder sentence) and MCL
+  advances silently to Phase 5.
+
+⛔ STOP RULE: Do NOT emit Phase 5 until Phase 4.6 is complete.
 
 ## Phase 5: Verification Report — MANDATORY
 
 For full rules, read `my-claude-lang/phase5-review.md`
 
-After Phase 4.5 resolves all missed-risk decisions, MCL produces a
-Verification Report with **3 sections** in this order:
+After Phase 4.6 resolves all impact decisions, MCL produces a
+Verification Report with **up to 2 sections** in this order (any
+section whose content is empty is omitted entirely — no header, no
+placeholder sentence):
 
 1. **Spec Compliance** — **mismatches only** (⚠️/❌). If every MUST/SHOULD
-   is met, emit a single localized sentence: *"All MUST/SHOULD items
-   comply."* / *"Tüm MUST/SHOULD uyumlu."* Do NOT list ✅ items.
-2. **Impact Analysis** — what else in the project could be affected,
-   updated to reflect any decisions from Phase 4.5.
-3. **`!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`** — the developer's must-test
+   is met, OMIT Section 1 entirely — no header, no "All MUST/SHOULD
+   items comply." sentence. The absence of the section IS the
+   all-clear signal. Do NOT list ✅ items.
+2. **`!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`** — the developer's must-test
    list, rendered in the developer's detected language, wrapped in
-   `!!! ... !!!`, updated to reflect any Phase 4.5 decisions. Examples:
+   `!!! ... !!!`, updated to reflect Phase 4.5 and Phase 4.6
+   decisions. Examples:
    - Turkish: `!!! MUTLAKA TEST ETMENİZ GEREKENLER !!!`
    - English: `!!! YOU MUST TEST THESE !!!`
    - Spanish: `!!! DEBES PROBAR ESTO !!!`
@@ -295,10 +327,16 @@ ALL phases MUST be executed. No phase can be skipped. This is the core principle
 - **Phase 4**: All execution happens from the verified spec. Mid-execution questions
   go through the bridge (English ↔ developer's language).
 - **Phase 4.5**: Interactive Missed Risks dialog — one risk per turn, developer
-  replies with skip / specific fix / general rule. Phase 5 cannot start until
-  Phase 4.5 completes (or confirms no risks exist).
-- **Phase 5**: Results are explained, not just listed. 3 sections: Spec Compliance
-  (mismatches only), Impact Analysis, `!!! <LOCALIZED-MUST-TEST> !!!`.
+  replies with skip / specific fix / general rule. Phase 4.6 cannot start until
+  Phase 4.5 completes (or confirms no risks exist). When no risks: phase omitted
+  entirely.
+- **Phase 4.6**: Interactive Impact Review dialog — one downstream impact per
+  turn, same skip / fix / rule options. Impact = real effect on other parts
+  of the project, never meta-changelog. Phase 5 cannot start until 4.6
+  completes. When no impacts: phase omitted entirely.
+- **Phase 5**: Results are explained, not just listed. Up to 2 sections: Spec
+  Compliance (mismatches only — omitted when none),
+  `!!! <LOCALIZED-MUST-TEST> !!!`. Empty sections are omitted entirely.
 
 Skipping any phase — especially Phase 2, 3, 4.5 — breaks the entire bridge.
 The three-way communication (User ↔ MCL ↔ Claude Code) only works when all

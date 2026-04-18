@@ -5,22 +5,32 @@ that gives the developer confidence that the AI did the right thing.
 
 ## When Phase 5 Runs
 
-After **Phase 4.5 (Post-Code Risk Review)** is fully resolved — i.e. every
-risk MCL surfaced has been answered by the developer (skip / apply fix /
-make general rule) — MCL MUST produce the Verification Report. This is
-NOT optional. Phase 4.5 is NOT the last step.
+After **Phase 4.6 (Post-Risk Impact Review)** is fully resolved — i.e.
+every impact MCL surfaced has been answered by the developer (skip /
+apply fix / make general rule), and Phase 4.5 before it is also
+resolved — MCL MUST produce the Verification Report. This is NOT
+optional. Phase 4.6 is NOT the last step.
 
-If you wrote code and stopped without running Phase 4.5 AND emitting
-this report, you skipped two phases — go back and produce both.
+If you wrote code and stopped without running Phase 4.5, Phase 4.6
+AND emitting this report, you skipped phases — go back and produce
+all of them.
 
 ⛔ STOP RULE: Phase 4 does NOT end with "done" or a summary of changes.
-Phase 4 hands off to Phase 4.5; Phase 4.5 hands off to Phase 5. Phase 5
-is the last step. If you find yourself writing "all steps completed"
-without the 3 sections below, you are violating this rule.
+Phase 4 hands off to Phase 4.5; Phase 4.5 hands off to Phase 4.6;
+Phase 4.6 hands off to Phase 5. Phase 5 is the last step. If you find
+yourself writing "all steps completed" without any of the sections
+below, you are violating this rule.
 
-The report has **exactly three** mandatory sections — no more, no less.
-(Prior to MCL 5.3.0 the report had 4 sections with Missed Risks embedded;
-prior to MCL 5.2.0 it had 5 with a Permission Summary. Both are removed.)
+The report has **up to two** sections, in this order: Spec Compliance,
+must-test. Any section whose content is empty is **omitted entirely**
+(no header, no placeholder sentence, no filler). Section 1 in
+particular is omitted when every MUST/SHOULD is satisfied — the
+absence of the section IS the all-clear signal.
+(Prior to MCL 5.4.0 the report had a third section, Impact Analysis,
+which was extracted into its own Phase 4.6 interactive dialog;
+prior to MCL 5.3.0 the report had 4 sections with Missed Risks
+embedded; prior to MCL 5.2.0 it had 5 with a Permission Summary.
+All are removed.)
 
 ## Section 1: Spec Compliance — Mismatches Only
 
@@ -34,54 +44,23 @@ compliance and ❌ for missing/failed items.
 ⚠️ SHOULD: [requirement] → Kısmen: [what's partial, what's not]
 ```
 
-If EVERY MUST and SHOULD requirement is fully satisfied, emit exactly
-one sentence in the developer's language and nothing more:
+If EVERY MUST and SHOULD requirement is fully satisfied, OMIT
+Section 1 entirely — no "📋 Spec Uyumluluğu:" header, no "All
+MUST/SHOULD items comply." sentence, no placeholder of any kind.
+Proceed directly to Section 2. The absence of Section 1 IS the
+all-clear signal.
 
-- Turkish: `Tüm MUST/SHOULD maddeleri karşılandı.`
-- English: `All MUST/SHOULD items comply.`
-- Spanish: `Todos los elementos MUST/SHOULD cumplen.`
-- Japanese: `すべての MUST/SHOULD 項目が満たされています。`
-- Korean: `모든 MUST/SHOULD 항목이 충족되었습니다.`
-- Arabic: `جميع عناصر MUST/SHOULD مستوفاة.`
-- Hindi: `सभी MUST/SHOULD आइटम अनुपालन करते हैं।`
-- Portuguese: `Todos os itens MUST/SHOULD estão em conformidade.`
-- French: `Tous les éléments MUST/SHOULD sont conformes.`
-- German: `Alle MUST/SHOULD-Punkte sind erfüllt.`
-- Chinese: `所有 MUST/SHOULD 项均符合要求。`
-- Russian: `Все пункты MUST/SHOULD соблюдены.`
-- Hebrew: `כל פריטי MUST/SHOULD עומדים בדרישות.`
-- Indonesian: `Semua item MUST/SHOULD terpenuhi.`
+Do NOT list satisfied items. Do NOT emit a table of ✅ lines. Do NOT
+emit a consolation sentence. The developer reads the spec; they do
+not need every green check restated — and they do not need a
+placeholder telling them there is nothing to read.
 
-Do NOT list satisfied items. Do NOT emit a table of ✅ lines. The
-developer reads the spec; they do not need every green check restated.
-
-## Section 2: Impact Analysis
-
-What other parts of the project MIGHT be affected by this change,
-**reflecting the developer's Phase 4.5 decisions**. If the developer
-applied a fix for a risk in Phase 4.5, the impact picture may shrink;
-if they skipped a risk, the impact may include known-accepted exposure.
-
-```
-🔍 Etki Analizi:
-- [file/feature 1]: [why it might be affected]
-- [file/feature 2]: [why it might be affected]
-- Yoksa: "Bu değişiklik izole, başka yerleri etkilemiyor."
-```
-
-Check for:
-- Files that import the modified files
-- Shared components/utilities that were changed
-- API contracts that may have shifted
-- Database schema changes that affect other queries
-- CSS/style changes that may cascade to other pages
-- Consequences of accepted/skipped risks from Phase 4.5
-
-## Section 3: `!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`
+## Section 2: `!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`
 
 Items the developer MUST verify in a running environment — because the
-sandboxed Claude cannot. This list must reflect Phase 4.5 decisions
-(tests for applied fixes; acceptance smoke for skipped risks).
+sandboxed Claude cannot. This list must reflect both Phase 4.5 and
+Phase 4.6 decisions (tests for applied fixes; acceptance smoke for
+skipped risks; regression coverage for impacted consumers).
 
 The section title MUST be wrapped in `!!! ... !!!` and rendered in the
 developer's detected language:
@@ -111,7 +90,7 @@ Content format:
 - [ ] [Step 1: specific action → expected result]
 - [ ] [Step 2: specific action → expected result]
 - [ ] [Edge case test from Phase 2 spec]
-- [ ] [Regression test for affected areas from Section 2]
+- [ ] [Regression test for consumers surfaced in Phase 4.6]
 - [ ] [Smoke test for any risk the developer skipped in Phase 4.5]
 ```
 
@@ -119,7 +98,7 @@ Tests must be:
 - Specific (not "test the feature" but "click X button, expect Y")
 - Cover the golden path (happy case)
 - Cover edge cases from the spec
-- Cover regression for impacted areas from Section 2
+- Cover regression for consumers surfaced in Phase 4.6
 - Cover residual exposure from Phase 4.5 skipped risks
 
 ## Presentation Rules
@@ -127,6 +106,7 @@ Tests must be:
 - ALL sections are in the developer's language
 - Code snippets and file names stay in English
 - Do NOT include a Missed Risks section — Phase 4.5 handled that
+- Do NOT include an Impact Analysis section — Phase 4.6 handled that
 - Do NOT include a Permission Summary section — removed in MCL 5.2.0
 - Do NOT list ✅-compliant items in Section 1 — mismatches only
 - After the full report, ask: "Do you understand everything? (yes / no)"
