@@ -1,6 +1,6 @@
 #!/bin/bash
 # MCL Setup Script
-# Installs my-claude-lang globally: skill files + auto-activation hook.
+# Installs my-claude-lang globally: skill files + three auto-activation hooks.
 # Run once — works for all projects.
 
 set -e
@@ -8,10 +8,18 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_SRC="$SCRIPT_DIR/skills/my-claude-lang.md"
 SKILL_RULES_SRC="$SCRIPT_DIR/skills/my-claude-lang"
-HOOK_SRC="$SCRIPT_DIR/hooks/mcl-activate.sh"
+HOOK_SRC_DIR="$SCRIPT_DIR/hooks"
+HOOK_ACTIVATE_SRC="$HOOK_SRC_DIR/mcl-activate.sh"
+HOOK_PRETOOL_SRC="$HOOK_SRC_DIR/mcl-pre-tool.sh"
+HOOK_STOP_SRC="$HOOK_SRC_DIR/mcl-stop.sh"
+HOOK_LIB_SRC="$HOOK_SRC_DIR/lib"
 
 SKILL_DST="$HOME/.claude/skills/my-claude-lang"
-HOOK_DST="$HOME/.claude/hooks/mcl-activate.sh"
+HOOK_DST_DIR="$HOME/.claude/hooks"
+HOOK_ACTIVATE_DST="$HOOK_DST_DIR/mcl-activate.sh"
+HOOK_PRETOOL_DST="$HOOK_DST_DIR/mcl-pre-tool.sh"
+HOOK_STOP_DST="$HOOK_DST_DIR/mcl-stop.sh"
+HOOK_LIB_DST="$HOOK_DST_DIR/lib"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 
 echo "my-claude-lang (MCL) Setup"
@@ -36,7 +44,7 @@ if ! printf '%s' "$CANONICAL_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; the
 fi
 echo "MCL version: $CANONICAL_VERSION"
 VERSION_MISMATCH=0
-for f in "$SCRIPT_DIR/README.md" "$SCRIPT_DIR/README.tr.md" "$SKILL_SRC" "$HOOK_SRC"; do
+for f in "$SCRIPT_DIR/README.md" "$SCRIPT_DIR/README.tr.md" "$SKILL_SRC" "$HOOK_ACTIVATE_SRC"; do
   [ -f "$f" ] || continue
   FILE_VERSION="$(grep -oE '🌐 MCL [0-9]+\.[0-9]+\.[0-9]+' "$f" | head -1 | awk '{print $3}')"
   if [ -n "$FILE_VERSION" ] && [ "$FILE_VERSION" != "$CANONICAL_VERSION" ]; then
@@ -59,13 +67,26 @@ cp "$SKILL_SRC" "$SKILL_DST/SKILL.md"
 cp "$SKILL_RULES_SRC"/*.md "$SKILL_DST/"
 echo "[OK] Skill files installed to $SKILL_DST (clean copy)"
 
-# 2. Install hook script
-mkdir -p "$(dirname "$HOOK_DST")"
-cp "$HOOK_SRC" "$HOOK_DST"
-chmod +x "$HOOK_DST"
-echo "[OK] Hook script installed to $HOOK_DST"
+# 2. Install hook scripts (three hooks + lib/)
+#    mcl-activate.sh  — UserPromptSubmit: renders MCL banner + activates skill
+#    mcl-pre-tool.sh  — PreToolUse: phase-lock gate for mutating tools
+#    mcl-stop.sh      — Stop: spec-hash tracking + approval-marker transitions
+#    lib/mcl-state.sh — shared state helpers (sourced by pre-tool + stop)
+mkdir -p "$HOOK_DST_DIR"
+cp "$HOOK_ACTIVATE_SRC" "$HOOK_ACTIVATE_DST"
+cp "$HOOK_PRETOOL_SRC"  "$HOOK_PRETOOL_DST"
+cp "$HOOK_STOP_SRC"     "$HOOK_STOP_DST"
+chmod +x "$HOOK_ACTIVATE_DST" "$HOOK_PRETOOL_DST" "$HOOK_STOP_DST"
 
-# 3. Configure hook in settings.json
+# Clean lib destination so renamed/removed helpers don't linger.
+rm -rf "$HOOK_LIB_DST"
+mkdir -p "$HOOK_LIB_DST"
+cp "$HOOK_LIB_SRC"/*.sh "$HOOK_LIB_DST/"
+echo "[OK] Hook scripts + lib installed to $HOOK_DST_DIR"
+
+# 3. Configure hooks in settings.json
+#    Fresh install: write all three event registrations.
+#    Existing file: detect any missing hook and print the manual block.
 if [ ! -f "$SETTINGS_FILE" ]; then
   cat > "$SETTINGS_FILE" << 'SETTINGS'
 {
@@ -80,17 +101,48 @@ if [ ! -f "$SETTINGS_FILE" ]; then
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/mcl-pre-tool.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/mcl-stop.sh"
+          }
+        ]
+      }
     ]
   }
 }
 SETTINGS
-  echo "[OK] Created $SETTINGS_FILE with MCL hook"
+  echo "[OK] Created $SETTINGS_FILE with MCL hooks (activate + pre-tool + stop)"
 else
-  if grep -q '"hooks"' "$SETTINGS_FILE" 2>/dev/null && grep -q "mcl-activate" "$SETTINGS_FILE" 2>/dev/null; then
-    echo "[OK] Hook already configured in $SETTINGS_FILE"
+  # Detect hook REGISTRATION, not just substring. The user's permissions
+  # allowlist often contains the hook path too — matching on `mcl-stop`
+  # alone yields false positives. Anchor on the `~/.claude/hooks/` prefix
+  # that only appears in a hook `command` field.
+  MISSING=""
+  grep -q '~/.claude/hooks/mcl-activate.sh'  "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-activate"
+  grep -q '~/.claude/hooks/mcl-pre-tool.sh'  "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-pre-tool"
+  grep -q '~/.claude/hooks/mcl-stop.sh'      "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-stop"
+  if [ -z "$MISSING" ]; then
+    echo "[OK] All three MCL hooks already configured in $SETTINGS_FILE"
   else
     echo ""
-    echo "[!] settings.json already exists. Add this to your $SETTINGS_FILE:"
+    echo "[!] settings.json exists but is missing:$MISSING"
+    echo "    Merge the following into the \"hooks\" object in $SETTINGS_FILE:"
     echo ""
     cat << 'MANUAL'
   "hooks": {
@@ -98,20 +150,79 @@ else
       {
         "matcher": "",
         "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/mcl-activate.sh"
-          }
+          { "type": "command", "command": "~/.claude/hooks/mcl-activate.sh" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "~/.claude/hooks/mcl-pre-tool.sh" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "~/.claude/hooks/mcl-stop.sh" }
         ]
       }
     ]
   }
 MANUAL
     echo ""
-    echo "    Add it inside your existing settings.json."
   fi
 fi
 
 echo ""
-echo "Done! MCL is now installed globally."
-echo "Open a new Claude Code session and start typing in your language."
+
+# 4. Post-install smoke check
+#    "Yazdım ≠ çalışıyor." Verify the files actually landed where they
+#    must be before telling the developer setup is done. Failure here
+#    indicates a broken install that would otherwise silently no-op.
+SMOKE_FAIL=0
+check_file() {
+  if [ -f "$1" ]; then
+    echo "[OK] $1"
+  else
+    echo "[FAIL] Missing: $1"
+    SMOKE_FAIL=1
+  fi
+}
+check_exec() {
+  if [ -x "$1" ]; then
+    echo "[OK] executable: $1"
+  else
+    echo "[FAIL] Not executable: $1"
+    SMOKE_FAIL=1
+  fi
+}
+
+echo "Post-install smoke check:"
+check_file "$SKILL_DST/SKILL.md"
+check_file "$HOOK_ACTIVATE_DST"
+check_file "$HOOK_PRETOOL_DST"
+check_file "$HOOK_STOP_DST"
+check_file "$HOOK_LIB_DST/mcl-state.sh"
+check_exec "$HOOK_ACTIVATE_DST"
+check_exec "$HOOK_PRETOOL_DST"
+check_exec "$HOOK_STOP_DST"
+
+# Verify mcl-activate.sh produces well-formed JSON on empty stdin
+# (fast proxy for "hook actually runs and its deps resolve").
+if echo '{}' | bash "$HOOK_ACTIVATE_DST" 2>/dev/null | python3 -m json.tool >/dev/null 2>&1; then
+  echo "[OK] mcl-activate.sh emits valid JSON"
+else
+  echo "[FAIL] mcl-activate.sh did not emit valid JSON"
+  SMOKE_FAIL=1
+fi
+
+echo ""
+if [ "$SMOKE_FAIL" = "0" ]; then
+  echo "Done! MCL $CANONICAL_VERSION is now installed globally."
+else
+  echo "[FAIL] Setup completed but smoke check detected issues above."
+  exit 1
+fi
