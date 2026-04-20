@@ -52,9 +52,12 @@ Example English wording:
 Before any production code is touched, walk every Acceptance
 Criterion from the Phase 2 spec and write a corresponding test
 case. All tests go into the project's existing test files (or new
-files matching the project's test layout). The test framework is
-whatever `test_command` runs — do not introduce a different
-framework.
+files matching the project's test layout). New test file paths
+MUST match whatever pattern `test_command` picks up (e.g. if
+`test_command` is `node --test 'test/*.test.mjs'`, a new file
+must live at `test/<name>.test.mjs` or the runner will never
+execute it). The test framework is whatever `test_command` runs
+— do not introduce a different framework.
 
 Do NOT write production code in this step. If the implementation
 does not yet exist, the test is expected to fail at the next
@@ -91,7 +94,10 @@ Examples:
 The runner result is informational, not a gate. React to it:
 
 - **All tests fail (expected)** — proceed to Step 6 silently. The
-  RED block is already visible; no extra commentary needed.
+  RED block is already visible; no extra commentary needed. Do NOT
+  emit a transitional sentence like "proceeding to code" or "koda
+  geçiliyor" — the RED block IS the transition; a trailing prose
+  line is noise.
 - **Some tests pass** — flag to the developer in their language
   before proceeding:
 

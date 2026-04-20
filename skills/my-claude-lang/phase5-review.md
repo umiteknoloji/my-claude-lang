@@ -70,6 +70,14 @@ happened; if TDD mode was enabled but Phase 4 fell through due to
 missing `test_command`, the normal Phase 5 runner invocation above
 still applies.
 
+The TDD-cycle summary line is MANDATORY whenever a GREEN verify
+happened in Phase 4 — even when Phase 4.5 and Phase 4.6 both
+emitted nothing (their "omit entirely" rule does not extend to
+this line). The summary is the single most compact proof to the
+developer that the two Phase 4 runner blocks were the ground
+truth Phase 5 is standing on; without it, Phase 5 opens with
+nothing tying back to the TDD cycle.
+
 </mcl_constraint>
 
 The report has **up to two** sections, in this order: Spec Compliance,
