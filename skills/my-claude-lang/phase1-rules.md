@@ -2,6 +2,32 @@
 
 # Phase 1: Gather Parameters — Detailed Rules
 
+## Pre-Flow: LSP Plugin Check (first developer message only)
+
+Before Step 1 below, on the **first** developer message of a conversation:
+
+1. Run `bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect "$(pwd)"`.
+   Empty stdout → no recognizable stack → skip the rest of this
+   pre-flow and proceed to Main Flow Step 1.
+2. For each detected tag, check whether the matching plugin name is
+   present as a key under `.plugins` in
+   `~/.claude/plugins/installed_plugins.json`. If present → silent
+   no-op for that tag.
+3. For each detected-but-missing plugin, surface a one-sentence
+   suggestion in the developer's language with the install command
+   (`/plugin install <name>@claude-plugins-official`). If the language
+   server binary is likely also missing, mention it with the OS-appropriate
+   install hint. See `my-claude-lang/plugin-suggestions.md` for the full
+   stack→plugin→binary table.
+4. The developer may accept, decline, or ignore. Either way, proceed to
+   Main Flow Step 1 immediately — the suggestion does not gate Phase 1.
+   If the developer declines, do not re-ask in this conversation.
+
+Skip this pre-flow entirely when:
+- Not the first developer message in the conversation.
+- Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) is in progress.
+- Every detected tag already has its plugin installed.
+
 ## Main Flow
 
 When the developer describes what they want:

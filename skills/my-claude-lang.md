@@ -114,6 +114,17 @@ MCL validates meaning in BOTH directions. For full gate rules, read `my-claude-l
 - **Gate 2** (MCL → Claude Code): Challenge vague terms before accepting
 - **Gate 3** (Claude Code → MCL → User): Explain, don't just translate
 
+## Plugin Suggestions (first developer message only)
+
+For full plugin-suggestion rules, read `my-claude-lang/plugin-suggestions.md`
+
+At the start of a new conversation, before Phase 1 questions, MCL runs
+`bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect "$(pwd)"` and, for
+each detected language tag whose matching official Claude Code LSP
+plugin is missing from `~/.claude/plugins/`, asks the developer once in
+their language whether to install it. Passive suggestion only — MCL
+never auto-installs. Empty detection output → skip entirely.
+
 ## Phase 1: Gather Parameters
 
 For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
