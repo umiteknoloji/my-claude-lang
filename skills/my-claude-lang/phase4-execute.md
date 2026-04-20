@@ -84,4 +84,33 @@ Called automatically when Phase 3 is confirmed.
      for the new task
    - Either way, the new task gets its own Phase 1-3 cycle
 
+<mcl_constraint name="spec-history">
+
+## Spec History — automatic feature ledger
+
+On every `✅ MCL APPROVED` that transitions phase to EXECUTE, the Stop
+hook writes the full spec body to `.mcl/specs/NNNN-slug.md` with YAML
+frontmatter (spec_id, approved_at, spec_hash, branch, head_at_approval,
+completion_commit=null, status=active). `.mcl/specs/INDEX.md` is
+regenerated as a pipe-table sorted newest-first.
+
+This is a background mechanism — Phase 4 prose flow does NOT change.
+MCL does NOT need to announce the save in every turn. Mention it only
+when:
+
+- The developer explicitly asks where specs are stored, or
+- A drift-reapproval landed and the developer asks why a new file
+  appeared, or
+- Completion: when the developer ships the feature, remind them that
+  they should update the frontmatter's `completion_commit` + `status:
+  shipped` fields in the matching `NNNN-slug.md` file.
+
+Specs dir is part of the project — it should be checked into git as
+living documentation. Slug is derived from the spec's Objective line;
+when derivation fails, fallback `spec-NNNN` is used. Idempotency: a
+second approval of the same spec body (identical hash) is a no-op —
+duplicate file is not produced.
+
+</mcl_constraint>
+
 </mcl_phase>

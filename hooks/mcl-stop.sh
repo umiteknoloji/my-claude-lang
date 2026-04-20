@@ -257,6 +257,7 @@ if [ -n "$APPROVAL_MARKER" ]; then
     mcl_state_set drift_hash null
     mcl_audit_log "drift-reapproved" "stop" "prior=${CURRENT_HASH:0:12} new=${SPEC_HASH:0:12}"
     mcl_debug_log "stop" "drift-reapproved" "prior=${CURRENT_HASH:0:12} new=${SPEC_HASH:0:12} phase=${CURRENT_PHASE}"
+    bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$SPEC_HASH" 2>/dev/null || true
   elif [ "$SPEC_APPROVED" = "true" ] || [ "$CURRENT_PHASE" -ge 4 ] 2>/dev/null; then
     mcl_debug_log "stop" "marker-idempotent" "phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
   elif [ -z "$CURRENT_HASH" ]; then
@@ -266,6 +267,7 @@ if [ -n "$APPROVAL_MARKER" ]; then
     mcl_state_set current_phase 4
     mcl_state_set phase_name '"EXECUTE"'
     mcl_debug_log "stop" "marker-approve" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4"
+    bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
   else
     mcl_debug_log "stop" "marker-ignored-wrong-phase" "phase=${CURRENT_PHASE}"
   fi

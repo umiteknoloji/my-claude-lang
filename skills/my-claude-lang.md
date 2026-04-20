@@ -168,6 +168,11 @@ spec. If they haven't responded yet, you have NOT received confirmation.
 For full execution rules, read `my-claude-lang/phase4-execute.md`
 For opt-in batch TDD overlay rules, read `my-claude-lang/phase4-tdd.md`
 
+On every approval the Stop hook auto-saves the spec body to
+`.mcl/specs/NNNN-slug.md` with YAML frontmatter — background
+mechanism, no prose announcement needed (see `phase4-execute.md` for
+the `spec-history` constraint).
+
 All code in English. All communication in developer's language.
 Every question/answer goes through Gate 1, 2, 3.
 When Claude Code asks a question, MCL adds context: WHY it's asking +
