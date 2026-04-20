@@ -166,6 +166,7 @@ spec. If they haven't responded yet, you have NOT received confirmation.
 ## Phase 4: Execute with Live Translation
 
 For full execution rules, read `my-claude-lang/phase4-execute.md`
+For opt-in batch TDD overlay rules, read `my-claude-lang/phase4-tdd.md`
 
 All code in English. All communication in developer's language.
 Every question/answer goes through Gate 1, 2, 3.

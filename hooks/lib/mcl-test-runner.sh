@@ -94,6 +94,11 @@ PY
 }
 
 mcl_test_run() {
+  # Optional first arg: audit label (e.g., "red-baseline", "green-verify").
+  # When absent, the audit entry omits `label=` entirely so older
+  # log-consumers keep parsing cleanly.
+  local label="${1:-}"
+
   # Read config. No-op (exit 0, empty stdout) when test_command is
   # absent, empty, or only whitespace — this is the opt-in path.
   local cmd
@@ -184,11 +189,15 @@ mcl_test_run() {
       printf '\n```\n'
     fi
 
-    mcl_audit_log "test-run" "runner" "result=${result} exit=${exit_display} duration_ms=${duration_ms} output_bytes=${output_bytes}"
+    audit_fields="result=${result} exit=${exit_display} duration_ms=${duration_ms} output_bytes=${output_bytes}"
+    if [ -n "$label" ]; then
+      audit_fields="label=${label} ${audit_fields}"
+    fi
+    mcl_audit_log "test-run" "runner" "$audit_fields"
   )
 }
 
 # CLI dispatch — only when invoked directly, not when sourced.
 if [ "${BASH_SOURCE[0]:-}" = "${0:-}" ] && [ -n "${BASH_SOURCE[0]:-}" ]; then
-  mcl_test_run
+  mcl_test_run "${1:-}"
 fi

@@ -52,6 +52,24 @@ When `test_command` is absent or empty, this constraint is a no-op —
 the Verification Report proceeds exactly as specified elsewhere in this
 phase file.
 
+### TDD mode — skip re-invocation
+
+When `tdd=true` (see `phase4-tdd.md`) AND Phase 4 has already emitted
+a `🟢 GREEN verify` block, DO NOT invoke the runner again here.
+Phase 5 starts instead with a localized TDD-cycle summary line that
+references the two Phase 4 runner invocations (which are already
+visible earlier in the conversation). Examples:
+
+- Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama tamamlandı`
+- English: `✅ TDD cycle: RED baseline → GREEN verify complete`
+
+Then proceed to Section 1. A double runner invocation in one cycle
+would be noise — the Phase 4 blocks already carry the diagnostic
+information. This skip applies ONLY when Phase 4 GREEN verify
+happened; if TDD mode was enabled but Phase 4 fell through due to
+missing `test_command`, the normal Phase 5 runner invocation above
+still applies.
+
 </mcl_constraint>
 
 The report has **up to two** sections, in this order: Spec Compliance,

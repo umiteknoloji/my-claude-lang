@@ -231,6 +231,10 @@ if [ "$SMOKE_FAIL" = "0" ]; then
   echo "inherits your env, filesystem access, and network. MCL does not"
   echo "review the command — audit your own config.json entries before use."
   echo ""
+  echo "Add '\"tdd\": true' alongside test_command to enable batch TDD mode:"
+  echo "MCL writes tests first, runs a RED baseline, then writes code, then"
+  echo "runs GREEN verify — all inside Phase 4 before the report."
+  echo ""
   echo "Done! MCL $CANONICAL_VERSION is now installed globally."
 else
   echo "[FAIL] Setup completed but smoke check detected issues above."
