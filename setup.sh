@@ -68,10 +68,12 @@ cp "$SKILL_RULES_SRC"/*.md "$SKILL_DST/"
 echo "[OK] Skill files installed to $SKILL_DST (clean copy)"
 
 # 2. Install hook scripts (three hooks + lib/)
-#    mcl-activate.sh  — UserPromptSubmit: renders MCL banner + activates skill
-#    mcl-pre-tool.sh  — PreToolUse: phase-lock gate for mutating tools
-#    mcl-stop.sh      — Stop: spec-hash tracking + approval-marker transitions
-#    lib/mcl-state.sh — shared state helpers (sourced by pre-tool + stop)
+#    mcl-activate.sh         — UserPromptSubmit: renders MCL banner + activates skill
+#    mcl-pre-tool.sh         — PreToolUse: phase-lock gate for mutating tools
+#    mcl-stop.sh             — Stop: spec-hash tracking + approval-marker transitions
+#    lib/mcl-state.sh        — shared state helpers (sourced by pre-tool + stop)
+#    lib/mcl-config.sh       — .mcl/config.json reader (opt-in developer config)
+#    lib/mcl-test-runner.sh  — opt-in Phase 5 test-runner orchestration
 mkdir -p "$HOOK_DST_DIR"
 cp "$HOOK_ACTIVATE_SRC" "$HOOK_ACTIVATE_DST"
 cp "$HOOK_PRETOOL_SRC"  "$HOOK_PRETOOL_DST"
@@ -206,6 +208,8 @@ check_file "$HOOK_ACTIVATE_DST"
 check_file "$HOOK_PRETOOL_DST"
 check_file "$HOOK_STOP_DST"
 check_file "$HOOK_LIB_DST/mcl-state.sh"
+check_file "$HOOK_LIB_DST/mcl-config.sh"
+check_file "$HOOK_LIB_DST/mcl-test-runner.sh"
 check_exec "$HOOK_ACTIVATE_DST"
 check_exec "$HOOK_PRETOOL_DST"
 check_exec "$HOOK_STOP_DST"
@@ -221,6 +225,12 @@ fi
 
 echo ""
 if [ "$SMOKE_FAIL" = "0" ]; then
+  echo "── Opt-in test runner (β) ──"
+  echo "If you add a 'test_command' to a project's .mcl/config.json, MCL will"
+  echo "execute it during Phase 5 in YOUR shell with NO sandbox. The command"
+  echo "inherits your env, filesystem access, and network. MCL does not"
+  echo "review the command — audit your own config.json entries before use."
+  echo ""
   echo "Done! MCL $CANONICAL_VERSION is now installed globally."
 else
   echo "[FAIL] Setup completed but smoke check detected issues above."

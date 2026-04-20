@@ -23,6 +23,37 @@ Phase 4.6 hands off to Phase 5. Phase 5 is the last step. If you find
 yourself writing "all steps completed" without any of the sections
 below, you are violating this rule.
 
+<mcl_constraint name="test-runner-orchestration">
+
+## Test Runner Orchestration (opt-in)
+
+When the developer has opted in by declaring a non-empty `test_command`
+in `$(pwd)/.mcl/config.json`, MCL MUST invoke the test runner during
+Phase 5 **before** emitting Section 1 of the Verification Report.
+
+How:
+1. Check config via `bash ~/.claude/hooks/lib/mcl-config.sh get test_command`.
+2. If the output is empty, skip this step entirely — there is no opt-in.
+3. Otherwise invoke `bash ~/.claude/hooks/lib/mcl-test-runner.sh` via the
+   Bash tool in the developer's project root.
+4. Paste the runner's stdout **verbatim** at the very top of the
+   Verification Report — above any other section, before Section 1.
+
+The runner emits one of three formatted blocks (GREEN / RED / TIMEOUT)
+with duration and an optional fenced `text` block carrying merged
+stdout+stderr. Do not reformat, summarize, or translate the runner's
+output — it is a fixed-format machine block the developer reads directly.
+
+Failure is NOT a gate. A RED or TIMEOUT result is information for the
+developer; MCL still emits the full Verification Report below it. The
+runner is orchestration, not enforcement.
+
+When `test_command` is absent or empty, this constraint is a no-op —
+the Verification Report proceeds exactly as specified elsewhere in this
+phase file.
+
+</mcl_constraint>
+
 The report has **up to two** sections, in this order: Spec Compliance,
 must-test. Any section whose content is empty is **omitted entirely**
 (no header, no placeholder sentence, no filler). Section 1 in
