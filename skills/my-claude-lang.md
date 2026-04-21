@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.13.0` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 5.14.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## MCL Tag Schema
@@ -328,6 +328,19 @@ AI did the right thing. Phase 4.5 does NOT end without this report.
 
 ⛔ STOP RULE: Do NOT write "all steps completed" or "done" without
 producing the 3-section Verification Report after Phase 4.5 finishes.
+
+## `mcl-finish` — Cross-Session Finish Mode
+
+For full `mcl-finish` rules, read `my-claude-lang/mcl-finish.md`
+
+Introduced in MCL 5.14.0. The developer types the literal keyword
+`mcl-finish` to aggregate Phase 4.6 impacts accumulated since the
+last checkpoint and emit a project-level finish report. Like
+`mcl-update`, it bypasses the normal Phase 1 → 5 pipeline. Every
+Phase 5 Verification Report ends with a localized reminder line
+pointing at the command. Impact persistence to `.mcl/impact/` and
+checkpoint writes to `.mcl/finish/` are append-only; Phase 4.5
+risks are NOT persisted across sessions.
 
 ## Rule Capture
 

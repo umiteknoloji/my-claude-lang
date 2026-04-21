@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.13.0
+# my-claude-lang 🌐 MCL 5.14.0
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -80,7 +80,7 @@ Phase 5: Verification Report — spec-compliance mismatches (if any)
 
 **No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit "yes."
 
-Every response starts with `🌐 MCL 5.13.0` so you always know the bridge is active.
+Every response starts with `🌐 MCL 5.14.0` so you always know the bridge is active.
 
 ---
 
@@ -183,6 +183,25 @@ cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
 ```
 
 `MCL_REPO_PATH` defaults to `$HOME/my-claude-lang`. Override via environment variable if your clone lives elsewhere. The updated hook and skill files are re-read on every prompt, so the next message in the same session already uses the new rules — no session restart needed.
+
+---
+
+## Cross-Session Finish Mode — `mcl-finish`
+
+Phase 4.6 surfaces downstream impacts one at a time during execution. Many of those impacts are genuine "I'll verify this next week" items — they belong to a horizon that doesn't fit inside a single session.
+
+`mcl-finish` is the checkpoint that carries them across.
+
+Every Phase 5 Verification Report ends with a localized reminder line pointing at the command. When you're ready, type the literal message `mcl-finish` and MCL will:
+
+1. Aggregate every Phase 4.6 impact written to `.mcl/impact/` since the last checkpoint
+2. Run a full-project Semgrep rescan on supported stacks (silently skipped on unsupported ones)
+3. Emit a project-level finish report in your language
+4. Write a new checkpoint to `.mcl/finish/NNNN-YYYY-MM-DD.md`
+
+The next `mcl-finish` starts a fresh window from that checkpoint — closed impacts stay in the archive, new ones pile up for the next pass. No git commits, no remote pushes, no external reporting — pure local state.
+
+Phase 4.5 risks are NOT accumulated: they're resolved in-session.
 
 ---
 

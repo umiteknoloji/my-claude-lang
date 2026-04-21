@@ -108,6 +108,53 @@ Never fabricate impacts to fill the section. Never surface
 self-referential changelog items. Never re-surface items already
 handled in Phase 4.5.
 
+## Impact Persistence — `.mcl/impact/NNNN.md`
+
+Introduced in MCL 5.14.0 as the persistence layer behind the
+`mcl-finish` slash-command.
+
+After the developer responds to an impact (skip / fix-applied /
+rule-captured), MCL writes a single file to `.mcl/impact/` capturing
+the impact prose as presented and the resolution. One file per impact.
+File naming is a monotonic 4-digit id (`0001.md`, `0002.md`, …)
+computed by scanning existing filenames in the directory.
+
+File format:
+
+```
+---
+impact_id: NNNN
+presented_at: <ISO8601 local time>
+branch: <git branch or null>
+head_at_presentation: <short sha or null>
+resolution: skip | fix-applied | rule-captured | open
+---
+
+[exact impact prose as shown to the developer, one line or
+several lines — include the cited artifact (file path / function /
+consumer) and the one-sentence "why affected"]
+```
+
+Writing rules:
+
+- Write once per impact, at the turn the developer resolves it.
+- `resolution: open` is only legal for a session that ended before
+  the developer replied — do NOT pre-write `open` and hope to update
+  later; write on resolution.
+- Do NOT write the file for impacts the scan surfaced internally but
+  decided not to present (false positives / self-reference filter).
+- Do NOT rewrite or delete existing `.mcl/impact/` files. The
+  `mcl-finish` checkpoint model treats the dir as append-only.
+- Create the `.mcl/impact/` dir on demand (`mkdir -p`); never fail a
+  Phase 4.6 resolution because the dir was missing.
+
+The impact dir is NOT the risks dir. Phase 4.5 risks are resolved
+in-session and are NOT persisted — per the captured rule that
+unambiguous risks auto-fix silently and surfaced ones get an
+immediate skip/fix/rule decision. Only impacts cross the
+session boundary, because downstream effects can be genuine "I'll
+check this next week" items. Risks cannot.
+
 ## Anti-Patterns
 
 For Phase 4.6 anti-patterns, see `my-claude-lang/anti-patterns.md` —

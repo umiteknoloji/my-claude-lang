@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.13.0
+# my-claude-lang 🌐 MCL 5.14.0
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -81,7 +81,7 @@ Aşama 5: Doğrulama Raporu — spec-uyum uyuşmazlıkları (varsa) ve
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Senin açık "evet"in olmadan hiçbir şey ilerlemez.
 
-Her yanıt `🌐 MCL 5.13.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 5.14.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ---
 
@@ -184,6 +184,25 @@ cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
 ```
 
 `MCL_REPO_PATH` varsayılan olarak `$HOME/my-claude-lang`. Klonun başka bir yerdeyse environment variable ile ayarla. Güncellenen hook ve skill dosyaları her prompt'ta yeniden okunduğu için aynı oturumdaki bir sonraki mesajın yeni kuralları kullanır — oturum yeniden başlatmaya gerek yok.
+
+---
+
+## Oturumlar Arası Bitirme Modu — `mcl-finish`
+
+Phase 4.6 execution sırasında downstream etkileri teker teker yüzeye çıkarır. Bu etkilerin çoğu "haftaya bir kontrol edeyim" türünden gerçek maddelerdir — tek bir oturuma sığmayan, ileri tarihli kontroller.
+
+`mcl-finish` bu maddeleri oturumlar arasında taşıyan checkpoint mekanizmasıdır.
+
+Her Phase 5 Doğrulama Raporu, bu komuta işaret eden senin dilinde bir hatırlatıcı satırla biter. Hazır olduğunda mesaj olarak sadece `mcl-finish` yaz ve MCL şunları yapar:
+
+1. Son checkpoint'ten bu yana `.mcl/impact/` dizinine yazılmış tüm Phase 4.6 etkilerini toplar
+2. Desteklenen stack'lerde full-project Semgrep taraması çalıştırır (desteklenmeyenlerde sessizce atlanır)
+3. Senin dilinde proje seviyesi bir bitirme raporu emit eder
+4. `.mcl/finish/NNNN-YYYY-MM-DD.md` olarak yeni bir checkpoint yazar
+
+Bir sonraki `mcl-finish` bu checkpoint'ten itibaren yeni bir pencere açar — kapanan etkiler arşivde kalır, yeniler bir sonraki pass için birikmeye başlar. Git commit yok, remote push yok, external reporting yok — tamamen yerel state.
+
+Phase 4.5 riskleri biriktirilmez: onlar oturum içinde çözülür.
 
 ---
 

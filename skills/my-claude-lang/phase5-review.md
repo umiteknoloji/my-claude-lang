@@ -174,6 +174,49 @@ Tests must be:
   If "no" → re-explain the unclear part
 - The report is part of MCL's response — it is NOT optional
 
+## Tail Reminder — `mcl-finish` (MCL 5.14.0+)
+
+Every Phase 5 Verification Report MUST end with a single localized
+reminder line pointing at the `mcl-finish` slash-command. The line
+sits AFTER Section 2 (the must-test checklist) as the final
+user-facing line of the report. Its purpose is to keep the
+session-local developer aware that Phase 4.6 impacts are
+accumulating on disk and a cross-session finish pass is one
+keyword away.
+
+Localized forms:
+
+- Turkish: `Son kontroller için \`mcl-finish\` yazın.`
+- English: `Type \`mcl-finish\` for final cross-session checks.`
+- Spanish: `Escribe \`mcl-finish\` para las verificaciones finales entre sesiones.`
+- French: `Tapez \`mcl-finish\` pour les vérifications finales inter-sessions.`
+- German: `Geben Sie \`mcl-finish\` für abschließende sitzungsübergreifende Prüfungen ein.`
+- Japanese: `セッション横断の最終確認は \`mcl-finish\` と入力してください。`
+- Korean: `세션 간 최종 확인은 \`mcl-finish\` 를 입력하세요.`
+- Chinese: `输入 \`mcl-finish\` 进行跨会话的最终检查。`
+- Arabic: `اكتب \`mcl-finish\` لإجراء فحوصات نهائية عبر الجلسات.`
+- Hindi: `सत्रों के बीच अंतिम जाँच के लिए \`mcl-finish\` टाइप करें।`
+- Portuguese: `Digite \`mcl-finish\` para verificações finais entre sessões.`
+- Russian: `Введите \`mcl-finish\` для финальных межсессионных проверок.`
+- Hebrew: `הקלידו \`mcl-finish\` לבדיקות סופיות בין הפעלות.`
+- Indonesian: `Ketik \`mcl-finish\` untuk pemeriksaan akhir lintas sesi.`
+
+Rules:
+
+- The reminder is MANDATORY on every Phase 5 report — even when
+  Section 1 is omitted and Section 2 is the only visible section.
+- The reminder is NOT subject to the empty-section-omission rule.
+  Unlike Phase 4.5 / 4.6 / Section 1 — which can vanish when
+  empty — this line always renders.
+- The reminder is a single line. Do NOT wrap it in a named section
+  header. Do NOT add surrounding prose explaining what
+  `mcl-finish` does (the developer learns by typing it).
+- The token `mcl-finish` stays verbatim in all languages (it is
+  a fixed technical token per the language rule).
+- This reminder does NOT fire inside an `mcl-finish` run itself —
+  `mcl-finish` has its own output format and is not followed by a
+  Phase 5 report.
+
 ## Legacy: Code Review and Test Results
 
 When code review, test results, or completion reports come back
