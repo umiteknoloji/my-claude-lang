@@ -3,15 +3,27 @@
 # `📋 Spec:` block, compute sha256 over a normalized body, and update
 # `.mcl/state.json` accordingly.
 #
-# Transitions driven here (v1):
+# Transitions driven here:
 #   - phase 1 → 2 (SPEC_REVIEW)      : first time a spec block appears
-#   - no-op                          : same spec emitted again (same hash)
+#   - phase 2/3 → 4 (EXECUTE)        : AskUserQuestion spec-approval call
+#                                      returned an "Approve" family option
 #   - drift_detected=true flag       : different hash appears while
-#                                      spec_approved=true (v2 will act on it)
+#                                      spec_approved=true (warn-only in
+#                                      PreToolUse; visible in activate
+#                                      hook DRIFT_NOTICE)
+#   - drift_detected=false           : developer reverted to the approved
+#                                      body (hash equals stored spec_hash)
+#                                      OR re-approved via AskUserQuestion
 #
-# Never regresses phase. Never overwrites an approved spec's hash.
+# Never regresses phase. Never overwrites an approved spec's hash
+# without an explicit new AskUserQuestion approval.
+#
 # Stop hook input: JSON on stdin with `transcript_path` (Claude Code's
 # jsonl transcript for the current session).
+#
+# Since 6.0.0: the text-based `✅ MCL APPROVED` marker protocol is
+# REMOVED. Approval signals come from `AskUserQuestion` tool_use /
+# tool_result pairs whose `question` begins with `MCL {version} | `.
 
 set -u
 
@@ -46,7 +58,6 @@ import json, sys, hashlib, re
 path = sys.argv[1]
 
 def extract_text(msg):
-    # Handle both {"message": {...}} wrappers and flat {role, content}.
     if isinstance(msg, dict) and "message" in msg and isinstance(msg["message"], dict):
         msg = msg["message"]
     if not isinstance(msg, dict):
@@ -87,13 +98,6 @@ except Exception:
 if not last_text:
     sys.exit(0)
 
-# Spec block: from first line matching `📋 Spec:` (optionally prefixed
-# by markdown heading marks like `##` or a list marker — the emoji
-# trigger is what anchors the block, not the surrounding decoration)
-# up to the next markdown heading `^#+\s` on its own line, or EOF.
-# Canonical spec pattern uses `**Section**` bold — not `## Section`
-# headings — so the heading-based terminator reliably marks the
-# closing `## Next Step` / `## Notes` divider after the body.
 spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:")
 lines = last_text.splitlines()
 start = None
@@ -113,8 +117,6 @@ for j in range(start + 1, len(lines)):
 
 body_lines = lines[start:end]
 
-# Normalize: strip trailing whitespace per line, collapse consecutive
-# blank lines, trim leading/trailing blanks.
 normalized = []
 prev_blank = False
 for ln in body_lines:
@@ -124,7 +126,6 @@ for ln in body_lines:
         continue
     normalized.append(ln)
     prev_blank = is_blank
-# Trim leading/trailing blanks
 while normalized and normalized[0] == "":
     normalized.pop(0)
 while normalized and normalized[-1] == "":
@@ -142,17 +143,14 @@ if [ -z "$SPEC_HASH" ]; then
 fi
 
 # --- Partial spec detection (rate-limit interruption defense) ---
-# If the last assistant turn carries a `📋 Spec:` marker but is missing
-# any of the seven required section headers, raise a state flag so the
-# next `mcl-activate` pass injects a recovery audit block, and make the
-# marker-transition block below a no-op while the flag is set. Complete
-# specs auto-clear the flag.
+# Unchanged from 5.x. Claude must re-emit a complete spec before the
+# AskUserQuestion approval call can advance state; while partial_spec
+# is true, any approval tool_result is ignored as defense-in-depth.
 PARTIAL_MISSING="$(bash "$SCRIPT_DIR/lib/mcl-partial-spec.sh" check "$TRANSCRIPT_PATH" 2>/dev/null)"
 PARTIAL_RC=$?
 PARTIAL_STATE="$(mcl_state_get partial_spec 2>/dev/null)"
 case "$PARTIAL_RC" in
   0)
-    # Partial spec in THIS turn — raise the flag.
     mcl_state_set partial_spec true
     if [ -n "$SPEC_HASH" ]; then
       mcl_state_set partial_spec_body_sha "\"${SPEC_HASH:0:16}\""
@@ -161,7 +159,6 @@ case "$PARTIAL_RC" in
     mcl_debug_log "stop" "partial-spec" "missing=$(printf '%s' "$PARTIAL_MISSING" | tr '\n' '|')"
     ;;
   1)
-    # Structurally complete — if flag was raised in a prior turn, clear.
     if [ "$PARTIAL_STATE" = "true" ]; then
       mcl_state_set partial_spec false
       mcl_state_set partial_spec_body_sha null
@@ -170,41 +167,73 @@ case "$PARTIAL_RC" in
     fi
     ;;
   *)
-    # No spec marker in turn — leave any existing flag alone; it clears
-    # only when a complete spec arrives.
     :
     ;;
 esac
 
-# Detect the approval marker — a line matching exactly
-# `^\s*✅\s*MCL\s+APPROVED\s*$` in the last assistant message. Strict
-# line-anchor + whole-line match avoids rhetorical false positives.
-APPROVAL_MARKER="$(python3 -c '
+# --- AskUserQuestion approval scanner (replaces marker regex in 6.0.0) ---
+# Scan the transcript for the most recent AskUserQuestion tool_use/tool_result
+# pair whose question begins with "MCL {version} | ". Emit a pipe-separated
+# record on stdout:
+#   <semantic_intent>|<selected_option>
+# where semantic_intent is one of:
+#   spec-approve      — Phase 3 spec approval
+#   summary-confirm   — Phase 1 summary confirmation (no state mutation here)
+#   other             — recognized MCL question but not a state-transitioning one
+# and selected_option is the raw option string picked by the developer
+# (or empty if cancelled).
+ASKQ_RECORD="$(python3 -c '
 import json, sys, re
 
 path = sys.argv[1]
 
-def extract_text(msg):
-    if isinstance(msg, dict) and "message" in msg and isinstance(msg["message"], dict):
-        msg = msg["message"]
-    if not isinstance(msg, dict):
-        return None
-    if msg.get("role") != "assistant":
-        return None
-    content = msg.get("content")
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for item in content:
-            if isinstance(item, dict) and item.get("type") == "text":
-                t = item.get("text")
-                if isinstance(t, str):
-                    parts.append(t)
-        return "\n".join(parts) if parts else None
-    return None
+PREFIX_RE = re.compile(r"^MCL\s+[0-9]+\.[0-9]+\.[0-9]+\s*\|\s*(.+)$", re.DOTALL)
 
-last_text = None
+# Semantic intent detectors: lowercase substring match on question body.
+# English + major MCL languages. The skill file enumerates the exact
+# canonical strings; these regexes are a superset so localization drift
+# does not break detection.
+SPEC_APPROVE_TOKENS = [
+    "approve this spec", "approve the spec",
+    "spec.i onayl",  # tr: spec\u2019i onayl\u0131yor musun
+    "spec onay",
+    "aprobar esta spec", "aprueba este spec",
+    "approuver ce spec", "approuver cette sp",
+    "genehmigen sie diese spec",
+    "\u3053\u306e\u30b9\u30da\u30c3\u30af\u3092\u627f\u8a8d",
+    "\uc2a4\ud399\uc744 \uc2b9\uc778",
+    "\u6279\u51c6\u6b64\u89c4\u8303",
+    "\u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0645\u0648\u0627\u0635\u0641\u0627\u062a",
+    "\u05d0\u05e9\u05e8 \u05d0\u05ea \u05d4\u05de\u05e4\u05e8\u05d8",
+    "\u0907\u0938 \u0938\u094d\u092a\u0947\u0915 \u0915\u094b \u0938\u094d\u0935\u0940\u0915\u093e\u0930",
+    "setujui spec ini",
+    "aprovar este spec",
+    "\u043e\u0434\u043e\u0431\u0440\u0438\u0442\u044c \u044d\u0442\u043e\u0442 \u0441\u043f\u0435\u043a",
+]
+
+SUMMARY_CONFIRM_TOKENS = [
+    "is this correct",
+    "is this summary correct",
+    "bu \u00f6zet do\u011fru",
+    "bu do\u011fru mu",
+    "\u00e8s esto correcto",
+    "ce r\u00e9sum\u00e9 est-il correct",
+    "ist diese zusammenfassung korrekt",
+    "\u3053\u306e\u8981\u7d04\u306f\u6b63\u3057\u3044",
+    "\uc774 \uc694\uc57d\uc774 \ub9de",
+    "\u6b64\u6458\u8981\u662f\u5426\u6b63\u786e",
+]
+
+def extract_message(obj):
+    if isinstance(obj, dict) and "message" in obj and isinstance(obj["message"], dict):
+        return obj["message"]
+    return obj if isinstance(obj, dict) else None
+
+# Collect AskUserQuestion tool_use + paired tool_result.
+tool_uses = {}      # tool_use_id -> {question, options}
+tool_results = {}   # tool_use_id -> raw content string
+order = []          # preserve tool_use order for "most recent"
+
 try:
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
@@ -215,37 +244,141 @@ try:
                 obj = json.loads(line)
             except Exception:
                 continue
-            text = extract_text(obj)
-            if text:
-                last_text = text
+            msg = extract_message(obj)
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role")
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                t = item.get("type")
+                if role == "assistant" and t == "tool_use" and item.get("name") == "AskUserQuestion":
+                    tid = item.get("id") or ""
+                    inp = item.get("input") or {}
+                    q = ""
+                    opts = []
+                    if isinstance(inp, dict):
+                        q = inp.get("question") or ""
+                        raw_opts = inp.get("options") or []
+                        if isinstance(raw_opts, list):
+                            for o in raw_opts:
+                                if isinstance(o, str):
+                                    opts.append(o)
+                                elif isinstance(o, dict):
+                                    lbl = o.get("label") or o.get("option") or o.get("text") or ""
+                                    if lbl:
+                                        opts.append(lbl)
+                    if tid:
+                        tool_uses[tid] = {"question": q, "options": opts}
+                        order.append(tid)
+                elif role == "user" and t == "tool_result":
+                    tid = item.get("tool_use_id") or ""
+                    if not tid:
+                        continue
+                    raw = item.get("content")
+                    text = ""
+                    if isinstance(raw, str):
+                        text = raw
+                    elif isinstance(raw, list):
+                        parts = []
+                        for sub in raw:
+                            if isinstance(sub, dict):
+                                if sub.get("type") == "text" and isinstance(sub.get("text"), str):
+                                    parts.append(sub["text"])
+                        text = "\n".join(parts)
+                    tool_results[tid] = text
 except Exception:
     sys.exit(0)
 
-if not last_text:
-    sys.exit(0)
+# Find the most recent MCL-prefixed AskUserQuestion with a paired tool_result.
+record = None
+for tid in reversed(order):
+    use = tool_uses.get(tid)
+    res = tool_results.get(tid)
+    if not use:
+        continue
+    m = PREFIX_RE.match(use["question"].strip())
+    if not m:
+        continue
+    body = m.group(1).lower()
+    # Decide semantic intent.
+    intent = "other"
+    for tok in SPEC_APPROVE_TOKENS:
+        if tok in body:
+            intent = "spec-approve"
+            break
+    if intent == "other":
+        for tok in SUMMARY_CONFIRM_TOKENS:
+            if tok in body:
+                intent = "summary-confirm"
+                break
+    # Extract selected option from tool_result. The tool_result payload
+    # format varies; we search for the first option label that appears
+    # as a substring, else fall back to the raw text.
+    selected = ""
+    if res:
+        res_norm = res.strip()
+        for opt in use.get("options", []):
+            if opt and opt in res_norm:
+                selected = opt
+                break
+        if not selected:
+            selected = res_norm.splitlines()[0].strip() if res_norm else ""
+    record = f"{intent}|{selected}"
+    break
 
-pattern = re.compile(r"^[ \t]*\u2705[ \t]*MCL[ \t]+APPROVED[ \t]*$", re.MULTILINE)
-if pattern.search(last_text):
-    print("1")
+if record:
+    print(record)
 ' "$TRANSCRIPT_PATH" 2>/dev/null)"
 
-# If neither spec nor marker present, nothing to do.
-if [ -z "$SPEC_HASH" ] && [ -z "$APPROVAL_MARKER" ]; then
+ASKQ_INTENT=""
+ASKQ_SELECTED=""
+if [ -n "$ASKQ_RECORD" ]; then
+  ASKQ_INTENT="${ASKQ_RECORD%%|*}"
+  ASKQ_SELECTED="${ASKQ_RECORD#*|}"
+fi
+
+# Helper: is $1 an "approve family" option string?
+# Lowercase substring match on a fixed 14-language whitelist.
+_mcl_is_approve_option() {
+  local raw="$1"
+  [ -z "$raw" ] && return 1
+  local norm
+  norm="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  case "$norm" in
+    *onayla*|*onaylıyorum*|*onaylıyorum*|*evet*|*kabul*|*tamam*) return 0 ;;
+    *approve*|*yes*|*confirm*|*ok*|*proceed*|*accept*) return 0 ;;
+    *aprobar*|*sí*|*si*|*confirmar*) return 0 ;;
+    *approuver*|*oui*|*confirmer*) return 0 ;;
+    *genehmigen*|*bestätigen*|*ja*) return 0 ;;
+    *承認*|*はい*|*確認*|*了解*) return 0 ;;
+    *승인*|*네*|*확인*|*예*) return 0 ;;
+    *批准*|*是*|*确认*) return 0 ;;
+    *موافق*|*نعم*|*تأكيد*) return 0 ;;
+    *אשר*|*כן*|*אישור*) return 0 ;;
+    *स्वीकार*|*हाँ*|*हां*) return 0 ;;
+    *setujui*|*ya*|*konfirmasi*) return 0 ;;
+    *aprovar*|*sim*|*confirmar*) return 0 ;;
+    *одобрить*|*да*|*подтвердить*) return 0 ;;
+  esac
+  return 1
+}
+
+# If neither spec nor AskUserQuestion approval present, nothing to do.
+if [ -z "$SPEC_HASH" ] && [ -z "$ASKQ_INTENT" ]; then
   exit 0
 fi
 
-# Apply transitions to state.json.
 mcl_state_init
 CURRENT_PHASE="$(mcl_state_get current_phase)"
 CURRENT_HASH="$(mcl_state_get spec_hash)"
 SPEC_APPROVED="$(mcl_state_get spec_approved)"
-# Capture drift state BEFORE the spec-hash block potentially mutates it.
-# Drift re-approval must only fire when drift pre-existed this turn — a
-# turn that emits both new-spec AND marker together would otherwise
-# bypass developer review.
 PRE_DRIFT_DETECTED="$(mcl_state_get drift_detected)"
 
-# --- Spec-hash transitions (only when a fresh spec is in this turn) ---
+# --- Spec-hash transitions (when a fresh spec is in this turn) ---
 if [ -n "$SPEC_HASH" ]; then
   case "$CURRENT_PHASE" in
     1)
@@ -263,10 +396,22 @@ if [ -n "$SPEC_HASH" ]; then
       fi
       ;;
     4|5)
-      if [ "$SPEC_APPROVED" = "true" ] && [ -n "$CURRENT_HASH" ] && [ "$CURRENT_HASH" != "$SPEC_HASH" ]; then
-        mcl_state_set drift_detected true
-        mcl_state_set drift_hash "\"$SPEC_HASH\""
-        mcl_debug_log "stop" "drift-detected" "approved=${CURRENT_HASH:0:12} new=${SPEC_HASH:0:12}"
+      if [ "$SPEC_APPROVED" = "true" ] && [ -n "$CURRENT_HASH" ]; then
+        if [ "$CURRENT_HASH" = "$SPEC_HASH" ]; then
+          # Same body as the approved spec — if drift was flagged, clear.
+          if [ "$PRE_DRIFT_DETECTED" = "true" ]; then
+            mcl_state_set drift_detected false
+            mcl_state_set drift_hash null
+            mcl_audit_log "drift-reverted" "stop" "hash=${SPEC_HASH:0:12}"
+            mcl_debug_log "stop" "drift-reverted" "hash=${SPEC_HASH:0:12}"
+          else
+            mcl_debug_log "stop" "post-approval-noop" "phase=${CURRENT_PHASE} hash=${SPEC_HASH:0:12}"
+          fi
+        else
+          mcl_state_set drift_detected true
+          mcl_state_set drift_hash "\"$SPEC_HASH\""
+          mcl_debug_log "stop" "drift-detected" "approved=${CURRENT_HASH:0:12} new=${SPEC_HASH:0:12}"
+        fi
       else
         mcl_debug_log "stop" "post-approval-noop" "phase=${CURRENT_PHASE} hash=${SPEC_HASH:0:12}"
       fi
@@ -274,51 +419,40 @@ if [ -n "$SPEC_HASH" ]; then
   esac
 fi
 
-# --- Approval-marker transition (Domino 4) ---
-# Marker only lifts the gate when:
-#   - marker matched in the last assistant message
-#   - current_phase in {2,3} (SPEC_REVIEW or USER_VERIFY — approval-ready)
-#   - a spec_hash is already recorded (something real to approve)
-# Any other combination is a no-op. Fires AFTER the spec-hash block so
-# that phase 1→2 in the same turn still gets advanced to 4 if the
-# marker also appeared (rare but possible on the very first spec turn).
-if [ -n "$APPROVAL_MARKER" ]; then
-  # Re-read phase in case the spec-hash block just advanced 1→2.
+# --- AskUserQuestion approval transition (replaces marker branch) ---
+if [ "$ASKQ_INTENT" = "spec-approve" ]; then
   CURRENT_PHASE="$(mcl_state_get current_phase)"
   CURRENT_HASH="$(mcl_state_get spec_hash)"
   SPEC_APPROVED="$(mcl_state_get spec_approved)"
   PARTIAL_NOW="$(mcl_state_get partial_spec 2>/dev/null)"
   if [ "$PARTIAL_NOW" = "true" ]; then
-    # Defense-in-depth: a marker in a partial-spec window must not
-    # transition phase. Claude's recovery audit also forbids emitting
-    # the marker in recovery turns, but a stray/rhetorical match or a
-    # developer-typed token should still not self-approve.
-    mcl_audit_log "marker-ignored-partial-spec" "stop" "phase=${CURRENT_PHASE}"
-    mcl_debug_log "stop" "marker-ignored-partial-spec" "phase=${CURRENT_PHASE}"
-  elif [ "$PRE_DRIFT_DETECTED" = "true" ] && [ -n "$SPEC_HASH" ]; then
-    # Drift re-approval: developer re-emitted a spec (original, divergent, or
-    # new) and issued the marker AFTER MCL LOCK engaged in a prior turn.
-    # Gated on PRE_DRIFT_DETECTED so a single turn that simultaneously drifts
-    # AND emits the marker cannot self-approve — developer must see the lock
-    # at least once before re-approval counts.
-    mcl_state_set spec_hash "\"$SPEC_HASH\""
+    mcl_audit_log "askq-ignored-partial-spec" "stop" "phase=${CURRENT_PHASE}"
+    mcl_debug_log "stop" "askq-ignored-partial-spec" "phase=${CURRENT_PHASE}"
+  elif ! _mcl_is_approve_option "$ASKQ_SELECTED"; then
+    mcl_audit_log "askq-non-approve" "stop" "phase=${CURRENT_PHASE} selected=${ASKQ_SELECTED}"
+    mcl_debug_log "stop" "askq-non-approve" "phase=${CURRENT_PHASE} selected=${ASKQ_SELECTED}"
+  elif [ "$PRE_DRIFT_DETECTED" = "true" ] && [ -n "$CURRENT_HASH" ]; then
+    # Drift re-approval via AskUserQuestion: the recorded spec_hash was
+    # just updated above if a new spec was emitted this turn; clear drift.
     mcl_state_set drift_detected false
     mcl_state_set drift_hash null
-    mcl_audit_log "drift-reapproved" "stop" "prior=${CURRENT_HASH:0:12} new=${SPEC_HASH:0:12}"
-    mcl_debug_log "stop" "drift-reapproved" "prior=${CURRENT_HASH:0:12} new=${SPEC_HASH:0:12} phase=${CURRENT_PHASE}"
-    bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$SPEC_HASH" 2>/dev/null || true
+    mcl_audit_log "drift-reapproved" "stop" "hash=${CURRENT_HASH:0:12} via=askuserquestion"
+    mcl_debug_log "stop" "drift-reapproved" "hash=${CURRENT_HASH:0:12}"
+    bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
   elif [ "$SPEC_APPROVED" = "true" ] || [ "$CURRENT_PHASE" -ge 4 ] 2>/dev/null; then
-    mcl_debug_log "stop" "marker-idempotent" "phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
+    mcl_debug_log "stop" "askq-idempotent" "phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
   elif [ -z "$CURRENT_HASH" ]; then
-    mcl_debug_log "stop" "marker-ignored-no-spec" "phase=${CURRENT_PHASE}"
+    mcl_audit_log "askq-ignored-no-spec" "stop" "phase=${CURRENT_PHASE}"
+    mcl_debug_log "stop" "askq-ignored-no-spec" "phase=${CURRENT_PHASE}"
   elif [ "$CURRENT_PHASE" = "2" ] || [ "$CURRENT_PHASE" = "3" ]; then
     mcl_state_set spec_approved true
     mcl_state_set current_phase 4
     mcl_state_set phase_name '"EXECUTE"'
-    mcl_debug_log "stop" "marker-approve" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4"
+    mcl_audit_log "approve-via-askuserquestion" "stop" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4"
+    mcl_debug_log "stop" "approve-via-askuserquestion" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4"
     bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
   else
-    mcl_debug_log "stop" "marker-ignored-wrong-phase" "phase=${CURRENT_PHASE}"
+    mcl_debug_log "stop" "askq-ignored-wrong-phase" "phase=${CURRENT_PHASE}"
   fi
 fi
 

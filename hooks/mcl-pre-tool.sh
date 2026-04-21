@@ -8,7 +8,12 @@
 # Allow conditions (all must hold for a mutating tool to pass):
 #   current_phase >= 4
 #   spec_approved == true
-#   drift_detected != true
+#
+# Since 6.0.0: drift_detected no longer denies tools — it only emits a
+# `drift-warn` audit entry and passes the tool through. The activate
+# hook is responsible for surfacing the drift to the developer on their
+# NEXT turn via a DRIFT_NOTICE block; resolution is a fresh
+# AskUserQuestion approval call, not a hook-level block.
 #
 # Everything else (Read, Glob, Grep, WebFetch, WebSearch, TodoWrite,
 # Bash, Task, ...) passes through unchanged. Bash and Task are handled
@@ -48,18 +53,22 @@ CURRENT_PHASE="${CURRENT_PHASE:-1}"
 SPEC_APPROVED="${SPEC_APPROVED:-false}"
 PHASE_NAME="${PHASE_NAME:-COLLECT}"
 
-REASON=""
+# Drift is now warn-only (since 6.0.0): emit audit entry and fall through.
 if [ "$DRIFT_DETECTED" = "true" ]; then
-  REASON="MCL LOCK — spec drift detected: the current spec body no longer matches the previously-approved hash. Follow the \`drift-reapproval\` protocol — re-emit the spec in full, name what changed from the previously-approved version, wait for the developer's explicit approval, then in the FOLLOWING turn re-emit the \`📋 Spec:\` block AND \`✅ MCL APPROVED\` together in the same assistant message (the hook clears drift only when both appear in one turn — it requires a non-empty SPEC_HASH together with PRE_DRIFT_DETECTED=true). Do NOT retry this tool call in the current turn."
-elif [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null; then
-  REASON="MCL LOCK — current_phase=${CURRENT_PHASE} (${PHASE_NAME}). Mutating tool \`${TOOL_NAME}\` is blocked until Phase 4 (EXECUTE). Emit the 📋 Spec: block, get the developer's explicit 'yes', then proceed."
+  mcl_audit_log "drift-warn" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE}"
+  mcl_debug_log "pre-tool" "drift-warn" "tool=${TOOL_NAME} phase=${CURRENT_PHASE}"
+fi
+
+REASON=""
+if [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null; then
+  REASON="MCL LOCK — current_phase=${CURRENT_PHASE} (${PHASE_NAME}). Mutating tool \`${TOOL_NAME}\` is blocked until Phase 4 (EXECUTE). Emit the 📋 Spec: block, get the developer's explicit approval via AskUserQuestion, then proceed."
 elif [ "$SPEC_APPROVED" != "true" ]; then
-  REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked until the developer explicitly approves the 📋 Spec: block."
+  REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked until the developer explicitly approves the 📋 Spec: block via AskUserQuestion."
 fi
 
 if [ -n "$REASON" ]; then
-  mcl_audit_log "deny-tool" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED} drift=${DRIFT_DETECTED:-false}"
-  mcl_debug_log "pre-tool" "deny" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED} drift=${DRIFT_DETECTED:-false}"
+  mcl_audit_log "deny-tool" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
+  mcl_debug_log "pre-tool" "deny" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
   python3 -c '
 import json, sys
 reason = sys.argv[1]

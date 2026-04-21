@@ -75,26 +75,30 @@ Phase 4.6 is omitted entirely (see "When There Are No Impacts").
 Phase 4.6 is NOT a one-shot list. It is a **sequential,
 one-impact-per-turn conversation**. For each impact MCL surfaces:
 
-1. MCL presents **one** impact with a short explanation:
+1. MCL presents **one** impact as plain text with a short explanation:
    - **What** is affected (concrete artifact: file path, function,
      consumer component, route)
    - **Why** this change affects it (import, shared state, contract
      break, etc.)
-2. MCL presents the developer's options:
-   - **Skip** — accept the impact as-is, the developer will handle it
-     later (or considers it non-breaking)
-   - **Apply a specific fix** — MCL patches the consumer before
-     moving on
-   - **Make this a general rule** — triggers Rule Capture (see
-     `rule-capture.md`)
-3. MCL STOPS and waits for the developer's reply **in the next
-   message**
-4. On reply: execute the chosen action, then present the next impact
-5. Repeat until all impacts are resolved
+2. MCL immediately calls (since 6.0.0):
+   ```
+   AskUserQuestion({
+     question: "MCL 6.0.0 | <localized impact decision prompt>",
+     options: [
+       "<apply-fix-in-language>",    # MCL patches the consumer
+       "<skip-in-language>",         # accept the impact as-is
+       "<make-rule-in-language>"     # triggers Rule Capture
+     ]
+   })
+   ```
+3. MCL STOPS and waits for the tool_result **in the next message**.
+4. On tool_result: execute the chosen action, then present the next
+   impact.
+5. Repeat until all impacts are resolved.
 
-⛔ STOP RULE: After presenting an impact, STOP. Do NOT list the next
-impact in the same response. Do NOT proceed to Phase 5. Wait for the
-developer's reply in the next message.
+⛔ STOP RULE: After presenting an impact and calling `AskUserQuestion`,
+STOP. Do NOT list the next impact in the same response. Do NOT proceed
+to Phase 5. Wait for the tool_result.
 
 ## When There Are No Impacts
 

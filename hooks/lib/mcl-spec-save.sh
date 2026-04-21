@@ -4,9 +4,11 @@
 # regenerate `INDEX.md`. Idempotent on spec_hash (drift-reapproval of
 # the same body writes once).
 #
-# Invoked from mcl-stop.sh at the moment a `✅ MCL APPROVED` marker
-# transitions the phase to EXECUTE — both fresh-approval and
-# drift-reapproval paths.
+# Invoked from mcl-stop.sh at the moment an AskUserQuestion approve-family
+# tool_result transitions the phase to EXECUTE — both fresh-approval
+# (`approve-via-askuserquestion`) and drift-reapproval (`drift-reapproved |
+# via=askuserquestion`) paths. Since 6.0.0 the legacy `✅ MCL APPROVED`
+# text marker is no longer a trigger.
 #
 # CLI:
 #   bash ~/.claude/hooks/lib/mcl-spec-save.sh <transcript_path> <spec_hash>

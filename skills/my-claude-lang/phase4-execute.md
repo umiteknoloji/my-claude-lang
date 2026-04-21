@@ -90,7 +90,8 @@ Called automatically when Phase 3 is confirmed.
 
 ## Spec History — automatic feature ledger
 
-On every `✅ MCL APPROVED` that transitions phase to EXECUTE, the Stop
+On every AskUserQuestion approve-family tool_result that transitions
+phase to EXECUTE (audit event `approve-via-askuserquestion`), the Stop
 hook writes the full spec body to `.mcl/specs/NNNN-slug.md` with YAML
 frontmatter (spec_id, approved_at, spec_hash, branch, head_at_approval,
 completion_commit=null, status=active). `.mcl/specs/INDEX.md` is

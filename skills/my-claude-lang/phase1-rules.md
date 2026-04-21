@@ -74,7 +74,7 @@ When the developer describes what they want:
    using the Question Flow Rule. Do NOT present a summary first.
    Just ask the first question directly and naturally.
 4. Once ALL parameters are clear and complete → present ONE summary
-   AND ask "Is this correct? (yes / no)".
+   as plain text AND immediately call `AskUserQuestion` (since 6.0.0).
    Do NOT present intermediate summaries during question gathering.
    Do NOT summarize twice. There is exactly ONE summary — when all
    parameters are ready. No partial summaries, no "here's what I
@@ -93,18 +93,26 @@ I understood the following:
 
 **Success looks like:**
 [what "done" means]
-
-Is this correct? (yes / no)
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
-**⛔ STOP RULE:** After presenting this summary, your response ENDS.
-Do NOT read files. Do NOT explore code. Do NOT start writing the spec.
-Do NOT say "I'll prepare the spec now." STOP and wait for the developer
-to say "yes" or "no." The summary + "Is this correct?" is the ENTIRE response.
+Then call:
+```
+AskUserQuestion({
+  question: "MCL 6.0.0 | <localized 'Is this correct?'>",
+  options: ["<approve-family-in-language>", "<edit>", "<cancel>"]
+})
+```
 
-5. If the developer says "no" → ask "What did I get wrong?", re-summarize
-6. Only after developer explicitly confirms with "yes" → call Phase 2
+**⛔ STOP RULE:** After presenting the summary and calling
+`AskUserQuestion`, your response ENDS. Do NOT read files. Do NOT
+explore code. Do NOT start writing the spec. Do NOT say "I'll prepare
+the spec now." STOP and wait for the tool_result.
+
+5. If the tool_result is non-approve-family (edit/cancel/etc.) → ask
+   "What did I get wrong?" and re-run gathering.
+6. Only after the tool_result returns an approve-family option → call
+   Phase 2.
 
 ## Question Flow Rule
 

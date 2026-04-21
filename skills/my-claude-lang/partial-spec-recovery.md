@@ -2,16 +2,16 @@
 
 # Partial Spec Recovery — Rate-Limit Interruption Defense
 
-Introduced in MCL 5.15.0.
+Introduced in MCL 5.15.0; adapted to AskUserQuestion in 6.0.0.
 
 A Phase 2 `📋 Spec:` emission can be cut off mid-stream by a
 rate-limit, a network drop, or a process kill. Before 5.15.0, a
 follow-up `yes` from the developer would transition the MCL state
 machine to Phase 4 (EXECUTE) anyway — because the Stop hook's only
-input was the `✅ MCL APPROVED` token, not the structural
-completeness of the spec body it was approving. A truncated spec
-could therefore be silently promoted to an approved spec, and the
-developer had no recourse short of a manual `rm .mcl/state.json`.
+input was a text marker, not the structural completeness of the
+spec body. A truncated spec could therefore be silently promoted to
+an approved spec, and the developer had no recourse short of a
+manual `rm .mcl/state.json`.
 
 This constraint closes that hole by detecting structural
 truncation at the Stop-hook layer, raising a state flag, and
@@ -67,7 +67,7 @@ in `hooks/lib/mcl-state.sh` — no custom helpers.
 ## Stop-Hook Transitions
 
 After the Stop hook extracts `SPEC_HASH`, and **before** the
-marker-transition block, it calls the partial-spec helper:
+AskUserQuestion approval branch, it calls the partial-spec helper:
 
 | helper rc | state transition                                    |
 | --------- | --------------------------------------------------- |
@@ -75,9 +75,11 @@ marker-transition block, it calls the partial-spec helper:
 | 1 (complete) | if `partial_spec=true` → clear both fields        |
 | 2 (no spec) | leave any existing flag alone                     |
 
-The marker block then early-returns (no phase transition) when
-`partial_spec=true`, even if the approval marker regex matches. This
-is defense-in-depth alongside Claude's own recovery guidance.
+The AskUserQuestion approval branch early-returns (no phase
+transition, emits `askq-ignored-partial-spec` audit) when
+`partial_spec=true`, even if the developer picked an approve-family
+option. This is defense-in-depth alongside Claude's own recovery
+guidance.
 
 ## Activate-Hook Recovery Audit
 
@@ -88,8 +90,15 @@ an `<mcl_audit name="partial-spec-recovery">` block into
 1. Open with ONE localized line acknowledging the interruption.
 2. Re-emit the FULL `📋 Spec:` block from Phase 1 context —
    every required section present.
-3. NOT emit `✅ MCL APPROVED` in the recovery turn.
-4. End with the standard localized approval prompt and STOP.
+3. NOT emit the legacy `✅ MCL APPROVED` text (dead in 6.0.0).
+4. End with a Phase 3 `AskUserQuestion` call (prefix
+   `MCL 6.0.0 | `) asking for fresh spec approval, then STOP.
+   Note: the Stop hook IGNORES the tool_result while
+   `partial_spec=true` (emits `askq-ignored-partial-spec`). The
+   flag clears on the same turn if and only if the re-emitted
+   spec passes the structural-completeness check. The DEVELOPER
+   must approve again in the FOLLOWING turn, once the flag is
+   clear.
 
 The audit repeats every turn until a structurally-complete spec
 clears the flag — this is a deliberate exception to the
@@ -107,11 +116,11 @@ Partial-spec recovery and drift-reapproval are **distinct flows**:
 
 They do not compose. The Stop-hook order is: extract
 SPEC_HASH → partial-spec check → spec-hash transitions →
-marker transitions. A turn that is simultaneously partial AND
-drifted is treated as partial first (the flag blocks the
-marker-transition); the drift state stays raised and clears only
-after the developer approves a structurally-complete re-emitted
-spec in a later turn.
+AskUserQuestion approval transition. A turn that is simultaneously
+partial AND drifted is treated as partial first (the flag blocks
+the approval transition); the drift state stays raised and clears
+only after the developer approves a structurally-complete
+re-emitted spec via AskUserQuestion in a later turn.
 
 ## Anti-Patterns
 

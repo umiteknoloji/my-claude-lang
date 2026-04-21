@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.15.0
+# my-claude-lang 🌐 MCL 6.0.0
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -79,9 +79,25 @@ Aşama 5: Doğrulama Raporu — spec-uyum uyuşmazlıkları (varsa) ve
          listesi.
 ```
 
-**Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Senin açık "evet"in olmadan hiçbir şey ilerlemez.
+**Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Açık onayın olmadan hiçbir şey ilerlemez.
 
-Her yanıt `🌐 MCL 5.15.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+### AskUserQuestion ile Onaylar (6.0.0'dan itibaren)
+
+Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 3 spec onayı, her Aşama 4.5
+risk, her Aşama 4.6 etki, plugin onayı, git-init onayı, drift çözümü,
+`mcl-update` / `mcl-finish` / yapıştırılan-CLI onayı) artık yerleşik
+Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
+`MCL 6.0.0 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+"evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
+açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
+kalıyor.
+
+Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
+**yalnızca uyarı**: yazma araçları asla engellenmiyor, ama MCL her turda
+bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
+onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
+
+Her yanıt `🌐 MCL 6.0.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ---
 

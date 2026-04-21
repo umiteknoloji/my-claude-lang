@@ -30,18 +30,27 @@ with "done" or a changes summary — it hands off to Phase 4.5.
 Phase 4.5 is NOT a one-shot list. It is a **sequential, one-risk-per-turn
 conversation**. For each risk MCL surfaces:
 
-1. MCL presents **one** risk with a short explanation of why it matters
-   (security / data integrity / performance / regression / UX / etc.)
-2. MCL presents the developer's options:
-   - Skip — accept the risk as-is
-   - Apply a specific fix — MCL implements the fix before moving on
-   - Make this a general rule — triggers Rule Capture (see `rule-capture.md`)
-3. MCL STOPS and waits for the developer's reply **in the next message**
-4. On reply: execute the chosen action, then present the next risk
-5. Repeat until all risks are resolved
+1. MCL presents **one** risk as plain text with a short explanation of
+   why it matters (security / data integrity / performance / regression
+   / UX / etc.)
+2. MCL immediately calls (since 6.0.0):
+   ```
+   AskUserQuestion({
+     question: "MCL 6.0.0 | <localized risk decision prompt>",
+     options: [
+       "<apply-fix-in-language>",     # MCL implements the fix
+       "<skip-in-language>",          # accept the risk as-is
+       "<make-rule-in-language>"      # triggers Rule Capture
+     ]
+   })
+   ```
+3. MCL STOPS and waits for the tool_result **in the next message**.
+4. On tool_result: execute the chosen action, then present the next risk.
+5. Repeat until all risks are resolved.
 
-⛔ STOP RULE: After presenting a risk, STOP. Do NOT list the next risk
-in the same response. Do NOT proceed to Phase 5. Wait for the developer.
+⛔ STOP RULE: After presenting a risk and calling `AskUserQuestion`,
+STOP. Do NOT list the next risk in the same response. Do NOT proceed
+to Phase 5. Wait for the tool_result.
 
 ## Automated SAST Pre-Scan (Semgrep)
 

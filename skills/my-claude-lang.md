@@ -54,8 +54,20 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.15.0` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 6.0.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
+
+## AskUserQuestion Protocol (since 6.0.0)
+
+For full AskUserQuestion rules, read `my-claude-lang/askuserquestion-protocol.md`
+
+Every closed-ended MCL interaction — spec approval, summary confirmation,
+risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
+drift resolution, partial-spec recovery, mcl-update, mcl-finish, pasted-CLI
+passthrough — uses Claude Code's native `AskUserQuestion` tool with
+`question` prefixed `MCL 6.0.0 | `. The Stop hook parses tool_use/tool_result
+pairs to advance MCL state. The legacy `✅ MCL APPROVED` text marker is
+DEAD in 6.0.0 — Claude must never emit it; it carries no state effect.
 
 ## MCL Tag Schema
 
@@ -169,15 +181,19 @@ consolidated install-suggestion block at the first developer message.
 For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
 
 1. Read developer's message, extract parameters
-2. If ANY parameter unclear → ask questions ONE AT A TIME, no summary first
-3. If ALL parameters clear → present summary, ask "Is this correct? (yes / no)"
-4. Developer says "yes" → THEN call Phase 2. Not before.
+2. If ANY parameter unclear → ask questions ONE AT A TIME as plain text
+   (open-ended gather is NOT AskUserQuestion)
+3. If ALL parameters clear → present summary as plain text, THEN call
+   `AskUserQuestion({question: "MCL 6.0.0 | <localized-is-this-correct>",
+   options: ["<approve-family-in-language>", "<edit>", "<cancel>"]})`.
+4. Only after the tool_result returns an approve-family option does the
+   Stop hook advance state — THEN call Phase 2. Not before.
 
-**⛔ STOP RULE:** After asking a question OR presenting a summary for confirmation,
-your response ENDS. Do not write anything else. Do not call tools. Do not explore
-files. Do not read code. Do not say "I'll prepare the spec now." STOP and wait
-for the developer's explicit "yes" in the next message. The summary is NOT
-permission to start Phase 2 — only the developer's "yes" is.
+**⛔ STOP RULE:** After asking an open-ended clarifying question OR after
+calling `AskUserQuestion` for the summary confirmation, your response ENDS.
+Do not write anything else. Do not call tools beyond the AskUserQuestion
+itself. The summary is NOT permission to start Phase 2 — only the
+developer's approve-family selection in the tool_result is.
 
 ## Phase 2: Generate English Spec — MANDATORY, NEVER SKIP
 
@@ -193,12 +209,15 @@ processes the request AS IF a native English engineer wrote it.
 4. Include: Objective, MUST/SHOULD requirements, Acceptance Criteria,
    Edge Cases, Technical Approach, Out of Scope
 5. After the spec, explain in developer's language what it says
-6. Ask: "Is this what you want? (yes / no)"
-7. Do NOT proceed without explicit "yes"
+6. Call `AskUserQuestion({question: "MCL 6.0.0 | <localized-spec-approval
+   e.g. Bu spec'i onaylıyor musun? / Approve this spec?>", options:
+   ["<approve-family>", "<edit>", "<cancel>"]})`
+7. Do NOT proceed until the tool_result returns an approve-family option.
+   Do NOT emit the legacy `✅ MCL APPROVED` marker — it is dead in 6.0.0.
 
-**⛔ STOP RULE:** After asking "Is this what you want?", your response ENDS.
-Do not write code. Do not call tools. Do not start implementation. STOP and
-wait for the developer's explicit "yes" in the next message.
+**⛔ STOP RULE:** After calling `AskUserQuestion` for spec approval, your
+response ENDS. Do not write code. Do not call further tools. STOP and wait
+for the tool_result.
 
 Spec = SINGLE SOURCE OF TRUTH. All code must satisfy the spec.
 
@@ -207,11 +226,14 @@ Spec = SINGLE SOURCE OF TRUTH. All code must satisfy the spec.
 For full verification rules, read `my-claude-lang/phase3-verify.md`
 
 Phase 3 is COMBINED with Phase 2 — when the spec is shown, the developer
-verifies it. The explanation after the spec IS Phase 3.
-Developer must understand AND agree → then call Phase 4.
+verifies it. The explanation after the spec IS Phase 3, followed by the
+Phase 3 `AskUserQuestion` call with prefix `MCL 6.0.0 | `.
+Developer must understand AND pick an approve-family option in the
+tool_result → then Phase 4 begins (Stop hook flips state).
 
-**⛔ STOP RULE:** Phase 4 CANNOT start until the developer says "yes" to the
-spec. If they haven't responded yet, you have NOT received confirmation.
+**⛔ STOP RULE:** Phase 4 CANNOT start until the AskUserQuestion tool_result
+returns an approve-family option. An assistant-text "yes" without the
+corresponding tool_result is NOT confirmation.
 
 ## Phase 4: Execute with Live Translation
 
@@ -346,17 +368,18 @@ risks are NOT persisted across sessions.
 
 For full partial-spec-recovery rules, read `my-claude-lang/partial-spec-recovery.md`
 
-Introduced in MCL 5.15.0. When a Phase 2 `📋 Spec:` emission is
-truncated mid-stream (rate-limit, network drop, process kill), the
-Stop hook detects structural incompleteness (missing any of the
-seven required section headers), raises `partial_spec=true` in
-state, and the next `mcl-activate` pass injects a localized
-recovery audit block telling Claude to re-emit the full spec and
-await a fresh approval. Belt-and-suspenders: while the flag is
-raised, the Stop hook mechanically ignores `✅ MCL APPROVED`
-tokens — a subsequent `yes` from the developer cannot silently
-promote a truncated spec to EXECUTE. The flag clears automatically
-when a structurally-complete spec is detected on a later Stop pass.
+Introduced in MCL 5.15.0; adapted to AskUserQuestion in 6.0.0. When a
+Phase 2 `📋 Spec:` emission is truncated mid-stream (rate-limit, network
+drop, process kill), the Stop hook detects structural incompleteness
+(missing any of the seven required section headers), raises
+`partial_spec=true` in state, and the next `mcl-activate` pass injects a
+localized recovery audit block telling Claude to re-emit the full spec
+and then call `AskUserQuestion` for a fresh approval. Belt-and-suspenders:
+while the flag is raised, the Stop hook mechanically IGNORES any
+AskUserQuestion approval (emits `askq-ignored-partial-spec` audit) — a
+subsequent approve cannot silently promote a truncated spec to EXECUTE.
+The flag clears automatically when a structurally-complete spec is
+detected on a later Stop pass.
 
 ## Rule Capture
 

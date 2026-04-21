@@ -13,7 +13,7 @@ Called automatically when spec is generated.
    understanding is precise.
 4. MCL applies Gate 3: translate Claude Code's verified summary to the
    developer's language. Explain technical concepts, don't just translate words.
-5. Present to the developer:
+5. Present the translated summary and action plan as plain text:
 
 ```
 [DEVELOPER'S LANGUAGE]
@@ -23,15 +23,22 @@ Claude Code understood it this way:
 [translated summary of Claude Code's interpretation]
 
 [translated action plan]
-
-Do you understand what this means? (yes / no)
-Does this match what you want? (yes / no)
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
-6. If developer doesn't understand → re-explain differently
-7. If developer understands but disagrees → ask "What did I get wrong?",
-   fix the English spec, repeat Phase 3
-8. Only when the developer understands AND agrees → call Phase 4
+6. Then call (since 6.0.0):
+```
+AskUserQuestion({
+  question: "MCL 6.0.0 | <localized 'Approve this spec?' — e.g.
+    Turkish: Bu spec'i onaylıyor musun?; English: Approve this spec?>",
+  options: ["<approve-family-in-language>", "<edit>", "<cancel>"]
+})
+```
+   Do NOT emit the legacy `✅ MCL APPROVED` marker — dead in 6.0.0.
+
+7. If developer picks a non-approve option → ask "What did I get
+   wrong?", fix the English spec, repeat Phase 3.
+8. Only when the tool_result returns an approve-family option → Stop
+   hook flips state to Phase 4 (`approve-via-askuserquestion` audit).
 
 </mcl_phase>
