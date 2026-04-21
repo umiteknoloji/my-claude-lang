@@ -195,7 +195,8 @@ PREFIX_RE = re.compile(r"^MCL\s+[0-9]+\.[0-9]+\.[0-9]+\s*\|\s*(.+)$", re.DOTALL)
 # does not break detection.
 SPEC_APPROVE_TOKENS = [
     "approve this spec", "approve the spec",
-    "spec.i onayl",  # tr: spec\u2019i onayl\u0131yor musun
+    "spec\u0027i onayl",    # tr: ASCII apostrophe
+    "spec\u2019i onayl",    # tr: curly apostrophe
     "spec onay",
     "aprobar esta spec", "aprueba este spec",
     "approuver ce spec", "approuver cette sp",
@@ -261,16 +262,23 @@ try:
                     q = ""
                     opts = []
                     if isinstance(inp, dict):
-                        q = inp.get("question") or ""
-                        raw_opts = inp.get("options") or []
-                        if isinstance(raw_opts, list):
-                            for o in raw_opts:
-                                if isinstance(o, str):
-                                    opts.append(o)
-                                elif isinstance(o, dict):
-                                    lbl = o.get("label") or o.get("option") or o.get("text") or ""
-                                    if lbl:
-                                        opts.append(lbl)
+                        questions = inp.get("questions")
+                        first = None
+                        if isinstance(questions, list) and questions and isinstance(questions[0], dict):
+                            first = questions[0]
+                        elif isinstance(inp.get("question"), str):
+                            first = inp
+                        if isinstance(first, dict):
+                            q = first.get("question") or ""
+                            raw_opts = first.get("options") or []
+                            if isinstance(raw_opts, list):
+                                for o in raw_opts:
+                                    if isinstance(o, str):
+                                        opts.append(o)
+                                    elif isinstance(o, dict):
+                                        lbl = o.get("label") or o.get("option") or o.get("text") or ""
+                                        if lbl:
+                                            opts.append(lbl)
                     if tid:
                         tool_uses[tid] = {"question": q, "options": opts}
                         order.append(tid)
