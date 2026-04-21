@@ -238,6 +238,41 @@ per-session only.
 - Maintain a blocklist of MCP plugins. Rule C is evaluated per-plugin
   at curation time; runtime does not inspect plugin archives.
 
+## Tier-2 survey outcome — `claude-plugins-official` walk (2026-04-21)
+
+The full `claude-plugins-official` marketplace (145 plugins, the same
+list Claude Code's `/plugin` Discover tab surfaces) was walked against
+the tier-2 criteria: no `.mcp.json` (Rule C), natural alignment with
+a single MCL phase, no role overlap with the curated 5 unless Rule B
+different-angle value is clear, and non-ambient (not duplicating
+`superpowers`' methodology role).
+
+**Result: 0 additions to the curated set.** The pool partitioned as:
+
+- **MCP-transported (Rule C):** `greptile` (contains `.mcp.json`),
+  `semgrep` (source path `semgrep/mcp-marketplace`), and by strong
+  SaaS-backed signal `sourcegraph`, `coderabbit`, `optibot`,
+  `autofix-bot`. MCL already uses the `semgrep` CLI binary directly
+  via `Bash`, which is Rule-C-compliant; the marketplace plugin
+  wrapper is not needed.
+- **Role overlap without Rule B justification:** `atomic-agents`,
+  `ai-firstify`, `qodo-skills` — duplicate `code-review` / `feature-dev`
+  territory with comparable angle and training surface.
+- **Vertical / domain-specific:** `shopify*`, `ui5`, `aws-serverless`,
+  `adlc`, `nightvision`, `frontend-design`, `playground`, `gopls-lsp`,
+  and similar stack-scoped plugins. These do not align with a universal
+  MCL phase and are already surfaced organically through
+  `plugin-suggestions.md` at Phase 1 entry when a matching stack is
+  detected.
+- **Meta / developer-invoked:** `skill-creator`, `claude-md-management`.
+  Useful for developers maintaining MCL itself or their own `CLAUDE.md`,
+  but not phase-aligned and not suitable for silent auto-dispatch.
+
+The negative outcome is load-bearing: it is the reason the curated
+set stays at five. Future candidates must either survive Rule C with
+non-MCP transport or present a Rule B different-angle case against
+this survey's partitioning.
+
 ## Out of scope
 
 - Dynamic discovery of plugins beyond the curated list. MCL does not

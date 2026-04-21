@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.12.1
+# my-claude-lang 🌐 MCL 5.13.0
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -81,7 +81,7 @@ Aşama 5: Doğrulama Raporu — spec-uyum uyuşmazlıkları (varsa) ve
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Senin açık "evet"in olmadan hiçbir şey ilerlemez.
 
-Her yanıt `🌐 MCL 5.12.1` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 5.13.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ---
 
