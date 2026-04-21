@@ -30,6 +30,40 @@ Skip this pre-flow entirely when:
 - Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) is in progress.
 - Every detected tag already has its plugin installed.
 
+## Pre-Flow: Test-Command Resolution (first developer message only)
+
+TDD is mandatory on every Phase 4 (see `phase4-tdd.md`). Resolve the
+test command up front so the developer knows early what will happen
+in Phase 4 — never surprise them mid-execution with a runner question.
+
+On the **first** developer message, after the LSP Plugin Check:
+
+1. Check explicit config: `bash ~/.claude/hooks/lib/mcl-config.sh get test_command`.
+   Non-empty → resolved, skip the rest of this pre-flow.
+2. Run auto-detect: `bash ~/.claude/hooks/lib/mcl-test-runner.sh detect`.
+   Non-empty → resolved, skip the rest of this pre-flow.
+3. Both empty → ask the developer ONE question in their language:
+
+   > Turkish: *TDD her Phase 4'te çalışıyor. Bu projede testler
+   > hangi komutla koşuyor? ('yok' dersen TDD bu session için
+   > atlanır.)*
+   >
+   > English: *TDD runs on every Phase 4. What command runs the
+   > tests in this project? (type 'none' to skip TDD for this
+   > session.)*
+
+   - Non-empty reply → offer to persist as `test_command` in
+     `.mcl/config.json`. Either way, the command is used for this
+     session.
+   - `none` / equivalent → session-scoped skip flag is set; Phase 4
+     TDD overlay silently falls through to non-TDD execution.
+
+Skip this pre-flow entirely when:
+- Not the first developer message in the conversation.
+- Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) is in progress.
+- Auto-detect or config already resolved the command (no question
+  needed).
+
 ## Main Flow
 
 When the developer describes what they want:

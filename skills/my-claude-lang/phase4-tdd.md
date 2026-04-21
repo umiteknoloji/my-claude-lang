@@ -49,10 +49,12 @@ command in this order:
    fall through to `test_command` config if the developer wants a
    composed runner.
 
-3. **Developer prompt** — if neither config nor auto-detect yields
-   a command, ask the developer ONE question in their language
-   (Phase 1 gather-style — not a Phase 4 interruption if Phase 1
-   already resolved this):
+3. **Developer prompt** — normally this case never hits in Phase 4
+   because `phase1-rules.md`'s Test-Command Resolution pre-flow
+   already resolved it on the first developer message. This option
+   is a defensive fallback for sessions where Phase 1 pre-flow was
+   skipped (e.g., MCL was installed mid-session). Ask the developer
+   ONE question in their language:
 
    > Turkish: *Testler hangi komutla koşuyor? ('yok' dersen TDD
    > bu session için atlanır.)*

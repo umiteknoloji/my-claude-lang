@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.12.0
+# my-claude-lang 🌐 MCL 5.12.1
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -80,7 +80,7 @@ Phase 5: Verification Report — spec-compliance mismatches (if any)
 
 **No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit "yes."
 
-Every response starts with `🌐 MCL 5.12.0` so you always know the bridge is active.
+Every response starts with `🌐 MCL 5.12.1` so you always know the bridge is active.
 
 ---
 
