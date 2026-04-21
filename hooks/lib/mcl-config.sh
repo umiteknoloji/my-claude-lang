@@ -2,7 +2,7 @@
 # MCL Config — .mcl/config.json reader (opt-in developer config).
 #
 # Sourceable library AND CLI. Reads optional developer config at
-# $(pwd)/.mcl/config.json. Missing file is normal (opt-in): returns
+# <project>/.mcl/config.json. Missing file is normal (opt-in): returns
 # empty output, exit 0. Malformed JSON prints a stderr warning and
 # returns empty output, exit 0 — never crashes the caller.
 #
@@ -27,7 +27,7 @@
 
 set -u
 
-MCL_CONFIG_DIR="${MCL_CONFIG_DIR:-$(pwd)/.mcl}"
+MCL_CONFIG_DIR="${MCL_CONFIG_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}"
 MCL_CONFIG_FILE="${MCL_CONFIG_FILE:-$MCL_CONFIG_DIR/config.json}"
 
 mcl_config_get() {

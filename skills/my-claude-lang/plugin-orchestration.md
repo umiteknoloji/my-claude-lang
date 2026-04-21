@@ -68,8 +68,8 @@ gate with a guarantee: no skip, because git is always present.
   silently skip for the rest of the project's lifetime, with a
   one-line note in Phase 4.5 report ("code-review skipped: no git").
 - Write failure (read-only mount, permission denied) → fail open:
-  log to `.mcl/audit.log`, silently skip git-dependent plugins, do
-  not block the session.
+  log to `<project>/.mcl/audit.log`, silently skip git-dependent
+  plugins, do not block the session.
 - MCL never adds a remote, never pushes, never commits on the
   developer's behalf inside this repo. The repo exists for read-only
   bookkeeping by plugins.

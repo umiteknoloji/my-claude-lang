@@ -6,7 +6,7 @@
 # tmp-file + mv (atomic rename) so a crash mid-write cannot leave the
 # state file half-serialized.
 #
-# State file lives at `$(pwd)/.mcl/state.json` — one file per working
+# State file lives at `<project>/.mcl/state.json` — one file per working
 # directory. Stale-state garbage collection is NOT in v1 (YAGNI).
 #
 # Schema v1:
@@ -34,7 +34,7 @@
 set -u
 
 MCL_STATE_SCHEMA_VERSION=1
-MCL_STATE_DIR="${MCL_STATE_DIR:-$(pwd)/.mcl}"
+MCL_STATE_DIR="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}"
 MCL_STATE_FILE="${MCL_STATE_FILE:-$MCL_STATE_DIR/state.json}"
 
 _mcl_state_default() {

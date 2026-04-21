@@ -34,7 +34,7 @@ fi
 source "$SCRIPT_DIR/mcl-state.sh"
 
 _mcl_spec_dir() {
-  printf '%s\n' "${MCL_STATE_DIR:-$(pwd)/.mcl}/specs"
+  printf '%s\n' "${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/specs"
 }
 
 # Extract the normalized spec body (same logic as mcl-stop.sh). Prints
