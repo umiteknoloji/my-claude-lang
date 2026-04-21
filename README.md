@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.11.0
+# my-claude-lang 🌐 MCL 5.12.0
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -36,7 +36,7 @@ You could use a translator. But here's what happens when you translate your requ
 
 ## What my-claude-lang Actually Does
 
-It runs a **five-phase mutual understanding loop** before a single line of code is written:
+It runs a **seven-phase mutual understanding loop** before a single line of code is written:
 
 ```
 You (your language)
@@ -55,18 +55,32 @@ Phase 3: MCL explains the spec back to you in your language.
          You verify Claude understood correctly.
   │
   ▼
-Phase 4: Code gets written. Every question Claude asks you during
-         execution goes through the bridge — with context explaining
-         WHY it's asking and WHAT each answer changes.
+Phase 4: Code gets written. Mandatory batch TDD runs inside this
+         phase — tests first (RED baseline), then production code,
+         then GREEN verify. Every question Claude asks during
+         execution goes through the bridge — with context
+         explaining WHY it's asking and WHAT each answer changes.
   │
   ▼
-Phase 5: Results are explained, not just listed.
-         You understand what was built and why.
+Phase 4.5 (Risk Review): MCL scans the just-written code for missed
+         risks — edge cases, security, performance, regressions — and
+         walks each one with you, one at a time.
+  │
+  ▼
+Phase 4.6 (Impact Review): MCL scans the rest of the project for
+         real downstream effects of the change — callers, shared
+         utilities, schema/API shifts — and surfaces each one for
+         your decision.
+  │
+  ▼
+Phase 5: Verification Report — spec-compliance mismatches (if any)
+         and a localized "!!! YOU MUST TEST THESE !!!" list of
+         items you should verify in a running environment.
 ```
 
 **No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit "yes."
 
-Every response starts with `🌐 MCL 5.11.0` so you always know the bridge is active.
+Every response starts with `🌐 MCL 5.12.0` so you always know the bridge is active.
 
 ---
 

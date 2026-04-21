@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.11.0
+# my-claude-lang 🌐 MCL 5.12.0
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -36,7 +36,7 @@ Ama İngilizce düşünüyor. Ve İngilizce bilmiyorsan, tüm bunların dışın
 
 ## my-claude-lang Gerçekte Ne Yapıyor
 
-Tek bir satır kod yazılmadan önce **beş aşamalı karşılıklı anlama döngüsü** kuruyor:
+Tek bir satır kod yazılmadan önce **yedi aşamalı karşılıklı anlama döngüsü** kuruyor:
 
 ```
 Sen (kendi dilinde)
@@ -55,18 +55,33 @@ Aşama 3: MCL spec'i sana kendi dilinde açıklıyor.
          Claude'un doğru anlayıp anlamadığını doğruluyorsun.
   │
   ▼
-Aşama 4: Kod yazılıyor. Claude Code'un çalışma sırasında sana
-         sorduğu her soru köprüden geçiyor — NEDEN sorduğunu
-         ve hangi cevabın NE değiştireceğini açıklayarak.
+Aşama 4: Kod yazılıyor. Bu aşamanın içinde zorunlu batch TDD
+         çalışıyor — önce testler (RED taban), sonra production
+         kodu, sonra GREEN doğrulama. Claude Code'un çalışma
+         sırasında sorduğu her soru köprüden geçiyor — NEDEN
+         sorduğunu ve hangi cevabın NE değiştireceğini açıklayarak.
   │
   ▼
-Aşama 5: Sonuçlar sadece listelenmez, açıklanır.
-         Ne inşa edildiğini ve neden öyle yapıldığını anlıyorsun.
+Aşama 4.5 (Risk İncelemesi): MCL yeni yazılan kodu atlanmış
+         riskler için tarıyor — uç durumlar, güvenlik, performans,
+         gerilemeler — ve her birini seninle tek tek konuşuyor.
+  │
+  ▼
+Aşama 4.6 (Etki İncelemesi): MCL projenin geri kalanını,
+         değişikliğin gerçek downstream etkileri için tarıyor —
+         çağıranlar, ortak yardımcılar, şema/API kaymaları — ve
+         her birini senin kararın için önüne koyuyor.
+  │
+  ▼
+Aşama 5: Doğrulama Raporu — spec-uyum uyuşmazlıkları (varsa) ve
+         çalışır bir ortamda doğrulaman gereken maddelerin
+         yerelleştirilmiş "!!! MUTLAKA TEST ETMENİZ GEREKENLER !!!"
+         listesi.
 ```
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Senin açık "evet"in olmadan hiçbir şey ilerlemez.
 
-Her yanıt `🌐 MCL 5.11.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 5.12.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ---
 

@@ -1,6 +1,6 @@
 <mcl_phase name="phase4-tdd">
 
-# Phase 4 TDD: opt-in batch TDD overlay
+# Phase 4 TDD: mandatory batch TDD
 
 **`superpowers` (tier-A, ambient):** active throughout this overlay (both test-writing and code-writing sub-phases) — no explicit dispatch point; its methodology layer applies as a behavioral prior.
 
@@ -10,44 +10,77 @@ all tests first, RED baseline, all code, GREEN verify. The cycle
 happens entirely inside Phase 4; Phase 4.5, Phase 4.6, and Phase 5
 run afterward as usual.
 
-TDD is **opt-in**. It activates only when `.mcl/config.json`
-carries `"tdd": true` AND a non-empty `test_command`. When either
-is missing, this file is a silent no-op and normal Phase 4 runs.
+TDD is **mandatory** — it runs on every Phase 4 execution. There
+is no opt-in flag. The only path that skips TDD is when the test
+command cannot be resolved even after auto-detection and the
+developer explicitly declines to provide one (see Step 1).
 
 <mcl_constraint name="tdd-batch-flow">
 
-## Step 1 — Activation check
+## Step 1 — Resolve the test command
 
-Before writing any production code in Phase 4, read the opt-in
-flag:
+Before writing any production code in Phase 4, resolve the test
+command in this order:
 
-```
-bash ~/.claude/hooks/lib/mcl-config.sh get tdd
-```
+1. **Explicit config** — read `test_command` from `.mcl/config.json`:
 
-If the output is anything other than `true` (including empty),
-this entire constraint is a no-op. Proceed with normal Phase 4.
+   ```
+   bash ~/.claude/hooks/lib/mcl-config.sh get test_command
+   ```
 
-## Step 2 — Precondition check
+   If non-empty, use it.
 
-If `tdd=true` but `test_command` is empty:
+2. **Framework auto-detect** — if config is empty, inspect the
+   project root (`$CLAUDE_PROJECT_DIR`) for a recognized manifest
+   and derive the command:
 
-```
-bash ~/.claude/hooks/lib/mcl-config.sh get test_command
-```
+   | Manifest                             | Derived command          |
+   | ------------------------------------ | ------------------------ |
+   | `package.json` with `scripts.test`   | `npm test`               |
+   | `pyproject.toml` (pytest detected)   | `pytest`                 |
+   | `Cargo.toml`                         | `cargo test`             |
+   | `go.mod`                             | `go test ./...`          |
+   | `pom.xml`                            | `mvn test`               |
+   | `build.gradle` or `build.gradle.kts` | `gradle test`            |
 
-Warn the developer in their language, then fall through to non-TDD
-Phase 4. Example Turkish wording:
+   The helper `mcl_test_detect_command` in
+   `hooks/lib/mcl-test-runner.sh` encodes this mapping. First match
+   wins; multi-manifest projects (e.g. JS frontend + Python backend)
+   fall through to `test_command` config if the developer wants a
+   composed runner.
 
-> TDD modu etkin ama `.mcl/config.json` içinde `test_command`
-> tanımlı değil. Runner olmadan RED/GREEN ölçülemez —
-> normal Phase 4 akışına düşülüyor.
+3. **Developer prompt** — if neither config nor auto-detect yields
+   a command, ask the developer ONE question in their language
+   (Phase 1 gather-style — not a Phase 4 interruption if Phase 1
+   already resolved this):
 
-Example English wording:
+   > Turkish: *Testler hangi komutla koşuyor? ('yok' dersen TDD
+   > bu session için atlanır.)*
+   >
+   > English: *What command runs the tests? (type 'none' to skip
+   > TDD for this session.)*
 
-> TDD mode is enabled but `.mcl/config.json` does not declare
-> `test_command`. Without a runner, RED/GREEN cannot be
-> measured — falling back to non-TDD Phase 4.
+   - Non-empty answer → use it for this session; offer to persist
+     to `.mcl/config.json` as `test_command`.
+   - `none` / equivalent → fall through to non-TDD Phase 4 with
+     the warning in Step 2. This is the ONLY path that skips TDD.
+
+## Step 2 — Precondition warning (only when Step 1 returned 'none')
+
+If Step 1 could not resolve a command AND the developer explicitly
+declined, warn in their language then proceed with normal Phase 4
+(no RED/GREEN cycle):
+
+> Turkish: *TDD bu session için atlanıyor — koşulabilir bir test
+> komutu yok. Test altyapısı eklendiğinde MCL otomatik devreye
+> girer.*
+>
+> English: *TDD is skipped for this session — no runnable test
+> command is available. MCL will auto-engage once a test setup
+> exists.*
+
+In every other case (command resolved via config, auto-detect, or
+developer prompt) TDD continues with Step 3.
 
 ## Step 3 — Test-writing sub-phase
 
@@ -55,11 +88,11 @@ Before any production code is touched, walk every Acceptance
 Criterion from the Phase 2 spec and write a corresponding test
 case. All tests go into the project's existing test files (or new
 files matching the project's test layout). New test file paths
-MUST match whatever pattern `test_command` picks up (e.g. if
-`test_command` is `node --test 'test/*.test.mjs'`, a new file
-must live at `test/<name>.test.mjs` or the runner will never
-execute it). The test framework is whatever `test_command` runs
-— do not introduce a different framework.
+MUST match whatever pattern the resolved command picks up (e.g. if
+the command is `node --test 'test/*.test.mjs'`, a new file must
+live at `test/<name>.test.mjs` or the runner will never execute
+it). The test framework is whatever the resolved command runs —
+do not introduce a different framework.
 
 Do NOT write production code in this step. If the implementation
 does not yet exist, the test is expected to fail at the next

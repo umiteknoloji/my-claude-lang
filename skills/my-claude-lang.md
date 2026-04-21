@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.11.0` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 5.12.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## MCL Tag Schema
@@ -216,7 +216,7 @@ spec. If they haven't responded yet, you have NOT received confirmation.
 ## Phase 4: Execute with Live Translation
 
 For full execution rules, read `my-claude-lang/phase4-execute.md`
-For opt-in batch TDD overlay rules, read `my-claude-lang/phase4-tdd.md`
+For mandatory batch TDD rules, read `my-claude-lang/phase4-tdd.md`
 
 On every approval the Stop hook auto-saves the spec body to
 `.mcl/specs/NNNN-slug.md` with YAML frontmatter — background

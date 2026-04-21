@@ -1,11 +1,15 @@
 #!/bin/bash
-# MCL Test Runner — opt-in Phase 5 test-runner orchestration.
+# MCL Test Runner — Phase 4 batch TDD + Phase 5 test-runner orchestration.
 #
-# Claude invokes this via the Bash tool during Phase 5 when the
-# developer has declared a `test_command` in .mcl/config.json.
-# The runner executes the command with a portable timeout, captures
-# merged stdout+stderr, truncates to 2KB preserving the tail, and
-# prints a formatted block that Claude pastes verbatim at the top
+# Claude invokes this via the Bash tool. Command resolution order:
+#   1. `test_command` from .mcl/config.json (explicit override)
+#   2. Framework auto-detect from project manifest (package.json,
+#      pyproject.toml, Cargo.toml, go.mod, pom.xml, build.gradle)
+#   3. Fallback: return 0 with empty output (graceful skip)
+#
+# The runner executes the resolved command with a portable timeout,
+# captures merged stdout+stderr, truncates to 2KB preserving the tail,
+# and prints a formatted block that Claude pastes verbatim at the top
 # of the Verification Report.
 #
 # Exits 0 for GREEN / RED / TIMEOUT / no-op. Non-zero only on
@@ -45,6 +49,83 @@ source "$SCRIPT_DIR/mcl-config.sh"
 
 MCL_RUNNER_DEFAULT_TIMEOUT=120
 MCL_RUNNER_MAX_OUTPUT=2048
+
+mcl_test_detect_command() {
+  # Inspect the project root for a recognized manifest and echo the
+  # derived test command. Empty output (exit 0) when no manifest is
+  # recognized. Callers decide how to handle the empty case.
+  #
+  # Project root resolution mirrors mcl-state.sh / mcl-config.sh:
+  # CLAUDE_PROJECT_DIR takes precedence, pwd is fallback.
+  local root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+  [ -d "$root" ] || return 0
+
+  # package.json with scripts.test
+  if [ -f "$root/package.json" ]; then
+    if python3 -c '
+import json, sys
+try:
+    obj = json.load(open(sys.argv[1]))
+    scripts = obj.get("scripts") or {}
+    sys.exit(0 if isinstance(scripts.get("test"), str) and scripts.get("test").strip() else 1)
+except Exception:
+    sys.exit(1)
+' "$root/package.json" 2>/dev/null; then
+      printf '%s\n' "npm test"
+      return 0
+    fi
+  fi
+
+  # pyproject.toml — pytest if declared as tool or dependency.
+  # Substring match is intentional: we do not want to pull tomllib
+  # just to distinguish [tool.pytest] from a `pytest` dep line; both
+  # count as "this project uses pytest".
+  if [ -f "$root/pyproject.toml" ]; then
+    if grep -qE '^(\[tool\.pytest|pytest\s*[=<>!~])' "$root/pyproject.toml" 2>/dev/null \
+      || grep -qE '"pytest"' "$root/pyproject.toml" 2>/dev/null; then
+      printf '%s\n' "pytest"
+      return 0
+    fi
+  fi
+
+  # Cargo.toml → cargo test
+  if [ -f "$root/Cargo.toml" ]; then
+    printf '%s\n' "cargo test"
+    return 0
+  fi
+
+  # go.mod → go test ./...
+  if [ -f "$root/go.mod" ]; then
+    printf '%s\n' "go test ./..."
+    return 0
+  fi
+
+  # Maven pom.xml → mvn test
+  if [ -f "$root/pom.xml" ]; then
+    printf '%s\n' "mvn test"
+    return 0
+  fi
+
+  # Gradle (either build.gradle or build.gradle.kts)
+  if [ -f "$root/build.gradle" ] || [ -f "$root/build.gradle.kts" ]; then
+    printf '%s\n' "gradle test"
+    return 0
+  fi
+
+  # No recognized manifest — empty output, caller handles.
+  return 0
+}
+
+_mcl_runner_resolve_command() {
+  # Resolve the command to run: config > auto-detect > empty.
+  local cmd
+  cmd="$(mcl_config_get test_command)"
+  if [ -n "${cmd// /}" ]; then
+    printf '%s\n' "$cmd"
+    return 0
+  fi
+  mcl_test_detect_command
+}
 
 _mcl_runner_resolve_timeout() {
   # Read test_command_timeout_seconds; must be a positive integer.
@@ -99,10 +180,11 @@ mcl_test_run() {
   # log-consumers keep parsing cleanly.
   local label="${1:-}"
 
-  # Read config. No-op (exit 0, empty stdout) when test_command is
-  # absent, empty, or only whitespace — this is the opt-in path.
+  # Resolve command (config > auto-detect). No-op when neither path
+  # yields a command — this is the graceful-skip path for projects
+  # without a test setup.
   local cmd
-  cmd="$(mcl_config_get test_command)"
+  cmd="$(_mcl_runner_resolve_command)"
   if [ -z "${cmd// /}" ]; then
     return 0
   fi
@@ -198,6 +280,17 @@ mcl_test_run() {
 }
 
 # CLI dispatch — only when invoked directly, not when sourced.
+# Subcommands:
+#   detect          → print auto-detected command (or nothing)
+#   <label>         → run with audit label (red-baseline / green-verify / ...)
+#   (no arg)        → run with no label
 if [ "${BASH_SOURCE[0]:-}" = "${0:-}" ] && [ -n "${BASH_SOURCE[0]:-}" ]; then
-  mcl_test_run "${1:-}"
+  case "${1:-}" in
+    detect)
+      mcl_test_detect_command
+      ;;
+    *)
+      mcl_test_run "${1:-}"
+      ;;
+  esac
 fi
