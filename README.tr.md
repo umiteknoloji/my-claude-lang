@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.14.0
+# my-claude-lang 🌐 MCL 5.15.0
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -81,7 +81,7 @@ Aşama 5: Doğrulama Raporu — spec-uyum uyuşmazlıkları (varsa) ve
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Senin açık "evet"in olmadan hiçbir şey ilerlemez.
 
-Her yanıt `🌐 MCL 5.14.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 5.15.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ---
 
@@ -184,6 +184,14 @@ cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
 ```
 
 `MCL_REPO_PATH` varsayılan olarak `$HOME/my-claude-lang`. Klonun başka bir yerdeyse environment variable ile ayarla. Güncellenen hook ve skill dosyaları her prompt'ta yeniden okunduğu için aynı oturumdaki bir sonraki mesajın yeni kuralları kullanır — oturum yeniden başlatmaya gerek yok.
+
+---
+
+## Parçalı Spec Kurtarma — Rate-Limit Kesinti Savunması
+
+Uzun spec'ler rate-limit, ağ kesintisi veya süreç kill ile yarıda kesilebilir. 5.15.0 öncesi, sonraki turda senden gelen bir `evet` bu yarıda kalmış spec'i sessizce EXECUTE fazına geçiriyordu — çünkü MCL'in state makinesi sadece approval token'ına bakıyordu, spec body'nin yapısal tamlığına bakmıyordu. Gereksinimlerinin yarısı eksik onaylanmış bir spec ile kalıyordun ve tek çıkış yolu manuel `rm .mcl/state.json` idi.
+
+5.15.0 ile MCL bu kesintiyi Stop-hook katmanında tespit ediyor: bir `📋 Spec:` bloğu yedi zorunlu bölümden (Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope) herhangi birini kapsamıyorsa, state'e `partial_spec=true` bayrağı yazılır. Bir sonraki aktivasyon Claude'a spec'i tam olarak yeniden yayınlamasını söyler — ve bayrak temiz spec ile sıfırlanana kadar hiçbir approval token'ı dinlenmez. Kesintiyi fark etmek zorunda değilsin; MCL senin için fark eder.
 
 ---
 

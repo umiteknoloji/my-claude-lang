@@ -88,9 +88,13 @@ if not last_text:
     sys.exit(0)
 
 lines = last_text.splitlines()
+# Trigger line tolerates optional markdown heading marks (`##`) or list
+# markers before the `📋 Spec:` emoji — must stay in sync with the
+# matching regex in `mcl-stop.sh`.
+spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:")
 start = None
 for i, ln in enumerate(lines):
-    if ln.lstrip().startswith("\U0001F4CB Spec:"):
+    if spec_line_re.match(ln):
         start = i
         break
 if start is None:

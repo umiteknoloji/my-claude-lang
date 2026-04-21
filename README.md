@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 5.14.0
+# my-claude-lang 🌐 MCL 5.15.0
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -80,7 +80,7 @@ Phase 5: Verification Report — spec-compliance mismatches (if any)
 
 **No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit "yes."
 
-Every response starts with `🌐 MCL 5.14.0` so you always know the bridge is active.
+Every response starts with `🌐 MCL 5.15.0` so you always know the bridge is active.
 
 ---
 
@@ -183,6 +183,14 @@ cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
 ```
 
 `MCL_REPO_PATH` defaults to `$HOME/my-claude-lang`. Override via environment variable if your clone lives elsewhere. The updated hook and skill files are re-read on every prompt, so the next message in the same session already uses the new rules — no session restart needed.
+
+---
+
+## Partial Spec Recovery — Rate-Limit Interruption Defense
+
+Long specs can get cut off mid-stream by a rate-limit, a network drop, or a process kill. Before 5.15.0, a follow-up `yes` from you would silently promote that truncated spec to EXECUTE — because MCL's state machine only listened for the approval token, not the structural completeness of the spec body. You'd end up with an approved spec that was missing half its requirements, and the only way out was a manual `rm .mcl/state.json`.
+
+Since 5.15.0, MCL detects the truncation at the Stop-hook layer: if a `📋 Spec:` block is missing any of the seven required sections (Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope), a `partial_spec=true` flag is raised in state. The next activation tells Claude to re-emit the full spec — and ignores any approval token until the flag is cleared by a complete spec. Defense-in-depth: the developer doesn't need to notice the interrupt; MCL notices for them.
 
 ---
 

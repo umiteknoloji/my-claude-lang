@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.14.0` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 5.15.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## MCL Tag Schema
@@ -341,6 +341,22 @@ Phase 5 Verification Report ends with a localized reminder line
 pointing at the command. Impact persistence to `.mcl/impact/` and
 checkpoint writes to `.mcl/finish/` are append-only; Phase 4.5
 risks are NOT persisted across sessions.
+
+## Partial Spec Recovery — Rate-Limit Interruption Defense
+
+For full partial-spec-recovery rules, read `my-claude-lang/partial-spec-recovery.md`
+
+Introduced in MCL 5.15.0. When a Phase 2 `📋 Spec:` emission is
+truncated mid-stream (rate-limit, network drop, process kill), the
+Stop hook detects structural incompleteness (missing any of the
+seven required section headers), raises `partial_spec=true` in
+state, and the next `mcl-activate` pass injects a localized
+recovery audit block telling Claude to re-emit the full spec and
+await a fresh approval. Belt-and-suspenders: while the flag is
+raised, the Stop hook mechanically ignores `✅ MCL APPROVED`
+tokens — a subsequent `yes` from the developer cannot silently
+promote a truncated spec to EXECUTE. The flag clears automatically
+when a structurally-complete spec is detected on a later Stop pass.
 
 ## Rule Capture
 

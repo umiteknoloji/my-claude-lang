@@ -87,12 +87,18 @@ except Exception:
 if not last_text:
     sys.exit(0)
 
-# Spec block: from first line matching `📋 Spec:` up to next markdown
-# heading (^#) on its own line, or EOF. Keep the header line in the body.
+# Spec block: from first line matching `📋 Spec:` (optionally prefixed
+# by markdown heading marks like `##` or a list marker — the emoji
+# trigger is what anchors the block, not the surrounding decoration)
+# up to the next markdown heading `^#+\s` on its own line, or EOF.
+# Canonical spec pattern uses `**Section**` bold — not `## Section`
+# headings — so the heading-based terminator reliably marks the
+# closing `## Next Step` / `## Notes` divider after the body.
+spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:")
 lines = last_text.splitlines()
 start = None
 for i, ln in enumerate(lines):
-    if ln.lstrip().startswith("📋 Spec:"):
+    if spec_line_re.match(ln):
         start = i
         break
 if start is None:
@@ -134,6 +140,41 @@ print(hashlib.sha256(body.encode("utf-8")).hexdigest())
 if [ -z "$SPEC_HASH" ]; then
   mcl_debug_log "stop" "no-spec" "transcript=${TRANSCRIPT_PATH}"
 fi
+
+# --- Partial spec detection (rate-limit interruption defense) ---
+# If the last assistant turn carries a `📋 Spec:` marker but is missing
+# any of the seven required section headers, raise a state flag so the
+# next `mcl-activate` pass injects a recovery audit block, and make the
+# marker-transition block below a no-op while the flag is set. Complete
+# specs auto-clear the flag.
+PARTIAL_MISSING="$(bash "$SCRIPT_DIR/lib/mcl-partial-spec.sh" check "$TRANSCRIPT_PATH" 2>/dev/null)"
+PARTIAL_RC=$?
+PARTIAL_STATE="$(mcl_state_get partial_spec 2>/dev/null)"
+case "$PARTIAL_RC" in
+  0)
+    # Partial spec in THIS turn — raise the flag.
+    mcl_state_set partial_spec true
+    if [ -n "$SPEC_HASH" ]; then
+      mcl_state_set partial_spec_body_sha "\"${SPEC_HASH:0:16}\""
+    fi
+    mcl_audit_log "partial-spec" "stop" "missing=$(printf '%s' "$PARTIAL_MISSING" | tr '\n' ',' | sed 's/,$//')"
+    mcl_debug_log "stop" "partial-spec" "missing=$(printf '%s' "$PARTIAL_MISSING" | tr '\n' '|')"
+    ;;
+  1)
+    # Structurally complete — if flag was raised in a prior turn, clear.
+    if [ "$PARTIAL_STATE" = "true" ]; then
+      mcl_state_set partial_spec false
+      mcl_state_set partial_spec_body_sha null
+      mcl_audit_log "partial-spec-cleared" "stop" ""
+      mcl_debug_log "stop" "partial-spec-cleared" ""
+    fi
+    ;;
+  *)
+    # No spec marker in turn — leave any existing flag alone; it clears
+    # only when a complete spec arrives.
+    :
+    ;;
+esac
 
 # Detect the approval marker — a line matching exactly
 # `^\s*✅\s*MCL\s+APPROVED\s*$` in the last assistant message. Strict
@@ -246,7 +287,15 @@ if [ -n "$APPROVAL_MARKER" ]; then
   CURRENT_PHASE="$(mcl_state_get current_phase)"
   CURRENT_HASH="$(mcl_state_get spec_hash)"
   SPEC_APPROVED="$(mcl_state_get spec_approved)"
-  if [ "$PRE_DRIFT_DETECTED" = "true" ] && [ -n "$SPEC_HASH" ]; then
+  PARTIAL_NOW="$(mcl_state_get partial_spec 2>/dev/null)"
+  if [ "$PARTIAL_NOW" = "true" ]; then
+    # Defense-in-depth: a marker in a partial-spec window must not
+    # transition phase. Claude's recovery audit also forbids emitting
+    # the marker in recovery turns, but a stray/rhetorical match or a
+    # developer-typed token should still not self-approve.
+    mcl_audit_log "marker-ignored-partial-spec" "stop" "phase=${CURRENT_PHASE}"
+    mcl_debug_log "stop" "marker-ignored-partial-spec" "phase=${CURRENT_PHASE}"
+  elif [ "$PRE_DRIFT_DETECTED" = "true" ] && [ -n "$SPEC_HASH" ]; then
     # Drift re-approval: developer re-emitted a spec (original, divergent, or
     # new) and issued the marker AFTER MCL LOCK engaged in a prior turn.
     # Gated on PRE_DRIFT_DETECTED so a single turn that simultaneously drifts
