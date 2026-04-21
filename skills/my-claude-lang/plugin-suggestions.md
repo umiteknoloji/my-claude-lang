@@ -1,14 +1,22 @@
 <mcl_phase name="plugin-suggestions">
 
-# Plugin Suggestions — Stack-Aware LSP Recommendations
+# Plugin Suggestions — Stack-Conditional Recommendations
 
 MCL detects the project's language stack and, when a matching official
-Claude Code LSP plugin is not yet installed, asks the developer once
-per conversation to install it. Purpose: give Claude per-edit compiler
-feedback (type errors, symbol resolution, go-to-def, rename) so the
-"write, build, see error" cycle collapses from minutes to milliseconds.
+Claude Code plugin is not yet installed, asks the developer once per
+conversation to install it. Two classes of plugin are suggested here:
 
-This is a passive suggestion. MCL never auto-installs.
+- **LSP plugins** — give Claude per-edit compiler feedback (type
+  errors, symbol resolution, go-to-def, rename) so the "write, build,
+  see error" cycle collapses from minutes to milliseconds.
+- **Non-LSP stack-conditional plugins** (currently just
+  `frontend-design`) — provide framework-specific tooling that is
+  only useful when a matching stack is detected.
+
+This is a passive suggestion. MCL never auto-installs. All
+stack-conditional plugins are **install-on-suggest**, distinct from
+the curated required set in `plugin-orchestration.md` which MCL
+dispatches silently at phase alignment points.
 
 ## Overlap with built-in behavior
 
@@ -53,6 +61,26 @@ single project may return multiple tags (e.g. a monorepo with both
 `package.json` and `pyproject.toml` returns `typescript` and `python`
 on separate lines) — recommend the plugin for each.
 
+## Non-LSP Stack-Conditional Plugins
+
+### `frontend-design`
+
+| Trigger                                      | Plugin            | Install command                                             |
+| -------------------------------------------- | ----------------- | ----------------------------------------------------------- |
+| `typescript` OR `javascript` stack detected  | `frontend-design` | `/plugin install frontend-design@claude-plugins-official`   |
+
+`frontend-design` is **not** in the curated orchestration set — it
+does not auto-dispatch. It is offered once per conversation when MCL
+detects a frontend-capable stack, and runs only via its own explicit
+slash-command invocations after install.
+
+Trigger is coarse on purpose: any `typescript`/`javascript` tag
+qualifies. Node-only backends (no React/Vue/Svelte/Next/Nuxt/Angular/
+Solid dependency) will see a false-positive suggestion; this is
+acceptable because the suggestion is passive and declinable. A
+future refinement could scan `package.json` dependencies for
+framework markers — tracked as out of scope below.
+
 ## Detection Protocol
 
 At the start of a new conversation in a project (first developer
@@ -85,8 +113,13 @@ message), before asking Phase 1 questions:
 - Auto-install the plugin or the binary.
 - Remember the decline across conversations. If the developer
   declined today, MCL may ask again in a future conversation.
-- Recommend non-LSP official plugins here (code-review, feature-dev,
-  session-report, security-guidance). Those overlap with existing
-  MCL phases and require separate integration analysis.
+- Recommend orchestration-set plugins here (`superpowers`,
+  `feature-dev`, `code-review`, `pr-review-toolkit`). Those belong to
+  the curated required set in `plugin-orchestration.md` and surface
+  via the consolidated install-suggestion block, not this file.
+- Refine `frontend-design` suggestion with framework-marker checks
+  (React/Vue/Svelte/Next/Nuxt/Angular/Solid in `package.json`
+  dependencies). Out of scope for MVP — current coarse trigger is
+  sufficient.
 
 </mcl_phase>

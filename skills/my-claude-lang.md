@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 5.8.0` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 5.9.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## MCL Tag Schema
@@ -120,10 +120,49 @@ For full plugin-suggestion rules, read `my-claude-lang/plugin-suggestions.md`
 
 At the start of a new conversation, before Phase 1 questions, MCL runs
 `bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect "$(pwd)"` and, for
-each detected language tag whose matching official Claude Code LSP
-plugin is missing from `~/.claude/plugins/`, asks the developer once in
-their language whether to install it. Passive suggestion only — MCL
-never auto-installs. Empty detection output → skip entirely.
+each detected language tag whose matching official Claude Code plugin
+is missing from `~/.claude/plugins/`, asks the developer once in their
+language whether to install it. Two classes are suggested: per-language
+LSP plugins (e.g. `typescript-lsp`, `pyright-lsp`) and non-LSP
+stack-conditional plugins (currently `frontend-design`, triggered by
+`typescript`/`javascript` tags). Passive suggestion only — MCL never
+auto-installs. Empty detection output → skip entirely.
+
+## Plugin Integration (bridge scope when another plugin runs)
+
+For full plugin-integration rules, read `my-claude-lang/plugin-integration.md`
+
+When a third-party slash-command plugin (`/feature-dev`, `/pr-review`,
+`/code-review`, `/skill-creator`, etc.) is invoked and runs its own
+workflow, MCL's language bridge still applies unconditionally: every
+developer-facing question, report, decision prompt, progress update, and
+summary from that plugin is rendered in the developer's language.
+Bridge scope is defined by who reads the text, not who produced it.
+The plugin's internal prompts, agent-to-agent dispatch, and fixed
+technical tokens (paths, identifiers, CLI flags, MUST/SHOULD) stay
+unchanged.
+
+## Plugin Orchestration (curated required set, silent auto-dispatch)
+
+For full plugin-orchestration rules, read `my-claude-lang/plugin-orchestration.md`
+
+MCL silently auto-dispatches a curated required plugin set
+(`superpowers`, `feature-dev`, `code-review`, `pr-review-toolkit`,
+`security-guidance`) at natural alignment points of its phase
+pipeline — the developer never types `/feature-dev` or `/code-review`.
+Outputs are merged into MCL's own phase prose in the developer's
+language. `superpowers` is the always-on ambient methodology layer —
+active across every MCL phase (1, 2, 3, 4, 4.5, 4.6, 5) with no
+explicit dispatch point; its behavioral prior shapes every phase
+without a visible handoff. Three rules govern the dispatch: Rule A —
+MCL guarantees git by asking once per project for consent to run
+`git init` locally (no remote, read-only bookkeeping); Rule B —
+overlapping plugins are multi-angle validation, not redundancy, so
+dispatch runs silently and findings are merged with a
+stricter-verdict-wins tiebreaker; Rule C — MCP-server plugins are
+filtered out of the curated set (binary CLIs invoked via Bash are
+allowed). Missing curated plugins are surfaced once in a single
+consolidated install-suggestion block at the first developer message.
 
 ## Phase 1: Gather Parameters
 

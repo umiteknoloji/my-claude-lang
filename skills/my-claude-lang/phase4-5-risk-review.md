@@ -2,6 +2,8 @@
 
 # Phase 4.5: Post-Code Risk Review
 
+**`superpowers` (tier-A, ambient):** active throughout this phase — no explicit dispatch point; its methodology layer applies as a behavioral prior.
+
 Phase 4.5 is a **mandatory, sequential, interactive dialog** that runs
 AFTER Phase 4 (code is written) and BEFORE Phase 5 (Verification Report).
 Introduced in MCL 5.3.0.
@@ -40,6 +42,68 @@ conversation**. For each risk MCL surfaces:
 
 ⛔ STOP RULE: After presenting a risk, STOP. Do NOT list the next risk
 in the same response. Do NOT proceed to Phase 5. Wait for the developer.
+
+## Automated SAST Pre-Scan (Semgrep)
+
+Before running the human-judgment category review below, Phase 4.5
+invokes Semgrep as an automated SAST pre-scan over files MCL wrote
+or edited in this session's Phase 4. Semgrep findings either
+**auto-fix silently** (HIGH / MEDIUM with unambiguous autofix) or
+**seed the Phase 4.5 dialog as regular risks** (HIGH / MEDIUM without
+autofix or where multiple valid options exist). Semgrep never
+produces a standalone section — its output is merged into the
+existing risk-dialog flow.
+
+### Invocation
+
+```
+bash ~/.claude/hooks/lib/mcl-semgrep.sh scan <file1> <file2> ...
+```
+
+Pass the deduplicated list of files edited or created during Phase 4
+of this session. Relative or absolute paths both work. Empty list →
+skip the scan. Do NOT scan files that were not touched this session
+(delta scope invariant — protects against noisy legacy findings).
+
+### Preflight gate
+
+If `mcl-activate.sh` already emitted a `semgrep-missing` or
+`semgrep-unsupported-stack` notice this session, skip the SAST step
+silently. The developer has already been told once; Phase 4.5's
+category-based review below still runs normally.
+
+### Findings handling
+
+Helper emits JSON:
+`{"findings":[{"severity","rule_id","file","line","message","autofix"}, ...],
+ "scanned_files":N, "errors":[...]}`.
+
+For each finding:
+
+- **`severity=LOW`** → suppress entirely. Do not surface. Do not log
+  to the dialog. (LOW packs too many false positives to be useful
+  at this level.)
+- **`severity=HIGH` or `MEDIUM`** with a non-null `autofix` AND an
+  unambiguous application point → apply the autofix silently via
+  `Edit` / `MultiEdit` (per the global captured rule: "auto-fix
+  unambiguous Phase 4.5 risks silently"). Record via
+  `mcl_audit_log "semgrep-autofix" "phase4-5" "rule=<rule_id> file=<file>:<line>"`.
+- **`severity=HIGH` or `MEDIUM`** where `autofix` is null, ambiguous,
+  or requires a trade-off → surface as a normal Phase 4.5 risk in
+  the sequential dialog. Render the `message` in the developer's
+  language, cite `file:line`, offer the three standard options
+  (skip / specific fix / general rule).
+
+`errors` entries are logged but do NOT block the Phase 4.5 dialog —
+SAST is advisory, not blocking. Scan timeout or helper failure → one
+audit-log line, then proceed to the category-based review below.
+
+### Output discipline
+
+The SAST step is invisible unless it surfaces risks. Never announce
+"running Semgrep…", "Semgrep found N issues", or "SAST scan complete".
+The developer sees only the risk-dialog turns seeded by Semgrep,
+blended with the category-based risks MCL itself identifies.
 
 ## Risk Categories to Review
 

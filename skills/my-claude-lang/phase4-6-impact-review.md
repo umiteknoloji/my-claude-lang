@@ -2,6 +2,8 @@
 
 # Phase 4.6: Post-Risk Impact Review
 
+**`superpowers` (tier-A, ambient):** active throughout this phase — no explicit dispatch point; its methodology layer applies as a behavioral prior.
+
 Phase 4.6 is a **mandatory, sequential, interactive dialog** that runs
 AFTER Phase 4.5 (risk review is resolved) and BEFORE Phase 5
 (Verification Report). Introduced in MCL 5.4.0.

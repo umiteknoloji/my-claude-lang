@@ -2,6 +2,8 @@
 
 # Phase 4 TDD: opt-in batch TDD overlay
 
+**`superpowers` (tier-A, ambient):** active throughout this overlay (both test-writing and code-writing sub-phases) — no explicit dispatch point; its methodology layer applies as a behavioral prior.
+
 Phase 4 normally writes production code immediately after the spec
 is approved. This overlay turns that into a **batch TDD cycle**:
 all tests first, RED baseline, all code, GREEN verify. The cycle
