@@ -225,8 +225,11 @@ log_warn "İndirdikten sonra 'kotlin-lsp' komutunun PATH'te olduğundan emin olu
 log_info "C# (csharp-ls)..."
 claude plugin install csharp-lsp@claude-plugins-official
 if has_cmd dotnet; then
-    dotnet tool install -g csharp-ls || dotnet tool update -g csharp-ls
-    log_ok "csharp-ls kuruldu"
+    if dotnet tool install -g csharp-ls 2>/dev/null || dotnet tool update -g csharp-ls 2>/dev/null; then
+        log_ok "csharp-ls kuruldu"
+    else
+        log_warn "csharp-ls kurulamadı (NuGet paketi bozuk olabilir) — atlandı"
+    fi
 else
     log_warn "dotnet yok — csharp-ls atlandı (https://dotnet.microsoft.com/download)"
 fi
