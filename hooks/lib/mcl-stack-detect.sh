@@ -44,6 +44,27 @@ mcl_stack_detect() {
     else
       _mcl_stack_add javascript
     fi
+
+    # Frontend framework markers (MVP: react/vue/svelte). Tags the
+    # dominant framework so Phase 4a picks the right component syntax.
+    # Multiple can match (Nx monorepo, stale deps) — MCL prose reconciles.
+    if grep -q '"react"' "$dir/package.json" 2>/dev/null; then
+      _mcl_stack_add react-frontend
+    fi
+    if grep -Eq '"(vue|nuxt)"' "$dir/package.json" 2>/dev/null; then
+      _mcl_stack_add vue-frontend
+    fi
+    if grep -Eq '"(svelte|@sveltejs/kit)"' "$dir/package.json" 2>/dev/null; then
+      _mcl_stack_add svelte-frontend
+    fi
+  fi
+
+  # Static HTML (no JS framework detected): top-level index.html or *.html
+  # in the absence of package.json. Lets Phase 4a emit plain HTML+JS.
+  if [ ! -f "$dir/package.json" ]; then
+    if [ -f "$dir/index.html" ] || compgen -G "$dir/*.html" >/dev/null; then
+      _mcl_stack_add html-static
+    fi
   fi
 
   # Python

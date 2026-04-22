@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 6.1.1
+# my-claude-lang 🌐 MCL 6.2.0
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -87,7 +87,7 @@ Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 3 spec onayı, her Aşama 4.5
 risk, her Aşama 4.6 etki, plugin onayı, git-init onayı, drift çözümü,
 `mcl-update` / `mcl-finish` / yapıştırılan-CLI onayı) artık yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 6.1.1 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+`MCL 6.2.0 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
 "evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
 açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
 kalıyor.
@@ -97,7 +97,32 @@ Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
 bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
 onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
-Her yanıt `🌐 MCL 6.1.1` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 6.2.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+
+### UI Build / Review Alt-Fazları (6.2.0'dan itibaren)
+
+Görevin bir UI yüzeyi olduğunda (her projede varsayılan), Phase 4 üç
+alt-faza ayrılıyor — böylece MCL değiştirmek istediğin bir UI'ın
+üstüne backend yazarken seyretmek zorunda kalmıyorsun:
+
+1. **Phase 4a (BUILD_UI)** — MCL sadece dummy data ile çalıştırılabilir
+   bir frontend yazıyor. Stack'ine göre React / Vue / Svelte / statik
+   HTML. Sana bir "çalıştır" komutu veriyor (`npm run dev` vb.) ve
+   tarayıcında açıyorsun.
+2. **Phase 4b (UI_REVIEW)** — MCL backend'e geçmeden önce UI doğru
+   mu diye soruyor. Dört seçenek: onay / revize / **sen de bak ve
+   raporla** / iptal. "Sen de bak ve raporla" opt-in bir boru hattı:
+   Playwright + screenshot + Claude'un multimodal görüsü ile MCL
+   kendi yazdığı UI'a gerçekten bakıp ne gördüğünü anlatıyor —
+   `playwright` kurulu olmasını gerektirir, asla otomatik kurmaz.
+3. **Phase 4c (BACKEND)** — ancak onayladıktan sonra MCL dummy
+   fixture'ları gerçek API çağrılarına dönüştürüyor, data layer'ı
+   yazıyor, error ve loading state'lerini gerçek async'e bağlıyor.
+
+Phase 1 özet onayında "onay, UI atlayacağız" seçersen Phase 4
+ayrılmadan çalışır (6.1.1 davranışının aynısı). UI default ON çünkü
+projelerin çoğunun UI yüzeyi var; bash script'leri ve yalnızca-backend
+değişiklikleri tek tıkla opt-out yapıyor.
 
 ---
 

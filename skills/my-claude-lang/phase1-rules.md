@@ -99,10 +99,42 @@ I understood the following:
 Then call:
 ```
 AskUserQuestion({
-  question: "MCL 6.0.0 | <localized 'Is this correct?'>",
-  options: ["<approve-family-in-language>", "<edit>", "<cancel>"]
+  question: "MCL 6.2.0 | <localized 'Is this correct?'>",
+  options: [
+    "<approve-family — UI included (recommended)>",
+    "<approve-family — skip UI>",
+    "<edit>",
+    "<cancel>"
+  ]
 })
 ```
+
+The 4-option form is MANDATORY since 6.2.0. UI is DEFAULT ON — the
+first approve option enables Phase 4a/4b/4c; the second tells MCL
+this task has no UI layer and should run the standard Phase 4 flow
+direct. Localize BOTH approve labels — the stop hook detects the
+"skip UI" variant by matching `_mcl_is_ui_skip_option` token sets
+(see `hooks/mcl-stop.sh`).
+
+Reference approve-label pairs (full 14-language set lives in the
+stop hook):
+
+| Locale | UI included (recommended)        | Skip UI                       |
+| ------ | -------------------------------- | ----------------------------- |
+| TR     | Onay (UI dahil)                   | Onay, UI atlayacağız          |
+| EN     | Approve (UI included)             | Approve, skip UI              |
+| JA     | 承認（UI含む）                     | 承認、UIなし                   |
+| KO     | 승인 (UI 포함)                    | 승인, UI 건너뛰기              |
+| ZH     | 批准（包含 UI）                    | 批准, 跳过 UI                  |
+| AR     | موافق (مع الواجهة)                | موافق, بدون واجهة              |
+| HE     | אישור (כולל ממשק)                 | אישור, בלי ממשק                |
+| DE     | Genehmigen (mit UI)               | Genehmigen, ohne UI            |
+| ES     | Aprobar (con UI)                  | Aprobar, omitir UI             |
+| FR     | Approuver (avec UI)               | Approuver, sans UI             |
+| HI     | स्वीकृति (UI सहित)                 | स्वीकृति, UI छोड़ें             |
+| ID     | Setuju (dengan UI)                | Setuju, lewati UI              |
+| PT     | Aprovar (com UI)                  | Aprovar, pular UI              |
+| RU     | Одобрить (с UI)                   | Одобрить, без UI               |
 
 **⛔ STOP RULE:** After presenting the summary and calling
 `AskUserQuestion`, your response ENDS. Do NOT read files. Do NOT
@@ -112,7 +144,8 @@ the spec now." STOP and wait for the tool_result.
 5. If the tool_result is non-approve-family (edit/cancel/etc.) → ask
    "What did I get wrong?" and re-run gathering.
 6. Only after the tool_result returns an approve-family option → call
-   Phase 2.
+   Phase 2. The stop hook sets `ui_flow_active` from the chosen label:
+   approve + skip-UI token → `false`; approve alone → `true`.
 
 ## Question Flow Rule
 

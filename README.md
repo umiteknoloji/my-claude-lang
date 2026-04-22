@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 6.1.1
+# my-claude-lang 🌐 MCL 6.2.0
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -86,7 +86,7 @@ Every closed-ended gate (Phase 1 summary, Phase 3 spec approval, each
 Phase 4.5 risk, each Phase 4.6 impact, plugin consent, git-init consent,
 drift resolution, `mcl-update` / `mcl-finish` / pasted-CLI confirmation)
 now arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 6.1.1 | `. You pick an option in the UI — no typing
+question prefix `MCL 6.2.0 | `. You pick an option in the UI — no typing
 "yes" or "✅ MCL APPROVED" required. Open-ended Phase 1 gathering stays
 as a plain-text conversation.
 
@@ -95,7 +95,33 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 6.1.1` so you always know the bridge is active.
+Every response starts with `🌐 MCL 6.2.0` so you always know the bridge is active.
+
+### UI Build / Review Sub-Phases (since 6.2.0)
+
+When a task has a UI surface (default for every project), Phase 4
+splits into three sub-phases so you never watch MCL build the backend
+on top of a UI you wanted to change:
+
+1. **Phase 4a (BUILD_UI)** — MCL writes a runnable frontend with
+   dummy data only. React / Vue / Svelte / static HTML depending on
+   your stack. You get a "run it" command (`npm run dev` etc.) and
+   open it in your browser.
+2. **Phase 4b (UI_REVIEW)** — MCL asks whether the UI is right
+   before moving on. Four options: approve / revise / **see it
+   yourself and report** / cancel. "See it yourself" is an opt-in
+   pipeline that uses Playwright + screenshots + Claude's
+   multimodal vision to actually look at the UI it built and
+   describe what it sees — requires `playwright` installed, never
+   auto-installs.
+3. **Phase 4c (BACKEND)** — only after you approve, MCL swaps dummy
+   fixtures for real API calls, writes the data layer, wires error
+   and loading states to real async behavior.
+
+At Phase 1's summary confirm, pick "approve, skip UI" to run Phase 4
+without the split (same behavior as 6.1.1). UI is default ON because
+most projects have a UI surface; bash scripts and backend-only
+changes opt out in one click.
 
 ---
 

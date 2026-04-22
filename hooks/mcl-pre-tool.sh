@@ -157,6 +157,71 @@ elif [ "$SPEC_APPROVED" != "true" ]; then
   REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked until the developer explicitly approves the 📋 Spec: block via AskUserQuestion."
 fi
 
+# -------- Branch: UI flow path-exception (Phase 4a BUILD_UI / 4b REVIEW) --------
+# When UI flow is active AND we're in BUILD_UI or REVIEW sub-phase, only
+# frontend paths + .mcl/ internals are writeable. Backend paths stay
+# locked until the developer approves the UI and MCL advances to the
+# BACKEND sub-phase. This prevents "Claude wrote the backend before I
+# saw the UI" regressions.
+if [ -z "$REASON" ]; then
+  UI_FLOW_ACTIVE="$(mcl_state_get ui_flow_active 2>/dev/null)"
+  UI_SUB_PHASE="$(mcl_state_get ui_sub_phase 2>/dev/null)"
+  if [ "$UI_FLOW_ACTIVE" = "true" ] && { [ "$UI_SUB_PHASE" = "BUILD_UI" ] || [ "$UI_SUB_PHASE" = "REVIEW" ]; }; then
+    UI_PATH_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, re, sys
+try:
+    obj = json.loads(sys.stdin.read())
+except Exception:
+    print("allow|"); sys.exit(0)
+tin = obj.get("tool_input") or {}
+# Write/Edit/MultiEdit use file_path; NotebookEdit uses notebook_path.
+p = tin.get("file_path") or tin.get("notebook_path") or ""
+if not p:
+    print("allow|"); sys.exit(0)
+
+# Normalize relative-style path for matching (strip leading ./, leave
+# absolute paths alone — classifier uses substring search anchored by
+# path separators).
+norm = p.replace("\\\\", "/")
+
+# Backend path globs — checked FIRST so `pages/api/**` wins over the
+# broader `pages/**` frontend allow. If any backend pattern matches,
+# deny.
+backend_patterns = [
+    r"(^|/)src/api(/|$)",
+    r"(^|/)src/server(/|$)",
+    r"(^|/)src/services(/|$)",
+    r"(^|/)src/lib/db(/|$)",
+    r"(^|/)src/db(/|$)",
+    r"(^|/)src/backend(/|$)",
+    r"(^|/)pages/api(/|$)",          # Next.js pages router
+    r"(^|/)app/api(/|$)",            # Next.js app router
+    r"(^|/)prisma(/|$)",
+    r"(^|/)drizzle(/|$)",
+    r"(^|/)supabase/migrations(/|$)",
+    r"(^|/)migrations(/|$)",
+    r"(^|/)\\.env(\\.|$)",           # .env, .env.local, .env.production
+    r"(^|/)\\.env$",
+    r"(^|/)vite\\.config\\.",
+    r"(^|/)next\\.config\\.",
+    r"(^|/)nuxt\\.config\\.",
+    r"(^|/)vercel\\.json$",
+    r"(^|/)netlify\\.toml$",
+    r"(^|/)server\\.(js|ts|mjs)$",
+    r"(^|/)index\\.server\\.",
+]
+for pat in backend_patterns:
+    if re.search(pat, norm):
+        print(f"deny|{p}"); sys.exit(0)
+print("allow|")
+' 2>/dev/null)"
+    if [ "${UI_PATH_VERDICT%%|*}" = "deny" ]; then
+      DENIED_PATH="${UI_PATH_VERDICT#deny|}"
+      REASON="MCL UI-BUILD LOCK — ui_sub_phase=${UI_SUB_PHASE}. Backend path \`${DENIED_PATH}\` is blocked until the developer approves the UI and MCL advances to the BACKEND sub-phase. Frontend code (components, pages, styles, fixtures), \`public/\`, \`.mcl/\` temp files, and framework-neutral files (README, package.json) are allowed. Build the UI with mock/fixture data only; integrate backend in Phase 4c."
+    fi
+  fi
+fi
+
 if [ -n "$REASON" ]; then
   mcl_audit_log "deny-tool" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
   mcl_debug_log "pre-tool" "deny" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"

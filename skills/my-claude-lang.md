@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 6.1.1` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 6.2.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## AskUserQuestion Protocol (since 6.0.0)
@@ -65,7 +65,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 drift resolution, partial-spec recovery, mcl-update, mcl-finish, pasted-CLI
 passthrough — uses Claude Code's native `AskUserQuestion` tool with
-`question` prefixed `MCL 6.1.1 | `. The Stop hook parses tool_use/tool_result
+`question` prefixed `MCL 6.2.0 | `. The Stop hook parses tool_use/tool_result
 pairs to advance MCL state. The legacy `✅ MCL APPROVED` text marker is
 DEAD in 6.0.0 — Claude must never emit it; it carries no state effect.
 
@@ -200,7 +200,7 @@ For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
 2. If ANY parameter unclear → ask questions ONE AT A TIME as plain text
    (open-ended gather is NOT AskUserQuestion)
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 6.1.1 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 6.2.0 | <localized-is-this-correct>",
    options: ["<approve-family-in-language>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns an approve-family option does the
    Stop hook advance state — THEN call Phase 2. Not before.
@@ -225,7 +225,7 @@ processes the request AS IF a native English engineer wrote it.
 4. Include: Objective, MUST/SHOULD requirements, Acceptance Criteria,
    Edge Cases, Technical Approach, Out of Scope
 5. After the spec, explain in developer's language what it says
-6. Call `AskUserQuestion({question: "MCL 6.1.1 | <localized-spec-approval
+6. Call `AskUserQuestion({question: "MCL 6.2.0 | <localized-spec-approval
    e.g. Bu spec'i onaylıyor musun? / Approve this spec?>", options:
    ["<approve-family>", "<edit>", "<cancel>"]})`
 7. Do NOT proceed until the tool_result returns an approve-family option.
@@ -243,7 +243,7 @@ For full verification rules, read `my-claude-lang/phase3-verify.md`
 
 Phase 3 is COMBINED with Phase 2 — when the spec is shown, the developer
 verifies it. The explanation after the spec IS Phase 3, followed by the
-Phase 3 `AskUserQuestion` call with prefix `MCL 6.1.1 | `.
+Phase 3 `AskUserQuestion` call with prefix `MCL 6.2.0 | `.
 Developer must understand AND pick an approve-family option in the
 tool_result → then Phase 4 begins (Stop hook flips state).
 
@@ -255,6 +255,9 @@ corresponding tool_result is NOT confirmation.
 
 For full execution rules, read `my-claude-lang/phase4-execute.md`
 For mandatory batch TDD rules, read `my-claude-lang/phase4-tdd.md`
+For Phase 4a BUILD_UI rules, read `my-claude-lang/phase4a-ui-build.md`
+For Phase 4b UI_REVIEW rules, read `my-claude-lang/phase4b-ui-review.md`
+For Phase 4c BACKEND rules, read `my-claude-lang/phase4c-backend.md`
 
 On every approval the Stop hook auto-saves the spec body to
 `.mcl/specs/NNNN-slug.md` with YAML frontmatter — background
@@ -275,6 +278,34 @@ installs, WebFetch/WebSearch, sudo/chmod/chown, writes under `~/.claude/`
 — proceed silently. On ambiguity, default to showing the plan. When the
 plan IS triggered, list every action with what/why/harness question
 (translated)/option meanings and wait for confirmation.
+
+## UI Flow (since MCL 6.2.0 — default ON)
+
+UI flow is DEFAULT ON every project. The Phase 1 summary confirm asks
+with four options: "approve (UI included)" [recommended],
+"approve, skip UI", "edit", "cancel". Default ON rationale: projects
+with a UI surface are the majority; tasks without UI (bash scripts,
+config fixes, backend-only changes) are the exception and opt out at
+Phase 1.
+
+When `ui_flow_active = true`, Phase 4 runs as three sub-phases:
+- **Phase 4a (BUILD_UI)** — MCL writes a runnable frontend with dummy
+  data only, emits a "run it" snippet (npm run dev / python -m
+  http.server), and transitions to Phase 4b. Backend writes are BLOCKED
+  by `mcl-pre-tool.sh` path exception during this sub-phase.
+- **Phase 4b (UI_REVIEW)** — MCL calls AskUserQuestion with options
+  "approve, proceed to backend" / "revise" / "see it yourself and
+  report" / "cancel". Revise loops back to 4a. The "see it yourself"
+  option is an opt-in visual-inspect pipeline (Playwright + screenshot
+  + multimodal Read) — MCL actually looks at the UI it built and
+  reports observations. Only "approve" exits to Phase 4c.
+- **Phase 4c (BACKEND)** — path lock lifts, MCL swaps dummy fixtures
+  for real API calls, writes data layer, wires error/loading/empty to
+  real async state, then flows into Phase 4.5.
+
+When `ui_flow_active = false`, Phase 4 runs the single-path
+`phase4-execute.md` flow unchanged — 6.1.1 behavior is preserved
+bit-for-bit.
 
 ## Phase 4.5: Post-Code Risk Review — MANDATORY
 

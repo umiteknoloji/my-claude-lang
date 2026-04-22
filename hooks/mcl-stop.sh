@@ -225,6 +225,47 @@ SUMMARY_CONFIRM_TOKENS = [
     "\u6b64\u6458\u8981\u662f\u5426\u6b63\u786e",
 ]
 
+# UI_REVIEW_TOKENS: detect Phase 4b review question body.
+# Canonical anchor per skill file is "UI review" (en) or the localized
+# equivalent per language. Lowercased substring match with generous
+# drift tolerance. The skill enumerates canonical strings; this is a
+# superset so localization drift does not break detection.
+UI_REVIEW_TOKENS = [
+    "ui review",
+    "review the ui",
+    "proceed to backend",
+    "ui incele",            # tr
+    "backend\u0027e ge\u00e7",
+    "backend\u2019e ge\u00e7",
+    "arka uca",
+    "revisi\u00f3n de ui",  # es
+    "pasar a backend",
+    "revue ui",             # fr
+    "examiner l\u0027ui",
+    "passer au backend",
+    "ui-\u00fcberpr\u00fcfung",  # de
+    "ui \u00fcberpr\u00fcfen",
+    "zum backend",
+    "ui \u30ec\u30d3\u30e5\u30fc",  # ja
+    "\u30d0\u30c3\u30af\u30a8\u30f3\u30c9\u3078",
+    "ui \u691c\u53ce",              # ko
+    "\ubc31\uc5d4\ub4dc\ub85c",
+    "ui \u5ba1\u67e5",              # zh
+    "\u8f6c\u5230\u540e\u7aef",
+    "\u0645\u0631\u0627\u062c\u0639\u0629 \u0627\u0644\u0648\u0627\u062c\u0647\u0629",  # ar
+    "\u0627\u0644\u0627\u0646\u062a\u0642\u0627\u0644 \u0625\u0644\u0649 \u0627\u0644\u062e\u0644\u0641\u064a\u0629",
+    "\u05e1\u05e7\u05d9\u05e8\u05ea \u05de\u05de\u05e9\u05e7",  # he
+    "\u05de\u05e2\u05d1\u05e8 \u05dc\u05d1\u05d0\u05e7\u05d0\u05e0\u05d3",
+    "ui \u0938\u092e\u0940\u0915\u094d\u0937\u093e",           # hi
+    "\u092c\u0948\u0915\u090f\u0902\u0921 \u092a\u0930",
+    "tinjauan ui",           # id
+    "lanjut ke backend",
+    "revis\u00e3o de ui",    # pt
+    "ir para backend",
+    "\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 ui",  # ru
+    "\u043f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a \u0431\u044d\u043a\u0435\u043d\u0434\u0443",
+]
+
 def extract_message(obj):
     if isinstance(obj, dict) and "message" in obj and isinstance(obj["message"], dict):
         return obj["message"]
@@ -323,6 +364,11 @@ for tid in reversed(order):
             if tok in body:
                 intent = "summary-confirm"
                 break
+    if intent == "other":
+        for tok in UI_REVIEW_TOKENS:
+            if tok in body:
+                intent = "ui-review"
+                break
     # Extract selected option from tool_result. The tool_result payload
     # format varies; we search for the first option label that appears
     # as a substring, else fall back to the raw text.
@@ -371,6 +417,62 @@ _mcl_is_approve_option() {
     *setujui*|*ya*|*konfirmasi*) return 0 ;;
     *aprovar*|*sim*|*confirmar*) return 0 ;;
     *одобрить*|*да*|*подтвердить*) return 0 ;;
+  esac
+  return 1
+}
+
+# Helper: does the selected option indicate "skip UI" on the Phase 1
+# summary-confirm askq? 14-language substring match via direct UTF-8
+# characters (bash 3.2 does not interpret \u escapes). Absence here
+# means UI flow stays on per default policy.
+_mcl_is_ui_skip_option() {
+  local raw="$1"
+  [ -z "$raw" ] && return 1
+  local norm
+  norm="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  case "$norm" in
+    *"ui atla"*|*"ui'siz"*|*"ui yok"*|*"ui'yi atla"*) return 0 ;;
+    *"skip ui"*|*"without ui"*|*"no ui"*) return 0 ;;
+    *"sin ui"*|*"omitir ui"*|*"saltar ui"*) return 0 ;;
+    *"sans ui"*|*"passer ui"*|*"ignorer ui"*) return 0 ;;
+    *"ohne ui"*|*"ui überspringen"*) return 0 ;;
+    *"uiなし"*|*"ui スキップ"*) return 0 ;;
+    *"ui 건너뛰기"*|*"ui 없이"*) return 0 ;;
+    *"跳过 ui"*|*"无 ui"*) return 0 ;;
+    *"بدون واجهة"*|*"تخطي الواجهة"*) return 0 ;;
+    *"בלי ממשק"*|*"דלג ממשק"*) return 0 ;;
+    *"ui छोड़ें"*|*"ui के बिना"*) return 0 ;;
+    *"tanpa ui"*|*"lewati ui"*) return 0 ;;
+    *"sem ui"*|*"pular ui"*|*"ignorar ui"*) return 0 ;;
+    *"без ui"*|*"пропустить ui"*) return 0 ;;
+  esac
+  return 1
+}
+
+# Helper: does the selected option on the Phase 4b ui-review askq ask
+# MCL to visually inspect the built UI itself (opt-in vision loop)?
+# Returns 0 when the developer picks the "see and report back yourself"
+# option. 14-language substring match via direct UTF-8 characters.
+_mcl_is_vision_request_option() {
+  local raw="$1"
+  [ -z "$raw" ] && return 1
+  local norm
+  norm="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  case "$norm" in
+    *"sen de bak"*|*"kendin bak"*|*"kendin gör"*) return 0 ;;
+    *"see it yourself"*|*"look yourself"*|*"inspect yourself"*|*"you look"*) return 0 ;;
+    *"míralo tú"*|*"revisa tú mismo"*) return 0 ;;
+    *"regarde toi-même"*|*"inspecte toi-même"*) return 0 ;;
+    *"schau selbst"*|*"selbst prüfen"*) return 0 ;;
+    *"自分で確認"*|*"自分で見"*) return 0 ;;
+    *"직접 확인"*|*"직접 보"*) return 0 ;;
+    *"你自己看"*|*"自己检查"*) return 0 ;;
+    *"تحقق بنفسك"*) return 0 ;;
+    *"תבדוק בעצמך"*) return 0 ;;
+    *"खुद देखें"*) return 0 ;;
+    *"lihat sendiri"*|*"cek sendiri"*) return 0 ;;
+    *"veja você mesmo"*|*"inspecione você"*) return 0 ;;
+    *"посмотри сам"*|*"проверь сам"*) return 0 ;;
   esac
   return 1
 }
@@ -456,11 +558,68 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     mcl_state_set spec_approved true
     mcl_state_set current_phase 4
     mcl_state_set phase_name '"EXECUTE"'
-    mcl_audit_log "approve-via-askuserquestion" "stop" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4"
+    # If UI flow was enabled at Phase 1 confirm, enter BUILD_UI sub-phase.
+    # Otherwise stay in the classic phase-4 EXECUTE path.
+    UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
+    if [ "$UI_FLOW_ON" = "true" ]; then
+      mcl_state_set ui_sub_phase '"BUILD_UI"'
+      mcl_audit_log "ui-flow-enter-build" "stop" "hash=${CURRENT_HASH:0:12}"
+    fi
+    mcl_audit_log "approve-via-askuserquestion" "stop" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4 ui_flow=${UI_FLOW_ON}"
     mcl_debug_log "stop" "approve-via-askuserquestion" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4"
     bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
   else
     mcl_debug_log "stop" "askq-ignored-wrong-phase" "phase=${CURRENT_PHASE}"
+  fi
+fi
+
+# --- Phase 1 summary-confirm UI flow opt-in/opt-out ---
+# Since 6.2.0 the 4-option summary-confirm askq has: approve-with-UI,
+# approve-skip-UI, edit, cancel. An approve-family option enables UI
+# flow by default; picking the explicit skip option disables it.
+# Non-approve picks are noops — edit or cancel are handled by the
+# developer on the next turn.
+if [ "$ASKQ_INTENT" = "summary-confirm" ]; then
+  if _mcl_is_approve_option "$ASKQ_SELECTED"; then
+    if _mcl_is_ui_skip_option "$ASKQ_SELECTED"; then
+      mcl_state_set ui_flow_active false
+      mcl_audit_log "ui-flow-skip" "stop" "selected=${ASKQ_SELECTED}"
+      mcl_debug_log "stop" "ui-flow-skip" "selected=${ASKQ_SELECTED}"
+    else
+      mcl_state_set ui_flow_active true
+      mcl_audit_log "ui-flow-enable" "stop" "selected=${ASKQ_SELECTED}"
+      mcl_debug_log "stop" "ui-flow-enable" "selected=${ASKQ_SELECTED}"
+    fi
+  else
+    mcl_debug_log "stop" "summary-confirm-non-approve" "selected=${ASKQ_SELECTED}"
+  fi
+fi
+
+# --- Phase 4b ui-review dispatch ---
+# Emitted when the developer selects an option on the UI review askq.
+# - approve-family: advance ui_sub_phase to BACKEND, unlock backend paths
+# - vision-request: noop here. The skill tells Claude to run the
+#   visual-inspect pipeline in its next turn by reading the transcript.
+#   No persistent flag needed.
+# - revise or cancel: noop. Free-text feedback is handled inline by
+#   Claude on the next turn.
+if [ "$ASKQ_INTENT" = "ui-review" ]; then
+  UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
+  UI_SUB_NOW="$(mcl_state_get ui_sub_phase 2>/dev/null)"
+  if [ "$UI_FLOW_ON" != "true" ]; then
+    mcl_audit_log "ui-review-stray" "stop" "ui_flow=${UI_FLOW_ON} sub=${UI_SUB_NOW}"
+    mcl_debug_log "stop" "ui-review-stray" "ui_flow=${UI_FLOW_ON} sub=${UI_SUB_NOW}"
+  elif _mcl_is_approve_option "$ASKQ_SELECTED"; then
+    mcl_state_set ui_reviewed true
+    mcl_state_set ui_sub_phase '"BACKEND"'
+    mcl_audit_log "approve-ui-review-via-askuserquestion" "stop" "sub=${UI_SUB_NOW}->BACKEND"
+    mcl_debug_log "stop" "ui-review-approve" "sub=${UI_SUB_NOW}->BACKEND"
+  elif _mcl_is_vision_request_option "$ASKQ_SELECTED"; then
+    mcl_audit_log "ui-review-vision-request" "stop" "selected=${ASKQ_SELECTED}"
+    mcl_debug_log "stop" "ui-review-vision-request" "selected=${ASKQ_SELECTED}"
+  else
+    mcl_audit_log "ui-review-noop" "stop" "selected=${ASKQ_SELECTED}"
+    mcl_debug_log "stop" "ui-review-noop" "selected=${ASKQ_SELECTED}"
   fi
 fi
 

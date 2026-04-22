@@ -9,15 +9,25 @@
 # State file lives at `<project>/.mcl/state.json` — one file per working
 # directory. Stale-state garbage collection is NOT in v1 (YAGNI).
 #
-# Schema v1:
+# Schema v2 (since MCL 6.2.0):
 #   {
-#     "schema_version": 1,
-#     "current_phase":  1,           // 1..5
-#     "phase_name":     "COLLECT",   // COLLECT|SPEC_REVIEW|USER_VERIFY|EXECUTE|DELIVER
-#     "spec_approved":  false,
-#     "spec_hash":      null,        // sha256 of approved spec body
-#     "last_update":    1713456789   // unix epoch seconds
+#     "schema_version":      2,
+#     "current_phase":       1,           // 1..5
+#     "phase_name":          "COLLECT",   // COLLECT|SPEC_REVIEW|USER_VERIFY|EXECUTE|DELIVER
+#     "spec_approved":       false,
+#     "spec_hash":           null,        // sha256 of approved spec body
+#     "plugin_gate_active":  false,
+#     "plugin_gate_missing": [],
+#     "ui_flow_active":      false,       // set by Phase 1 confirm (opt-out path)
+#     "ui_sub_phase":        null,        // "BUILD_UI" | "REVIEW" | "BACKEND" | null
+#     "ui_build_hash":       null,        // sha256 of last frontend build output
+#     "ui_reviewed":         false,       // set by Phase 4b approve intent
+#     "last_update":         1713456789   // unix epoch seconds
 #   }
+#
+# v1 files (schema_version=1) are auto-migrated to v2 on next hook run.
+# v1→v2 migration adds the four UI fields with default values and
+# preserves a backup at `.mcl/state.json.backup.v1`.
 #
 # CLI usage:
 #   mcl-state.sh init                          # create default if missing
@@ -33,7 +43,7 @@
 
 set -u
 
-MCL_STATE_SCHEMA_VERSION=1
+MCL_STATE_SCHEMA_VERSION=2
 MCL_STATE_DIR="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}"
 MCL_STATE_FILE="${MCL_STATE_FILE:-$MCL_STATE_DIR/state.json}"
 
@@ -49,6 +59,10 @@ _mcl_state_default() {
   "spec_hash": null,
   "plugin_gate_active": false,
   "plugin_gate_missing": [],
+  "ui_flow_active": false,
+  "ui_sub_phase": null,
+  "ui_build_hash": null,
+  "ui_reviewed": false,
   "last_update": ${now}
 }
 JSON
@@ -75,14 +89,16 @@ _mcl_state_auth_check() {
 }
 
 _mcl_state_valid() {
-  # Return 0 if stdin is parseable JSON with schema_version == 1.
+  # Return 0 if stdin is parseable JSON with schema_version 1 or 2.
+  # v1 files are accepted so mcl_state_init can migrate them in-place
+  # instead of corrupt-copying + replacing with default.
   # Uses `python3 -c` (not heredoc) so the piped body isn't shadowed.
   python3 -c '
 import json, sys
 try:
     obj = json.loads(sys.stdin.read())
     assert isinstance(obj, dict)
-    assert obj.get("schema_version") == 1
+    assert obj.get("schema_version") in (1, 2)
     assert isinstance(obj.get("current_phase"), int)
     assert 1 <= obj["current_phase"] <= 5
 except Exception:
@@ -90,10 +106,51 @@ except Exception:
 ' 2>/dev/null
 }
 
+_mcl_state_migrate_v1_to_v2() {
+  # Read the current file, add missing v2 fields with defaults, rewrite
+  # atomically. Backup the v1 body at `.mcl/state.json.backup.v1` so the
+  # migration is reversible by hand if anything goes wrong. Emits an
+  # audit event so the migration is always visible after the fact.
+  [ -f "$MCL_STATE_FILE" ] || return 0
+  local body migrated
+  body="$(cat "$MCL_STATE_FILE" 2>/dev/null)" || return 1
+  cp "$MCL_STATE_FILE" "${MCL_STATE_FILE}.backup.v1" 2>/dev/null || true
+  migrated="$(printf '%s' "$body" | python3 -c '
+import json, sys, time
+obj = json.loads(sys.stdin.read())
+obj["schema_version"] = 2
+obj.setdefault("plugin_gate_active", False)
+obj.setdefault("plugin_gate_missing", [])
+obj.setdefault("ui_flow_active", False)
+obj.setdefault("ui_sub_phase", None)
+obj.setdefault("ui_build_hash", None)
+obj.setdefault("ui_reviewed", False)
+obj["last_update"] = int(time.time())
+print(json.dumps(obj, indent=2))
+' 2>/dev/null)"
+  [ -n "$migrated" ] || return 1
+  _mcl_state_write_raw "$migrated" || return 1
+  mcl_audit_log "migrate-v1-to-v2" "$(basename "${0:-unknown}")" "backup=${MCL_STATE_FILE}.backup.v1"
+}
+
 mcl_state_init() {
   mkdir -p "$MCL_STATE_DIR" 2>/dev/null || true
   if [ ! -f "$MCL_STATE_FILE" ]; then
     _mcl_state_write_raw "$(_mcl_state_default)"
+    return 0
+  fi
+  # File exists — check if it needs v1→v2 migration.
+  local current_version
+  current_version="$(python3 -c '
+import json, sys
+try:
+    obj = json.load(open(sys.argv[1]))
+    print(obj.get("schema_version", 0))
+except Exception:
+    print(0)
+' "$MCL_STATE_FILE" 2>/dev/null)"
+  if [ "$current_version" = "1" ]; then
+    _mcl_state_migrate_v1_to_v2
   fi
 }
 

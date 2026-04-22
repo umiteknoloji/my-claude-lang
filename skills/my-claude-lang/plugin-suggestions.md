@@ -69,17 +69,32 @@ on separate lines) — recommend the plugin for each.
 | -------------------------------------------- | ----------------- | ----------------------------------------------------------- |
 | `typescript` OR `javascript` stack detected  | `frontend-design` | `/plugin install frontend-design@claude-plugins-official`   |
 
-`frontend-design` is **not** in the curated orchestration set — it
-does not auto-dispatch. It is offered once per conversation when MCL
-detects a frontend-capable stack, and runs only via its own explicit
-slash-command invocations after install.
+`frontend-design` has TWO roles since MCL 6.2.0:
 
-Trigger is coarse on purpose: any `typescript`/`javascript` tag
-qualifies. Node-only backends (no React/Vue/Svelte/Next/Nuxt/Angular/
-Solid dependency) will see a false-positive suggestion; this is
-acceptable because the suggestion is passive and declinable. A
-future refinement could scan `package.json` dependencies for
-framework markers — tracked as out of scope below.
+1. **Install-suggest at Phase 1** (unchanged). When the stack is
+   `typescript`/`javascript` and the plugin is missing, suggest it
+   once per conversation with the install command above.
+
+2. **Auto-dispatch in Phase 4a (BUILD_UI)** — when the UI flow is
+   active (`ui_flow_active = true`) AND the plugin is installed, MCL
+   silently dispatches `frontend-design` at the start of Phase 4a
+   under Rule B (multi-angle validation). The plugin's suggestions
+   are merged into the component code / Phase 4a prose; raw plugin
+   tool calls are not exposed to the developer. If the plugin is NOT
+   installed when Phase 4a starts, MCL proceeds without it — Phase
+   4a is never blocked on an absent plugin.
+
+`frontend-design` is still NOT part of the curated REQUIRED set
+(`plugin-gate.md`). It is stack-conditional: required-quality when
+the stack matches AND UI flow is on; otherwise passive. Outside
+Phase 4a it runs only via its own explicit slash-command invocations
+after install.
+
+Framework markers (`react-frontend`, `vue-frontend`,
+`svelte-frontend`, `html-static`) emitted by
+`mcl-stack-detect.sh` sharpen Phase 4a's dispatch — MCL passes the
+detected framework as context to the plugin so its suggestions match
+the actual component syntax.
 
 ## Detection Protocol
 
@@ -118,8 +133,8 @@ message), before asking Phase 1 questions:
   the curated required set in `plugin-orchestration.md` and surface
   via the consolidated install-suggestion block, not this file.
 - Refine `frontend-design` suggestion with framework-marker checks
-  (React/Vue/Svelte/Next/Nuxt/Angular/Solid in `package.json`
-  dependencies). Out of scope for MVP — current coarse trigger is
-  sufficient.
+  for Angular/Solid — `react-frontend`/`vue-frontend`/`svelte-frontend`/
+  `html-static` are detected since 6.2.0; Angular/Solid detection is
+  deferred to a later release.
 
 </mcl_phase>

@@ -6,6 +6,25 @@
 
 Called automatically when Phase 3 is confirmed.
 
+## Flow Split (since MCL 6.2.0)
+
+Phase 4 forks on `ui_flow_active`:
+
+- `ui_flow_active = true` (Phase 1 approve with UI included, default):
+  Phase 4 runs as three sub-phases in order:
+  - **Phase 4a BUILD_UI** — read `my-claude-lang/phase4a-ui-build.md`
+  - **Phase 4b UI_REVIEW** — read `my-claude-lang/phase4b-ui-review.md`
+  - **Phase 4c BACKEND** — read `my-claude-lang/phase4c-backend.md`
+  All rules below still apply inside each sub-phase; they describe
+  the shared Phase 4 behavior. Only Phase 4c reaches Phase 4.5.
+- `ui_flow_active = false` (Phase 1 approve with "skip UI") OR task
+  has no UI by construction: the default flow below runs top-to-bottom
+  and exits directly to Phase 4.5.
+
+Sub-phases share state (`spec_approved`, `current_phase`, `ui_sub_phase`)
+managed by `hooks/lib/mcl-state.sh`. Never transition sub-phase by
+prose assertion alone — the stop hook is the only authority.
+
 1. All code, comments, variable names, commit messages → English
 2. All communication with the developer → their language
 3. When Claude Code asks a question:
