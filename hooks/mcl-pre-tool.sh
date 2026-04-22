@@ -200,15 +200,14 @@ backend_patterns = [
     r"(^|/)drizzle(/|$)",
     r"(^|/)supabase/migrations(/|$)",
     r"(^|/)migrations(/|$)",
-    r"(^|/)\\.env(\\.|$)",           # .env, .env.local, .env.production
-    r"(^|/)\\.env$",
-    r"(^|/)vite\\.config\\.",
-    r"(^|/)next\\.config\\.",
-    r"(^|/)nuxt\\.config\\.",
-    r"(^|/)vercel\\.json$",
-    r"(^|/)netlify\\.toml$",
-    r"(^|/)server\\.(js|ts|mjs)$",
-    r"(^|/)index\\.server\\.",
+    r"(^|/)\.env(\.|$)",             # .env, .env.local, .env.production
+    r"(^|/)vite\.config\.",
+    r"(^|/)next\.config\.",
+    r"(^|/)nuxt\.config\.",
+    r"(^|/)vercel\.json$",
+    r"(^|/)netlify\.toml$",
+    r"(^|/)server\.(js|ts|mjs)$",
+    r"(^|/)index\.server\.",
 ]
 for pat in backend_patterns:
     if re.search(pat, norm):
