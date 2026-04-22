@@ -36,6 +36,97 @@ except Exception:
     pass
 ' 2>/dev/null)"
 
+# -------- Branch: plugin gate (hard gate, overrides phase logic) --------
+# When `plugin_gate_active=true` in state, mutating tools AND writer-Bash
+# commands are denied regardless of phase/approval. Read-only tools still
+# pass through. The gate is set by mcl-activate.sh on the first message of
+# a session when curated / LSP plugins or their binaries are missing.
+PLUGIN_GATE_ACTIVE="$(mcl_state_get plugin_gate_active 2>/dev/null)"
+if [ "$PLUGIN_GATE_ACTIVE" = "true" ]; then
+  GATE_DENY=0
+  case "$TOOL_NAME" in
+    Write|Edit|MultiEdit|NotebookEdit)
+      GATE_DENY=1
+      ;;
+    Bash)
+      BASH_CMD="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    print((obj.get("tool_input") or {}).get("command","") or "")
+except Exception:
+    pass
+' 2>/dev/null)"
+      if [ -n "$BASH_CMD" ]; then
+        IS_WRITER="$(printf '%s' "$BASH_CMD" | python3 -c '
+import re, sys
+cmd = sys.stdin.read()
+# Shell-redirection writers: `> file`, `>> file`, `>|`, `|& tee`.
+if re.search(r"(^|[^<>&0-9])>>?\s*[^&\s]", cmd) or re.search(r"\btee\b(?!\s*--help)", cmd):
+    print("1"); sys.exit(0)
+# Mutating commands at token boundary.
+token_re = r"(?:^|[\s|;&`(])"
+patterns = [
+    token_re + r"(rm|mv|cp|touch|mkdir|rmdir|chmod|chown|chgrp|ln|truncate|dd|patch|install|unlink)\b",
+    token_re + r"sed\b[^|;&`]*?\s-i\b",
+    token_re + r"git\s+(commit|push|add|rm|mv|reset|checkout|restore|switch|rebase|merge|pull|fetch|init|clone|stash|tag|branch|clean|cherry-pick|revert|apply|am|worktree)\b",
+    token_re + r"(npm|yarn|pnpm|bun|pip|pip3|poetry|uv|gem|bundle|cargo|go|brew|apt|apt-get|dnf|yum|pacman|zypper)\s+(install|i|ci|add|remove|uninstall|update|upgrade|mod)\b",
+    # NOTE: we deliberately do NOT block `bash foo.sh` / `python3 foo.py`.
+    # Read-only helper scripts (our own `mcl-plugin-gate.sh check`, lint
+    # dry-runs, stat collectors) would otherwise be false-positived. Real
+    # mutating scripts still hit the other patterns when they reach a
+    # mutating shell command inside.
+    token_re + r"(docker|docker-compose|kubectl|terraform|ansible|helm|systemctl|launchctl)\s+\w+",
+    token_re + r"(curl|wget)\s+[^|;&`]*(-o|--output|-O|--download)\b",
+]
+for p in patterns:
+    if re.search(p, cmd):
+        print("1"); sys.exit(0)
+print("0")
+' 2>/dev/null)"
+        [ "$IS_WRITER" = "1" ] && GATE_DENY=1
+      fi
+      ;;
+    *)
+      # Read-only tools (Read, Glob, Grep, TodoWrite, WebFetch, WebSearch, Task, AskUserQuestion, ...).
+      ;;
+  esac
+  if [ "$GATE_DENY" = "1" ]; then
+    MISSING_SUMMARY="$(python3 -c '
+import json, sys
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as f:
+        obj = json.load(f)
+    arr = obj.get("plugin_gate_missing") or []
+    bits = []
+    for item in arr:
+        k = item.get("kind")
+        if k == "plugin":
+            bits.append("plugin:" + item.get("name",""))
+        elif k == "binary":
+            bits.append("binary:" + item.get("plugin","") + "/" + item.get("name",""))
+    print(" ".join(bits))
+except Exception:
+    print("")
+' "$MCL_STATE_FILE" 2>/dev/null)"
+    GATE_REASON="MCL PLUGIN GATE — required plugins or binaries are missing (${MISSING_SUMMARY}). Mutating tools and writer-Bash commands are blocked for this project until every missing item is installed and MCL reloads in a new session. Read-only tools (Read / Grep / Glob / read-only Bash) still work. Tell the developer which items are missing and the /plugin install commands; do NOT retry the blocked tool."
+    mcl_audit_log "plugin-gate-block" "pre-tool" "tool=${TOOL_NAME} missing=${MISSING_SUMMARY}"
+    mcl_debug_log "pre-tool" "plugin-gate-block" "tool=${TOOL_NAME}"
+    python3 -c '
+import json, sys
+reason = sys.argv[1]
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason
+    }
+}))
+' "$GATE_REASON"
+    exit 0
+  fi
+fi
+
 # Fast-path: non-mutating tool → allow.
 case "$TOOL_NAME" in
   Write|Edit|MultiEdit|NotebookEdit) ;;

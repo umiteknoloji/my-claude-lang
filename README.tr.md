@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 6.0.1
+# my-claude-lang 🌐 MCL 6.1.0
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -87,7 +87,7 @@ Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 3 spec onayı, her Aşama 4.5
 risk, her Aşama 4.6 etki, plugin onayı, git-init onayı, drift çözümü,
 `mcl-update` / `mcl-finish` / yapıştırılan-CLI onayı) artık yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 6.0.1 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+`MCL 6.1.0 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
 "evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
 açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
 kalıyor.
@@ -97,7 +97,7 @@ Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
 bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
 onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
-Her yanıt `🌐 MCL 6.0.1` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 6.1.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ---
 
@@ -167,7 +167,39 @@ MCL belirsizlik çözmeyi **zorunlu** kılıyor, opsiyonel değil:
 
 ## Kurulum
 
-Klonla, tek komut çalıştır. Bitti. Ayar yok. Dil seçimi yok.
+### 1. Adım — Gerekli Claude Code plugin'lerini kur (MCL'DEN ÖNCE)
+
+6.1.0'dan itibaren MCL, curated orkestrasyon plugin'leri (`superpowers`,
+`security-guidance`) ve stack'ine göre tespit edilen LSP plugin'leri
+kurulu değilse kendini sert-kilitler. Önce platformuna uygun installer'ı
+çalıştır:
+
+```bash
+# macOS / Linux
+chmod +x install-claude-plugins.sh
+./install-claude-plugins.sh
+```
+
+```powershell
+# Windows (PowerShell)
+.\install-claude-plugins.ps1
+```
+
+Script'ler önce resmi `claude-plugins-official` marketplace'ini ve
+topluluk `obra/superpowers-marketplace` marketplace'ini kaydeder,
+ardından curated orkestrasyon setini ve Claude Code'un desteklediği
+tüm LSP plugin'lerini kurar. Her iki script de idempotent — tekrar
+tekrar çalıştırabilirsin. `claude` CLI'nin PATH'te olması gerekir.
+
+> **Neden önce bu?** Bu adımı atlarsan MCL'in PreToolUse hook'u her
+> session'ın ilk mesajında `Write` / `Edit` / `MultiEdit` /
+> `NotebookEdit` ve writer-Bash komutlarını (`rm`, `git commit`,
+> paket kurulumu, shell yönlendirmesi, ...) reddeder; gate sadece
+> yeni bir session açıldığında tekrar kontrol eder.
+
+### 2. Adım — MCL'i kur
+
+Klonla, tek komut çalıştır. Ayar yok. Dil seçimi yok.
 
 ```bash
 git clone https://github.com/umiteknoloji/my-claude-lang.git

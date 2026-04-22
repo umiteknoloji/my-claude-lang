@@ -47,6 +47,8 @@ _mcl_state_default() {
   "phase_name": "COLLECT",
   "spec_approved": false,
   "spec_hash": null,
+  "plugin_gate_active": false,
+  "plugin_gate_missing": [],
   "last_update": ${now}
 }
 JSON
