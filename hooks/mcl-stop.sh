@@ -215,16 +215,52 @@ SPEC_APPROVE_TOKENS = [
 ]
 
 SUMMARY_CONFIRM_TOKENS = [
+    # English
     "is this correct",
     "is this summary correct",
-    "bu \u00f6zet do\u011fru",
-    "bu do\u011fru mu",
+    "summary correct",
+    # Turkish — accept both "bu özet doğru" and the shorter
+    # "özet doğru" / "doğru mu" variants that drift in the wild.
+    "\u00f6zet do\u011fru",     # "özet doğru"
+    "do\u011fru mu",             # "doğru mu"
+    # Spanish — "es" (sometimes spelled "és") + correcto variants
     "\u00e8s esto correcto",
-    "ce r\u00e9sum\u00e9 est-il correct",
-    "ist diese zusammenfassung korrekt",
-    "\u3053\u306e\u8981\u7d04\u306f\u6b63\u3057\u3044",
-    "\uc774 \uc694\uc57d\uc774 \ub9de",
-    "\u6b64\u6458\u8981\u662f\u5426\u6b63\u786e",
+    "es correcto",
+    "resumen correcto",
+    # French
+    "r\u00e9sum\u00e9 est-il correct",
+    "est-il correct",
+    "r\u00e9sum\u00e9 correct",
+    # German
+    "zusammenfassung korrekt",
+    "ist das korrekt",
+    # Japanese
+    "\u8981\u7d04\u306f\u6b63\u3057\u3044",   # 要約は正しい
+    "\u6b63\u3057\u3044\u3067\u3059\u304b",  # 正しいですか
+    # Korean
+    "\uc694\uc57d\uc774 \ub9de",              # 요약이 맞
+    "\ub9de\uc2b5\ub2c8\uae4c",               # 맞습니까
+    # Chinese
+    "\u6458\u8981\u662f\u5426\u6b63\u786e",   # 摘要是否正确
+    "\u6b63\u786e\u5417",                     # 正确吗
+    # Arabic
+    "\u0647\u0644 \u0647\u0630\u0627 \u0635\u062d\u064a\u062d",  # هل هذا صحيح
+    "\u0627\u0644\u0645\u0644\u062e\u0635 \u0635\u062d\u064a\u062d", # الملخص صحيح
+    # Hebrew
+    "\u05d4\u05d0\u05dd \u05d6\u05d4 \u05e0\u05db\u05d5\u05df",   # האם זה נכון
+    "\u05d4\u05e1\u05d9\u05db\u05d5\u05dd \u05e0\u05db\u05d5\u05df", # הסיכום נכון
+    # Hindi
+    "\u0915\u094d\u092f\u093e \u092f\u0939 \u0938\u0939\u0940",     # क्या यह सही
+    "\u0938\u093e\u0930\u093e\u0902\u0936 \u0938\u0939\u0940",     # सारांश सही
+    # Indonesian
+    "apakah ini benar",
+    "ringkasan benar",
+    # Portuguese
+    "est\u00e1 correto",
+    "resumo est\u00e1 correto",
+    # Russian
+    "\u044d\u0442\u043e \u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u043e",  # это правильно
+    "\u0440\u0435\u0437\u044e\u043c\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u043e",  # резюме правильно
 ]
 
 # UI_REVIEW_TOKENS: detect Phase 4b review question body.
@@ -428,34 +464,6 @@ _mcl_is_approve_option() {
   return 1
 }
 
-# Helper: does the selected option indicate "skip UI" on the Phase 1
-# summary-confirm askq? 14-language substring match via direct UTF-8
-# characters (bash 3.2 does not interpret \u escapes). Absence here
-# means UI flow stays on per default policy.
-_mcl_is_ui_skip_option() {
-  local raw="$1"
-  [ -z "$raw" ] && return 1
-  local norm
-  norm="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
-  case "$norm" in
-    *"ui atla"*|*"ui'siz"*|*"ui yok"*|*"ui'yi atla"*) return 0 ;;
-    *"skip ui"*|*"without ui"*|*"no ui"*) return 0 ;;
-    *"sin ui"*|*"omitir ui"*|*"saltar ui"*) return 0 ;;
-    *"sans ui"*|*"passer ui"*|*"ignorer ui"*) return 0 ;;
-    *"ohne ui"*|*"ui überspringen"*) return 0 ;;
-    *"uiなし"*|*"ui スキップ"*) return 0 ;;
-    *"ui 건너뛰기"*|*"ui 없이"*) return 0 ;;
-    *"跳过 ui"*|*"无 ui"*) return 0 ;;
-    *"بدون واجهة"*|*"تخطي الواجهة"*) return 0 ;;
-    *"בלי ממשק"*|*"דלג ממשק"*) return 0 ;;
-    *"ui छोड़ें"*|*"ui के बिना"*) return 0 ;;
-    *"tanpa ui"*|*"lewati ui"*) return 0 ;;
-    *"sem ui"*|*"pular ui"*|*"ignorar ui"*) return 0 ;;
-    *"без ui"*|*"пропустить ui"*) return 0 ;;
-  esac
-  return 1
-}
-
 # Helper: does the selected option on the Phase 4b ui-review askq ask
 # MCL to visually inspect the built UI itself (opt-in vision loop)?
 # Returns 0 when the developer picks the "see and report back yourself"
@@ -586,25 +594,16 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
   fi
 fi
 
-# --- Phase 1 summary-confirm UI flow opt-in/opt-out ---
-# Since 6.2.0 the 4-option summary-confirm askq has: approve-with-UI,
-# approve-skip-UI, edit, cancel. An approve-family option enables UI
-# flow by default; picking the explicit skip option disables it.
-# Non-approve picks are noops — edit or cancel are handled by the
-# developer on the next turn.
+# --- Phase 1 summary-confirm ---
+# Since 6.5.2 ui_flow_active is owned by mcl-activate.sh (stack
+# heuristic). The summary-confirm askq is a plain 3-option form
+# (approve / edit / cancel) with NO UI opt-out. This branch only
+# logs the approve/non-approve decision for auditability.
 if [ "$ASKQ_INTENT" = "summary-confirm" ]; then
   if _mcl_is_approve_option "$ASKQ_SELECTED"; then
-    if _mcl_is_ui_skip_option "$ASKQ_SELECTED"; then
-      mcl_state_set ui_flow_active false
-      mcl_audit_log "ui-flow-skip" "stop" "selected=${ASKQ_SELECTED}"
-      mcl_debug_log "stop" "ui-flow-skip" "selected=${ASKQ_SELECTED}"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append summary_confirmed ui_skipped
-    else
-      mcl_state_set ui_flow_active true
-      mcl_audit_log "ui-flow-enable" "stop" "selected=${ASKQ_SELECTED}"
-      mcl_debug_log "stop" "ui-flow-enable" "selected=${ASKQ_SELECTED}"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append summary_confirmed ui_enabled
-    fi
+    mcl_audit_log "summary-confirm-approve" "stop" "selected=${ASKQ_SELECTED}"
+    mcl_debug_log "stop" "summary-confirm-approve" "selected=${ASKQ_SELECTED}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append summary_confirmed approved
   else
     mcl_debug_log "stop" "summary-confirm-non-approve" "selected=${ASKQ_SELECTED}"
   fi

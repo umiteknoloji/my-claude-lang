@@ -129,6 +129,86 @@ mcl_stack_detect() {
   unset -f _mcl_stack_add
 }
 
+# mcl_is_ui_capable — heuristic: does this project have a UI surface?
+# Returns 0 (true) / 1 (false). Called once per session by
+# mcl-activate.sh to decide ui_flow_active without prompting the
+# developer. Cheap checks only — existence tests and jq lookups.
+#
+# True when any of:
+#   - package.json exists AND:
+#       * templates/ dir (Symfony/Twig) present, OR
+#       * scripts.dev / scripts.start / scripts.serve defined, OR
+#       * src/components/, src/pages/, src/app/ dir exists, OR
+#       * src/ dir exists with *.tsx / *.jsx / *.vue / *.svelte files
+#   - manage.py + templates/ dir (Django)
+#   - Gemfile mentions rails AND app/views/ exists (Rails)
+#   - config/routes.rb exists AND app/views/ exists (Rails, alt signal)
+#   - Root-level index.html (static site) — even alongside package.json
+#   - composer.json exists AND templates/ dir (Symfony/Laravel/Twig)
+#
+# False when none of the above hold. CLI repos, pure-backend APIs,
+# config-only repos, MCL itself (only hooks/ + skills/) → false.
+mcl_is_ui_capable() {
+  local dir="${1:-$(pwd)}"
+  [ -d "$dir" ] || return 1
+
+  # Root-level index.html — static site, any stack.
+  [ -f "$dir/index.html" ] && return 0
+
+  # Node / frontend framework land.
+  if [ -f "$dir/package.json" ]; then
+    # Symfony/Twig projects carry package.json (Encore) alongside templates/.
+    [ -d "$dir/templates" ] && return 0
+
+    # Component/page dirs are strong UI signals.
+    [ -d "$dir/src/components" ] && return 0
+    [ -d "$dir/src/pages" ] && return 0
+    [ -d "$dir/src/app" ] && return 0
+    [ -d "$dir/app" ] && return 0
+
+    # jq check on scripts.dev/start/serve — cheap, no content parsing
+    # beyond JSON-native.
+    if command -v jq >/dev/null 2>&1; then
+      local script
+      script="$(jq -r '.scripts.dev // .scripts.start // .scripts.serve // empty' "$dir/package.json" 2>/dev/null)"
+      [ -n "$script" ] && return 0
+    else
+      # jq absent — fall back to substring match.
+      if grep -qE '"(dev|start|serve)"[[:space:]]*:' "$dir/package.json" 2>/dev/null; then
+        return 0
+      fi
+    fi
+
+    # Any frontend file extension under src/.
+    if [ -d "$dir/src" ]; then
+      if find "$dir/src" -maxdepth 3 -type f \
+           \( -name '*.tsx' -o -name '*.jsx' -o -name '*.vue' -o -name '*.svelte' \) \
+           2>/dev/null | grep -q .; then
+        return 0
+      fi
+    fi
+  fi
+
+  # Django.
+  if [ -f "$dir/manage.py" ] && [ -d "$dir/templates" ]; then
+    return 0
+  fi
+
+  # Rails — app/views/ is the canonical template dir.
+  if [ -d "$dir/app/views" ]; then
+    return 0
+  fi
+
+  # PHP composer projects with templates/ (Symfony without package.json,
+  # Laravel with resources/views).
+  if [ -f "$dir/composer.json" ]; then
+    [ -d "$dir/templates" ] && return 0
+    [ -d "$dir/resources/views" ] && return 0
+  fi
+
+  return 1
+}
+
 # CLI dispatch — only when invoked directly, not when sourced.
 if [ "${BASH_SOURCE[0]:-}" = "${0:-}" ] && [ -n "${BASH_SOURCE[0]:-}" ]; then
   cmd="${1:-}"
@@ -137,8 +217,16 @@ if [ "${BASH_SOURCE[0]:-}" = "${0:-}" ] && [ -n "${BASH_SOURCE[0]:-}" ]; then
       shift
       mcl_stack_detect "${1:-}"
       ;;
+    ui-capable)
+      shift
+      if mcl_is_ui_capable "${1:-}"; then
+        echo "true"
+      else
+        echo "false"
+      fi
+      ;;
     *)
-      echo "usage: $0 detect [dir]" >&2
+      echo "usage: $0 detect|ui-capable [dir]" >&2
       exit 2
       ;;
   esac
