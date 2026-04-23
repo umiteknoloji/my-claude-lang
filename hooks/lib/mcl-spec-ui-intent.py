@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-# MCL spec-body UI intent scanner (since 6.5.4).
+# MCL spec-body UI intent scanner (since 6.5.4; in 6.5.5 the text
+# selector was changed from "last assistant text" to "last assistant
+# text that contains a 📋 Spec: block" — mirror of the same fix in
+# hooks/mcl-stop.sh).
 #
-# Reads the Claude Code transcript at argv[1], finds the last assistant
-# text, isolates the `📋 Spec:` block, and checks for strong UI-framework
-# markers. Single-match is enough — the marker set is designed to avoid
-# false positives in non-UI specs (a Python script spec, a bash bug fix,
-# etc. will never contain any of these tokens).
+# Reads the Claude Code transcript at argv[1], finds the most recent
+# spec-bearing assistant text, isolates the `📋 Spec:` block, and
+# checks for strong UI-framework markers. Single-match is enough — the
+# marker set is designed to avoid false positives in non-UI specs (a
+# Python script spec, a bash bug fix, etc. will never contain any of
+# these tokens).
 #
 # Output: literal "true" or "false" on stdout. No stderr on normal paths.
 # Exit code: always 0.
@@ -35,7 +39,15 @@ def extract_text(msg):
     return None
 
 
-def last_assistant_text(path):
+SPEC_MARKER_RE = re.compile(r"\U0001F4CB[ \t]+Spec:")
+
+
+def last_assistant_spec_text(path):
+    # Since 6.5.5: pick the most recent assistant text that CONTAINS a
+    # `📋 Spec:` block. Earlier versions returned the most recent text
+    # unconditionally, so trailing narration in a spec-bearing turn (e.g.
+    # "Kodu yazıyorum") hid the spec from this scanner and UI intent
+    # never fired on well-formed but tail-padded turns.
     last = None
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -48,7 +60,7 @@ def last_assistant_text(path):
                 except Exception:
                     continue
                 text = extract_text(obj)
-                if text:
+                if text and SPEC_MARKER_RE.search(text):
                     last = text
     except Exception:
         return None
@@ -141,7 +153,7 @@ def main():
         print("false")
         return 0
     path = sys.argv[1]
-    text = last_assistant_text(path)
+    text = last_assistant_spec_text(path)
     if not text:
         print("false")
         return 0

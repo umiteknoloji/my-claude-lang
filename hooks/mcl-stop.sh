@@ -49,9 +49,12 @@ if [ -z "$TRANSCRIPT_PATH" ] || [ ! -f "$TRANSCRIPT_PATH" ]; then
   exit 0
 fi
 
-# Parse the transcript: find the last assistant message, extract its
-# text content, locate the `📋 Spec:` block (bounded by the next
-# markdown heading `^#...` or EOF), normalize, sha256.
+# Parse the transcript: find the most recent assistant message whose
+# text CONTAINS a `📋 Spec:` block (since 6.5.5 — earlier versions took
+# the last assistant text unconditionally, so trailing non-spec
+# narration in a spec-bearing turn hid the spec from the hook and
+# forced the model to re-emit it on recovery turns). Bound the block
+# by the next markdown heading `^#...` or EOF, normalize, sha256.
 # Output to stdout: a single hex digest if a spec block was found,
 # otherwise nothing.
 SPEC_HASH="$(python3 -c '
@@ -80,7 +83,9 @@ def extract_text(msg):
         return "\n".join(parts) if parts else None
     return None
 
-last_text = None
+spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:", re.MULTILINE)
+
+last_spec_text = None
 try:
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
@@ -92,16 +97,15 @@ try:
             except Exception:
                 continue
             text = extract_text(obj)
-            if text:
-                last_text = text
+            if text and spec_line_re.search(text):
+                last_spec_text = text
 except Exception:
     sys.exit(0)
 
-if not last_text:
+if not last_spec_text:
     sys.exit(0)
 
-spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:")
-lines = last_text.splitlines()
+lines = last_spec_text.splitlines()
 start = None
 for i, ln in enumerate(lines):
     if spec_line_re.match(ln):
