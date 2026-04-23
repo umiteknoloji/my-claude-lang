@@ -71,12 +71,32 @@ mcl_plugin_gate_required_binaries() {
   esac
 }
 
+_mcl_plugin_gate_has_any_source_files() {
+  # Return 0 if the project directory contains at least one recognizable
+  # source file. Bootstrap / empty projects return 1 so LSP plugin
+  # suggestions are suppressed until the developer has committed to a stack.
+  local dir="${1:-$(pwd)}"
+  local exts="js ts jsx tsx py go rb java kt php cpp cc cxx c cs rs swift lua vue svelte"
+  local ext f
+  for ext in $exts; do
+    f="$(find "$dir" -maxdepth 6 -name "*.${ext}" -not -path '*/.git/*' \
+         -not -path '*/node_modules/*' -not -path '*/__pycache__/*' \
+         -not -path '*/vendor/*' 2>/dev/null | head -1)"
+    [ -n "$f" ] && return 0
+  done
+  return 1
+}
+
 mcl_plugin_gate_required_plugins() {
   # Curated tier-A always required, regardless of stack.
   echo "superpowers"
   echo "security-guidance"
 
   local dir="${1:-$(pwd)}"
+  # LSP plugins are only relevant when source files already exist.
+  # An empty/bootstrap project has no stack yet — skip LSP suggestions.
+  _mcl_plugin_gate_has_any_source_files "$dir" 2>/dev/null || return 0
+
   local tag
   # Stack detect is advisory — unknown stacks simply add no LSP rows.
   while IFS= read -r tag; do

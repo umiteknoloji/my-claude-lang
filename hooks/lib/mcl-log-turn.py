@@ -40,9 +40,11 @@ try:
             + (u.get("cache_read_input_tokens") or 0)
         )
 
-    turn_tok = usage_tokens(usages[-1])
+    last = usages[-1]
+    turn_tok = usage_tokens(last)
     cumulative = sum(usage_tokens(u) for u in usages)
-    remaining = max(0, CONTEXT_LIMIT - cumulative)
+    # input_tokens of the last turn = current context window size (not billing sum)
+    remaining = max(0, CONTEXT_LIMIT - (last.get("input_tokens") or 0))
 
     def fmt(n: int) -> str:
         return f"{n:,}".replace(",", ".")

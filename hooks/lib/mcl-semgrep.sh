@@ -88,6 +88,24 @@ _mcl_semgrep_cache_fresh() {
   [ "$age_days" -lt "$MCL_SEMGREP_CACHE_TTL_DAYS" ]
 }
 
+_mcl_semgrep_has_any_code_files() {
+  # Return 0 if the project directory contains at least one file with a
+  # recognizable source extension. Bootstrap / empty projects return 1 so
+  # the preflight can emit rc=3 (silent) rather than rc=1 (unsupported-
+  # stack warning that fires before the developer has stated their language).
+  local dir="${1:-$(pwd)}"
+  local exts="js ts jsx tsx py go rb java kt php cpp cc cxx c cs rs swift lua vue svelte"
+  local ext f
+  for ext in $exts; do
+    # find is the right tool here — glob depth-first across the tree.
+    f="$(find "$dir" -maxdepth 6 -name "*.${ext}" -not -path '*/.git/*' \
+         -not -path '*/node_modules/*' -not -path '*/__pycache__/*' \
+         -not -path '*/vendor/*' 2>/dev/null | head -1)"
+    [ -n "$f" ] && return 0
+  done
+  return 1
+}
+
 _mcl_semgrep_any_supported_stack() {
   # Check project's detected stacks against the Semgrep-supported list.
   # Return 0 if at least one detected tag is supported; 1 otherwise.
@@ -110,12 +128,21 @@ mcl_semgrep_preflight() {
   #   0 = OK, SAST will run
   #   1 = soft skip (unsupported stack — caller emits one-time warning)
   #   2 = hard block (binary missing — caller refuses session)
+  #   3 = empty project — no source files yet; silent skip, no warning
   if ! _mcl_semgrep_binary_present; then
     local hint
     hint="$(_mcl_semgrep_install_hint)"
     printf 'semgrep-missing|install=%s\n' "$hint"
     mcl_audit_log "semgrep-preflight" "mcl-activate" "missing-binary"
     return 2
+  fi
+  # Empty project — no source files yet. Bootstrap sessions have not written
+  # any code yet; the stack is unknown and the "unsupported" notice would be
+  # premature. Return 3 so the caller skips silently without a developer notice.
+  if ! _mcl_semgrep_has_any_code_files "${1:-$(pwd)}"; then
+    printf 'semgrep-empty-project\n'
+    mcl_audit_log "semgrep-preflight" "mcl-activate" "empty-project"
+    return 3
   fi
   if ! _mcl_semgrep_any_supported_stack "${1:-$(pwd)}"; then
     printf 'semgrep-unsupported-stack\n'

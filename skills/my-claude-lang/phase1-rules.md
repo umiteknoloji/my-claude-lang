@@ -30,13 +30,15 @@ Skip this pre-flow entirely when:
 - Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) is in progress.
 - Every detected tag already has its plugin installed.
 
-## Pre-Flow: Test-Command Resolution (first developer message only)
+## Pre-Flow: Test-Command Resolution (after Phase 1 summary approval only)
 
 TDD is mandatory on every Phase 4 (see `phase4-tdd.md`). Resolve the
-test command up front so the developer knows early what will happen
-in Phase 4 — never surprise them mid-execution with a runner question.
+test command **after the Phase 1 summary is approved** (AskUserQuestion
+returns an approve-family option) so the question is never asked before
+the developer has stated what they are building.
 
-On the **first** developer message, after the LSP Plugin Check:
+Immediately after the Phase 1 AskUserQuestion tool_result returns
+approve (and BEFORE emitting the spec):
 
 1. Check explicit config: `bash ~/.claude/hooks/lib/mcl-config.sh get test_command`.
    Non-empty → resolved, skip the rest of this pre-flow.
@@ -59,10 +61,9 @@ On the **first** developer message, after the LSP Plugin Check:
      TDD overlay silently falls through to non-TDD execution.
 
 Skip this pre-flow entirely when:
-- Not the first developer message in the conversation.
-- Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) is in progress.
 - Auto-detect or config already resolved the command (no question
   needed).
+- Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) is already in progress.
 
 ## Main Flow
 
@@ -99,7 +100,7 @@ I understood the following:
 Then call:
 ```
 AskUserQuestion({
-  question: "MCL 6.5.7 | <localized 'Is this correct?'>",
+  question: "MCL 7.0.0 | <localized 'Is this correct?'>",
   options: [
     "<approve-verb>",
     "<edit-verb>",

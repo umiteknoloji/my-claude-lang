@@ -100,3 +100,24 @@
 2026-04-24 01:02:32 | semgrep-preflight | mcl-activate | unsupported-stack
 2026-04-24 01:03:13 | semgrep-preflight | mcl-activate | unsupported-stack
 2026-04-24 01:17:08 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 01:17:31 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 01:17:31 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 01:17:31 | summary-confirm-approve | stop | selected=User has answered your questions: "MCL 6.5.6 | Spec doğru mu?"="evet doğru. eksik bişey olmaz dimi ?". You can now continue with the user's answers in mind.
+2026-04-24 01:21:10 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 01:22:09 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 01:22:09 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 01:22:09 | summary-confirm-approve | stop | selected=User has answered your questions: "MCL 6.5.6 | Spec doğru mu?"="evet doğru. eksik bişey olmaz dimi ?". You can now continue with the user's answers in mind.
+2026-04-24 01:23:22 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 01:24:40 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 01:24:41 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 01:24:41 | summary-confirm-approve | stop | selected=User has answered your questions: "MCL 6.5.6 | Spec doğru mu?"="evet doğru. eksik bişey olmaz dimi ?". You can now continue with the user's answers in mind.
+2026-04-24 01:26:28 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 01:32:44 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 01:33:04 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 01:33:13 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 01:33:32 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 01:33:43 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 01:34:05 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 01:34:32 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 01:34:56 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 01:35:44 | semgrep-preflight | mcl-activate | unsupported-stack

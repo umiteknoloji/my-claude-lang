@@ -147,60 +147,74 @@ if [ ! -f "$SETTINGS_FILE" ]; then
 SETTINGS
   echo "[OK] Created $SETTINGS_FILE with MCL hooks (activate + pre-tool + stop + post-tool)"
 else
-  # Detect hook REGISTRATION, not just substring. The user's permissions
-  # allowlist often contains the hook path too — matching on `mcl-stop`
-  # alone yields false positives. Anchor on the `~/.claude/hooks/` prefix
-  # that only appears in a hook `command` field.
-  MISSING=""
-  grep -q '~/.claude/hooks/mcl-activate.sh'   "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-activate"
-  grep -q '~/.claude/hooks/mcl-pre-tool.sh'   "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-pre-tool"
-  grep -q '~/.claude/hooks/mcl-stop.sh'       "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-stop"
-  grep -q '~/.claude/hooks/mcl-post-tool.sh'  "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-post-tool"
-  if [ -z "$MISSING" ]; then
-    echo "[OK] All four MCL hooks already configured in $SETTINGS_FILE"
-  else
-    echo ""
-    echo "[!] settings.json exists but is missing:$MISSING"
-    echo "    Merge the following into the \"hooks\" object in $SETTINGS_FILE:"
-    echo ""
-    cat << 'MANUAL'
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/mcl-activate.sh" }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/mcl-pre-tool.sh" }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/mcl-stop.sh" }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/mcl-post-tool.sh" }
-        ]
-      }
-    ]
-  }
-MANUAL
-    echo ""
-  fi
+  # Existing settings.json — auto-merge any missing MCL hook entries using
+  # Python so the file stays valid JSON and we never just print a manual block.
+  # Uses a temp-file + atomic rename to guard against write failures.
+  python3 - "$SETTINGS_FILE" << 'PYMERGE'
+import json, sys, os, tempfile
+
+HOOKS = {
+    "UserPromptSubmit": "~/.claude/hooks/mcl-activate.sh",
+    "PreToolUse":       "~/.claude/hooks/mcl-pre-tool.sh",
+    "Stop":             "~/.claude/hooks/mcl-stop.sh",
+    "PostToolUse":      "~/.claude/hooks/mcl-post-tool.sh",
+}
+
+path = sys.argv[1]
+try:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+except Exception as e:
+    print(f"[WARN] Cannot parse {path}: {e}. Skipping auto-merge.")
+    sys.exit(0)
+
+if not isinstance(data, dict):
+    print(f"[WARN] {path} is not a JSON object. Skipping auto-merge.")
+    sys.exit(0)
+
+hooks_obj = data.setdefault("hooks", {})
+if not isinstance(hooks_obj, dict):
+    print(f"[WARN] 'hooks' key in {path} is not an object. Skipping auto-merge.")
+    sys.exit(0)
+
+added = []
+for event, cmd in HOOKS.items():
+    # Check whether this exact command is already registered under this event.
+    existing = hooks_obj.get(event, [])
+    already = any(
+        h.get("command") == cmd
+        for entry in (existing or [])
+        for h in (entry.get("hooks") or [])
+        if isinstance(entry, dict) and isinstance(h, dict)
+    )
+    if not already:
+        hooks_obj.setdefault(event, []).append({
+            "matcher": "",
+            "hooks": [{"type": "command", "command": cmd}]
+        })
+        added.append(event)
+
+if not added:
+    print("[OK] All four MCL hooks already configured in " + path)
+    sys.exit(0)
+
+# Write atomically: temp file in the same directory, then rename.
+dirpath = os.path.dirname(os.path.abspath(path))
+try:
+    fd, tmp = tempfile.mkstemp(dir=dirpath, suffix=".json.tmp")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp, path)
+    print("[OK] Auto-merged missing hooks into " + path + ": " + ", ".join(added))
+except Exception as e:
+    try:
+        os.unlink(tmp)
+    except Exception:
+        pass
+    print(f"[FAIL] Could not write {path}: {e}")
+    sys.exit(1)
+PYMERGE
 fi
 
 echo ""
