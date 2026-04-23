@@ -99,7 +99,7 @@ I understood the following:
 Then call:
 ```
 AskUserQuestion({
-  question: "MCL 6.5.3 | <localized 'Is this correct?'>",
+  question: "MCL 6.5.4 | <localized 'Is this correct?'>",
   options: [
     "<approve-verb>",
     "<edit-verb>",

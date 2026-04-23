@@ -574,9 +574,26 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     mcl_state_set spec_approved true
     mcl_state_set current_phase 4
     mcl_state_set phase_name '"EXECUTE"'
-    # If UI flow was enabled at Phase 1 confirm, enter BUILD_UI sub-phase.
-    # Otherwise stay in the classic phase-4 EXECUTE path.
     UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
+    # Spec-body UI intent detection (since 6.5.4). Bootstrap / scaffold
+    # sessions have no file-system UI signals at session start, so the
+    # activate-hook heuristic sets ui_flow_active=false. If the approved
+    # spec body contains strong UI-framework markers (Next.js, React,
+    # TSX, Tailwind, shadcn, components/ui, etc.), we flip the flag here
+    # so Phase 4a BUILD_UI engages and mcl-pre-tool.sh path-exception
+    # locks backend paths until the developer reviews the UI.
+    SPEC_INTENT_SCANNER="$SCRIPT_DIR/lib/mcl-spec-ui-intent.py"
+    if [ "$UI_FLOW_ON" != "true" ] && [ -f "$SPEC_INTENT_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
+      UI_INTENT="$(python3 "$SPEC_INTENT_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
+      if [ "$UI_INTENT" = "true" ]; then
+        mcl_state_set ui_flow_active true
+        UI_FLOW_ON="true"
+        mcl_audit_log "ui-flow-spec-intent" "stop" "hash=${CURRENT_HASH:0:12}"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_flow_spec_intent "${CURRENT_HASH:0:12}"
+      fi
+    fi
+    # If UI flow is on (from Phase 1 heuristic OR spec-intent scan above),
+    # enter BUILD_UI sub-phase. Otherwise stay in the classic phase-4 path.
     if [ "$UI_FLOW_ON" = "true" ]; then
       mcl_state_set ui_sub_phase '"BUILD_UI"'
       mcl_audit_log "ui-flow-enter-build" "stop" "hash=${CURRENT_HASH:0:12}"
