@@ -56,6 +56,16 @@ def extract_text(msg):
         return "\n".join(parts) if parts else None
     return None
 
+# Since 6.5.5: select the most recent assistant text that CONTAINS a
+# `📋 Spec:` block, not the most recent text overall. Mirrors the fix
+# in hooks/mcl-stop.sh — trailing narration in a spec-bearing turn
+# (e.g. spec + "Kodu yazıyorum") must not hide the spec from partial
+# detection.
+spec_line_re = re.compile(
+    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:",
+    re.MULTILINE,
+)
+
 last_text = None
 try:
     with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -68,18 +78,13 @@ try:
             except Exception:
                 continue
             text = extract_text(obj)
-            if text:
+            if text and spec_line_re.search(text):
                 last_text = text
 except Exception:
     sys.exit(2)
 
 if not last_text:
     sys.exit(2)
-
-# Accept `📋 Spec:` optionally prefixed by markdown heading marks
-# (`#`, `##`, ...) and/or list markers — same tolerance as the
-# widened Stop-hook detection.
-spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:")
 
 lines = last_text.splitlines()
 start = None
