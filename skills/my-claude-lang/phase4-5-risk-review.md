@@ -179,10 +179,13 @@ anti-patterns live in a single file to avoid drift.
 
 After every Phase 4.5 risk is resolved (skipped, fixed, or
 rule-captured), run a TDD re-verify before handing off to Phase 4.6
-— provided ALL of the following hold:
+— provided `test_command` is configured (`bash ~/.claude/hooks/lib/mcl-config.sh get test_command` returns non-empty).
 
-- `test_command` is configured: `bash ~/.claude/hooks/lib/mcl-config.sh get test_command` returns non-empty.
-- At least one risk was **fixed** (a Write / Edit / Bash call was made during Phase 4.5). If all risks were skipped or captured-as-rule with no code change, skip the re-verify.
+Skip the re-verify **only** when Phase 4.5 was omitted entirely (no
+risks found and the phase was silent). If Phase 4.5 ran — even if
+all risks were skipped with no code change — re-verify still runs.
+An all-skip re-run costs nothing (tests stay GREEN) and removes any
+ambiguity about whether fixes were applied.
 
 How:
 1. Run `bash ~/.claude/hooks/lib/mcl-test-runner.sh green-verify`.
