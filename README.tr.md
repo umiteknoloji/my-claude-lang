@@ -61,16 +61,19 @@ Aşama 4: Kod yazılıyor. Bu aşamanın içinde zorunlu batch TDD
 
          UI yüzeyi tespit edildiğinde (varsayılan: ON), Aşama 4 üçe bölünür:
          ├─ 4a BUILD_UI  — sadece dummy data ile çalışır frontend.
-         │                 Çalıştırma komutu verilir; tarayıcında açarsın.
+         │                 Çalıştırma komutu verilir; MCL tarayıcıyı açar.
          ├─ 4b UI_REVIEW — backend başlamadan önce UI'ı onaylarsın.
          │                 Opt-in Playwright görsel incelemesi mevcut.
          └─ 4c BACKEND   — gerçek API çağrıları, data layer, async bağlantı.
                            Yalnızca UI onayından sonra çalışır.
   │
   ▼
-Aşama 4.5 (Risk İncelemesi): MCL yeni yazılan kodu atlanmış
-         riskler için tarıyor — uç durumlar, güvenlik, performans,
-         gerilemeler — ve her birini seninle tek tek konuşuyor.
+Aşama 4.5 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
+         performans kararlarının doğru uygulandığını doğrular; ardından
+         atlanmış riskleri tarar — uç durumlar, gerilemeler — ve her
+         birini seninle tek tek konuşur. Risk düzeltmeleri bittikten
+         sonra TDD testleri yeniden koşar: hepsi yeşil → geçer; kırmızı
+         → ilgili kod düzeltilir; çelişki → sen karar verirsin.
   │
   ▼
 Aşama 4.6 (Etki İncelemesi): MCL projenin geri kalanını,
@@ -113,8 +116,8 @@ alt-faza ayrılıyor — böylece MCL değiştirmek istediğin bir UI'ın
 
 1. **Phase 4a (BUILD_UI)** — MCL sadece dummy data ile çalıştırılabilir
    bir frontend yazıyor. Stack'ine göre React / Vue / Svelte / statik
-   HTML. Sana bir "çalıştır" komutu veriyor (`npm run dev` vb.) ve
-   tarayıcında açıyorsun.
+   HTML. Çalıştırma komutu veriyor (`npm run dev` vb.); MCL
+   tarayıcıyı otomatik açar, sen incelersin.
 2. **Phase 4b (UI_REVIEW)** — MCL backend'e geçmeden önce UI doğru
    mu diye soruyor. Dört seçenek: onay / revize / **sen de bak ve
    raporla** / iptal. "Sen de bak ve raporla" opt-in bir boru hattı:

@@ -60,16 +60,19 @@ Phase 4: Code gets written. Mandatory batch TDD runs inside this
 
          When a UI surface is detected (default ON), Phase 4 splits:
          ├─ 4a BUILD_UI  — runnable frontend with dummy data only.
-         │                 You get a run command; open it in browser.
+         │                 You get a run command; MCL auto-opens it.
          ├─ 4b UI_REVIEW — approve the UI before backend starts.
          │                 Opt-in Playwright vision review available.
          └─ 4c BACKEND   — real API calls, data layer, async wiring.
                            Only runs after UI approval.
   │
   ▼
-Phase 4.5 (Risk Review): MCL scans the just-written code for missed
-         risks — edge cases, security, performance, regressions — and
-         walks each one with you, one at a time.
+Phase 4.5 (Risk Review): MCL verifies that the security and
+         performance decisions designed in the spec were correctly
+         implemented, then scans for any missed risks — edge cases,
+         regressions — walking each one with you. After risk fixes,
+         TDD re-runs: all green → passes; any red → code is fixed;
+         MCL / Claude Code conflict → you decide.
   │
   ▼
 Phase 4.6 (Impact Review): MCL scans the rest of the project for
@@ -110,8 +113,8 @@ on top of a UI you wanted to change:
 
 1. **Phase 4a (BUILD_UI)** — MCL writes a runnable frontend with
    dummy data only. React / Vue / Svelte / static HTML depending on
-   your stack. You get a "run it" command (`npm run dev` etc.) and
-   open it in your browser.
+   your stack. You get a run command (`npm run dev` etc.); MCL
+   auto-opens it in your browser.
 2. **Phase 4b (UI_REVIEW)** — MCL asks whether the UI is right
    before moving on. Four options: approve / revise / **see it
    yourself and report** / cancel. "See it yourself" is an opt-in
