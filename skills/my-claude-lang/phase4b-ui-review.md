@@ -6,8 +6,15 @@
 
 ## Entry Condition
 
-Phase 4b starts the moment Phase 4a emits its final "run it" snippet.
-No state flag flip — it is a direct call from Phase 4a procedure step 6.
+Phase 4b is **deferred** since 6.5.0. Phase 4a now auto-starts the dev
+server and opens the browser, then STOPS. Phase 4b only begins when
+the developer returns on their own — i.e. on the developer's NEXT
+turn after the browser-open, carrying a free-form reply in their own
+words. There is no preemptive `AskUserQuestion`.
+
+The state flags are unchanged (`ui_sub_phase = "BUILD_UI"`,
+`ui_reviewed = false`) until the developer's reply is interpreted
+and acted on.
 
 ## Core Intent
 
@@ -22,13 +29,41 @@ approval at Phase 3 cannot fully verify visual intent.
 For the opt-in "MCL sees its own UI" pipeline (Playwright + screenshot
 + Read multimodal), read `my-claude-lang/phase4b-ui-review/visual-inspect.md`.
 
-## Review AskUserQuestion
+## Interpreting the Developer's Free-Form Reply
 
-After Phase 4a emits the run snippet, call:
+When the developer's next turn arrives after Phase 4a's browser-open,
+MCL reads their message and classifies it into one of three intents
+**before** calling any tool. No `AskUserQuestion` is emitted up front —
+the reply itself is the decision.
+
+Intent classification (match against 14-language token sets; case-
+insensitive, substring match, any-match wins):
+
+| Intent          | Turkish cues                       | English cues                              |
+| --------------- | ---------------------------------- | ----------------------------------------- |
+| `approve`       | "beğendim", "güzel olmuş", "onay", "tamam devam", "backend'e geç" | "looks good", "approve", "ship it", "go backend", "proceed" |
+| `revise`        | "şunu değiştir", "büyüt", "renk", "yanlış", "olmamış", "revize", free-form critique | "change", "fix", "smaller", "color", "wrong", "revise"   |
+| `cancel`        | "iptal", "vazgeç", "durdur"        | "cancel", "stop", "abandon"               |
+
+Full 14-language token sets live in `hooks/mcl-stop.sh` under
+`UI_REVIEW_TOKENS` and must stay in sync.
+
+**Tie-breakers:**
+- Approve + revise tokens together → `revise` wins (e.g. "güzel ama
+  butonu büyüt" is critique-bearing, not an approval).
+- No recognised tokens and the reply is pure feedback prose → treat
+  as `revise` with the whole message as the feedback payload.
+- Ambiguous one-word reply in a non-cue form → fall back to the
+  explicit `AskUserQuestion` below.
+
+## Confirmation AskUserQuestion (fallback only)
+
+If intent classification is genuinely ambiguous (empty reply, a
+single emoji, a question back at MCL, etc.), and only then, emit:
 
 ```
 AskUserQuestion({
-  question: "MCL 6.2.0 | <localized: UI reviewed? proceed to backend?>",
+  question: "MCL 6.5.0 | <localized: UI reviewed? proceed to backend?>",
   options: [
     "<approve-family: approve, proceed to backend>",
     "<revise: rewrite the UI>",

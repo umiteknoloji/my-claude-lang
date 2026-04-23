@@ -73,17 +73,71 @@ promotion details.
 4. Include dev-toggleable state — `const [mockState, setMockState]`
    or `?state=loading` query param — so the developer can eyeball
    loading / empty / error / success states.
-5. **Do NOT run the dev server yourself** — emit a "run it" snippet
-   so the developer launches it in their terminal:
-   ```
-   UI dummy data ile hazır. Çalıştır:
-     npm run dev      (veya yarn dev / pnpm dev / python -m http.server)
-   Tarayıcıda: http://localhost:5173/<route>
-   ```
-   Detect the run command from `package.json` scripts; if no
-   frontend framework, fall back to `python -m http.server 8080`.
-6. Immediately transition to Phase 4b by calling the review
-   `AskUserQuestion` (see `my-claude-lang/phase4b-ui-review.md`).
+5. **Run the dev server and open it in the developer's browser.**
+   Prior releases asked the developer to copy-paste a run snippet, then
+   pushed an `AskUserQuestion` at them before they had seen anything.
+   Since 6.5.0 MCL does the launching itself, because a developer
+   cannot meaningfully answer "approve or revise?" without looking at
+   the page first.
+
+   Procedure:
+
+   1. **Short-circuit if docker-compose is active.** If
+      `docker compose ps --services --filter status=running` emits at
+      least one service and the project has a `docker-compose.yml`
+      mapping a web port, skip the host run command — assume the UI
+      is already served (developer ran `docker compose up`). Jump
+      to sub-step 4.
+   2. **Resolve the run command** in this order, first match wins:
+      - `package.json` scripts: `dev` → `start` → `serve` (pick one)
+      - Symfony project (`bin/console` + `composer.json`): `symfony serve -d` if Symfony CLI is on PATH, else `php -S 127.0.0.1:8000 -t public`
+      - Django (`manage.py`): `python manage.py runserver`
+      - Rails (`bin/rails`): `bin/rails s`
+      - `index.html` at repo root with no framework: `python3 -m http.server 8080`
+      - Fallback: emit the snippet-only path from the pre-6.5.0 flow
+        and STOP (developer must launch manually).
+   3. **Dispatch via `Bash` with `run_in_background: true`.** Capture
+      the shell id so the stop hook can reference it in the audit
+      log. Sleep ~3s to give the server a chance to bind.
+   4. **Derive the URL** by framework:
+      - Vite: `http://localhost:5173/<route>`
+      - Next.js / Nuxt: `http://localhost:3000/<route>`
+      - Webpack dev-server default: `http://localhost:8080/<route>`
+      - Symfony CLI: `http://127.0.0.1:8000/<route>`
+      - PHP built-in: `http://127.0.0.1:8000/<route>`
+      - Django: `http://127.0.0.1:8000/<route>`
+      - Rails: `http://127.0.0.1:3000/<route>`
+      - Static server: `http://localhost:8080/<route>`
+      `<route>` comes from the approved spec (e.g. `/login`, `/calculator`).
+   5. **Open the browser.** On macOS: `open <url>`. On Linux:
+      `xdg-open <url>` (no-op if absent). Windows is not auto-opened
+      (MCL emits the URL for the developer to click).
+   6. **Emit the localized "UI açıldı" prose** (single short line
+      in the developer's language — see table below). Include the
+      URL in the line so it is clickable.
+
+   | Locale | "UI açıldı" prose (substitute `<url>`)                                                       |
+   | ------ | ------------------------------------------------------------------------------------------- |
+   | TR     | UI hazır ve tarayıcıda açıldı: `<url>` — incele, sonra geri dön ve ne düşündüğünü yaz.      |
+   | EN     | UI is up and open in your browser: `<url>` — inspect it, then come back and tell me.        |
+   | AR     | الواجهة جاهزة ومفتوحة في متصفحك: `<url>` — افحصها ثم عُد وأخبرني برأيك.                     |
+   | DE     | UI läuft und ist im Browser geöffnet: `<url>` — sieh es dir an und sag mir dann Bescheid.   |
+   | ES     | La UI está lista y abierta en tu navegador: `<url>` — revísala y luego cuéntame qué opinas. |
+   | FR     | L'UI est lancée et ouverte dans ton navigateur : `<url>` — regarde-la puis reviens me dire. |
+   | HE     | הממשק מוכן ונפתח בדפדפן: `<url>` — בדוק ותחזור לספר לי מה דעתך.                            |
+   | HI     | UI तैयार है और ब्राउज़र में खुल गया है: `<url>` — देखें, फिर वापस आकर बताएं।                  |
+   | ID     | UI siap dan terbuka di browser-mu: `<url>` — periksa, lalu kembali ceritakan pendapatmu.    |
+   | JA     | UIが起動してブラウザで開かれました: `<url>` — 確認してから戻って感想を教えてください。     |
+   | KO     | UI가 실행되어 브라우저에서 열렸습니다: `<url>` — 확인하고 돌아와 의견을 알려주세요.           |
+   | PT     | A UI está rodando e aberta no navegador: `<url>` — confira e depois me diga o que achou.    |
+   | RU     | UI запущен и открыт в браузере: `<url>` — посмотри, потом вернись и расскажи впечатление.   |
+   | ZH     | UI 已启动并在浏览器中打开：`<url>` — 先看看，然后回来告诉我你的想法。                       |
+
+6. **STOP.** Do not call `AskUserQuestion` now. The developer needs
+   room to inspect the UI in their browser without a modal dialog
+   blocking the terminal. Phase 4b takes over on the developer's
+   NEXT turn, after they return with free-form feedback (see
+   `my-claude-lang/phase4b-ui-review.md`).
 
 ## What Does NOT Happen in Phase 4a
 
