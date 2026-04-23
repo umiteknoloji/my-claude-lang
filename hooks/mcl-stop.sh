@@ -431,4 +431,15 @@ if [ "$ASKQ_INTENT" = "ui-review" ]; then
   fi
 fi
 
+# --- Session log: turn summary with actual token counts (since 6.5.7) ---
+_STOP_LOG_LIB="$SCRIPT_DIR/lib/mcl-log-append.sh"
+_STOP_TURN_SCRIPT="$SCRIPT_DIR/lib/mcl-log-turn.py"
+if [ -f "$_STOP_LOG_LIB" ] && [ -f "$_STOP_TURN_SCRIPT" ] \
+   && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] \
+   && command -v python3 >/dev/null 2>&1; then
+  source "$_STOP_LOG_LIB"
+  TURN_MSG="$(python3 "$_STOP_TURN_SCRIPT" "$TRANSCRIPT_PATH" 2>/dev/null)"
+  [ -n "$TURN_MSG" ] && mcl_log_append "$TURN_MSG"
+fi
+
 exit 0

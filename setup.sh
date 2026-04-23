@@ -12,6 +12,7 @@ HOOK_SRC_DIR="$SCRIPT_DIR/hooks"
 HOOK_ACTIVATE_SRC="$HOOK_SRC_DIR/mcl-activate.sh"
 HOOK_PRETOOL_SRC="$HOOK_SRC_DIR/mcl-pre-tool.sh"
 HOOK_STOP_SRC="$HOOK_SRC_DIR/mcl-stop.sh"
+HOOK_POSTTOOL_SRC="$HOOK_SRC_DIR/mcl-post-tool.sh"
 HOOK_LIB_SRC="$HOOK_SRC_DIR/lib"
 
 SKILL_DST="$HOME/.claude/skills/my-claude-lang"
@@ -19,6 +20,7 @@ HOOK_DST_DIR="$HOME/.claude/hooks"
 HOOK_ACTIVATE_DST="$HOOK_DST_DIR/mcl-activate.sh"
 HOOK_PRETOOL_DST="$HOOK_DST_DIR/mcl-pre-tool.sh"
 HOOK_STOP_DST="$HOOK_DST_DIR/mcl-stop.sh"
+HOOK_POSTTOOL_DST="$HOOK_DST_DIR/mcl-post-tool.sh"
 HOOK_LIB_DST="$HOOK_DST_DIR/lib"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 
@@ -67,23 +69,26 @@ cp "$SKILL_SRC" "$SKILL_DST/SKILL.md"
 cp "$SKILL_RULES_SRC"/*.md "$SKILL_DST/"
 echo "[OK] Skill files installed to $SKILL_DST (clean copy)"
 
-# 2. Install hook scripts (three hooks + lib/)
+# 2. Install hook scripts (four hooks + lib/)
 #    mcl-activate.sh         — UserPromptSubmit: renders MCL banner + activates skill
 #    mcl-pre-tool.sh         — PreToolUse: phase-lock gate for mutating tools
 #    mcl-stop.sh             — Stop: spec-hash tracking + approval-marker transitions
+#    mcl-post-tool.sh        — PostToolUse: session diary — one line per tool call
 #    lib/mcl-state.sh        — shared state helpers (sourced by pre-tool + stop)
 #    lib/mcl-config.sh       — .mcl/config.json reader (opt-in developer config)
 #    lib/mcl-test-runner.sh  — opt-in Phase 5 test-runner orchestration
 mkdir -p "$HOOK_DST_DIR"
-cp "$HOOK_ACTIVATE_SRC" "$HOOK_ACTIVATE_DST"
-cp "$HOOK_PRETOOL_SRC"  "$HOOK_PRETOOL_DST"
-cp "$HOOK_STOP_SRC"     "$HOOK_STOP_DST"
-chmod +x "$HOOK_ACTIVATE_DST" "$HOOK_PRETOOL_DST" "$HOOK_STOP_DST"
+cp "$HOOK_ACTIVATE_SRC"  "$HOOK_ACTIVATE_DST"
+cp "$HOOK_PRETOOL_SRC"   "$HOOK_PRETOOL_DST"
+cp "$HOOK_STOP_SRC"      "$HOOK_STOP_DST"
+cp "$HOOK_POSTTOOL_SRC"  "$HOOK_POSTTOOL_DST"
+chmod +x "$HOOK_ACTIVATE_DST" "$HOOK_PRETOOL_DST" "$HOOK_STOP_DST" "$HOOK_POSTTOOL_DST"
 
 # Clean lib destination so renamed/removed helpers don't linger.
 rm -rf "$HOOK_LIB_DST"
 mkdir -p "$HOOK_LIB_DST"
 cp "$HOOK_LIB_SRC"/*.sh "$HOOK_LIB_DST/"
+cp "$HOOK_LIB_SRC"/*.py "$HOOK_LIB_DST/" 2>/dev/null || true
 echo "[OK] Hook scripts + lib installed to $HOOK_DST_DIR"
 
 # 3. Configure hooks in settings.json
@@ -125,22 +130,34 @@ if [ ! -f "$SETTINGS_FILE" ]; then
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/mcl-post-tool.sh"
+          }
+        ]
+      }
     ]
   }
 }
 SETTINGS
-  echo "[OK] Created $SETTINGS_FILE with MCL hooks (activate + pre-tool + stop)"
+  echo "[OK] Created $SETTINGS_FILE with MCL hooks (activate + pre-tool + stop + post-tool)"
 else
   # Detect hook REGISTRATION, not just substring. The user's permissions
   # allowlist often contains the hook path too — matching on `mcl-stop`
   # alone yields false positives. Anchor on the `~/.claude/hooks/` prefix
   # that only appears in a hook `command` field.
   MISSING=""
-  grep -q '~/.claude/hooks/mcl-activate.sh'  "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-activate"
-  grep -q '~/.claude/hooks/mcl-pre-tool.sh'  "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-pre-tool"
-  grep -q '~/.claude/hooks/mcl-stop.sh'      "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-stop"
+  grep -q '~/.claude/hooks/mcl-activate.sh'   "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-activate"
+  grep -q '~/.claude/hooks/mcl-pre-tool.sh'   "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-pre-tool"
+  grep -q '~/.claude/hooks/mcl-stop.sh'       "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-stop"
+  grep -q '~/.claude/hooks/mcl-post-tool.sh'  "$SETTINGS_FILE" 2>/dev/null || MISSING="$MISSING mcl-post-tool"
   if [ -z "$MISSING" ]; then
-    echo "[OK] All three MCL hooks already configured in $SETTINGS_FILE"
+    echo "[OK] All four MCL hooks already configured in $SETTINGS_FILE"
   else
     echo ""
     echo "[!] settings.json exists but is missing:$MISSING"
@@ -169,6 +186,14 @@ else
         "matcher": "",
         "hooks": [
           { "type": "command", "command": "~/.claude/hooks/mcl-stop.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "~/.claude/hooks/mcl-post-tool.sh" }
         ]
       }
     ]
@@ -207,6 +232,7 @@ check_file "$SKILL_DST/SKILL.md"
 check_file "$HOOK_ACTIVATE_DST"
 check_file "$HOOK_PRETOOL_DST"
 check_file "$HOOK_STOP_DST"
+check_file "$HOOK_POSTTOOL_DST"
 check_file "$HOOK_LIB_DST/mcl-state.sh"
 check_file "$HOOK_LIB_DST/mcl-config.sh"
 check_file "$HOOK_LIB_DST/mcl-test-runner.sh"
@@ -215,9 +241,12 @@ check_file "$HOOK_LIB_DST/mcl-stack-detect.sh"
 check_file "$HOOK_LIB_DST/mcl-semgrep.sh"
 check_file "$HOOK_LIB_DST/mcl-finish.sh"
 check_file "$HOOK_LIB_DST/mcl-partial-spec.sh"
+check_file "$HOOK_LIB_DST/mcl-log-append.sh"
+check_file "$HOOK_LIB_DST/mcl-log-turn.py"
 check_exec "$HOOK_ACTIVATE_DST"
 check_exec "$HOOK_PRETOOL_DST"
 check_exec "$HOOK_STOP_DST"
+check_exec "$HOOK_POSTTOOL_DST"
 
 # Verify mcl-activate.sh produces well-formed JSON on empty stdin
 # (fast proxy for "hook actually runs and its deps resolve").
