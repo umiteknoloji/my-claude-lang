@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 6.3.0` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 6.4.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## AskUserQuestion Protocol (since 6.0.0)
@@ -65,7 +65,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 drift resolution, partial-spec recovery, mcl-update, mcl-finish, pasted-CLI
 passthrough — uses Claude Code's native `AskUserQuestion` tool with
-`question` prefixed `MCL 6.3.0 | `. The Stop hook parses tool_use/tool_result
+`question` prefixed `MCL 6.4.0 | `. The Stop hook parses tool_use/tool_result
 pairs to advance MCL state. The legacy `✅ MCL APPROVED` text marker is
 DEAD in 6.0.0 — Claude must never emit it; it carries no state effect.
 
@@ -200,7 +200,7 @@ For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
 2. If ANY parameter unclear → ask questions ONE AT A TIME as plain text
    (open-ended gather is NOT AskUserQuestion)
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 6.3.0 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 6.4.0 | <localized-is-this-correct>",
    options: ["<approve-family-in-language>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns an approve-family option does the
    Stop hook advance state — THEN call Phase 2. Not before.
@@ -225,7 +225,7 @@ processes the request AS IF a native English engineer wrote it.
 4. Include: Objective, MUST/SHOULD requirements, Acceptance Criteria,
    Edge Cases, Technical Approach, Out of Scope
 5. After the spec, explain in developer's language what it says
-6. Call `AskUserQuestion({question: "MCL 6.3.0 | <localized-spec-approval
+6. Call `AskUserQuestion({question: "MCL 6.4.0 | <localized-spec-approval
    e.g. Bu spec'i onaylıyor musun? / Approve this spec?>", options:
    ["<approve-family>", "<edit>", "<cancel>"]})`
 7. Do NOT proceed until the tool_result returns an approve-family option.
@@ -243,7 +243,7 @@ For full verification rules, read `my-claude-lang/phase3-verify.md`
 
 Phase 3 is COMBINED with Phase 2 — when the spec is shown, the developer
 verifies it. The explanation after the spec IS Phase 3, followed by the
-Phase 3 `AskUserQuestion` call with prefix `MCL 6.3.0 | `.
+Phase 3 `AskUserQuestion` call with prefix `MCL 6.4.0 | `.
 Developer must understand AND pick an approve-family option in the
 tool_result → then Phase 4 begins (Stop hook flips state).
 

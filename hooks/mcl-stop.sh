@@ -351,6 +351,11 @@ for tid in reversed(order):
     res = tool_results.get(tid)
     if not use:
         continue
+    if not res:
+        # Skip still-unanswered askq so the scanner descends to the
+        # most-recent *answered* one. Prevents summary-confirm approval
+        # loss when spec-approve is emitted in the same turn.
+        continue
     m = PREFIX_RE.match(use["question"].strip())
     if not m:
         continue
