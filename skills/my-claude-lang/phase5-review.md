@@ -56,29 +56,31 @@ phase file.
 
 ### TDD mode — skip re-invocation
 
-When `tdd=true` (see `phase4-tdd.md`) AND Phase 4 has already emitted
-a `🟢 GREEN verify` block, DO NOT invoke the runner again here.
-Phase 5 starts instead with a localized TDD-cycle summary line that
-references the two Phase 4 runner invocations (which are already
-visible earlier in the conversation). Examples:
+When `tdd=true` (see `phase4-tdd.md`) AND Phase 4 **or Phase 4.5**
+has already emitted a `🟢 GREEN verify` block in this session, DO NOT
+invoke the runner again here. Phase 5 starts instead with a localized
+TDD-cycle summary line. Examples:
 
-- Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama tamamlandı`
-- English: `✅ TDD cycle: RED baseline → GREEN verify complete`
+- Phase 4 GREEN only (no Phase 4.5 re-verify):
+  - Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama tamamlandı`
+  - English: `✅ TDD cycle: RED baseline → GREEN verify complete`
+- Phase 4 GREEN + Phase 4.5 re-verify GREEN:
+  - Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama → Phase 4.5 re-doğrulama tamamlandı`
+  - English: `✅ TDD cycle: RED baseline → GREEN verify → Phase 4.5 re-verify complete`
 
-Then proceed to Section 1. A double runner invocation in one cycle
-would be noise — the Phase 4 blocks already carry the diagnostic
-information. This skip applies ONLY when Phase 4 GREEN verify
-happened; if TDD mode was enabled but Phase 4 fell through due to
-missing `test_command`, the normal Phase 5 runner invocation above
-still applies.
+Then proceed to Section 1. A double (or triple) runner invocation
+would be noise — the earlier GREEN blocks already carry the diagnostic
+information. This skip applies ONLY when a GREEN verify has happened;
+if TDD mode was enabled but fell through due to missing `test_command`,
+the normal Phase 5 runner invocation above still applies.
 
 The TDD-cycle summary line is MANDATORY whenever a GREEN verify
-happened in Phase 4 — even when Phase 4.5 and Phase 4.6 both
-emitted nothing (their "omit entirely" rule does not extend to
+happened in Phase 4 or Phase 4.5 — even when Phase 4.5 and Phase 4.6
+both emitted nothing (their "omit entirely" rule does not extend to
 this line). The summary is the single most compact proof to the
-developer that the two Phase 4 runner blocks were the ground
-truth Phase 5 is standing on; without it, Phase 5 opens with
-nothing tying back to the TDD cycle.
+developer that the runner blocks were the ground truth Phase 5 is
+standing on; without it, Phase 5 opens with nothing tying back to
+the TDD cycle.
 
 </mcl_constraint>
 

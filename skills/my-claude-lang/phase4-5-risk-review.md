@@ -52,6 +52,35 @@ conversation**. For each risk MCL surfaces:
 STOP. Do NOT list the next risk in the same response. Do NOT proceed
 to Phase 5. Wait for the tool_result.
 
+## Spec Compliance Pre-Check
+
+Before the automated SAST scan and the category-based risk review,
+Phase 4.5 first verifies that every MUST and SHOULD requirement from
+the approved `📋 Spec:` body was implemented in Phase 4.
+
+How:
+1. Retrieve the approved spec from conversation context (the `📋 Spec:`
+   block approved in Phase 3). If the spec is unrecoverable from
+   context, skip this step silently and proceed to the SAST scan.
+2. Walk every MUST requirement, then every SHOULD requirement.
+3. For each requirement: inspect the Phase 4 code to determine whether
+   it is fully implemented, partially implemented, or absent.
+4. **Fully implemented** → silent pass — do NOT list it, do NOT report it.
+5. **Partially implemented or absent** → surface as a Phase 4.5 risk
+   in the sequential dialog, same format as all other risks:
+   - Cite the spec requirement verbatim (one sentence)
+   - Explain what is missing or incomplete in the implementation
+   - Offer the three standard options (apply fix / skip / make rule)
+   - STOP and wait for the developer's reply before continuing.
+
+Spec gaps feed into the **same sequential dialog** as SAST findings
+and category-based risks — not a separate section, no block heading.
+They appear first so they can be fixed before new implementation
+risks are reviewed.
+
+Empty result: if every MUST/SHOULD is fully implemented, skip this
+step entirely and proceed silently to the SAST scan.
+
 ## Automated SAST Pre-Scan (Semgrep)
 
 Before running the human-judgment category review below, Phase 4.5
@@ -146,11 +175,34 @@ silence is the correct signal.
 For Phase 4.5 anti-patterns, see `my-claude-lang/anti-patterns.md` —
 anti-patterns live in a single file to avoid drift.
 
-## Handoff to Phase 5
+## TDD Re-Verify
 
-After every risk is resolved (skipped, fixed, or captured as a rule),
-Phase 5 emits the Verification Report. The report's Impact Analysis and
-must-test sections MUST reflect Phase 4.5 decisions — fixes applied,
-risks accepted, rules captured.
+After every Phase 4.5 risk is resolved (skipped, fixed, or
+rule-captured), run a TDD re-verify before handing off to Phase 4.6
+— provided ALL of the following hold:
+
+- `test_command` is configured: `bash ~/.claude/hooks/lib/mcl-config.sh get test_command` returns non-empty.
+- At least one risk was **fixed** (a Write / Edit / Bash call was made during Phase 4.5). If all risks were skipped or captured-as-rule with no code change, skip the re-verify.
+
+How:
+1. Run `bash ~/.claude/hooks/lib/mcl-test-runner.sh green-verify`.
+2. **GREEN** → proceed to Phase 4.6.
+3. **RED** → a Phase 4.5 fix introduced a regression. Surface the
+   failing test(s) as a new Phase 4.5 risk in the sequential dialog:
+   - Cite the failing test name and error message
+   - State which risk-fix likely caused the regression
+   - Offer the three standard options (fix the regression / revert
+     the risk-fix / make rule)
+   - STOP, wait for reply, apply decision, re-run TDD. Repeat until
+     GREEN, then proceed to Phase 4.6.
+4. **TIMEOUT** → log one audit line (`mcl_audit_log "tdd-rerun-timeout" "phase4-5"`);
+   proceed to Phase 4.6 without blocking.
+
+## Handoff to Phase 4.6
+
+After every risk is resolved and TDD re-verify passes (or is skipped),
+proceed to Phase 4.6 (Post-Risk Impact Review). Phase 4.6 and Phase 5
+MUST reflect Phase 4.5 decisions — fixes applied, risks accepted,
+rules captured.
 
 </mcl_phase>
