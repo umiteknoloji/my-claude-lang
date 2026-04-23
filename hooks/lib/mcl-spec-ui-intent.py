@@ -39,7 +39,10 @@ def extract_text(msg):
     return None
 
 
-SPEC_MARKER_RE = re.compile(r"\U0001F4CB[ \t]+Spec:")
+SPEC_MARKER_RE = re.compile(
+    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:",
+    re.MULTILINE,
+)
 
 
 def last_assistant_spec_text(path):
