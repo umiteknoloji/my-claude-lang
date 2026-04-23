@@ -24,6 +24,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/mcl-state.sh
 source "$SCRIPT_DIR/lib/mcl-state.sh"
+# shellcheck source=lib/mcl-trace.sh
+[ -f "$SCRIPT_DIR/lib/mcl-trace.sh" ] && source "$SCRIPT_DIR/lib/mcl-trace.sh"
 
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
@@ -35,6 +37,19 @@ try:
 except Exception:
     pass
 ' 2>/dev/null)"
+
+# Trace: Task tool dispatch records which subagent MCL invoked.
+if [ "$TOOL_NAME" = "Task" ] && command -v mcl_trace_append >/dev/null 2>&1; then
+  SUBAGENT_TYPE="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    print((obj.get("tool_input") or {}).get("subagent_type","") or "")
+except Exception:
+    pass
+' 2>/dev/null)"
+  [ -n "$SUBAGENT_TYPE" ] && mcl_trace_append plugin_dispatched "$SUBAGENT_TYPE"
+fi
 
 # -------- Branch: plugin gate (hard gate, overrides phase logic) --------
 # When `plugin_gate_active=true` in state, mutating tools AND writer-Bash

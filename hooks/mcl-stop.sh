@@ -30,6 +30,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/mcl-state.sh
 source "$SCRIPT_DIR/lib/mcl-state.sh"
+# shellcheck source=lib/mcl-trace.sh
+[ -f "$SCRIPT_DIR/lib/mcl-trace.sh" ] && source "$SCRIPT_DIR/lib/mcl-trace.sh"
 
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
@@ -496,6 +498,7 @@ if [ -n "$SPEC_HASH" ]; then
       mcl_state_set phase_name '"SPEC_REVIEW"'
       mcl_state_set spec_hash "\"$SPEC_HASH\""
       mcl_debug_log "stop" "transition-1-to-2" "hash=${SPEC_HASH:0:12}"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 1 2
       ;;
     2|3)
       if [ "$CURRENT_HASH" != "$SPEC_HASH" ]; then
@@ -567,6 +570,11 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     fi
     mcl_audit_log "approve-via-askuserquestion" "stop" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4 ui_flow=${UI_FLOW_ON}"
     mcl_debug_log "stop" "approve-via-askuserquestion" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4"
+    command -v mcl_trace_append >/dev/null 2>&1 && {
+      mcl_trace_append spec_approved "${CURRENT_HASH:0:12}"
+      mcl_trace_append phase_transition "$CURRENT_PHASE" 4
+      [ "$UI_FLOW_ON" = "true" ] && mcl_trace_append ui_flow_enabled
+    }
     bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
   else
     mcl_debug_log "stop" "askq-ignored-wrong-phase" "phase=${CURRENT_PHASE}"
@@ -585,10 +593,12 @@ if [ "$ASKQ_INTENT" = "summary-confirm" ]; then
       mcl_state_set ui_flow_active false
       mcl_audit_log "ui-flow-skip" "stop" "selected=${ASKQ_SELECTED}"
       mcl_debug_log "stop" "ui-flow-skip" "selected=${ASKQ_SELECTED}"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append summary_confirmed ui_skipped
     else
       mcl_state_set ui_flow_active true
       mcl_audit_log "ui-flow-enable" "stop" "selected=${ASKQ_SELECTED}"
       mcl_debug_log "stop" "ui-flow-enable" "selected=${ASKQ_SELECTED}"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append summary_confirmed ui_enabled
     fi
   else
     mcl_debug_log "stop" "summary-confirm-non-approve" "selected=${ASKQ_SELECTED}"
@@ -614,6 +624,7 @@ if [ "$ASKQ_INTENT" = "ui-review" ]; then
     mcl_state_set ui_sub_phase '"BACKEND"'
     mcl_audit_log "approve-ui-review-via-askuserquestion" "stop" "sub=${UI_SUB_NOW}->BACKEND"
     mcl_debug_log "stop" "ui-review-approve" "sub=${UI_SUB_NOW}->BACKEND"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_review_approved
   elif _mcl_is_vision_request_option "$ASKQ_SELECTED"; then
     mcl_audit_log "ui-review-vision-request" "stop" "selected=${ASKQ_SELECTED}"
     mcl_debug_log "stop" "ui-review-vision-request" "selected=${ASKQ_SELECTED}"

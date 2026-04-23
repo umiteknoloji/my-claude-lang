@@ -82,9 +82,9 @@ nothing tying back to the TDD cycle.
 
 </mcl_constraint>
 
-The report has **up to two** sections, in this order: Spec Compliance,
-must-test. Any section whose content is empty is **omitted entirely**
-(no header, no placeholder sentence, no filler). Section 1 in
+The report has **up to three** sections, in this order: Spec Compliance,
+must-test, Process Trace. Any section whose content is empty is **omitted
+entirely** (no header, no placeholder sentence, no filler). Section 1 in
 particular is omitted when every MUST/SHOULD is satisfied — the
 absence of the section IS the all-clear signal.
 (Prior to MCL 5.4.0 the report had a third section, Impact Analysis,
@@ -161,6 +161,92 @@ Tests must be:
 - Cover edge cases from the spec
 - Cover regression for consumers surfaced in Phase 4.6
 - Cover residual exposure from Phase 4.5 skipped risks
+
+## Section 3: Process Trace (MCL 6.3.0+)
+
+A one-line-per-step localized rendering of `.mcl/trace.log` so the
+developer can verify that MCL actually ran every phase, dispatched
+the plugins it claimed to, and advanced state on approval — not just
+claimed it in prose. The trace is written by the hooks (deterministic,
+not model-compliance-dependent); Phase 5 reads and renders it.
+
+How:
+
+1. Read `.mcl/trace.log` via the Read tool. If the file does not
+   exist or is empty, OMIT Section 3 entirely — no header, no
+   placeholder. (The file is created by `hooks/lib/mcl-trace.sh` on
+   the first event of a session; its absence means no MCL-driven
+   events fired, which is itself diagnostic but not a Phase 5
+   rendering concern.)
+2. Parse each line as `<ISO-8601 UTC> | <event_key> | <csv-args>`.
+3. Emit a localized section header, then ONE bullet per event
+   describing what happened in the developer's language. The
+   `event_key` is English (stable machine token); the prose around
+   it is in the developer's language. Keep each bullet to a single
+   short sentence.
+
+Localized section header:
+
+- Turkish: `📜 Süreç İzlemesi:`
+- English: `📜 Process Trace:`
+- Spanish: `📜 Traza del Proceso:`
+- French: `📜 Trace du Processus:`
+- German: `📜 Prozess-Trace:`
+- Japanese: `📜 プロセストレース:`
+- Korean: `📜 프로세스 추적:`
+- Chinese: `📜 流程追踪：`
+- Arabic: `📜 تتبع العملية:`
+- Hindi: `📜 प्रक्रिया ट्रेस:`
+- Portuguese: `📜 Rastreamento do Processo:`
+- Russian: `📜 Трассировка Процесса:`
+- Hebrew: `📜 מעקב תהליך:`
+- Indonesian: `📜 Jejak Proses:`
+
+Event → localized prose mapping (use as a semantic key; render ONE
+short sentence per event in the developer's language):
+
+- `session_start,<version>` → "MCL `<version>` oturumu başladı." / "MCL `<version>` session started."
+- `stack_detected,<tags>` → "Stack algılandı: `<tags>`." / "Stack detected: `<tags>`."
+- `phase_transition,<from>,<to>` → "Faz `<from>` → `<to>`." / "Phase `<from>` → `<to>`."
+- `summary_confirmed,ui_enabled` → "Özet onaylandı (UI akışı açık)." / "Summary confirmed (UI flow on)."
+- `summary_confirmed,ui_skipped` → "Özet onaylandı (UI atlandı)." / "Summary confirmed (UI skipped)."
+- `spec_approved,<hash12>` → "Spec onaylandı (`<hash12>`)." / "Spec approved (`<hash12>`)."
+- `ui_flow_enabled` → "UI akışı BUILD_UI'ya girdi." / "UI flow entered BUILD_UI."
+- `ui_review_approved` → "UI review onaylandı → BACKEND." / "UI review approved → BACKEND."
+- `plugin_dispatched,<subagent>` → "Plugin çağrıldı: `<subagent>`." / "Plugin dispatched: `<subagent>`."
+- Unknown event key → render it verbatim as a single bullet, do
+  NOT omit. Future events added to the hook library will surface
+  here even if this skill file has not been updated.
+
+Format each bullet with the ISO timestamp trimmed to `HH:MM:SSZ`
+(date prefix dropped — the full session runs in a short window):
+
+```
+📜 Süreç İzlemesi:
+- 14:32:01Z — MCL 6.3.0 oturumu başladı.
+- 14:32:01Z — Stack algılandı: typescript,react.
+- 14:34:12Z — Faz 1 → 2.
+- 14:35:08Z — Özet onaylandı (UI akışı açık).
+- 14:37:44Z — Spec onaylandı (a1b2c3d4e5f6).
+- 14:37:44Z — Faz 3 → 4.
+- 14:40:12Z — Plugin çağrıldı: code-reviewer.
+- 14:55:02Z — UI review onaylandı → BACKEND.
+```
+
+Rules:
+
+- Do NOT dedupe or reorder events; the chronological order is the
+  signal.
+- Do NOT summarize with "N events fired" — render every line; the
+  developer is checking specific steps happened, a count does not
+  help.
+- If `.mcl/trace.log` has more than 50 lines, render the first 5
+  and the last 40 with a single localized bridge line between them
+  (Turkish: `… (X ara olay atlandı) …` / English: `… (X middle events elided) …`).
+  The head tells the reader how the session started; the tail tells
+  them what just happened.
+- This section is subject to the empty-section-omission rule — if
+  the file is missing or empty, Section 3 vanishes cleanly.
 
 ## Presentation Rules
 
