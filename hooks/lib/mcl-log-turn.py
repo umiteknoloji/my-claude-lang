@@ -40,20 +40,30 @@ try:
             + (u.get("cache_read_input_tokens") or 0)
         )
 
+    def input_context(u: dict) -> int:
+        # The actual context window occupied = all input-side tokens.
+        # cache_read_input_tokens dominates in cached sessions; plain
+        # input_tokens alone is only the non-cached slice (typically < 10).
+        return (
+            (u.get("input_tokens") or 0)
+            + (u.get("cache_creation_input_tokens") or 0)
+            + (u.get("cache_read_input_tokens") or 0)
+        )
+
     last = usages[-1]
     turn_tok = usage_tokens(last)
     cumulative = sum(usage_tokens(u) for u in usages)
-    # input_tokens of the last turn = current context window size (not billing sum)
-    remaining = max(0, CONTEXT_LIMIT - (last.get("input_tokens") or 0))
+    remaining = max(0, CONTEXT_LIMIT - input_context(last))
 
     def fmt(n: int) -> str:
         return f"{n:,}".replace(",", ".")
 
+    ctx = input_context(last)
     print(
         f"Bu tur tamamlandı. | "
         f"Tur: {fmt(turn_tok)} token | "
-        f"Toplam: {fmt(cumulative)} token | "
-        f"Kalan: {fmt(remaining)} / 200.000"
+        f"Bağlam: {fmt(ctx)} / 200.000 | "
+        f"Kalan: {fmt(remaining)}"
     )
 except Exception:
     pass
