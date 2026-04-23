@@ -268,13 +268,81 @@ _mcl_is_vision_request_option() {
   return 1
 }
 
+# Initialise state early — needed by phase review guard below as well as the
+# existing spec/askq transition branches.
+mcl_state_init
+CURRENT_PHASE="$(mcl_state_get current_phase)"
+
+# --- Phase 4.5 / 4.6 / 5 review enforcement (since 7.1.0) ---
+#
+# Core invariant: after Phase 4 code is written, Claude MUST run Phase 4.5
+# Risk Review, Phase 4.6 Impact Review, and Phase 5 Verification Report before
+# the session can end. This is enforced via `decision: block` — Claude Code
+# refuses to close the turn until Claude starts Phase 4.5.
+#
+# State machine (stored in phase_review_state):
+#   null / absent — Phase 4 hasn't written code yet (no enforcement needed)
+#   "pending"     — code was written, Phase 4.5 not yet started → BLOCK
+#   "running"     — Phase 4.5/4.6 dialog is in progress → allow through
+#
+# Transitions:
+#   code_written=true AND askuq=false → pending   (block)
+#   code_written=true AND askuq=true  → running   (Phase 4.5 fix + next risk)
+#   code_written=false AND askuq=true → running   (pure dialog turn)
+#   Session boundary resets state to null (mcl-activate.sh).
+#
+# Phase 4.5 fix writes are handled correctly: if Claude writes a risk fix AND
+# immediately calls AskUserQuestion in the same turn, askuq=true → running.
+# If the fix lands in its own turn without AskUserQuestion → pending → block.
+# This is intentional: every code write must be immediately followed by a
+# risk-review continuation.
+_PR_GUARD="$SCRIPT_DIR/lib/mcl-phase-review-guard.py"
+if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
+   && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+  _PR_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+  _PR_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
+  _PR_REVIEW_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
+
+  if [ "$_PR_PHASE" = "4" ] && [ "$_PR_APPROVED" = "true" ]; then
+    _PR_JSON="$(python3 "$_PR_GUARD" "$TRANSCRIPT_PATH" 2>/dev/null)"
+    _PR_CODE="$(printf '%s' "$_PR_JSON" | python3 -c \
+      'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("code_written") else "false")' 2>/dev/null)"
+    _PR_ASKUQ="$(printf '%s' "$_PR_JSON" | python3 -c \
+      'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("askuq_present") else "false")' 2>/dev/null)"
+
+    if [ "$_PR_ASKUQ" = "true" ]; then
+      # Phase 4.5/4.6 dialog is running this turn — transition to "running"
+      # regardless of whether code was also written (risk-fix + next-risk turn).
+      if [ "$_PR_REVIEW_STATE" != "running" ]; then
+        mcl_state_set phase_review_state '"running"' >/dev/null 2>&1 || true
+        mcl_audit_log "phase-review-running" "stop" "prev=${_PR_REVIEW_STATE}"
+        command -v mcl_trace_append >/dev/null 2>&1 && \
+          mcl_trace_append phase_review_running "${_PR_REVIEW_STATE:-null}"
+      fi
+    elif [ "$_PR_CODE" = "true" ]; then
+      # Code written this turn without Phase 4.5 dialog — enforce.
+      mcl_state_set phase_review_state '"pending"' >/dev/null 2>&1 || true
+      mcl_audit_log "phase-review-pending" "stop" \
+        "prev=${_PR_REVIEW_STATE} phase=${_PR_PHASE}"
+      command -v mcl_trace_append >/dev/null 2>&1 && \
+        mcl_trace_append phase_review_pending "${_PR_REVIEW_STATE:-null}"
+
+      # Return decision:block so Claude is forced to continue.
+      # The reason text is the authoritative instruction — it must be
+      # concrete and leave no ambiguity about what must happen next.
+      printf '%s\n' '{
+  "decision": "block",
+  "reason": "⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written this turn but Phase 4.5 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4.5 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4.5 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4.5 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL 7.1.0 |\n    3. After ALL Phase 4.5 risks are resolved → run Phase 4.6 Impact Review.\n    4. After Phase 4.6 → run Phase 5 Verification Report.\n\nPhase 4.5 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract."
+}'
+      exit 0
+    fi
+  fi
+fi
+
 # If neither spec nor AskUserQuestion approval present, nothing to do.
 if [ -z "$SPEC_HASH" ] && [ -z "$ASKQ_INTENT" ]; then
   exit 0
 fi
-
-mcl_state_init
-CURRENT_PHASE="$(mcl_state_get current_phase)"
 CURRENT_HASH="$(mcl_state_get spec_hash)"
 SPEC_APPROVED="$(mcl_state_get spec_approved)"
 PRE_DRIFT_DETECTED="$(mcl_state_get drift_detected)"
