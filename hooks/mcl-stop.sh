@@ -177,263 +177,35 @@ case "$PARTIAL_RC" in
     ;;
 esac
 
-# --- AskUserQuestion approval scanner (replaces marker regex in 6.0.0) ---
-# Scan the transcript for the most recent AskUserQuestion tool_use/tool_result
-# pair whose question begins with "MCL {version} | ". Emit a pipe-separated
-# record on stdout:
-#   <semantic_intent>|<selected_option>
-# where semantic_intent is one of:
+# --- AskUserQuestion approval scanner (shared lib since 6.5.6) ---
+# The scanner lives at hooks/lib/mcl-askq-scanner.py. Stop and PreToolUse
+# invoke the same script so intent classification + selected-option
+# extraction cannot drift between hooks. Scanner output is JSON with
+# fields {intent, selected, spec_hash}; stop consumes intent + selected
+# (spec_hash is computed separately above as SPEC_HASH for compatibility
+# with the existing post-approval branches). Intent is one of:
 #   spec-approve      — Phase 3 spec approval
-#   summary-confirm   — Phase 1 summary confirmation (no state mutation here)
-#   other             — recognized MCL question but not a state-transitioning one
-# and selected_option is the raw option string picked by the developer
-# (or empty if cancelled).
-ASKQ_RECORD="$(python3 -c '
-import json, sys, re
-
-path = sys.argv[1]
-
-PREFIX_RE = re.compile(r"^MCL\s+[0-9]+\.[0-9]+\.[0-9]+\s*\|\s*(.+)$", re.DOTALL)
-
-# Semantic intent detectors: lowercase substring match on question body.
-# English + major MCL languages. The skill file enumerates the exact
-# canonical strings; these regexes are a superset so localization drift
-# does not break detection.
-SPEC_APPROVE_TOKENS = [
-    "approve this spec", "approve the spec",
-    "spec\u0027i onayl",    # tr: ASCII apostrophe
-    "spec\u2019i onayl",    # tr: curly apostrophe
-    "spec onay",
-    "aprobar esta spec", "aprueba este spec",
-    "approuver ce spec", "approuver cette sp",
-    "genehmigen sie diese spec",
-    "\u3053\u306e\u30b9\u30da\u30c3\u30af\u3092\u627f\u8a8d",
-    "\uc2a4\ud399\uc744 \uc2b9\uc778",
-    "\u6279\u51c6\u6b64\u89c4\u8303",
-    "\u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0645\u0648\u0627\u0635\u0641\u0627\u062a",
-    "\u05d0\u05e9\u05e8 \u05d0\u05ea \u05d4\u05de\u05e4\u05e8\u05d8",
-    "\u0907\u0938 \u0938\u094d\u092a\u0947\u0915 \u0915\u094b \u0938\u094d\u0935\u0940\u0915\u093e\u0930",
-    "setujui spec ini",
-    "aprovar este spec",
-    "\u043e\u0434\u043e\u0431\u0440\u0438\u0442\u044c \u044d\u0442\u043e\u0442 \u0441\u043f\u0435\u043a",
-]
-
-SUMMARY_CONFIRM_TOKENS = [
-    # English
-    "is this correct",
-    "is this summary correct",
-    "summary correct",
-    # Turkish — accept both "bu özet doğru" and the shorter
-    # "özet doğru" / "doğru mu" variants that drift in the wild.
-    "\u00f6zet do\u011fru",     # "özet doğru"
-    "do\u011fru mu",             # "doğru mu"
-    # Spanish — "es" (sometimes spelled "és") + correcto variants
-    "\u00e8s esto correcto",
-    "es correcto",
-    "resumen correcto",
-    # French
-    "r\u00e9sum\u00e9 est-il correct",
-    "est-il correct",
-    "r\u00e9sum\u00e9 correct",
-    # German
-    "zusammenfassung korrekt",
-    "ist das korrekt",
-    # Japanese
-    "\u8981\u7d04\u306f\u6b63\u3057\u3044",   # 要約は正しい
-    "\u6b63\u3057\u3044\u3067\u3059\u304b",  # 正しいですか
-    # Korean
-    "\uc694\uc57d\uc774 \ub9de",              # 요약이 맞
-    "\ub9de\uc2b5\ub2c8\uae4c",               # 맞습니까
-    # Chinese
-    "\u6458\u8981\u662f\u5426\u6b63\u786e",   # 摘要是否正确
-    "\u6b63\u786e\u5417",                     # 正确吗
-    # Arabic
-    "\u0647\u0644 \u0647\u0630\u0627 \u0635\u062d\u064a\u062d",  # هل هذا صحيح
-    "\u0627\u0644\u0645\u0644\u062e\u0635 \u0635\u062d\u064a\u062d", # الملخص صحيح
-    # Hebrew
-    "\u05d4\u05d0\u05dd \u05d6\u05d4 \u05e0\u05db\u05d5\u05df",   # האם זה נכון
-    "\u05d4\u05e1\u05d9\u05db\u05d5\u05dd \u05e0\u05db\u05d5\u05df", # הסיכום נכון
-    # Hindi
-    "\u0915\u094d\u092f\u093e \u092f\u0939 \u0938\u0939\u0940",     # क्या यह सही
-    "\u0938\u093e\u0930\u093e\u0902\u0936 \u0938\u0939\u0940",     # सारांश सही
-    # Indonesian
-    "apakah ini benar",
-    "ringkasan benar",
-    # Portuguese
-    "est\u00e1 correto",
-    "resumo est\u00e1 correto",
-    # Russian
-    "\u044d\u0442\u043e \u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u043e",  # это правильно
-    "\u0440\u0435\u0437\u044e\u043c\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u043e",  # резюме правильно
-]
-
-# UI_REVIEW_TOKENS: detect Phase 4b review question body.
-# Canonical anchor per skill file is "UI review" (en) or the localized
-# equivalent per language. Lowercased substring match with generous
-# drift tolerance. The skill enumerates canonical strings; this is a
-# superset so localization drift does not break detection.
-UI_REVIEW_TOKENS = [
-    "ui review",
-    "review the ui",
-    "proceed to backend",
-    "ui incele",            # tr
-    "backend\u0027e ge\u00e7",
-    "backend\u2019e ge\u00e7",
-    "arka uca",
-    "revisi\u00f3n de ui",  # es
-    "pasar a backend",
-    "revue ui",             # fr
-    "examiner l\u0027ui",
-    "passer au backend",
-    "ui-\u00fcberpr\u00fcfung",  # de
-    "ui \u00fcberpr\u00fcfen",
-    "zum backend",
-    "ui \u30ec\u30d3\u30e5\u30fc",  # ja
-    "\u30d0\u30c3\u30af\u30a8\u30f3\u30c9\u3078",
-    "ui \u691c\u53ce",              # ko
-    "\ubc31\uc5d4\ub4dc\ub85c",
-    "ui \u5ba1\u67e5",              # zh
-    "\u8f6c\u5230\u540e\u7aef",
-    "\u0645\u0631\u0627\u062c\u0639\u0629 \u0627\u0644\u0648\u0627\u062c\u0647\u0629",  # ar
-    "\u0627\u0644\u0627\u0646\u062a\u0642\u0627\u0644 \u0625\u0644\u0649 \u0627\u0644\u062e\u0644\u0641\u064a\u0629",
-    "\u05e1\u05e7\u05d9\u05e8\u05ea \u05de\u05de\u05e9\u05e7",  # he
-    "\u05de\u05e2\u05d1\u05e8 \u05dc\u05d1\u05d0\u05e7\u05d0\u05e0\u05d3",
-    "ui \u0938\u092e\u0940\u0915\u094d\u0937\u093e",           # hi
-    "\u092c\u0948\u0915\u090f\u0902\u0921 \u092a\u0930",
-    "tinjauan ui",           # id
-    "lanjut ke backend",
-    "revis\u00e3o de ui",    # pt
-    "ir para backend",
-    "\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 ui",  # ru
-    "\u043f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a \u0431\u044d\u043a\u0435\u043d\u0434\u0443",
-]
-
-def extract_message(obj):
-    if isinstance(obj, dict) and "message" in obj and isinstance(obj["message"], dict):
-        return obj["message"]
-    return obj if isinstance(obj, dict) else None
-
-# Collect AskUserQuestion tool_use + paired tool_result.
-tool_uses = {}      # tool_use_id -> {question, options}
-tool_results = {}   # tool_use_id -> raw content string
-order = []          # preserve tool_use order for "most recent"
-
+#   summary-confirm   — Phase 1 summary confirmation (audit-only here)
+#   ui-review         — Phase 4b UI review approval
+#   other             — recognized MCL question but not state-transitioning
+ASKQ_SCANNER="$SCRIPT_DIR/lib/mcl-askq-scanner.py"
+if [ -f "$ASKQ_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
+  ASKQ_JSON="$(python3 "$ASKQ_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
+else
+  ASKQ_JSON=""
+fi
+ASKQ_RECORD="$(printf '%s' "$ASKQ_JSON" | python3 -c '
+import json, sys
 try:
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except Exception:
-                continue
-            msg = extract_message(obj)
-            if not isinstance(msg, dict):
-                continue
-            role = msg.get("role")
-            content = msg.get("content")
-            if not isinstance(content, list):
-                continue
-            for item in content:
-                if not isinstance(item, dict):
-                    continue
-                t = item.get("type")
-                if role == "assistant" and t == "tool_use" and item.get("name") == "AskUserQuestion":
-                    tid = item.get("id") or ""
-                    inp = item.get("input") or {}
-                    q = ""
-                    opts = []
-                    if isinstance(inp, dict):
-                        questions = inp.get("questions")
-                        first = None
-                        if isinstance(questions, list) and questions and isinstance(questions[0], dict):
-                            first = questions[0]
-                        elif isinstance(inp.get("question"), str):
-                            first = inp
-                        if isinstance(first, dict):
-                            q = first.get("question") or ""
-                            raw_opts = first.get("options") or []
-                            if isinstance(raw_opts, list):
-                                for o in raw_opts:
-                                    if isinstance(o, str):
-                                        opts.append(o)
-                                    elif isinstance(o, dict):
-                                        lbl = o.get("label") or o.get("option") or o.get("text") or ""
-                                        if lbl:
-                                            opts.append(lbl)
-                    if tid:
-                        tool_uses[tid] = {"question": q, "options": opts}
-                        order.append(tid)
-                elif role == "user" and t == "tool_result":
-                    tid = item.get("tool_use_id") or ""
-                    if not tid:
-                        continue
-                    raw = item.get("content")
-                    text = ""
-                    if isinstance(raw, str):
-                        text = raw
-                    elif isinstance(raw, list):
-                        parts = []
-                        for sub in raw:
-                            if isinstance(sub, dict):
-                                if sub.get("type") == "text" and isinstance(sub.get("text"), str):
-                                    parts.append(sub["text"])
-                        text = "\n".join(parts)
-                    tool_results[tid] = text
+    obj = json.loads(sys.stdin.read())
+    intent = obj.get("intent","") or ""
+    selected = obj.get("selected","") or ""
+    if intent or selected:
+        print(f"{intent}|{selected}")
 except Exception:
-    sys.exit(0)
+    pass
+' 2>/dev/null)"
 
-# Find the most recent MCL-prefixed AskUserQuestion with a paired tool_result.
-record = None
-for tid in reversed(order):
-    use = tool_uses.get(tid)
-    res = tool_results.get(tid)
-    if not use:
-        continue
-    if not res:
-        # Skip still-unanswered askq so the scanner descends to the
-        # most-recent *answered* one. Prevents summary-confirm approval
-        # loss when spec-approve is emitted in the same turn.
-        continue
-    m = PREFIX_RE.match(use["question"].strip())
-    if not m:
-        continue
-    body = m.group(1).lower()
-    # Decide semantic intent.
-    intent = "other"
-    for tok in SPEC_APPROVE_TOKENS:
-        if tok in body:
-            intent = "spec-approve"
-            break
-    if intent == "other":
-        for tok in SUMMARY_CONFIRM_TOKENS:
-            if tok in body:
-                intent = "summary-confirm"
-                break
-    if intent == "other":
-        for tok in UI_REVIEW_TOKENS:
-            if tok in body:
-                intent = "ui-review"
-                break
-    # Extract selected option from tool_result. The tool_result payload
-    # format varies; we search for the first option label that appears
-    # as a substring, else fall back to the raw text.
-    selected = ""
-    if res:
-        res_norm = res.strip()
-        for opt in use.get("options", []):
-            if opt and opt in res_norm:
-                selected = opt
-                break
-        if not selected:
-            selected = res_norm.splitlines()[0].strip() if res_norm else ""
-    record = f"{intent}|{selected}"
-    break
-
-if record:
-    print(record)
-' "$TRANSCRIPT_PATH" 2>/dev/null)"
 
 ASKQ_INTENT=""
 ASKQ_SELECTED=""
