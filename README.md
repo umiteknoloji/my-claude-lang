@@ -46,13 +46,10 @@ Phase 1: MCL gathers what you want — one question at a time.
          No ambiguity passes. You confirm the summary.
   │
   ▼
-Phase 2: Your confirmed intent becomes a visible English spec
-         (📋 Spec:) — written like a senior engineer with 15+ years
-         experience. You see it. You approve it.
-  │
-  ▼
-Phase 3: MCL explains the spec back to you in your language.
-         You verify Claude understood correctly.
+Phase 2+3: Your confirmed intent becomes a visible English spec
+           (📋 Spec:) written like a senior engineer with 15+ years
+           experience — and MCL explains it back in your language,
+           all in the same turn. One AskUserQuestion, one approval.
   │
   ▼
 Phase 4: Code gets written. Mandatory batch TDD runs inside this
@@ -60,6 +57,14 @@ Phase 4: Code gets written. Mandatory batch TDD runs inside this
          then GREEN verify. Every question Claude asks during
          execution goes through the bridge — with context
          explaining WHY it's asking and WHAT each answer changes.
+
+         When a UI surface is detected (default ON), Phase 4 splits:
+         ├─ 4a BUILD_UI  — runnable frontend with dummy data only.
+         │                 You get a run command; open it in browser.
+         ├─ 4b UI_REVIEW — approve the UI before backend starts.
+         │                 Opt-in Playwright vision review available.
+         └─ 4c BACKEND   — real API calls, data layer, async wiring.
+                           Only runs after UI approval.
   │
   ▼
 Phase 4.5 (Risk Review): MCL scans the just-written code for missed

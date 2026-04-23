@@ -46,13 +46,11 @@ Aşama 1: MCL ne istediğini anlamak için tek tek soru soruyor.
          Hiçbir belirsizlik geçemiyor. Özeti onaylıyorsun.
   │
   ▼
-Aşama 2: Onaylanan niyetin, görünür bir İngilizce teknik
-         spesifikasyona (📋 Spec:) dönüşüyor — 15+ yıl deneyimli
-         kıdemli bir mühendis gibi yazılıyor. Görüyorsun. Onaylıyorsun.
-  │
-  ▼
-Aşama 3: MCL spec'i sana kendi dilinde açıklıyor.
-         Claude'un doğru anlayıp anlamadığını doğruluyorsun.
+Aşama 2+3: Onaylanan niyetin, görünür bir İngilizce teknik
+           spesifikasyona (📋 Spec:) dönüşüyor — 15+ yıl deneyimli
+           kıdemli bir mühendis gibi yazılıyor — ve MCL spec'i
+           sana kendi dilinde açıklıyor; ikisi aynı turda, tek
+           AskUserQuestion onayıyla.
   │
   ▼
 Aşama 4: Kod yazılıyor. Bu aşamanın içinde zorunlu batch TDD
@@ -60,6 +58,14 @@ Aşama 4: Kod yazılıyor. Bu aşamanın içinde zorunlu batch TDD
          kodu, sonra GREEN doğrulama. Claude Code'un çalışma
          sırasında sorduğu her soru köprüden geçiyor — NEDEN
          sorduğunu ve hangi cevabın NE değiştireceğini açıklayarak.
+
+         UI yüzeyi tespit edildiğinde (varsayılan: ON), Aşama 4 üçe bölünür:
+         ├─ 4a BUILD_UI  — sadece dummy data ile çalışır frontend.
+         │                 Çalıştırma komutu verilir; tarayıcında açarsın.
+         ├─ 4b UI_REVIEW — backend başlamadan önce UI'ı onaylarsın.
+         │                 Opt-in Playwright görsel incelemesi mevcut.
+         └─ 4c BACKEND   — gerçek API çağrıları, data layer, async bağlantı.
+                           Yalnızca UI onayından sonra çalışır.
   │
   ▼
 Aşama 4.5 (Risk İncelemesi): MCL yeni yazılan kodu atlanmış
