@@ -332,3 +332,13 @@
 2026-04-24 23:45:38 | set | mcl-activate.sh | field=plugin_gate_active value=false
 2026-04-24 23:45:38 | set | mcl-activate.sh | field=plugin_gate_missing value=[]
 2026-04-24 23:45:38 | set | mcl-activate.sh | field=plugin_gate_session value=s2
+2026-04-24 23:54:24 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-25 00:14:01 | set | mcl-activate.sh | field=partial_spec value=false
+2026-04-25 00:14:01 | set | mcl-activate.sh | field=partial_spec_body_sha value=null
+2026-04-25 00:14:02 | set | mcl-activate.sh | field=phase_review_state value=null
+2026-04-25 00:14:02 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-25 00:14:02 | set | mcl-activate.sh | field=ui_flow_active value=false
+2026-04-25 00:14:02 | ui-flow-autodetect | mcl-activate.sh | ui_capable=false
+2026-04-25 00:14:02 | set | mcl-activate.sh | field=plugin_gate_active value=false
+2026-04-25 00:14:02 | set | mcl-activate.sh | field=plugin_gate_missing value=[]
+2026-04-25 00:14:02 | set | mcl-activate.sh | field=plugin_gate_session value=08e89c95-fbd4-4328-9cdb-d1999699cf85

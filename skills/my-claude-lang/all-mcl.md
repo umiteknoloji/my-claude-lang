@@ -37,9 +37,9 @@ a Pass condition, and a Skip condition.
 
 ### STEP-03: stack-detection
 **Phase:** Pre-Session | **Description:** mcl-activate.sh calls mcl-stack-detect.sh; result is logged as `stack_detected` event with detected language tags. `ui_flow_active` is set based on whether a UI-capable stack was found.
-**Signal:** trace.log contains `stack_detected | <tags>` on the session's first turn. state.json `ui_flow_active` is `true` or `false` (not null).
-**Pass:** trace.log has `stack_detected` event. state.json `ui_flow_active` is explicitly set.
-**Skip:** Silent skip when the project directory is empty (no source files). In that case trace.log has no `stack_detected` line; state.json `ui_flow_active` defaults to `false`.
+**Signal:** trace.log contains `stack_detected | <tags>` on the session's first turn. state.json `ui_flow_active` is `true` or `false` (not null). audit.log contains `ui-flow-autodetect | mcl-activate.sh | ui_capable=<bool>`.
+**Pass:** trace.log has `stack_detected` event AND state.json `ui_flow_active` is explicitly set.
+**Skip:** When the project has no source files OR no recognizable stack tags at session start — `STACK_TAGS` is empty, so `mcl_trace_append stack_detected` is NOT called (guarded by `[ -n "$STACK_TAGS" ]`). Correct skip when: trace.log has no `stack_detected` line for this session AND audit.log has `ui-flow-autodetect | ui_capable=false`. Do NOT mark as WARN if detection ran but found nothing — that is a legitimate skip.
 
 ---
 
@@ -105,8 +105,8 @@ a Pass condition, and a Skip condition.
 
 ### STEP-21: phase-1-to-2-transition
 **Phase:** 2 | **Description:** mcl-stop.sh detects the spec block in the assistant turn and transitions `current_phase` from 1 to 2 (`SPEC_REVIEW`).
-**Signal:** trace.log contains `phase_transition | 1 | 2`. state.json `current_phase=2`.
-**Pass:** trace.log has `phase_transition | 1 | 2`.
+**Signal:** trace.log contains `phase_transition | 1 | 2` AFTER the current-session's `session_start` line. state.json `current_phase=2`. audit.log contains a `set | mcl-stop.sh | field=current_phase value=2` (or equivalent state write) near the spec emission time.
+**Pass:** trace.log has `phase_transition | 1 | 2` in the current-session segment (after the last `session_start`). When evaluating check-up: if audit.log confirms the transition but trace.log is missing the event, report as ⚠️ WARN (intermittent trace write failure) rather than ❌ FAIL — the state machine did advance correctly.
 **Skip:** Never skipped when a spec was emitted in Phase 1 context.
 
 ---
@@ -170,9 +170,9 @@ a Pass condition, and a Skip condition.
 ---
 
 ### STEP-42: phase-review-enforcement
-**Phase:** 4→4.5 | **Description:** When code is written without Phase 4.5 dialog starting in the same turn, mcl-stop.sh sets `phase_review_state="pending"` and returns `decision:block` to force Phase 4.5 to start.
-**Signal:** audit.log `phase-review-pending | stop | prev=null phase=4`. trace.log `phase_review_pending | null`. state.json `phase_review_state="pending"`.
-**Pass:** `phase_review_state` transitions from `pending` to `running` when Phase 4.5 starts (same or next turn). The `pending` state should be transient — not stuck.
+**Phase:** 4→4.5 | **Description:** When code is written without Phase 4.5 dialog starting in the same turn, mcl-stop.sh sets `phase_review_state="pending"` and returns `decision:block`. "pending" is STICKY: the BLOCK re-fires on every subsequent turn (including Bash-only and text-only turns) until AskUserQuestion is called, transitioning state to "running".
+**Signal:** audit.log `phase-review-pending | stop | prev=... phase=4 code=...`. trace.log `phase_review_pending | ...`. state.json `phase_review_state="pending"`.
+**Pass:** `phase_review_state` transitions from `pending` to `running` when Phase 4.5 starts. The `pending` state persists until cleared by `askuq=true` — multiple audit.log `phase-review-pending` entries in a row are expected and correct (sticky re-block).
 **Skip:** When Phase 4.5 starts in the same turn as the last code write (AskUserQuestion called immediately). In this case state goes directly to `running` without `pending`.
 
 ---

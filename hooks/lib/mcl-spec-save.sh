@@ -69,6 +69,13 @@ def extract_text(msg):
         return "\n".join(parts) if parts else None
     return None
 
+# Must stay in sync with mcl-stop.sh — finds the last assistant turn
+# that CONTAINS a spec block (not just the last assistant turn).
+spec_line_re = re.compile(
+    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:",
+    re.MULTILINE,
+)
+
 last_text = None
 try:
     with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -81,7 +88,7 @@ try:
             except Exception:
                 continue
             text = extract_text(obj)
-            if text:
+            if text and spec_line_re.search(text):
                 last_text = text
 except Exception:
     sys.exit(0)
@@ -90,10 +97,6 @@ if not last_text:
     sys.exit(0)
 
 lines = last_text.splitlines()
-# Trigger line tolerates optional markdown heading marks (`##`) or list
-# markers before the `📋 Spec:` emoji — must stay in sync with the
-# matching regex in `mcl-stop.sh`.
-spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:")
 start = None
 for i, ln in enumerate(lines):
     if spec_line_re.match(ln):

@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 7.1.7
+# my-claude-lang 🌐 MCL 7.1.8
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
