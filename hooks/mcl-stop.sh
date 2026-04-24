@@ -32,6 +32,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/mcl-state.sh"
 # shellcheck source=lib/mcl-trace.sh
 [ -f "$SCRIPT_DIR/lib/mcl-trace.sh" ] && source "$SCRIPT_DIR/lib/mcl-trace.sh"
+# shellcheck source=lib/mcl-log-append.sh
+[ -f "$SCRIPT_DIR/lib/mcl-log-append.sh" ] && source "$SCRIPT_DIR/lib/mcl-log-append.sh"
 
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
@@ -273,7 +275,7 @@ _mcl_is_vision_request_option() {
 mcl_state_init
 CURRENT_PHASE="$(mcl_state_get current_phase)"
 
-# --- Phase 4.5 / 4.6 / 5 review enforcement (since 7.1.1) ---
+# --- Phase 4.5 / 4.6 / 5 review enforcement (since 7.1.2) ---
 #
 # Core invariant: after Phase 4 code is written, Claude MUST run Phase 4.5
 # Risk Review, Phase 4.6 Impact Review, and Phase 5 Verification Report before
@@ -332,7 +334,7 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
       # concrete and leave no ambiguity about what must happen next.
       printf '%s\n' '{
   "decision": "block",
-  "reason": "⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written this turn but Phase 4.5 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4.5 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4.5 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4.5 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL 7.1.1 |\n    3. After ALL Phase 4.5 risks are resolved → run Phase 4.6 Impact Review.\n    4. After Phase 4.6 → run Phase 5 Verification Report.\n\nPhase 4.5 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract."
+  "reason": "⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written this turn but Phase 4.5 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4.5 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4.5 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4.5 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL 7.1.2 |\n    3. After ALL Phase 4.5 risks are resolved → run Phase 4.6 Impact Review.\n    4. After Phase 4.6 → run Phase 5 Verification Report.\n\nPhase 4.5 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract."
 }'
       exit 0
     fi
@@ -356,6 +358,7 @@ if [ -n "$SPEC_HASH" ]; then
       mcl_state_set spec_hash "\"$SPEC_HASH\""
       mcl_debug_log "stop" "transition-1-to-2" "hash=${SPEC_HASH:0:12}"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 1 2
+      command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Faz 1 → 2 geçişi (spec algılandı)."
       ;;
     2|3)
       if [ "$CURRENT_HASH" != "$SPEC_HASH" ]; then
@@ -449,6 +452,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
       mcl_trace_append phase_transition "$CURRENT_PHASE" 4
       [ "$UI_FLOW_ON" = "true" ] && mcl_trace_append ui_flow_enabled
     }
+    command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Spec onaylandı. Faz ${CURRENT_PHASE} → 4 geçişi."
     bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
   else
     mcl_debug_log "stop" "askq-ignored-wrong-phase" "phase=${CURRENT_PHASE}"
@@ -508,6 +512,19 @@ if [ -f "$_STOP_LOG_LIB" ] && [ -f "$_STOP_TURN_SCRIPT" ] \
   source "$_STOP_LOG_LIB"
   TURN_MSG="$(python3 "$_STOP_TURN_SCRIPT" "$TRANSCRIPT_PATH" 2>/dev/null)"
   [ -n "$TURN_MSG" ] && mcl_log_append "$TURN_MSG"
+fi
+
+# Auto-clear drift after one warning turn (warn-once model, since 7.1.2).
+# The developer saw the DRIFT_NOTICE in this turn's activate-hook output;
+# no AskUserQuestion required. If an explicit re-approval already cleared
+# drift above, _STILL_DRIFT will be false and this block is a no-op.
+if [ "$PRE_DRIFT_DETECTED" = "true" ]; then
+  _STILL_DRIFT="$(mcl_state_get drift_detected 2>/dev/null)"
+  if [ "$_STILL_DRIFT" = "true" ]; then
+    mcl_state_set drift_detected false >/dev/null 2>&1 || true
+    mcl_state_set drift_hash null >/dev/null 2>&1 || true
+    mcl_audit_log "drift-auto-cleared" "stop" "approved=${CURRENT_HASH:0:12}"
+  fi
 fi
 
 exit 0

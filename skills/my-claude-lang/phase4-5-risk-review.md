@@ -105,10 +105,13 @@ skip the scan. Do NOT scan files that were not touched this session
 
 ### Preflight gate
 
-If `mcl-activate.sh` already emitted a `semgrep-missing` or
-`semgrep-unsupported-stack` notice this session, skip the SAST step
-silently. The developer has already been told once; Phase 4.5's
-category-based review below still runs normally.
+If `mcl-activate.sh` already emitted a `semgrep-missing` notice this
+session, skip the SAST step silently (Semgrep is not installed).
+A `semgrep-unsupported-stack` notice does NOT skip the scan — it fires
+at session start on the project as it exists then; if Phase 4
+subsequently created files of a supported type, the scan must still
+run on those files. Phase 4.5's category-based review below still runs
+normally.
 
 ### Findings handling
 
