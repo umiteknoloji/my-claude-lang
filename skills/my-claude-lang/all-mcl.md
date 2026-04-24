@@ -1,0 +1,256 @@
+<mcl_phase name="all-mcl-reference">
+
+# MCL Step Catalog
+
+Machine-readable reference of every MCL step in execution order.
+Used by `mcl check-up` to evaluate session health.
+Each step has a stable STEP-NN ID, a signal (what to look for in logs),
+a Pass condition, and a Skip condition.
+
+**Log sources:**
+- `trace.log` — `<ISO-UTC> | <event> | <args>` (deterministic hook events)
+- `audit.log` — `<datetime> | <event> | <source> | <key=val ...>` (operational events)
+- `state.json` — JSON phase state machine
+- `log/TIMESTAMP.md` — session diary (all tool calls with AskUserQuestion entries)
+- `specs/*.md` — approved spec files
+- `impact/*.md` — Phase 4.6 impact files
+
+---
+
+## PRE-SESSION STEPS
+
+### STEP-01: session-boundary
+**Phase:** Pre-Session | **Description:** mcl-activate.sh detects a new session_id and resets task-scoped state flags (drift_detected, partial_spec, phase_review_state) so stale prior-task state cannot bleed into the new session.
+**Signal:** audit.log contains `set | mcl-activate.sh | field=drift_detected value=false` near the session_start timestamp. state.json `plugin_gate_session` equals the current session_id.
+**Pass:** audit.log has at least one session-boundary reset write (drift_detected or phase_review_state reset to false/null). state.json `last_update` timestamp is close to session_start in trace.log.
+**Skip:** Never skipped — fires on every distinct session_id.
+
+---
+
+### STEP-02: version-banner
+**Phase:** Pre-Session | **Description:** Claude emits the `🌐 MCL X.Y.Z` banner as the first token of every developer-facing response, every turn, no exceptions.
+**Signal:** trace.log first event is `session_start | X.Y.Z`. Session diary first bullet contains the MCL version string.
+**Pass:** trace.log has `session_start` event. Version string appears in the session diary.
+**Skip:** Never skipped — STATIC_CONTEXT rule 1 is absolute.
+
+---
+
+### STEP-03: stack-detection
+**Phase:** Pre-Session | **Description:** mcl-activate.sh calls mcl-stack-detect.sh; result is logged as `stack_detected` event with detected language tags. `ui_flow_active` is set based on whether a UI-capable stack was found.
+**Signal:** trace.log contains `stack_detected | <tags>` on the session's first turn. state.json `ui_flow_active` is `true` or `false` (not null).
+**Pass:** trace.log has `stack_detected` event. state.json `ui_flow_active` is explicitly set.
+**Skip:** Silent skip when the project directory is empty (no source files). In that case trace.log has no `stack_detected` line; state.json `ui_flow_active` defaults to `false`.
+
+---
+
+### STEP-04: plugin-gate
+**Phase:** Pre-Session | **Description:** mcl-activate.sh checks required plugins and binaries. If any are missing, `plugin_gate_active=true` is set in state.json and a HARD-GATED notice blocks mutating tools for the session.
+**Signal:** audit.log line `plugin-gate-activated | mcl-activate.sh | missing=...` on session start if plugins are absent. state.json `plugin_gate_active` is `true` or `false`.
+**Pass:** state.json `plugin_gate_active` is explicitly set (not absent). audit.log records the check outcome.
+**Skip:** Never skipped — check always runs on the first prompt of each session_id.
+
+---
+
+### STEP-05: semgrep-preflight
+**Phase:** Pre-Session | **Description:** mcl-activate.sh calls `mcl-semgrep.sh preflight`; result is one of: `semgrep-ready`, `semgrep-cache-stale`, `semgrep-unsupported-stack`, `semgrep-missing`, or `semgrep-empty-project`. Result is injected as an `mcl_audit` block.
+**Signal:** audit.log line `semgrep-preflight | mcl-activate | <status>` (or the mcl_audit block appears in the session diary's first turn context).
+**Pass:** audit.log has a `semgrep-preflight` entry for this session. OR the `semgrep-unsupported-stack` / `semgrep-missing` mcl_audit block fired (visible in session context — acceptable outcomes).
+**Skip:** Only when `mcl-semgrep.sh` is not present in `hooks/lib/` (incomplete installation).
+
+---
+
+## PHASE 1 STEPS
+
+### STEP-10: intent-gathering
+**Phase:** 1 | **Description:** Claude asks clarifying questions one at a time in the developer's language until all Phase 1 parameters (intent, constraints, success_criteria, context) are clear. No spec is emitted until the summary is ready.
+**Signal:** Session diary shows plain-text question turns before the summary confirmation AskUserQuestion. No `📋 Spec:` block appears before `summary_confirmed` in trace.log.
+**Pass:** `summary_confirmed` event appears in trace.log. No premature spec emission before that event.
+**Skip:** When the developer's first message already contains all parameters — in that case the summary appears immediately with no prior question turns. Still passes if `summary_confirmed` is present.
+
+---
+
+### STEP-11: plugin-suggestions
+**Phase:** 1 | **Description:** On the first developer message, if stack-matched plugins are missing, MCL presents AskUserQuestion suggestions (one per plugin) before Phase 1 gathering starts.
+**Signal:** Session diary first substantive turn references missing plugin names. audit.log may contain `plugin-gate-activated` entries.
+**Pass:** If `plugin_gate_active=true` in state.json, the session diary shows an AskUserQuestion referencing plugin install commands on the first turn.
+**Skip:** When all stack-matched plugins are already installed (`plugin_gate_active=false`), or the project is empty. Correct and expected skip.
+
+---
+
+### STEP-12: test-command-resolution
+**Phase:** 1 | **Description:** After Phase 1 summary approval, MCL resolves the test command via `.mcl/config.json` → auto-detect from manifests → one-off developer question. Resolved value is persisted.
+**Signal:** `.mcl/config.json` contains `test_command` if the developer set it. Session diary shows test command resolution after summary confirmation.
+**Pass:** Either `test_command` is set in `.mcl/config.json`, OR the developer explicitly declined (and TDD flow was skipped). The question was NOT asked before Phase 1 summary approval.
+**Skip:** When `test_command` was already in config or auto-detected from manifests — no developer question needed.
+
+---
+
+### STEP-13: summary-confirmation
+**Phase:** 1 | **Description:** Claude presents the Phase 1 summary as plain text, then immediately calls AskUserQuestion with prefix `MCL X.Y.Z | ` and options Approve/Edit/Cancel. State transitions to Phase 2 on approval.
+**Signal:** trace.log contains `summary_confirmed | approved`. audit.log contains `summary-confirm-approve | stop`.
+**Pass:** trace.log has `summary_confirmed` event followed by `phase_transition | 1 | 2`.
+**Skip:** Never skipped — mandatory before Phase 2.
+
+---
+
+## PHASE 2/3 STEPS
+
+### STEP-20: spec-emission
+**Phase:** 2 | **Description:** Claude emits the visible `📋 Spec:` block with all seven required sections: Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope.
+**Signal:** mcl-stop.sh computes `SPEC_HASH` and writes it to state.json. state.json `current_phase` transitions to 2.
+**Pass:** state.json `spec_hash` is non-null and `current_phase` is 2 or higher.
+**Skip:** Never skipped — the spec is the MCL pipeline's core deliverable.
+
+---
+
+### STEP-20b: partial-spec-recovery
+**Phase:** 2 | **Description:** When a spec was truncated mid-emission (rate-limit or network drop), state.json `partial_spec=true` is set. The activate hook injects a recovery audit block on the next turn forcing a full re-emission.
+**Signal:** state.json `partial_spec=true`. audit.log contains `partial-spec | stop | missing=<sections>`.
+**Pass:** `partial_spec` cleared back to `false` after a complete spec was re-emitted. audit.log shows `partial-spec-cleared`.
+**Skip:** When no truncation occurred (`partial_spec=false` or absent throughout). Correct and expected skip.
+
+---
+
+### STEP-21: phase-1-to-2-transition
+**Phase:** 2 | **Description:** mcl-stop.sh detects the spec block in the assistant turn and transitions `current_phase` from 1 to 2 (`SPEC_REVIEW`).
+**Signal:** trace.log contains `phase_transition | 1 | 2`. state.json `current_phase=2`.
+**Pass:** trace.log has `phase_transition | 1 | 2`.
+**Skip:** Never skipped when a spec was emitted in Phase 1 context.
+
+---
+
+### STEP-22: spec-approval
+**Phase:** 3 | **Description:** After spec emission, Claude calls AskUserQuestion with prefix `MCL X.Y.Z | ` and options Approve/Edit/Cancel. On approval, mcl-stop.sh transitions to Phase 4: `spec_approved=true`, `current_phase=4`.
+**Signal:** trace.log contains `spec_approved | <hash12>` and `phase_transition | 2 | 4` (or `3 | 4`). audit.log contains `approve-via-askuserquestion | stop`. state.json `spec_approved=true`, `current_phase=4`.
+**Pass:** trace.log has both `spec_approved` and `phase_transition` to 4. state.json `spec_approved=true`.
+**Skip:** Never skipped — explicit approval is mandatory before Phase 4.
+
+---
+
+### STEP-23: spec-saved
+**Phase:** 3→4 | **Description:** mcl-spec-save.sh writes the approved spec body to `.mcl/specs/NNNN-slug.md` with YAML frontmatter (spec_id, approved_at, spec_hash, branch, head_at_approval).
+**Signal:** `.mcl/specs/` directory contains at least one `*.md` file. audit.log contains `spec-saved | mcl-spec-save.sh`.
+**Pass:** `.mcl/specs/` contains at least one spec file per approved spec in this session.
+**Skip:** Never skipped — spec save is automatic on every AskUserQuestion approval transition.
+
+---
+
+## PHASE 4 STEPS
+
+### STEP-40: code-writing
+**Phase:** 4 | **Description:** Claude writes code using Write/Edit/MultiEdit tools, all code in English, all communication in the developer's language. Writes stay within the approved spec's scope.
+**Signal:** Session diary shows Write/Edit tool call entries. mcl-stop.sh sets `phase_review_state` via mcl-phase-review-guard.py on code-written turns. state.json `current_phase=4`.
+**Pass:** Session diary contains Write or Edit tool entries after spec approval. state.json `current_phase=4`.
+**Skip:** Never skipped when spec is approved — Phase 4 always writes code.
+
+---
+
+### STEP-41: phase-review-enforcement
+**Phase:** 4→4.5 | **Description:** When code is written without Phase 4.5 dialog starting in the same turn, mcl-stop.sh sets `phase_review_state="pending"` and returns `decision:block` to force Phase 4.5 to start.
+**Signal:** audit.log `phase-review-pending | stop | prev=null phase=4`. trace.log `phase_review_pending | null`. state.json `phase_review_state="pending"`.
+**Pass:** `phase_review_state` transitions from `pending` to `running` when Phase 4.5 starts (same or next turn). The `pending` state should be transient — not stuck.
+**Skip:** When Phase 4.5 starts in the same turn as the last code write (AskUserQuestion called immediately). In this case state goes directly to `running` without `pending`.
+
+---
+
+### STEP-42a: ui-build-phase
+**Phase:** 4a | **Description:** When `ui_flow_active=true`, Claude writes frontend-only code with dummy data, no backend writes. Dev server is started and browser opened. Stops and waits for developer feedback before Phase 4b.
+**Signal:** state.json `ui_sub_phase="BUILD_UI"`. audit.log `ui-flow-enter-build | stop`. trace.log `ui_flow_enabled`.
+**Pass:** trace.log contains `ui_flow_enabled`. state.json `ui_sub_phase` progressed past `BUILD_UI`.
+**Skip:** When `ui_flow_active=false` (no UI stack detected). Standard Phase 4 runs instead. Correct and expected skip.
+
+---
+
+### STEP-42b: ui-review-phase
+**Phase:** 4b | **Description:** Developer provides free-form visual feedback. MCL calls AskUserQuestion with options approve-backend/revise/see-yourself/cancel. Only Approve exits to Phase 4c.
+**Signal:** audit.log `approve-ui-review-via-askuserquestion | stop`. trace.log `ui_review_approved`. state.json `ui_reviewed=true`, `ui_sub_phase="BACKEND"`.
+**Pass:** trace.log contains `ui_review_approved`. state.json `ui_reviewed=true`.
+**Skip:** When `ui_flow_active=false`. Correct and expected skip.
+
+---
+
+### STEP-42c: ui-backend-phase
+**Phase:** 4c | **Description:** Backend path lock lifts after `ui_reviewed=true`. Claude replaces dummy fixtures with real API routes, data layer, async state, error/loading/empty states.
+**Signal:** state.json `ui_sub_phase="BACKEND"`. Session diary shows backend file writes after `ui_review_approved` trace event.
+**Pass:** Session diary contains Write/Edit entries for backend files after `ui_review_approved`.
+**Skip:** When `ui_flow_active=false`. Correct and expected skip.
+
+---
+
+## PHASE 4.5 STEPS
+
+### STEP-450: spec-compliance-precheck
+**Phase:** 4.5 | **Description:** Before the risk scan, Phase 4.5 walks every MUST and SHOULD in the approved spec and surfaces any missing or partial implementations as risks in the sequential dialog.
+**Signal:** AskUserQuestion calls in session diary reference spec MUST/SHOULD requirement text. state.json `phase_review_state="running"`. audit.log `phase-review-running | stop`.
+**Pass:** Either no spec gaps (silent pass — no marker needed), OR AskUserQuestion was called for each gap found. `phase_review_state` progressed to `running`.
+**Skip:** When every MUST/SHOULD was fully implemented in Phase 4 (silent skip — correct behavior). Indistinguishable from STEP-452 skip; both are silent if Phase 4.5 was entirely omitted.
+
+---
+
+### STEP-451: sast-scan
+**Phase:** 4.5 | **Description:** Phase 4.5 invokes `mcl-semgrep.sh scan` on Phase 4 files. HIGH/MEDIUM findings with unambiguous autofix are applied silently; others seed the risk dialog.
+**Signal:** audit.log `semgrep-autofix | phase4-5 | rule=<id> file=<path:line>` for auto-applied fixes. Risk dialog AskUserQuestion entries cite `file:line` from Semgrep output.
+**Pass:** audit.log has `semgrep-autofix` entries for any auto-fixed findings. If no findings, scan ran silently (no marker needed — acceptable).
+**Skip:** When `semgrep-missing` notice fired at session start (Semgrep not installed), OR `semgrep-unsupported-stack` fired AND no supported-language files were written in Phase 4.
+
+---
+
+### STEP-452: risk-dialog
+**Phase:** 4.5 | **Description:** Sequential one-risk-per-turn dialog. Each risk presented via AskUserQuestion with options apply-fix/skip/make-rule. Developer resolves all risks before Phase 4.6.
+**Signal:** audit.log `phase-review-running | stop`. AskUserQuestion entries in session diary with `MCL X.Y.Z | ` prefix and risk-decision options.
+**Pass:** state.json `phase_review_state="running"` appears. Session diary shows at least one risk-decision AskUserQuestion entry.
+**Skip:** When Phase 4.5 found zero risks after honest review (entire phase silently omitted — correct behavior). Detectable by: `phase_review_state` never becomes `"running"` AND `current_phase` advanced to 5.
+
+---
+
+### STEP-453: tdd-re-verify
+**Phase:** 4.5 | **Description:** After all risks are resolved (if Phase 4.5 ran), `mcl-test-runner.sh green-verify` is called if `test_command` is configured.
+**Signal:** Session diary shows a GREEN verify block after risk resolution. audit.log `tdd-rerun-timeout | phase4-5` only on timeout. trace.log may contain a `test-run` event.
+**Pass:** Session diary shows GREEN test runner output before Phase 4.6 begins, OR `test_command` is not configured (no runner invoked — acceptable), OR Phase 4.5 was entirely omitted.
+**Skip:** When Phase 4.5 was entirely omitted (no risks found), OR `test_command` is not configured in `.mcl/config.json`.
+
+---
+
+## PHASE 4.6 STEPS
+
+### STEP-460: impact-detection
+**Phase:** 4.6 | **Description:** Sequential one-impact-per-turn dialog. Each real downstream effect on other project files presented via AskUserQuestion. Developer resolves all impacts.
+**Signal:** AskUserQuestion entries in session diary cite file paths, functions, or API consumers affected by Phase 4 changes. `.mcl/impact/` directory grows by one file per resolved impact.
+**Pass:** `.mcl/impact/` contains `*.md` files written during this session. Session diary shows impact-decision AskUserQuestion entries.
+**Skip:** When Phase 4.6 found zero real downstream impacts (entire phase silently omitted — correct behavior). Detectable by: no `*.md` files in `.mcl/impact/` from this session AND `current_phase=5`.
+
+---
+
+### STEP-461: impact-persistence
+**Phase:** 4.6 | **Description:** After each developer reply, MCL writes a `.mcl/impact/NNNN.md` file with YAML frontmatter: `impact_id`, `presented_at`, `branch`, `head_at_presentation`, `resolution` (skip/fix-applied/rule-captured/open).
+**Signal:** `.mcl/impact/NNNN.md` files exist with valid YAML frontmatter. File mtimes match the session timestamp.
+**Pass:** Each resolved impact has a corresponding `.mcl/impact/` file. YAML frontmatter has `resolution` field set.
+**Skip:** When Phase 4.6 found no impacts (no files written). Correct and expected skip — not a failure.
+
+---
+
+## PHASE 5 STEPS
+
+### STEP-50: spec-compliance-section
+**Phase:** 5 | **Description:** Phase 5 emits Section 1 (mismatches only — ⚠️/❌). If every MUST/SHOULD was satisfied, Section 1 is entirely omitted (no header, no placeholder).
+**Signal:** Session diary either contains a localized "Spec Uyumluluğu" / "Spec Compliance" block with only ⚠️/❌ items, OR Section 1 is absent (all compliant — correct behavior).
+**Pass:** Section 1 is absent (all compliant) OR contains only ⚠️/❌ items. No ✅ lines appear in Section 1.
+**Skip:** When every MUST/SHOULD was satisfied (correct, expected omission — not a failure).
+
+---
+
+### STEP-51: must-test-section
+**Phase:** 5 | **Description:** Phase 5 emits Section 2 wrapped in `!!! <LOCALIZED-MUST-TEST-PHRASE> !!!` with specific items the developer must verify in a running environment.
+**Signal:** Session diary contains the `!!! ... !!!` wrapped localized must-test header with at least one test item.
+**Pass:** Session diary contains `!!!` markers wrapping the must-test header. At least one test item is listed beneath it.
+**Skip:** Never skipped — Section 2 cannot be empty by definition: if Phase 4 wrote code, there is always something to test.
+
+---
+
+### STEP-52: process-trace-section
+**Phase:** 5 | **Description:** Phase 5 reads `.mcl/trace.log` via the Read tool and renders Section 3 as a localized bullet list of hook-emitted events in chronological order.
+**Signal:** Session diary contains localized "Süreç İzlemesi" / "Process Trace" / equivalent section. `.mcl/trace.log` exists and is non-empty.
+**Pass:** Section 3 is present in session diary if trace.log is non-empty. Events appear in chronological order.
+**Skip:** When `.mcl/trace.log` is missing or empty. Correct and expected skip.
+
+</mcl_phase>
