@@ -79,14 +79,29 @@ AskUserQuestion({
    hook flips state to Phase 4 (`approve-via-askuserquestion` audit).
 9. After the tool_result returns an approve-family option — and BEFORE
    Phase 4 code writing begins — resolve the test command (STEP-24).
-   Now that the spec is in context, the developer can give a meaningful
-   answer about test strategy:
+   Resolution priority (first non-empty result wins):
 
    a. Check config: `bash ~/.claude/hooks/lib/mcl-config.sh get test_command`.
       Non-empty → resolved, proceed to Phase 4.
    b. Auto-detect: `bash ~/.claude/hooks/lib/mcl-test-runner.sh detect`.
       Non-empty → resolved, proceed to Phase 4.
-   c. Both empty → ask the developer ONE question in their language:
+   c. Infer from the approved spec's Technical Approach section.
+      Read the stack/framework named there and map to a canonical test command:
+      - Node.js + Jest → `npx jest`
+      - Node.js + Vitest → `npx vitest run`
+      - Node.js (no explicit runner) → `npm test`
+      - Python + pytest → `pytest`
+      - Python + unittest → `python -m unittest`
+      - Go → `go test ./...`
+      - Ruby / Rails → `bundle exec rspec`
+      - PHP + PHPUnit → `./vendor/bin/phpunit`
+      - Java + Maven → `mvn test`
+      - Java + Gradle → `./gradlew test`
+      - Rust → `cargo test`
+      - Swift → `swift test`
+      If a confident single mapping exists → use it silently, proceed to Phase 4.
+      If the spec names a stack with multiple valid runner options → fall through to d.
+   d. Still unresolved → ask the developer ONE question in their language:
 
       > Turkish: *TDD her Phase 4'te çalışıyor. Bu projede testler
       > hangi komutla koşuyor? ('yok' dersen TDD bu session için
@@ -102,7 +117,7 @@ AskUserQuestion({
         silently falls through to non-TDD execution.
 
    Skip this step entirely when:
-   - Auto-detect or config already resolved the command.
+   - Config, auto-detect, or spec inference already resolved the command.
    - Mid-session (Phase 4 / 4.5 / 4.6 / 5) is already in progress.
 
 </mcl_phase>

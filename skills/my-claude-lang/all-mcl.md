@@ -128,10 +128,10 @@ a Pass condition, and a Skip condition.
 ---
 
 ### STEP-24: test-command-resolution
-**Phase:** 3→4 | **Description:** After spec approval and spec-save, MCL resolves the test command via `.mcl/config.json` → auto-detect from manifests → one-off developer question. Positioned here (not Phase 1) so the developer can give a meaningful answer with the spec already in context.
-**Signal:** `.mcl/config.json` contains `test_command` if the developer set it. Session diary shows test command resolution question after `spec_approved` trace event and before first Phase 4 code write.
-**Pass:** Either `test_command` is set in `.mcl/config.json`, OR the developer explicitly declined (TDD flow skipped for session). The question was NOT asked before spec approval.
-**Skip:** When `test_command` was already in config or auto-detected from manifests — no developer question needed.
+**Phase:** 3→4 | **Description:** After spec approval and spec-save, MCL resolves the test command via four priority steps: (1) `.mcl/config.json`, (2) auto-detect from manifests, (3) infer from the approved spec's Technical Approach section (e.g. "pytest" for Python+pytest, "go test ./..." for Go), (4) one-off developer question only if still unresolved. Positioned after spec approval so the spec's stack information can inform the inference.
+**Signal:** `.mcl/config.json` contains `test_command` if the developer set it. Session diary shows test command resolution (question or silent inference) after `spec_approved` trace event and before first Phase 4 code write.
+**Pass:** Either `test_command` is resolved (config / auto-detect / spec inference), OR the developer explicitly declined (TDD flow skipped for session). The question was NOT asked before spec approval.
+**Skip:** When `test_command` was already in config, auto-detected from manifests, or confidently inferred from spec — no developer question needed.
 
 ---
 
