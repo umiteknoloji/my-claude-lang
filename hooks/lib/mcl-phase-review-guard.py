@@ -12,7 +12,7 @@ stdout: JSON {"code_written": bool, "askuq_present": bool}
 import json
 import sys
 
-CODE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit", "Bash"}
+CODE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
 
 def last_assistant_tool_uses(path: str) -> list:
