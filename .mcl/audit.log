@@ -234,3 +234,101 @@
 2026-04-24 20:45:07 | semgrep-preflight | mcl-activate | unsupported-stack
 2026-04-24 20:45:53 | semgrep-preflight | mcl-activate | unsupported-stack
 2026-04-24 20:45:58 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 20:46:21 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 20:46:22 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 20:54:20 | set | mcl-activate.sh | field=drift_detected value=false
+2026-04-24 20:54:20 | set | mcl-activate.sh | field=drift_hash value=null
+2026-04-24 20:54:20 | set | mcl-activate.sh | field=partial_spec value=false
+2026-04-24 20:54:20 | set | mcl-activate.sh | field=partial_spec_body_sha value=null
+2026-04-24 20:54:20 | set | mcl-activate.sh | field=phase_review_state value=null
+2026-04-24 20:54:20 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 20:54:21 | set | mcl-activate.sh | field=ui_flow_active value=false
+2026-04-24 20:54:21 | ui-flow-autodetect | mcl-activate.sh | ui_capable=false
+2026-04-24 20:54:21 | set | mcl-activate.sh | field=plugin_gate_active value=false
+2026-04-24 20:54:21 | set | mcl-activate.sh | field=plugin_gate_missing value=[]
+2026-04-24 20:54:21 | set | mcl-activate.sh | field=plugin_gate_session value=08e89c95-fbd4-4328-9cdb-d1999699cf85
+2026-04-24 21:07:31 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 21:11:46 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 21:12:14 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 21:12:14 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 21:26:10 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 21:26:47 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 21:26:47 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 21:26:47 | set | mcl-stop.sh | field=drift_detected value=false
+2026-04-24 21:26:47 | set | mcl-stop.sh | field=drift_hash value=null
+2026-04-24 21:26:47 | drift-auto-cleared | stop | approved=6c751c82b24b
+2026-04-24 21:50:57 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 22:12:47 | set | mcl-activate.sh | field=drift_detected value=false
+2026-04-24 22:12:48 | set | mcl-activate.sh | field=drift_hash value=null
+2026-04-24 22:12:48 | set | mcl-activate.sh | field=partial_spec value=false
+2026-04-24 22:12:48 | set | mcl-activate.sh | field=partial_spec_body_sha value=null
+2026-04-24 22:12:48 | set | mcl-activate.sh | field=phase_review_state value=null
+2026-04-24 22:12:48 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 22:12:48 | set | mcl-activate.sh | field=ui_flow_active value=false
+2026-04-24 22:12:48 | ui-flow-autodetect | mcl-activate.sh | ui_capable=false
+2026-04-24 22:12:49 | set | mcl-activate.sh | field=plugin_gate_active value=false
+2026-04-24 22:12:49 | set | mcl-activate.sh | field=plugin_gate_missing value=[]
+2026-04-24 22:12:49 | set | mcl-activate.sh | field=plugin_gate_session value=s1
+2026-04-24 22:12:52 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 22:13:14 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 22:13:14 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 23:13:10 | set | mcl-activate.sh | field=drift_detected value=false
+2026-04-24 23:13:11 | set | mcl-activate.sh | field=drift_hash value=null
+2026-04-24 23:13:11 | set | mcl-activate.sh | field=partial_spec value=false
+2026-04-24 23:13:11 | set | mcl-activate.sh | field=partial_spec_body_sha value=null
+2026-04-24 23:13:11 | set | mcl-activate.sh | field=phase_review_state value=null
+2026-04-24 23:13:11 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:13:11 | set | mcl-activate.sh | field=ui_flow_active value=false
+2026-04-24 23:13:11 | ui-flow-autodetect | mcl-activate.sh | ui_capable=false
+2026-04-24 23:13:12 | set | mcl-activate.sh | field=plugin_gate_active value=false
+2026-04-24 23:13:12 | set | mcl-activate.sh | field=plugin_gate_missing value=[]
+2026-04-24 23:13:12 | set | mcl-activate.sh | field=plugin_gate_session value=08e89c95-fbd4-4328-9cdb-d1999699cf85
+2026-04-24 23:13:21 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 23:13:21 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 23:13:53 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:14:02 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 23:14:02 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 23:14:03 | set | mcl-stop.sh | field=drift_detected value=false
+2026-04-24 23:14:03 | set | mcl-stop.sh | field=drift_hash value=null
+2026-04-24 23:14:03 | drift-auto-cleared | stop | approved=6c751c82b24b
+2026-04-24 23:15:10 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:15:16 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 23:15:16 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 23:15:53 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:16:29 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 23:16:42 | drift-warn | pre-tool | tool=Edit phase=4
+2026-04-24 23:16:48 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:16:56 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 23:16:56 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 23:16:57 | set | mcl-stop.sh | field=drift_detected value=false
+2026-04-24 23:16:57 | set | mcl-stop.sh | field=drift_hash value=null
+2026-04-24 23:16:57 | drift-auto-cleared | stop | approved=6c751c82b24b
+2026-04-24 23:18:21 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:18:44 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 23:18:44 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 23:25:15 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:25:42 | set | mcl-stop.sh | field=drift_detected value=true
+2026-04-24 23:25:43 | set | mcl-stop.sh | field=drift_hash value="5b4290d3724617efe5002a803bfa5ff7d47c7c4424a4efc51006eb7913f2f550"
+2026-04-24 23:25:43 | set | mcl-stop.sh | field=drift_detected value=false
+2026-04-24 23:25:43 | set | mcl-stop.sh | field=drift_hash value=null
+2026-04-24 23:25:43 | drift-auto-cleared | stop | approved=6c751c82b24b
+2026-04-24 23:31:37 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:44:20 | set | mcl-activate.sh | field=partial_spec value=false
+2026-04-24 23:44:20 | set | mcl-activate.sh | field=partial_spec_body_sha value=null
+2026-04-24 23:44:20 | set | mcl-activate.sh | field=phase_review_state value=null
+2026-04-24 23:44:20 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:44:21 | set | mcl-activate.sh | field=ui_flow_active value=false
+2026-04-24 23:44:21 | ui-flow-autodetect | mcl-activate.sh | ui_capable=false
+2026-04-24 23:44:21 | set | mcl-activate.sh | field=plugin_gate_active value=false
+2026-04-24 23:44:21 | set | mcl-activate.sh | field=plugin_gate_missing value=[]
+2026-04-24 23:44:21 | set | mcl-activate.sh | field=plugin_gate_session value=s
+2026-04-24 23:44:24 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:45:37 | set | mcl-activate.sh | field=partial_spec value=false
+2026-04-24 23:45:37 | set | mcl-activate.sh | field=partial_spec_body_sha value=null
+2026-04-24 23:45:37 | set | mcl-activate.sh | field=phase_review_state value=null
+2026-04-24 23:45:37 | semgrep-preflight | mcl-activate | unsupported-stack
+2026-04-24 23:45:38 | set | mcl-activate.sh | field=ui_flow_active value=false
+2026-04-24 23:45:38 | ui-flow-autodetect | mcl-activate.sh | ui_capable=false
+2026-04-24 23:45:38 | set | mcl-activate.sh | field=plugin_gate_active value=false
+2026-04-24 23:45:38 | set | mcl-activate.sh | field=plugin_gate_missing value=[]
+2026-04-24 23:45:38 | set | mcl-activate.sh | field=plugin_gate_session value=s2

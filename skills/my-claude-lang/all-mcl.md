@@ -20,9 +20,9 @@ a Pass condition, and a Skip condition.
 ## PRE-SESSION STEPS
 
 ### STEP-01: session-boundary
-**Phase:** Pre-Session | **Description:** mcl-activate.sh detects a new session_id and resets task-scoped state flags (drift_detected, partial_spec, phase_review_state) so stale prior-task state cannot bleed into the new session.
-**Signal:** audit.log contains `set | mcl-activate.sh | field=drift_detected value=false` near the session_start timestamp. state.json `plugin_gate_session` equals the current session_id.
-**Pass:** audit.log has at least one session-boundary reset write (drift_detected or phase_review_state reset to false/null). state.json `last_update` timestamp is close to session_start in trace.log.
+**Phase:** Pre-Session | **Description:** mcl-activate.sh detects a new session_id and resets task-scoped state flags (partial_spec, phase_review_state) so stale prior-task state cannot bleed into the new session.
+**Signal:** audit.log contains `set | mcl-activate.sh | field=phase_review_state value=null` near the session_start timestamp. state.json `plugin_gate_session` equals the current session_id.
+**Pass:** audit.log has at least one session-boundary reset write (partial_spec or phase_review_state reset to false/null). state.json `last_update` timestamp is close to session_start in trace.log.
 **Skip:** Never skipped — fires on every distinct session_id.
 
 ---
@@ -212,10 +212,10 @@ a Pass condition, and a Skip condition.
 ---
 
 ### STEP-454: comprehensive-testing
-**Phase:** 4.5 | **Description:** After TDD re-verify passes, MCL checks that Phase 4 code is covered by four test categories: unit tests (individual functions/components), integration tests (cross-module interactions, API contracts), E2E tests (user flows — if UI stack active), load/stress tests (throughput-sensitive paths — if applicable). Missing categories are surfaced as risks in the sequential dialog.
-**Signal:** Session diary shows comprehensive test coverage AskUserQuestion turns after TDD re-verify. Risk entries cite specific uncovered test category and affected code path.
-**Pass:** All applicable test categories are covered, OR each missing category was surfaced as a risk and developer decided skip/fix/rule. Silently omitted when all categories are adequately covered.
-**Skip:** When Phase 4.5 was entirely omitted (no risks found), OR `test_command` is not configured, OR all four test categories are already covered by existing tests.
+**Phase:** 4.5 | **Description:** After TDD re-verify passes, MCL checks that Phase 4 code is covered by four test categories: unit tests (individual functions/components), integration tests (cross-module interactions, API contracts), E2E tests (user flows — if UI stack active), load/stress tests (throughput-sensitive paths — if applicable). When `test_command` is configured, Claude **writes** missing test files directly as Phase 4 code actions (not AskUserQuestion turns), then runs green-verify; RED surfaces as a new risk. When `test_command` is NOT configured, missing categories are documented in a single risk-dialog turn (add now / skip / make-rule).
+**Signal:** When test_command configured: session diary shows Write/Edit entries for test files after TDD re-verify, followed by a green-verify run. When test_command not configured: session diary shows a single AskUserQuestion citing missing test categories.
+**Pass:** All applicable test categories are covered, OR missing categories were either written (test_command present) or surfaced as a risk turn (test_command absent) and developer decided skip/fix/rule. Silently omitted when all categories are already covered.
+**Skip:** When Phase 4.5 was entirely omitted (no risks found), OR all four test categories are already covered by existing tests.
 
 ---
 

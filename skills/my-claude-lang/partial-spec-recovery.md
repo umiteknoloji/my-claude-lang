@@ -105,23 +105,6 @@ clears the flag — this is a deliberate exception to the
 **warn-once-then-execute** rule. Until the developer sees a fully
 recovered spec, every turn must carry the recovery instruction.
 
-## Interaction With Drift-Reapproval
-
-Partial-spec recovery and drift-reapproval are **distinct flows**:
-
-- **Drift**: `spec_hash` mismatch AFTER approval — a new divergent
-  spec needs re-approval.
-- **Partial**: spec body structurally truncated BEFORE approval —
-  the spec itself was never fully emitted.
-
-They do not compose. The Stop-hook order is: extract
-SPEC_HASH → partial-spec check → spec-hash transitions →
-AskUserQuestion approval transition. A turn that is simultaneously
-partial AND drifted is treated as partial first (the flag blocks
-the approval transition); the drift state stays raised and clears
-only after the developer approves a structurally-complete
-re-emitted spec via AskUserQuestion in a later turn.
-
 ## Anti-Patterns
 
 - **Auto-retry / auto-re-emit** without developer approval. Recovery

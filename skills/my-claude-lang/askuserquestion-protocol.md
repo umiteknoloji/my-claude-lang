@@ -39,7 +39,6 @@ prompts are forbidden for these moments.
 | 9 | `mcl-update` confirmation | After status report, before running `git pull && bash setup.sh` | "Güncelle" / "Update" / … |
 | 10 | `mcl-finish` confirmation | Before writing the checkpoint file | "Finalize et" / "Finalize" / … |
 | 11 | Pasted-CLI passthrough | When pasted command hits a genuinely ambiguous parameter beyond defaults | Surgical option list for the specific parameter |
-| 12 | Drift resolution | When `drift_detected=true` in state (activate hook emits DRIFT_NOTICE) | Two-path options: "Yeni spec'i onayla" (re-approve) OR "Onaylı spec'e geri dön" (revert) |
 
 ## Does NOT apply to (stay as plain text)
 
@@ -96,8 +95,7 @@ non-approve option as a "do not advance state" signal and logs
   `spec_approved=true`, `current_phase=4`, emits
   `approve-via-askuserquestion` audit entry. While `partial_spec=true`
   the tool_result is IGNORED (`askq-ignored-partial-spec` audit).
-- For drift re-approval (previous state had `drift_detected=true`),
-  clears drift with `drift-reapproved | via=askuserquestion` audit.
+
 - Never transitions on a text-only `yes` without the paired tool_result.
 
 ## Malformed-prefix handling

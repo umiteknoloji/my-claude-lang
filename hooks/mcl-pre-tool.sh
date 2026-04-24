@@ -9,12 +9,7 @@
 #   current_phase >= 4
 #   spec_approved == true
 #
-# Since 6.0.0: drift_detected no longer denies tools — it only emits a
-# `drift-warn` audit entry and passes the tool through. The activate
-# hook is responsible for surfacing the drift to the developer on their
-# NEXT turn via a DRIFT_NOTICE block; resolution is a fresh
-# AskUserQuestion approval call, not a hook-level block.
-#
+
 # Everything else (Read, Glob, Grep, WebFetch, WebSearch, TodoWrite,
 # Bash, Task, ...) passes through unchanged. Bash and Task are handled
 # by the prose layer in v1.
@@ -160,7 +155,6 @@ esac
 # Mutating tool attempted — consult state.
 CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
 SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
-DRIFT_DETECTED="$(mcl_state_get drift_detected 2>/dev/null)"
 PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
 
 # Default everything if state missing.
@@ -295,11 +289,6 @@ except Exception:
   fi
 fi
 
-# Drift is now warn-only (since 6.0.0): emit audit entry and fall through.
-if [ "$DRIFT_DETECTED" = "true" ]; then
-  mcl_audit_log "drift-warn" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE}"
-  mcl_debug_log "pre-tool" "drift-warn" "tool=${TOOL_NAME} phase=${CURRENT_PHASE}"
-fi
 
 REASON=""
 if [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null; then

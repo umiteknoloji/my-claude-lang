@@ -7,14 +7,7 @@
 #   - phase 1 → 2 (SPEC_REVIEW)      : first time a spec block appears
 #   - phase 2/3 → 4 (EXECUTE)        : AskUserQuestion spec-approval call
 #                                      returned an "Approve" family option
-#   - drift_detected=true flag       : different hash appears while
-#                                      spec_approved=true (warn-only in
-#                                      PreToolUse; visible in activate
-#                                      hook DRIFT_NOTICE)
-#   - drift_detected=false           : developer reverted to the approved
-#                                      body (hash equals stored spec_hash)
-#                                      OR re-approved via AskUserQuestion
-#
+
 # Never regresses phase. Never overwrites an approved spec's hash
 # without an explicit new AskUserQuestion approval.
 #
@@ -347,7 +340,6 @@ if [ -z "$SPEC_HASH" ] && [ -z "$ASKQ_INTENT" ]; then
 fi
 CURRENT_HASH="$(mcl_state_get spec_hash)"
 SPEC_APPROVED="$(mcl_state_get spec_approved)"
-PRE_DRIFT_DETECTED="$(mcl_state_get drift_detected)"
 
 # --- Spec-hash transitions (when a fresh spec is in this turn) ---
 if [ -n "$SPEC_HASH" ]; then
@@ -369,25 +361,7 @@ if [ -n "$SPEC_HASH" ]; then
       fi
       ;;
     4|5)
-      if [ "$SPEC_APPROVED" = "true" ] && [ -n "$CURRENT_HASH" ]; then
-        if [ "$CURRENT_HASH" = "$SPEC_HASH" ]; then
-          # Same body as the approved spec — if drift was flagged, clear.
-          if [ "$PRE_DRIFT_DETECTED" = "true" ]; then
-            mcl_state_set drift_detected false
-            mcl_state_set drift_hash null
-            mcl_audit_log "drift-reverted" "stop" "hash=${SPEC_HASH:0:12}"
-            mcl_debug_log "stop" "drift-reverted" "hash=${SPEC_HASH:0:12}"
-          else
-            mcl_debug_log "stop" "post-approval-noop" "phase=${CURRENT_PHASE} hash=${SPEC_HASH:0:12}"
-          fi
-        else
-          mcl_state_set drift_detected true
-          mcl_state_set drift_hash "\"$SPEC_HASH\""
-          mcl_debug_log "stop" "drift-detected" "approved=${CURRENT_HASH:0:12} new=${SPEC_HASH:0:12}"
-        fi
-      else
-        mcl_debug_log "stop" "post-approval-noop" "phase=${CURRENT_PHASE} hash=${SPEC_HASH:0:12}"
-      fi
+      mcl_debug_log "stop" "post-approval-noop" "phase=${CURRENT_PHASE} hash=${SPEC_HASH:0:12}"
       ;;
   esac
 fi
@@ -404,14 +378,6 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
   elif ! _mcl_is_approve_option "$ASKQ_SELECTED"; then
     mcl_audit_log "askq-non-approve" "stop" "phase=${CURRENT_PHASE} selected=${ASKQ_SELECTED}"
     mcl_debug_log "stop" "askq-non-approve" "phase=${CURRENT_PHASE} selected=${ASKQ_SELECTED}"
-  elif [ "$PRE_DRIFT_DETECTED" = "true" ] && [ -n "$CURRENT_HASH" ]; then
-    # Drift re-approval via AskUserQuestion: the recorded spec_hash was
-    # just updated above if a new spec was emitted this turn; clear drift.
-    mcl_state_set drift_detected false
-    mcl_state_set drift_hash null
-    mcl_audit_log "drift-reapproved" "stop" "hash=${CURRENT_HASH:0:12} via=askuserquestion"
-    mcl_debug_log "stop" "drift-reapproved" "hash=${CURRENT_HASH:0:12}"
-    bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
   elif [ "$SPEC_APPROVED" = "true" ] || [ "$CURRENT_PHASE" -ge 4 ] 2>/dev/null; then
     mcl_debug_log "stop" "askq-idempotent" "phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
   elif [ -z "$CURRENT_HASH" ]; then
@@ -512,19 +478,6 @@ if [ -f "$_STOP_LOG_LIB" ] && [ -f "$_STOP_TURN_SCRIPT" ] \
   source "$_STOP_LOG_LIB"
   TURN_MSG="$(python3 "$_STOP_TURN_SCRIPT" "$TRANSCRIPT_PATH" 2>/dev/null)"
   [ -n "$TURN_MSG" ] && mcl_log_append "$TURN_MSG"
-fi
-
-# Auto-clear drift after one warning turn (warn-once model, since 7.1.3).
-# The developer saw the DRIFT_NOTICE in this turn's activate-hook output;
-# no AskUserQuestion required. If an explicit re-approval already cleared
-# drift above, _STILL_DRIFT will be false and this block is a no-op.
-if [ "$PRE_DRIFT_DETECTED" = "true" ]; then
-  _STILL_DRIFT="$(mcl_state_get drift_detected 2>/dev/null)"
-  if [ "$_STILL_DRIFT" = "true" ]; then
-    mcl_state_set drift_detected false >/dev/null 2>&1 || true
-    mcl_state_set drift_hash null >/dev/null 2>&1 || true
-    mcl_audit_log "drift-auto-cleared" "stop" "approved=${CURRENT_HASH:0:12}"
-  fi
 fi
 
 exit 0

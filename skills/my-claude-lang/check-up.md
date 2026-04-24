@@ -120,7 +120,7 @@ Write the following Markdown to `STATE_DIR/log/hc.md`
 
 ### STEP-01: session-boundary
 **Durum:** ✅ PASS
-**Kanıt / Evidence:** audit.log line: "set | mcl-activate.sh | field=drift_detected value=false"
+**Kanıt / Evidence:** audit.log line: "set | mcl-activate.sh | field=phase_review_state value=null"
 **Not:** (any nuance)
 
 [one block per step]

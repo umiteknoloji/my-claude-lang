@@ -1,5 +1,9 @@
 <mcl_phase name="phase4-5-risk-review">
 
+> ⚠️ SYNC NOTE: The active Phase 4.5 rule lives in `mcl-activate.sh` STATIC_CONTEXT
+> (the `<mcl_phase name="phase4-5-risk-review">` block). This file is the extended
+> reference. When updating Phase 4.5 behavior, BOTH must be updated together.
+
 # Phase 4.5: Post-Code Risk Review
 
 **`superpowers` (tier-A, ambient):** active throughout this phase — no explicit dispatch point; its methodology layer applies as a behavioral prior.
@@ -239,16 +243,22 @@ Phase 4.5 risks.
 | **E2E tests** | UI stack is active (`ui_flow_active=true`) and new user flows were added |
 | **Load/stress tests** | Throughput-sensitive paths (queues, bulk processing, high-concurrency endpoints) |
 
-For each uncovered category: surface as a risk turn in the sequential
-dialog with a specific suggestion for what should be written (not a
-generic "add tests"). Developer may apply-fix / skip / make-rule.
+**Mechanic (when `test_command` is configured):**
+For each uncovered category, Claude **writes the missing test file(s)**
+as a Phase 4 code action — not a dialog turn. After writing, runs
+`mcl-test-runner.sh green-verify`. If RED → surfaces failing test as a
+new Phase 4.5 risk in the sequential dialog.
+
+**Mechanic (when `test_command` is NOT configured):**
+Documents missing categories in a single Phase 4.5 risk turn so the
+developer knows what to add later. They choose: add tests now / skip /
+make-rule.
 
 If all applicable categories are adequately covered, omit this step
 entirely (empty-section-omission rule).
 
 Skip STEP-454 when:
 - Phase 4.5 was entirely omitted (no risks found).
-- `test_command` is not configured in `.mcl/config.json`.
 - All four applicable categories are already covered by existing tests.
 
 ## Handoff to Phase 4.6

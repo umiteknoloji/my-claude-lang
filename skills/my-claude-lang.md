@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 7.1.6` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 7.1.7` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## AskUserQuestion Protocol (since 6.0.0)
@@ -63,9 +63,9 @@ For full AskUserQuestion rules, read `my-claude-lang/askuserquestion-protocol.md
 
 Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
-drift resolution, partial-spec recovery, mcl-update, mcl-finish, pasted-CLI
+partial-spec recovery, mcl-update, mcl-finish, pasted-CLI
 passthrough — uses Claude Code's native `AskUserQuestion` tool with
-`question` prefixed `MCL 7.1.6 | `. The Stop hook parses tool_use/tool_result
+`question` prefixed `MCL 7.1.7 | `. The Stop hook parses tool_use/tool_result
 pairs to advance MCL state. The legacy `✅ MCL APPROVED` text marker is
 DEAD in 6.0.0 — Claude must never emit it; it carries no state effect.
 
@@ -200,7 +200,7 @@ For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
 2. If ANY parameter unclear → ask questions ONE AT A TIME as plain text
    (open-ended gather is NOT AskUserQuestion)
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 7.1.6 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 7.1.7 | <localized-is-this-correct>",
    options: ["<approve-family-in-language>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns an approve-family option does the
    Stop hook advance state — THEN call Phase 2. Not before.
@@ -225,7 +225,7 @@ processes the request AS IF a native English engineer wrote it.
 4. Include: Objective, MUST/SHOULD requirements, Acceptance Criteria,
    Edge Cases, Technical Approach, Out of Scope
 5. After the spec, explain in developer's language what it says
-6. Call `AskUserQuestion({question: "MCL 7.1.6 | <localized-spec-approval
+6. Call `AskUserQuestion({question: "MCL 7.1.7 | <localized-spec-approval
    e.g. Bu spec'i onaylıyor musun? / Approve this spec?>", options:
    [{label: "<approve-verb-only>", description: "..."},
     {label: "<edit-verb>",         description: "..."},
@@ -250,7 +250,7 @@ For full verification rules, read `my-claude-lang/phase3-verify.md`
 
 Phase 3 is COMBINED with Phase 2 — when the spec is shown, the developer
 verifies it. The explanation after the spec IS Phase 3, followed by the
-Phase 3 `AskUserQuestion` call with prefix `MCL 7.1.6 | `.
+Phase 3 `AskUserQuestion` call with prefix `MCL 7.1.7 | `.
 Developer must understand AND pick an approve-family option in the
 tool_result → then Phase 4 begins (Stop hook flips state).
 
@@ -274,7 +274,7 @@ the `spec-history` constraint).
 All code in English. All communication in developer's language.
 This INCLUDES Phase 4 execution prose: every inter-tool status line
 ("Setup smoke PASS"), progress update ("Now commit + push"), closing
-sentence ("MCL 7.1.6 shipped"), release summary, and bullet-list
+sentence ("MCL 7.1.7 shipped"), release summary, and bullet-list
 header ("Changes:") is rendered in the developer's language.
 English-only survives ONLY in file paths, commit SHAs, command
 names (`git push`, `npm run dev`), code fragments, and fixed
@@ -425,7 +425,7 @@ producing the 3-section Verification Report after Phase 4.5 finishes.
 For full check-up rules, read `my-claude-lang/check-up.md`
 For the MCL step catalog (all 28 steps), read `my-claude-lang/all-mcl.md`
 
-Introduced in MCL 7.1.6. The developer types the literal keyword
+Introduced in MCL 7.1.7. The developer types the literal keyword
 `mcl check-up` to evaluate whether every MCL step ran correctly in the
 current session. The command reads `trace.log`, `audit.log`, `state.json`,
 and the session diary; evaluates each step in `all-mcl.md` against the
