@@ -77,15 +77,7 @@ a Pass condition, and a Skip condition.
 
 ---
 
-### STEP-12: test-command-resolution
-**Phase:** 1 | **Description:** After Phase 1 summary approval, MCL resolves the test command via `.mcl/config.json` → auto-detect from manifests → one-off developer question. Resolved value is persisted.
-**Signal:** `.mcl/config.json` contains `test_command` if the developer set it. Session diary shows test command resolution after summary confirmation.
-**Pass:** Either `test_command` is set in `.mcl/config.json`, OR the developer explicitly declined (and TDD flow was skipped). The question was NOT asked before Phase 1 summary approval.
-**Skip:** When `test_command` was already in config or auto-detected from manifests — no developer question needed.
-
----
-
-### STEP-13: summary-confirmation
+### STEP-12: summary-confirmation
 **Phase:** 1 | **Description:** Claude presents the Phase 1 summary as plain text, then immediately calls AskUserQuestion with prefix `MCL X.Y.Z | ` and options Approve/Edit/Cancel. State transitions to Phase 2 on approval.
 **Signal:** trace.log contains `summary_confirmed | approved`. audit.log contains `summary-confirm-approve | stop`.
 **Pass:** trace.log has `summary_confirmed` event followed by `phase_transition | 1 | 2`.
@@ -135,33 +127,25 @@ a Pass condition, and a Skip condition.
 
 ---
 
+### STEP-24: test-command-resolution
+**Phase:** 3→4 | **Description:** After spec approval and spec-save, MCL resolves the test command via `.mcl/config.json` → auto-detect from manifests → one-off developer question. Positioned here (not Phase 1) so the developer can give a meaningful answer with the spec already in context.
+**Signal:** `.mcl/config.json` contains `test_command` if the developer set it. Session diary shows test command resolution question after `spec_approved` trace event and before first Phase 4 code write.
+**Pass:** Either `test_command` is set in `.mcl/config.json`, OR the developer explicitly declined (TDD flow skipped for session). The question was NOT asked before spec approval.
+**Skip:** When `test_command` was already in config or auto-detected from manifests — no developer question needed.
+
+---
+
 ## PHASE 4 STEPS
 
-### STEP-40: code-writing
-**Phase:** 4 | **Description:** Claude writes code using Write/Edit/MultiEdit tools, all code in English, all communication in the developer's language. Writes stay within the approved spec's scope.
-**Signal:** Session diary shows Write/Edit tool call entries. mcl-stop.sh sets `phase_review_state` via mcl-phase-review-guard.py on code-written turns. state.json `current_phase=4`.
-**Pass:** Session diary contains Write or Edit tool entries after spec approval. state.json `current_phase=4`.
-**Skip:** Never skipped when spec is approved — Phase 4 always writes code.
-
----
-
-### STEP-41: phase-review-enforcement
-**Phase:** 4→4.5 | **Description:** When code is written without Phase 4.5 dialog starting in the same turn, mcl-stop.sh sets `phase_review_state="pending"` and returns `decision:block` to force Phase 4.5 to start.
-**Signal:** audit.log `phase-review-pending | stop | prev=null phase=4`. trace.log `phase_review_pending | null`. state.json `phase_review_state="pending"`.
-**Pass:** `phase_review_state` transitions from `pending` to `running` when Phase 4.5 starts (same or next turn). The `pending` state should be transient — not stuck.
-**Skip:** When Phase 4.5 starts in the same turn as the last code write (AskUserQuestion called immediately). In this case state goes directly to `running` without `pending`.
-
----
-
-### STEP-42a: ui-build-phase
-**Phase:** 4a | **Description:** When `ui_flow_active=true`, Claude writes frontend-only code with dummy data, no backend writes. Dev server is started and browser opened. Stops and waits for developer feedback before Phase 4b.
+### STEP-40a: ui-build-phase
+**Phase:** 4a | **Description:** When `ui_flow_active=true`, Claude writes frontend-only code with dummy data, no backend writes. Dev server is started and browser opened. Stops and waits for developer feedback before Phase 4b. UI phases run first so visual scaffolding is reviewed before backend logic is written.
 **Signal:** state.json `ui_sub_phase="BUILD_UI"`. audit.log `ui-flow-enter-build | stop`. trace.log `ui_flow_enabled`.
 **Pass:** trace.log contains `ui_flow_enabled`. state.json `ui_sub_phase` progressed past `BUILD_UI`.
 **Skip:** When `ui_flow_active=false` (no UI stack detected). Standard Phase 4 runs instead. Correct and expected skip.
 
 ---
 
-### STEP-42b: ui-review-phase
+### STEP-40b: ui-review-phase
 **Phase:** 4b | **Description:** Developer provides free-form visual feedback. MCL calls AskUserQuestion with options approve-backend/revise/see-yourself/cancel. Only Approve exits to Phase 4c.
 **Signal:** audit.log `approve-ui-review-via-askuserquestion | stop`. trace.log `ui_review_approved`. state.json `ui_reviewed=true`, `ui_sub_phase="BACKEND"`.
 **Pass:** trace.log contains `ui_review_approved`. state.json `ui_reviewed=true`.
@@ -169,7 +153,7 @@ a Pass condition, and a Skip condition.
 
 ---
 
-### STEP-42c: ui-backend-phase
+### STEP-40c: ui-backend-phase
 **Phase:** 4c | **Description:** Backend path lock lifts after `ui_reviewed=true`. Claude replaces dummy fixtures with real API routes, data layer, async state, error/loading/empty states.
 **Signal:** state.json `ui_sub_phase="BACKEND"`. Session diary shows backend file writes after `ui_review_approved` trace event.
 **Pass:** Session diary contains Write/Edit entries for backend files after `ui_review_approved`.
@@ -177,26 +161,42 @@ a Pass condition, and a Skip condition.
 
 ---
 
+### STEP-41: code-writing
+**Phase:** 4 | **Description:** Claude writes code using Write/Edit/MultiEdit tools, all code in English, all communication in the developer's language. Writes stay within the approved spec's scope. For UI stacks, general code-writing runs after the UI sub-phases (40a/b/c) complete.
+**Signal:** Session diary shows Write/Edit tool call entries. mcl-stop.sh sets `phase_review_state` via mcl-phase-review-guard.py on code-written turns. state.json `current_phase=4`.
+**Pass:** Session diary contains Write or Edit tool entries after spec approval. state.json `current_phase=4`.
+**Skip:** Never skipped when spec is approved — Phase 4 always writes code.
+
+---
+
+### STEP-42: phase-review-enforcement
+**Phase:** 4→4.5 | **Description:** When code is written without Phase 4.5 dialog starting in the same turn, mcl-stop.sh sets `phase_review_state="pending"` and returns `decision:block` to force Phase 4.5 to start.
+**Signal:** audit.log `phase-review-pending | stop | prev=null phase=4`. trace.log `phase_review_pending | null`. state.json `phase_review_state="pending"`.
+**Pass:** `phase_review_state` transitions from `pending` to `running` when Phase 4.5 starts (same or next turn). The `pending` state should be transient — not stuck.
+**Skip:** When Phase 4.5 starts in the same turn as the last code write (AskUserQuestion called immediately). In this case state goes directly to `running` without `pending`.
+
+---
+
 ## PHASE 4.5 STEPS
 
 ### STEP-450: spec-compliance-precheck
-**Phase:** 4.5 | **Description:** Before the risk scan, Phase 4.5 walks every MUST and SHOULD in the approved spec and surfaces any missing or partial implementations as risks in the sequential dialog.
+**Phase:** 4.5 | **Description:** Before the quality scan, Phase 4.5 walks every MUST and SHOULD in the approved spec and surfaces any missing or partial implementations as risks in the sequential dialog.
 **Signal:** AskUserQuestion calls in session diary reference spec MUST/SHOULD requirement text. state.json `phase_review_state="running"`. audit.log `phase-review-running | stop`.
 **Pass:** Either no spec gaps (silent pass — no marker needed), OR AskUserQuestion was called for each gap found. `phase_review_state` progressed to `running`.
 **Skip:** When every MUST/SHOULD was fully implemented in Phase 4 (silent skip — correct behavior). Indistinguishable from STEP-452 skip; both are silent if Phase 4.5 was entirely omitted.
 
 ---
 
-### STEP-451: sast-scan
-**Phase:** 4.5 | **Description:** Phase 4.5 invokes `mcl-semgrep.sh scan` on Phase 4 files. HIGH/MEDIUM findings with unambiguous autofix are applied silently; others seed the risk dialog.
-**Signal:** audit.log `semgrep-autofix | phase4-5 | rule=<id> file=<path:line>` for auto-applied fixes. Risk dialog AskUserQuestion entries cite `file:line` from Semgrep output.
-**Pass:** audit.log has `semgrep-autofix` entries for any auto-fixed findings. If no findings, scan ran silently (no marker needed — acceptable).
-**Skip:** When `semgrep-missing` notice fired at session start (Semgrep not installed), OR `semgrep-unsupported-stack` fired AND no supported-language files were written in Phase 4.
+### STEP-451: integrated-quality-scan
+**Phase:** 4.5 | **Description:** Before each risk-dialog turn, MCL applies four embedded lenses simultaneously as continuous practices (not sequential steps): (a) CODE REVIEW — correctness, logic errors, error handling, dead code; (b) SIMPLIFY — unnecessary complexity, premature abstraction, over-engineering; (c) PERFORMANCE — N+1 queries, unbounded loops, blocking ops, memory leaks (embedded practice, not a gate); (d) SECURITY — injection, auth bypass, XSS, CSRF, data exposure (embedded practice, not a gate). Semgrep SAST auto-fixes (HIGH/MEDIUM with unambiguous autofix) are applied silently and merged into the lens findings.
+**Signal:** audit.log `semgrep-autofix | phase4-5 | rule=<id> file=<path:line>` for auto-applied fixes. Risk dialog AskUserQuestion entries reference category labels (code-review / simplify / performance / security). state.json `phase_review_state="running"`.
+**Pass:** Each risk-dialog turn is preceded by a multi-lens scan. audit.log has `semgrep-autofix` entries for any auto-fixed findings. If scan is clean across all lenses, no marker needed — acceptable silent pass.
+**Skip:** When Phase 4.5 found zero risks across all lenses (entire phase omitted silently — correct). Semgrep scan step skipped when `semgrep-missing` notice fired at session start.
 
 ---
 
 ### STEP-452: risk-dialog
-**Phase:** 4.5 | **Description:** Sequential one-risk-per-turn dialog. Each risk presented via AskUserQuestion with options apply-fix/skip/make-rule. Developer resolves all risks before Phase 4.6.
+**Phase:** 4.5 | **Description:** Sequential one-risk-per-turn dialog. Each risk (sourced from spec gaps, any of the four quality lenses, or Semgrep findings) is presented via AskUserQuestion with options apply-fix/skip/make-rule. Developer resolves all risks before Phase 4.6.
 **Signal:** audit.log `phase-review-running | stop`. AskUserQuestion entries in session diary with `MCL X.Y.Z | ` prefix and risk-decision options.
 **Pass:** state.json `phase_review_state="running"` appears. Session diary shows at least one risk-decision AskUserQuestion entry.
 **Skip:** When Phase 4.5 found zero risks after honest review (entire phase silently omitted — correct behavior). Detectable by: `phase_review_state` never becomes `"running"` AND `current_phase` advanced to 5.
@@ -208,6 +208,14 @@ a Pass condition, and a Skip condition.
 **Signal:** Session diary shows a GREEN verify block after risk resolution. audit.log `tdd-rerun-timeout | phase4-5` only on timeout. trace.log may contain a `test-run` event.
 **Pass:** Session diary shows GREEN test runner output before Phase 4.6 begins, OR `test_command` is not configured (no runner invoked — acceptable), OR Phase 4.5 was entirely omitted.
 **Skip:** When Phase 4.5 was entirely omitted (no risks found), OR `test_command` is not configured in `.mcl/config.json`.
+
+---
+
+### STEP-454: comprehensive-testing
+**Phase:** 4.5 | **Description:** After TDD re-verify passes, MCL checks that Phase 4 code is covered by four test categories: unit tests (individual functions/components), integration tests (cross-module interactions, API contracts), E2E tests (user flows — if UI stack active), load/stress tests (throughput-sensitive paths — if applicable). Missing categories are surfaced as risks in the sequential dialog.
+**Signal:** Session diary shows comprehensive test coverage AskUserQuestion turns after TDD re-verify. Risk entries cite specific uncovered test category and affected code path.
+**Pass:** All applicable test categories are covered, OR each missing category was surfaced as a risk and developer decided skip/fix/rule. Silently omitted when all categories are adequately covered.
+**Skip:** When Phase 4.5 was entirely omitted (no risks found), OR `test_command` is not configured, OR all four test categories are already covered by existing tests.
 
 ---
 

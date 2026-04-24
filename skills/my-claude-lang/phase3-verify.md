@@ -77,5 +77,32 @@ AskUserQuestion({
    wrong?", fix the English spec, repeat Phase 3.
 8. Only when the tool_result returns an approve-family option → Stop
    hook flips state to Phase 4 (`approve-via-askuserquestion` audit).
+9. After the tool_result returns an approve-family option — and BEFORE
+   Phase 4 code writing begins — resolve the test command (STEP-24).
+   Now that the spec is in context, the developer can give a meaningful
+   answer about test strategy:
+
+   a. Check config: `bash ~/.claude/hooks/lib/mcl-config.sh get test_command`.
+      Non-empty → resolved, proceed to Phase 4.
+   b. Auto-detect: `bash ~/.claude/hooks/lib/mcl-test-runner.sh detect`.
+      Non-empty → resolved, proceed to Phase 4.
+   c. Both empty → ask the developer ONE question in their language:
+
+      > Turkish: *TDD her Phase 4'te çalışıyor. Bu projede testler
+      > hangi komutla koşuyor? ('yok' dersen TDD bu session için
+      > atlanır.)*
+      >
+      > English: *TDD runs on every Phase 4. What command runs the
+      > tests in this project? (type 'none' to skip TDD for this
+      > session.)*
+
+      - Non-empty reply → offer to persist as `test_command` in
+        `.mcl/config.json`. Either way, the command is used for this session.
+      - `none` / equivalent → session-scoped skip flag set; TDD overlay
+        silently falls through to non-TDD execution.
+
+   Skip this step entirely when:
+   - Auto-detect or config already resolved the command.
+   - Mid-session (Phase 4 / 4.5 / 4.6 / 5) is already in progress.
 
 </mcl_phase>

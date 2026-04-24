@@ -81,11 +81,32 @@ risks are reviewed.
 Empty result: if every MUST/SHOULD is fully implemented, skip this
 step entirely and proceed silently to the SAST scan.
 
+## Integrated Quality Scan (per-turn, before each risk-dialog turn)
+
+Before each risk-dialog turn, MCL applies four embedded lenses
+**simultaneously** — these are continuous practices designed into the
+review from the start, not isolated checkpoints bolted on at the end:
+
+| Lens | What to look for |
+|------|-----------------|
+| **Code Review** | Correctness, logic errors, error handling, dead code, missing validations |
+| **Simplify** | Unnecessary complexity, premature abstraction, over-engineering, duplicate logic |
+| **Performance** | N+1 queries, unbounded loops, blocking synchronous calls, memory leaks, large allocations |
+| **Security** | Injection (SQL, command, XSS), auth bypass, CSRF, sensitive data exposure, insecure defaults |
+
+Security and performance are **not separate gate steps** — they are
+facets of every risk assessment, surfaced naturally as part of the
+same sequential dialog. A finding from any lens is presented as one
+risk turn with a label (e.g. `[Security]`, `[Performance]`).
+
+Semgrep SAST findings (HIGH/MEDIUM with unambiguous autofix) are
+applied silently and merged into the lens output. The overall scan is
+invisible unless it produces surfaceable risks.
+
 ## Automated SAST Pre-Scan (Semgrep)
 
-Before running the human-judgment category review below, Phase 4.5
-invokes Semgrep as an automated SAST pre-scan over files MCL wrote
-or edited in this session's Phase 4. Semgrep findings either
+Phase 4.5 invokes Semgrep as an automated SAST pre-scan over files MCL
+wrote or edited in this session's Phase 4. Semgrep findings either
 **auto-fix silently** (HIGH / MEDIUM with unambiguous autofix) or
 **seed the Phase 4.5 dialog as regular risks** (HIGH / MEDIUM without
 autofix or where multiple valid options exist). Semgrep never
@@ -204,11 +225,37 @@ How:
 4. **TIMEOUT** → log one audit line (`mcl_audit_log "tdd-rerun-timeout" "phase4-5"`);
    proceed to Phase 4.6 without blocking.
 
+## Comprehensive Test Coverage (STEP-454)
+
+After TDD re-verify passes (or if `test_command` is configured),
+MCL checks that Phase 4 code is covered by four test categories.
+This step follows the same sequential dialog format as all other
+Phase 4.5 risks.
+
+| Category | Applies when |
+|----------|-------------|
+| **Unit tests** | Any new function, class, or module was created |
+| **Integration tests** | New API endpoints, cross-module data flows, DB interactions |
+| **E2E tests** | UI stack is active (`ui_flow_active=true`) and new user flows were added |
+| **Load/stress tests** | Throughput-sensitive paths (queues, bulk processing, high-concurrency endpoints) |
+
+For each uncovered category: surface as a risk turn in the sequential
+dialog with a specific suggestion for what should be written (not a
+generic "add tests"). Developer may apply-fix / skip / make-rule.
+
+If all applicable categories are adequately covered, omit this step
+entirely (empty-section-omission rule).
+
+Skip STEP-454 when:
+- Phase 4.5 was entirely omitted (no risks found).
+- `test_command` is not configured in `.mcl/config.json`.
+- All four applicable categories are already covered by existing tests.
+
 ## Handoff to Phase 4.6
 
-After every risk is resolved and TDD re-verify passes (or is skipped),
-proceed to Phase 4.6 (Post-Risk Impact Review). Phase 4.6 and Phase 5
-MUST reflect Phase 4.5 decisions — fixes applied, risks accepted,
-rules captured.
+After every risk is resolved (including STEP-454) and TDD re-verify
+passes (or is skipped), proceed to Phase 4.6 (Post-Risk Impact Review).
+Phase 4.6 and Phase 5 MUST reflect Phase 4.5 decisions — fixes applied,
+risks accepted, rules captured.
 
 </mcl_phase>

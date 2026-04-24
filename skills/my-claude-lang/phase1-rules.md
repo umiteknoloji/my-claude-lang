@@ -30,41 +30,6 @@ Skip this pre-flow entirely when:
 - Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) is in progress.
 - Every detected tag already has its plugin installed.
 
-## Pre-Flow: Test-Command Resolution (after Phase 1 summary approval only)
-
-TDD is mandatory on every Phase 4 (see `phase4-tdd.md`). Resolve the
-test command **after the Phase 1 summary is approved** (AskUserQuestion
-returns an approve-family option) so the question is never asked before
-the developer has stated what they are building.
-
-Immediately after the Phase 1 AskUserQuestion tool_result returns
-approve (and BEFORE emitting the spec):
-
-1. Check explicit config: `bash ~/.claude/hooks/lib/mcl-config.sh get test_command`.
-   Non-empty → resolved, skip the rest of this pre-flow.
-2. Run auto-detect: `bash ~/.claude/hooks/lib/mcl-test-runner.sh detect`.
-   Non-empty → resolved, skip the rest of this pre-flow.
-3. Both empty → ask the developer ONE question in their language:
-
-   > Turkish: *TDD her Phase 4'te çalışıyor. Bu projede testler
-   > hangi komutla koşuyor? ('yok' dersen TDD bu session için
-   > atlanır.)*
-   >
-   > English: *TDD runs on every Phase 4. What command runs the
-   > tests in this project? (type 'none' to skip TDD for this
-   > session.)*
-
-   - Non-empty reply → offer to persist as `test_command` in
-     `.mcl/config.json`. Either way, the command is used for this
-     session.
-   - `none` / equivalent → session-scoped skip flag is set; Phase 4
-     TDD overlay silently falls through to non-TDD execution.
-
-Skip this pre-flow entirely when:
-- Auto-detect or config already resolved the command (no question
-  needed).
-- Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) is already in progress.
-
 ## Main Flow
 
 When the developer describes what they want:
@@ -100,7 +65,7 @@ I understood the following:
 Then call:
 ```
 AskUserQuestion({
-  question: "MCL 7.1.5 | <localized 'Is this correct?'>",
+  question: "MCL 7.1.6 | <localized 'Is this correct?'>",
   options: [
     "<approve-verb>",
     "<edit-verb>",
