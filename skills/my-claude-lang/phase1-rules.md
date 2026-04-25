@@ -195,6 +195,8 @@ If the developer's confirmation contains additional scope or modifications
 
 ## Contradiction Detection
 
+### Logical Parameter Contradictions
+
 Before advancing from Phase 1 to Phase 2, check all parameters for
 logical contradictions. Examples:
 
@@ -206,6 +208,40 @@ If contradictions are found:
 - Explain the contradiction in the developer's language
 - Ask: "Which one takes priority?"
 - Resolve before advancing
+
+### GATE Answer Coherence
+
+After each GATE answer involving an architectural choice, silently check:
+do the technical implications of this answer fit the system behavior
+described in the conversation?
+
+**Trigger condition:** architectural choices only (auth model, data storage,
+API shape, consistency model). Not trivial parameters.
+
+**Mismatch examples:**
+- User said "JWT" but described flow requires server-side state lookup on every
+  request → JWT is stateless, cannot do this without a token store (= sessions)
+- User said "NoSQL" but requirements include multi-table transactional consistency
+  → NoSQL typically lacks multi-entity ACID guarantees
+- User said "stateless API" but described "remember me across devices"
+  → cross-device persistence requires server-side state
+- User said "microservice per domain" but described a flow needing ACID transactions
+  spanning multiple domains
+
+**Format** (verdict first — one sentence, developer's language):
+```
+⚠️ [Specific technical conflict]:
+"JWT seçtiniz, ama tarif ettiğiniz [behavior] sunucu tarafı oturum takibi
+gerektiriyor — JWT'nin stateless yapısıyla çelişiyor.
+(a) Stateless JWT → [what needs to change]
+(b) Server-side sessions → [described flow works as-is]"
+```
+
+**Rules:**
+- One conflict, one question — never a list
+- Only fire for concrete technical incompatibility — not style preference
+- Vague concern → skip silently
+- If user insists: pressure-resistance rule applies (hold position without new evidence)
 
 ## Nested Conditional Requirements
 
