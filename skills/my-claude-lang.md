@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 7.2.0` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 7.3.0` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## AskUserQuestion Protocol (since 6.0.0)
@@ -65,7 +65,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 partial-spec recovery, mcl-update, mcl-finish, pasted-CLI
 passthrough — uses Claude Code's native `AskUserQuestion` tool with
-`question` prefixed `MCL 7.2.0 | `. The Stop hook parses tool_use/tool_result
+`question` prefixed `MCL 7.3.0 | `. The Stop hook parses tool_use/tool_result
 pairs to advance MCL state. The legacy `✅ MCL APPROVED` text marker is
 DEAD in 6.0.0 — Claude must never emit it; it carries no state effect.
 
@@ -200,7 +200,7 @@ For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
 2. If ANY parameter unclear → ask questions ONE AT A TIME as plain text
    (open-ended gather is NOT AskUserQuestion)
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 7.2.0 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 7.3.0 | <localized-is-this-correct>",
    options: ["<approve-family-in-language>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns an approve-family option does the
    Stop hook advance state — THEN call Phase 2. Not before.
@@ -225,7 +225,7 @@ processes the request AS IF a native English engineer wrote it.
 4. Include: Objective, MUST/SHOULD requirements, Acceptance Criteria,
    Edge Cases, Technical Approach, Out of Scope
 5. After the spec, explain in developer's language what it says
-6. Call `AskUserQuestion({question: "MCL 7.2.0 | <localized-spec-approval
+6. Call `AskUserQuestion({question: "MCL 7.3.0 | <localized-spec-approval
    e.g. Bu spec'i onaylıyor musun? / Approve this spec?>", options:
    [{label: "<approve-verb-only>", description: "..."},
     {label: "<edit-verb>",         description: "..."},
@@ -250,7 +250,7 @@ For full verification rules, read `my-claude-lang/phase3-verify.md`
 
 Phase 3 is COMBINED with Phase 2 — when the spec is shown, the developer
 verifies it. The explanation after the spec IS Phase 3, followed by the
-Phase 3 `AskUserQuestion` call with prefix `MCL 7.2.0 | `.
+Phase 3 `AskUserQuestion` call with prefix `MCL 7.3.0 | `.
 Developer must understand AND pick an approve-family option in the
 tool_result → then Phase 4 begins (Stop hook flips state).
 
@@ -445,6 +445,23 @@ an unrecoverable state (e.g., approved the wrong spec, need to restart from Phas
 without closing the conversation). Like `mcl-finish` and `mcl-update`, it bypasses
 the normal Phase 1–5 pipeline — the hook resets state and Claude confirms the reset
 in the developer's language. Does NOT start Phase 1 automatically.
+
+## Proje Hafızası — `.mcl/project.md`
+
+Introduced in MCL 7.3.0. MCL, her tamamlanan task'ın Phase 5 sonunda `.mcl/project.md`
+dosyasını yazar veya günceller. Dosya şu bölümleri içerir:
+
+- **Mimari** — kalıcı mimari kararlar (JWT, API prefix, vb.)
+- **Teknik Borç** — `[ ]` açık / `[x] (tarih)` tamamlanmış checklist
+- **Bilinen Sorunlar** — `[ ]` açık / `[x] (tarih)` çözülmüş checklist
+
+Her session başında `mcl-activate.sh` bu dosyayı okur ve içeriği Claude'a `<mcl_project_memory>`
+bloğu olarak iletir. MCL bu sayede Phase 1'de zaten bilinen parametreleri (stack, mimari, tercihler)
+tekrar sormaz.
+
+Açık `[ ]` madde varsa MCL proaktif davranır: kullanıcının isteği varsa önce onu tamamlar, Phase 5
+sonunda en önemli 1 maddeyi AskUserQuestion ile sorar. Kullanıcının görevi yoksa Phase 1'den önce
+tek satırda bildirir.
 
 ## `mcl-finish` — Cross-Session Finish Mode
 

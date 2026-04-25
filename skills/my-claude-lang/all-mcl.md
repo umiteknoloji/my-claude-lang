@@ -269,4 +269,20 @@ a Pass condition, and a Skip condition.
 **Pass:** No structural divergence detected between STATIC_CONTEXT Phase 4.5 block and `phase4-5-risk-review.md`. Sync note is present in the skill file.
 **Skip:** When `skills/my-claude-lang/phase4-5-risk-review.md` does not exist (fresh clone before `bash setup.sh`). Expected skip — not a failure.
 
+---
+
+### STEP-54: project-memory-read
+**Phase:** 0 (session start) | **Description:** `mcl-activate.sh` checks for `.mcl/project.md` at every session turn. If found, injects content as `<mcl_project_memory>` and any open `[ ]` items as `<mcl_audit name="proactive-items">` into FULL_CONTEXT. Claude uses the memory to skip Phase 1 questions about already-known facts and surfaces the top open item proactively (after the user's task, or before Phase 1 if the user has no task).
+**Signal:** Hook's `additionalContext` contains `<mcl_project_memory>` when `.mcl/project.md` exists and is non-empty.
+**Pass:** Memory content and open items appear in `additionalContext`. Stack/architecture facts are referenced during Phase 1 without re-asking.
+**Skip:** When `.mcl/project.md` does not exist (new project — no completed task yet). Expected skip.
+
+---
+
+### STEP-55: project-memory-write
+**Phase:** 5 | **Description:** After Phase 5 Verification Report, MCL writes or updates `.mcl/project.md` with: architectural decisions from this session's spec, new `[ ]` items for unresolved Phase 4.5 risks, and `[x] (YYYY-MM-DD)` for items resolved this session. File stays under 50 lines. If the file does not exist, MCL creates it with the detected stack and current session's decisions.
+**Signal:** `.mcl/project.md` exists and is updated after the first completed Phase 4+5 task.
+**Pass:** File contains current session's architectural decisions. Resolved items are marked `[x]`. New debt from Phase 4.5 appears as `[ ]`.
+**Skip:** Never skipped when Phase 4 ran. If Phase 4 was skipped (check-up, mcl-finish, mcl-restart turns), project.md update is also skipped.
+
 </mcl_phase>

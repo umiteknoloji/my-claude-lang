@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 7.2.0
+# my-claude-lang 🌐 MCL 7.3.0
 
 ### The age of AI doesn't speak English. It speaks yours.
 
