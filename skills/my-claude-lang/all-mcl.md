@@ -88,9 +88,9 @@ a Pass condition, and a Skip condition.
 ## PHASE 2/3 STEPS
 
 ### STEP-20: spec-emission
-**Phase:** 2 | **Description:** Claude emits the visible `📋 Spec:` block with all seven required sections: Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope.
+**Phase:** 2 | **Description:** Claude emits the visible `📋 Spec:` block. Six base sections always present: Objective, MUST/SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope. Up to five conditional sections appear only when triggered: Non-functional Requirements (perf/scale constraints), Failure Modes & Degradation (external deps/async/distributed), Observability (critical path/audit/tracking), Reversibility/Rollback (migrations/destructive ops/feature flags), Data Contract (API/schema changes/cross-service).
 **Signal:** mcl-stop.sh computes `SPEC_HASH` and writes it to state.json. state.json `current_phase` transitions to 2.
-**Pass:** state.json `spec_hash` is non-null and `current_phase` is 2 or higher.
+**Pass:** state.json `spec_hash` is non-null and `current_phase` is 2 or higher. Conditional sections present iff their trigger applies.
 **Skip:** Never skipped — the spec is the MCL pipeline's core deliverable.
 
 ---

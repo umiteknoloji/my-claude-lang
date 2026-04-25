@@ -73,6 +73,43 @@ SHOULD NOT:
 ### Out of Scope
 - [Explicitly state what this task does NOT include]
 - [Prevents scope creep during implementation]
+
+<!-- CONDITIONAL SECTIONS — include only when triggered, omit entirely otherwise -->
+
+### Non-functional Requirements
+<!-- TRIGGER: performance/scale/resource constraints mentioned or implied -->
+- Latency: [p95 target, e.g. <200ms]
+- Throughput: [requests/sec or records/sec target]
+- Memory budget: [max RSS or heap allocation]
+- Concurrency: [max parallel operations]
+
+### Failure Modes & Degradation
+<!-- TRIGGER: external dependencies, async operations, distributed concerns -->
+- [Dependency X down]: [degraded behavior — e.g. return cached data, return 503]
+- [Timeout scenario]: [fallback behavior and user-visible error]
+- [Partial failure]: [which parts continue, which abort]
+- Circuit breaker / retry policy: [yes/no, thresholds]
+
+### Observability
+<!-- TRIGGER: critical production path, security audit trail, user behavior tracking -->
+- Log events: [which operations emit log entries and at what level]
+- Metrics: [which counters/gauges/histograms to emit]
+- Alerts: [what conditions should page or notify]
+- Trace spans: [which operations need distributed tracing]
+
+### Reversibility / Rollback
+<!-- TRIGGER: DB schema changes, data migrations, destructive operations, feature flags -->
+- Rollback procedure: [step-by-step how to revert this change]
+- Data safety: [is data loss possible? what backups are needed?]
+- Feature flag: [can this be toggled off without a deploy?]
+- Migration: [is the migration reversible? down-migration provided?]
+
+### Data Contract
+<!-- TRIGGER: API surface changes, shared schemas, cross-service boundaries -->
+- Request schema: [fields, types, validation rules]
+- Response schema: [fields, types, nullability]
+- Breaking changes: [yes/no — if yes, versioning strategy]
+- Migration: [how existing data/callers are handled]
 ```
 
 ## Why the Spec Must Be Visible

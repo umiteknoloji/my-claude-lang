@@ -222,8 +222,12 @@ processes the request AS IF a native English engineer wrote it.
 1. Announce: "All points are clear. Generating the specification..."
 2. Write the spec in a VISIBLE `📋 Spec:` block — the developer MUST see it
 3. Write it like a senior engineer with 15+ years experience
-4. Include: Objective, MUST/SHOULD requirements, Acceptance Criteria,
-   Edge Cases, Technical Approach, Out of Scope
+4. BASE SECTIONS (always): Objective, MUST/SHOULD requirements,
+   Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope.
+   CONDITIONAL SECTIONS (include only when triggered):
+   Non-functional Requirements / Failure Modes & Degradation /
+   Observability / Reversibility+Rollback / Data Contract.
+   See `phase2-spec.md` for triggers and templates.
 5. After the spec, explain in developer's language what it says
 6. Call `AskUserQuestion({question: "MCL 7.3.0 | <localized-spec-approval
    e.g. Bu spec'i onaylıyor musun? / Approve this spec?>", options:
