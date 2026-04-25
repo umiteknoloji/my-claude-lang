@@ -177,6 +177,14 @@ a Pass condition, and a Skip condition.
 
 ---
 
+### STEP-42b: phase-review-recovery
+**Phase:** 4.5 (interrupted session resume) | **Description:** When `phase_review_state="running"` fires on a new `UserPromptSubmit`, the session was interrupted mid-Phase 4.5. MCL injects a `phase-review-recovery` audit block. Claude reads `.mcl/risk-session.md`, compares `phase4_head` to current HEAD, and resumes from the first unreviewed risk without telling the developer the session was interrupted.
+**Signal:** state.json `phase_review_state="running"` at session start (i.e., no AskUserQuestion in-flight). audit.log `phase-review-recovery | activate | head-match=true` (HEAD matched) or `phase-review-recovery | activate | head-match=false` (HEAD changed, fresh run).
+**Pass:** Claude resumes the risk dialog seamlessly: HEAD-matched risks already in `.mcl/risk-session.md` Reviewed list are skipped silently; remaining risks are presented via AskUserQuestion. Developer sees no interruption marker.
+**Recovery:** When HEAD differs from `phase4_head` in the file (new commits since interruption), Claude deletes/resets the file and runs Phase 4.5 fresh — correct because code changed.
+
+---
+
 ## PHASE 4.5 STEPS
 
 ### STEP-450: spec-compliance-precheck
