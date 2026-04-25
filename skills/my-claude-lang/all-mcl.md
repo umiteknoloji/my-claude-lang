@@ -240,9 +240,9 @@ a Pass condition, and a Skip condition.
 ## PHASE 5 STEPS
 
 ### STEP-50: spec-compliance-section
-**Phase:** 5 | **Description:** Phase 5 emits Section 1 (mismatches only — ⚠️/❌). If every MUST/SHOULD was satisfied, Section 1 is entirely omitted (no header, no placeholder).
-**Signal:** Session diary either contains a localized "Spec Uyumluluğu" / "Spec Compliance" block with only ⚠️/❌ items, OR Section 1 is absent (all compliant — correct behavior).
-**Pass:** Section 1 is absent (all compliant) OR contains only ⚠️/❌ items. No ✅ lines appear in Section 1.
+**Phase:** 5 | **Description:** Phase 5 emits Section 1 as a markdown table `| Requirement | Status | Evidence |`. One row per MUST/SHOULD from the approved spec; only ⚠️ (partial) and ❌ (missing) rows are shown — ✅ rows are omitted. If every MUST/SHOULD was satisfied, Section 1 is entirely omitted (no header, no placeholder).
+**Signal:** Session diary either contains a localized "Spec Uyumluluğu" / "Spec Compliance" table with only ⚠️/❌ rows, OR Section 1 is absent (all compliant — correct behavior).
+**Pass:** Section 1 is absent (all compliant) OR contains a table with only ⚠️/❌ rows. No ✅ rows appear. Each row has a Requirement, Status, and Evidence (file:line or "not found").
 **Skip:** When every MUST/SHOULD was satisfied (correct, expected omission — not a failure).
 
 ---
@@ -260,5 +260,13 @@ a Pass condition, and a Skip condition.
 **Signal:** Session diary contains localized "Süreç İzlemesi" / "Process Trace" / equivalent section. `.mcl/trace.log` exists and is non-empty.
 **Pass:** Section 3 is present in session diary if trace.log is non-empty. Events appear in chronological order.
 **Skip:** When `.mcl/trace.log` is missing or empty. Correct and expected skip.
+
+---
+
+### STEP-53: static-context-skill-sync
+**Phase:** 0 (setup validation) | **Description:** Every `<mcl_phase>` block in `STATIC_CONTEXT` (inside `mcl-activate.sh`) has an extended reference skill file under `skills/my-claude-lang/`. During check-up, Claude reads the STATIC_CONTEXT Phase 4.5 block and `skills/my-claude-lang/phase4-5-risk-review.md` and checks for structural divergence: different step counts, different rule headings, missing sections, or the sync note missing from the skill file. Divergence means the active behavior (STATIC_CONTEXT) and the extended documentation no longer match — the next developer touching that phase has no reliable reference.
+**Signal:** check-up Step 9 divergence report (PASS / WARN / SKIP).
+**Pass:** No structural divergence detected between STATIC_CONTEXT Phase 4.5 block and `phase4-5-risk-review.md`. Sync note is present in the skill file.
+**Skip:** When `skills/my-claude-lang/phase4-5-risk-review.md` does not exist (fresh clone before `bash setup.sh`). Expected skip — not a failure.
 
 </mcl_phase>

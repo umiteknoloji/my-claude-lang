@@ -151,7 +151,28 @@ After writing `hc.md`, show the developer:
 
 ---
 
-## Step 8 — STOP
+## Step 8 — STATIC_CONTEXT Sync Check (STEP-53)
+
+Read the `<mcl_phase name="phase4-5-risk-review">` block inside the STATIC_CONTEXT
+heredoc in `hooks/mcl-activate.sh`.
+
+Read `skills/my-claude-lang/phase4-5-risk-review.md` (resolve path relative to MCL repo root,
+or `~/.claude/skills/my-claude-lang/phase4-5-risk-review.md` if installed).
+
+Compare:
+- Are the same four numbered steps present in both (SPEC COMPLIANCE PRE-CHECK, INTEGRATED
+  QUALITY SCAN, TDD RE-VERIFY, COMPREHENSIVE TEST COVERAGE)?
+- Is the STEP-454 mechanic (write test files vs document gaps) described consistently?
+- Does the skill file contain the `⚠️ SYNC NOTE:` warning at the top?
+
+Report STEP-53 in the summary table as:
+- ✅ PASS — no structural divergence detected
+- ⚠️ WARN — divergence found; list the specific diffs
+- ⏭️ SKIP — skill file not found (fresh install)
+
+---
+
+## Step 9 — STOP
 
 Do NOT proceed to Phase 4.5/4.6/5.
 Do NOT call AskUserQuestion.

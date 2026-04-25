@@ -1,0 +1,41 @@
+# Sample Phase 3 spec output — used by test-spec-extract.sh (once implemented).
+#
+# This represents what a typical Claude assistant turn looks like when MCL
+# emits a spec. The JSONL conversation file would contain this text inside
+# an assistant message object. The _mcl_spec_extract_body() function must
+# return text starting from "📋 Spec:" and not any earlier assistant turn.
+
+🌐 MCL 7.2.0
+
+Spec'inizi aşağıda bulabilirsiniz:
+
+📋 Spec:
+## Objective
+Build a login page with email and password authentication.
+
+## MUST
+- User can enter email and password in a form
+- On successful auth, redirect to /dashboard
+- On failure, show an error message
+
+## SHOULD
+- Show a loading spinner during the auth request
+- Validate email format on the client side
+
+## Acceptance Criteria
+- Valid credentials → redirect to /dashboard
+- Invalid credentials → error message visible
+- Empty fields → client-side validation error shown
+
+## Edge Cases
+- Network timeout → user-facing error, no redirect
+- Multiple rapid submits → second submit ignored while first is in flight
+
+## Technical Approach
+React functional component with controlled inputs, fetch/axios for API call,
+React Router for redirect.
+
+## Out of Scope
+- Social login (OAuth)
+- Remember me / persistent sessions
+- Password reset flow
