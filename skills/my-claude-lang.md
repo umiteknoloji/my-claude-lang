@@ -186,8 +186,9 @@ without a visible handoff. Three rules govern the dispatch: Rule A —
 MCL guarantees git by asking once per project for consent to run
 `git init` locally (no remote, read-only bookkeeping); Rule B —
 overlapping plugins are multi-angle validation, not redundancy, so
-dispatch runs silently and findings are merged with a
-stricter-verdict-wins tiebreaker; Rule C — MCP-server plugins are
+dispatch runs silently and findings are merged; conflicts surface as
+provenance-labeled Phase 4.5 risk items — developer decides, no
+automatic tiebreaker; Rule C — MCP-server plugins are
 filtered out of the curated set (binary CLIs invoked via Bash are
 allowed). Missing curated plugins are surfaced once in a single
 consolidated install-suggestion block at the first developer message.

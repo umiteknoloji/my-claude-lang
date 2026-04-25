@@ -98,10 +98,20 @@ that any single pass misses.
   union the remaining set, localize all developer-facing text per MCL's
   language bridge, preserve file paths / line numbers / code
   identifiers verbatim.
-- When plugins disagree (one says "safe", another says "unsafe"), the
-  stricter verdict wins. MCL surfaces the disagreement as a single
-  Phase 4.5 risk item — "plugin X flags Y as unsafe; plugin Z says
-  safe. Review:" — with both rationales in the developer's language.
+- When plugins disagree (one says "safe", another says "unsafe"), do NOT
+  apply an automatic tiebreaker. Surface the conflict as a single Phase
+  4.5 risk item with explicit provenance:
+
+  ```
+  [PLUGIN CONFLICT] <file>:<line> — <brief description>
+    • <plugin-A>: <verdict> — <one-sentence rationale>
+    • <plugin-B>: <verdict> — <one-sentence rationale>
+  ```
+
+  Present via AskUserQuestion with options matching the conflict
+  (skip / apply plugin-A fix / apply plugin-B fix / make rule).
+  The developer's decision auto-triggers rule-capture so the same
+  conflict type does not resurface in future sessions.
 
 ### Plugin output filtering — file-reference verification
 
