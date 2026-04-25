@@ -50,7 +50,12 @@ for f in "$SCRIPT_DIR/README.md" "$SCRIPT_DIR/README.tr.md" "$SKILL_SRC" "$HOOK_
   [ -f "$f" ] || continue
   FILE_VERSION="$(grep -oE '🌐 MCL [0-9]+\.[0-9]+\.[0-9]+' "$f" | head -1 | awk '{print $3}')"
   if [ -n "$FILE_VERSION" ] && [ "$FILE_VERSION" != "$CANONICAL_VERSION" ]; then
-    echo "[WARN] Version drift: $f has $FILE_VERSION, VERSION says $CANONICAL_VERSION"
+    sed -i '' "s/🌐 MCL ${FILE_VERSION}/🌐 MCL ${CANONICAL_VERSION}/g" "$f" 2>/dev/null \
+      || sed -i "s/🌐 MCL ${FILE_VERSION}/🌐 MCL ${CANONICAL_VERSION}/g" "$f"
+    # Also fix bare "MCL X.Y.Z" references (e.g. in prose, question prefix examples)
+    sed -i '' "s/MCL ${FILE_VERSION}/MCL ${CANONICAL_VERSION}/g" "$f" 2>/dev/null \
+      || sed -i "s/MCL ${FILE_VERSION}/MCL ${CANONICAL_VERSION}/g" "$f"
+    echo "[FIXED] Version synced in $f ($FILE_VERSION → $CANONICAL_VERSION)"
     VERSION_MISMATCH=1
   fi
 done
