@@ -204,7 +204,7 @@ a Pass condition, and a Skip condition.
 ---
 
 ### STEP-453: tdd-re-verify
-**Phase:** 4.5 | **Description:** After all risks are resolved (if Phase 4.5 ran), `mcl-test-runner.sh green-verify` is called if `test_command` is configured.
+**Phase:** 4.5 | **Description:** After all risks are resolved (if Phase 4.5 ran), `mcl-test-runner.sh green-verify` is called if `test_command` is configured. This is a post-risk full-suite run — separate from the per-criterion GREEN verifies in Phase 4.
 **Signal:** Session diary shows a GREEN verify block after risk resolution. audit.log `tdd-rerun-timeout | phase4-5` only on timeout. trace.log may contain a `test-run` event.
 **Pass:** Session diary shows GREEN test runner output before Phase 4.6 begins, OR `test_command` is not configured (no runner invoked — acceptable), OR Phase 4.5 was entirely omitted.
 **Skip:** When Phase 4.5 was entirely omitted (no risks found), OR `test_command` is not configured in `.mcl/config.json`.
@@ -284,5 +284,13 @@ a Pass condition, and a Skip condition.
 **Signal:** `.mcl/project.md` exists and is updated after the first completed Phase 4+5 task.
 **Pass:** File contains current session's architectural decisions. Resolved items are marked `[x]`. New debt from Phase 4.5 appears as `[ ]`.
 **Skip:** Never skipped when Phase 4 ran. If Phase 4 was skipped (check-up, mcl-finish, mcl-restart turns), project.md update is also skipped.
+
+---
+
+### STEP-56: tdd-refactor-step
+**Phase:** 4 | **Description:** After each per-criterion GREEN verify in the incremental TDD loop, MCL runs a refactor pass before moving to the next Acceptance Criterion. Refactor removes duplication, improves naming, and extracts functions for clarity — without adding behavior. Test runner is re-run after refactor to confirm tests stay GREEN. If any test turns RED during refactor, the change is reverted.
+**Signal:** Session diary shows code-quality edits between a GREEN verify and the next test write, followed by a runner confirm (no label).
+**Pass:** Code improved without behavior change; tests stay GREEN after refactor. If no refactor opportunity exists, step is skipped silently.
+**Skip:** When no duplication or clarity improvement is warranted (code is already clean). Expected skip for trivial implementations.
 
 </mcl_phase>

@@ -52,11 +52,13 @@ Phase 2+3: Your confirmed intent becomes a visible English spec
            all in the same turn. One AskUserQuestion, one approval.
   │
   ▼
-Phase 4: Code gets written. Mandatory batch TDD runs inside this
-         phase — tests first (RED baseline), then production code,
-         then GREEN verify. Every question Claude asks during
-         execution goes through the bridge — with context
-         explaining WHY it's asking and WHAT each answer changes.
+Phase 4: Code gets written. Incremental TDD runs inside this
+         phase — for each acceptance criterion: one failing test
+         (RED), minimum code to pass it (GREEN), then refactor.
+         Cycle repeats per criterion; full suite re-checked at end.
+         Every question Claude asks during execution goes through
+         the bridge — with context explaining WHY it's asking and
+         WHAT each answer changes.
 
          When a UI surface is detected (default ON), Phase 4 splits:
          ├─ 4a BUILD_UI  — runnable frontend with dummy data only.

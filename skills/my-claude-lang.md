@@ -261,7 +261,7 @@ corresponding tool_result is NOT confirmation.
 ## Phase 4: Execute with Live Translation
 
 For full execution rules, read `my-claude-lang/phase4-execute.md`
-For mandatory batch TDD rules, read `my-claude-lang/phase4-tdd.md`
+For incremental TDD rules (red-green-refactor), read `my-claude-lang/phase4-tdd.md`
 For Phase 4a BUILD_UI rules, read `my-claude-lang/phase4a-ui-build.md`
 For Phase 4b UI_REVIEW rules, read `my-claude-lang/phase4b-ui-review.md`
 For Phase 4c BACKEND rules, read `my-claude-lang/phase4c-backend.md`

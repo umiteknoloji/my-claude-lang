@@ -53,11 +53,13 @@ Aşama 2+3: Onaylanan niyetin, görünür bir İngilizce teknik
            AskUserQuestion onayıyla.
   │
   ▼
-Aşama 4: Kod yazılıyor. Bu aşamanın içinde zorunlu batch TDD
-         çalışıyor — önce testler (RED taban), sonra production
-         kodu, sonra GREEN doğrulama. Claude Code'un çalışma
-         sırasında sorduğu her soru köprüden geçiyor — NEDEN
-         sorduğunu ve hangi cevabın NE değiştireceğini açıklayarak.
+Aşama 4: Kod yazılıyor. Bu aşamanın içinde kademeli TDD
+         çalışıyor — her kabul kriteri için: bir failing test
+         (RED), onu geçecek minimum kod (GREEN), ardından refactor.
+         Döngü her kriter için tekrar eder; sonda tam suite tekrar
+         koşulur. Claude Code'un çalışma sırasında sorduğu her
+         soru köprüden geçiyor — NEDEN sorduğunu ve hangi cevabın
+         NE değiştireceğini açıklayarak.
 
          UI yüzeyi tespit edildiğinde (varsayılan: ON), Aşama 4 üçe bölünür:
          ├─ 4a BUILD_UI  — sadece dummy data ile çalışır frontend.
