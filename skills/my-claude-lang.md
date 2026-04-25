@@ -197,8 +197,11 @@ consolidated install-suggestion block at the first developer message.
 For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
 
 1. Read developer's message, extract parameters
-2. If ANY parameter unclear → ask questions ONE AT A TIME as plain text
-   (open-ended gather is NOT AskUserQuestion)
+2. DISAMBIGUATION TRIAGE before asking: SILENT (assume + mark in spec):
+   trivial defaults `[assumed: X]` and reversible choices `[default: X, changeable]`.
+   GATE (ask, one at a time): schema/migration, auth/permission model,
+   public API breaking changes, irreversible data consequences, security
+   boundaries. Heuristic: can you write the spec without this answer? Yes → silent.
 3. If ALL parameters clear → present summary as plain text, THEN call
    `AskUserQuestion({question: "MCL 7.3.0 | <localized-is-this-correct>",
    options: ["<approve-family-in-language>", "<edit>", "<cancel>"]})`.

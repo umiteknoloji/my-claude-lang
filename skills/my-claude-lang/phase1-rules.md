@@ -115,6 +115,47 @@ the spec now." STOP and wait for the tool_result.
    Phase 2. `ui_flow_active` is already set by activation; stop hook
    does NOT touch it on summary-confirm.
 
+## Disambiguation Triage
+
+Before asking any clarifying question, classify the ambiguity:
+
+### SILENT — assume and document (do NOT ask)
+
+**Trivial defaults** — standard industry values where any reasonable choice
+works and changing it later is cheap:
+- Pagination size (assume 20/page)
+- Error message wording
+- Log level for non-critical paths
+- Timeout values where no SLA is specified
+- Variable/function naming conventions (match existing codebase)
+
+→ Mark in spec as `[assumed: X]` under the relevant section.
+
+**Reversible choices** — a direction must be picked but it's easy to change:
+- Which CSS library within a category (Tailwind vs. Bootstrap)
+- State management approach for a simple feature
+- File/folder naming within the project's existing conventions
+- Test data structure
+
+→ Mark in spec as `[default: X, changeable]` under the relevant section.
+
+### GATE — ask one question at a time
+
+Ask only when writing the spec is impossible without the answer:
+- **Schema / migration decisions** — adding a non-null column, dropping a table, changing an index
+- **Auth or permission model** — who can see/do what
+- **Public API surface or breaking changes** — endpoint naming, response shape, versioning
+- **Business logic with irreversible data consequences** — "what happens to a user's posts when their account is deleted?"
+- **Security boundary decisions** — what is private, what is audited, what is encrypted
+
+**Heuristic:** "Can I write the spec without this answer?"
+- Yes → assume silently, mark it.
+- No → ask.
+
+**Safety net:** Phase 3 spec review shows all assumptions. If an assumption
+was wrong, the developer corrects it there — before any code is written.
+This means a wrong silent assumption has zero implementation cost.
+
 ## Question Flow Rule
 
 **⛔ STOP RULE:** When you ask a question, your ENTIRE response is ONLY that

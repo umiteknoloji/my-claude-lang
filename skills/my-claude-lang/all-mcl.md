@@ -62,10 +62,10 @@ a Pass condition, and a Skip condition.
 ## PHASE 1 STEPS
 
 ### STEP-10: intent-gathering
-**Phase:** 1 | **Description:** Claude asks clarifying questions one at a time in the developer's language until all Phase 1 parameters (intent, constraints, success_criteria, context) are clear. No spec is emitted until the summary is ready.
-**Signal:** Session diary shows plain-text question turns before the summary confirmation AskUserQuestion. No `📋 Spec:` block appears before `summary_confirmed` in trace.log.
-**Pass:** `summary_confirmed` event appears in trace.log. No premature spec emission before that event.
-**Skip:** When the developer's first message already contains all parameters — in that case the summary appears immediately with no prior question turns. Still passes if `summary_confirmed` is present.
+**Phase:** 1 | **Description:** Claude applies disambiguation triage before asking any question. SILENT path: trivial defaults and reversible choices are assumed and marked in the spec (`[assumed: X]` / `[default: X, changeable]`) without asking. GATE path: only schema/migration decisions, auth/permission model, public API breaking changes, irreversible data consequences, and security boundary decisions trigger a question — one at a time. Parameters that do not require a gate are resolved silently.
+**Signal:** Session diary shows plain-text question turns ONLY for gate-category ambiguities before the summary AskUserQuestion. No `📋 Spec:` block appears before `summary_confirmed` in trace.log.
+**Pass:** `summary_confirmed` event in trace.log. Gate questions are only for irreversible decisions. Trivial/reversible assumptions appear as `[assumed: X]` or `[default: X, changeable]` markers in the spec.
+**Skip:** When the developer's first message already contains all parameters with no ambiguity — summary appears immediately. Still passes if `summary_confirmed` is present.
 
 ---
 
