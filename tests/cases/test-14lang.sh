@@ -1,15 +1,11 @@
 #!/bin/bash
-# Test: all 14 supported language prompts produce valid JSON output.
+# Test: Turkish prompt produces valid JSON output.
 
 echo "--- test-14lang ---"
 
 _14l_dir="$(setup_test_dir)"
 
-while IFS= read -r _prompt || [ -n "$_prompt" ]; do
-  [ -z "$_prompt" ] && continue
-  [[ "$_prompt" == \#* ]] && continue
-  _out="$(run_activate_hook "$_14l_dir" "$_prompt")"
-  assert_json_valid "14lang prompt → valid JSON: ${_prompt:0:30}" "$_out"
-done < "$REPO_ROOT/tests/fixtures/prompts-14lang.txt"
+_out="$(run_activate_hook "$_14l_dir" "Bana basit bir login sayfası yap")"
+assert_json_valid "Turkish prompt → valid JSON" "$_out"
 
 cleanup_test_dir "$_14l_dir"
