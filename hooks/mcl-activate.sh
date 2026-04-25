@@ -122,6 +122,22 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: mcl-doctor keyword --------
+if [ "$PROMPT_NORM" = "mcl-doctor" ]; then
+  COST_HELPER="$(dirname "$0")/lib/mcl-cost.py"
+  COST_HELPER_ESC="$(printf '%s' "$COST_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$(pwd)}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  cat <<DOCTOR_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_DOCTOR_MODE — the developer typed the literal keyword ${_BT}mcl-doctor${_BT}. SKIP the entire MCL pipeline. Do NOT run Phase 1/spec/3/4/4.5/4.6/5. Do NOT ask clarifying questions. Do NOT emit a spec block.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — mcl-doctor${_BT}.\n2. Run ${_BT}python3 \"${COST_HELPER_ESC}\" \"${PROJECT_DIR_ESC}\"${_BT} via the Bash tool.\n3. Present the full output of that command to the developer as-is (it is already markdown-formatted).\n4. After the report, offer the developer one option: ${_BT}rm .mcl/cost.json${_BT} to reset the injection counter for this project (explain this clears accumulated per-turn data, not the session logs).\n\nSTOP RULE: no clarifying questions. ${_BT}mcl-doctor${_BT} is unambiguous — run the cost report.\n</mcl_core>"
+  }
+}
+DOCTOR_OUTPUT
+  exit 0
+fi
+
 # -------- Branch: mcl-restart keyword --------
 if [ "$PROMPT_NORM" = "mcl-restart" ]; then
   _STATE_LIB="$(dirname "$0")/lib/mcl-state.sh"
@@ -482,6 +498,27 @@ print(json.dumps(sys.stdin.read().strip())[1:-1])
 fi
 
 FULL_CONTEXT="${UPDATE_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${STATIC_CONTEXT}"
+
+# Log MCL injection size for cost accounting (mcl-doctor)
+if command -v python3 >/dev/null 2>&1; then
+  _MCL_CF="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/cost.json"
+  _MCL_IC="${#FULL_CONTEXT}"
+  python3 -c "
+import json, os, time
+p = '$_MCL_CF'
+d = {'turns': []}
+if os.path.isfile(p):
+    try:
+        d = json.load(open(p))
+    except Exception:
+        pass
+d.setdefault('turns', []).append({'ts': int(time.time()), 'chars': $_MCL_IC})
+t = p + '.tmp'
+json.dump(d, open(t, 'w'))
+os.replace(t, p)
+" 2>/dev/null || true
+fi
+
 
 cat <<HOOK_OUTPUT
 {
