@@ -247,19 +247,19 @@ a Pass condition, and a Skip condition.
 
 ## PHASE 5 STEPS
 
-### STEP-50: spec-compliance-section
-**Phase:** 5 | **Description:** Phase 5 emits Section 1 as a markdown table `| Requirement | Status | Evidence |`. One row per MUST/SHOULD from the approved spec; only ⚠️ (partial) and ❌ (missing) rows are shown — ✅ rows are omitted. If every MUST/SHOULD was satisfied, Section 1 is entirely omitted (no header, no placeholder).
-**Signal:** Session diary either contains a localized "Spec Uyumluluğu" / "Spec Compliance" table with only ⚠️/❌ rows, OR Section 1 is absent (all compliant — correct behavior).
-**Pass:** Section 1 is absent (all compliant) OR contains a table with only ⚠️/❌ rows. No ✅ rows appear. Each row has a Requirement, Status, and Evidence (file:line or "not found").
-**Skip:** When every MUST/SHOULD was satisfied (correct, expected omission — not a failure).
+### STEP-50: spec-coverage-section
+**Phase:** 5 | **Description:** Phase 5 emits Section 1 as a full traceability table `| Requirement | Test | Status |`. One row per MUST/SHOULD from the approved spec. ✅ rows show the test file:line and function name; ⚠️ rows show file:line with partial note; ❌ rows show "—" in the Test column. All rows are included — ✅ rows are NOT omitted.
+**Signal:** Session diary contains a localized "Spec Kapsama" / "Spec Coverage" table with all MUST/SHOULD rows; ✅ rows include test file:line references.
+**Pass:** All MUST/SHOULD rows present. ✅ rows have test:line in the Test column. ❌ rows have "—". Table uses `| Requirement | Test | Status |` columns.
+**Skip:** When test_command was never configured this session (no TDD ran at all). Correct, expected omission — not a failure.
 
 ---
 
-### STEP-51: must-test-section
-**Phase:** 5 | **Description:** Phase 5 emits Section 2 wrapped in `!!! <LOCALIZED-MUST-TEST-PHRASE> !!!` with specific items the developer must verify in a running environment.
-**Signal:** Session diary contains the `!!! ... !!!` wrapped localized must-test header with at least one test item.
-**Pass:** Session diary contains `!!!` markers wrapping the must-test header. At least one test item is listed beneath it.
-**Skip:** Never skipped — Section 2 cannot be empty by definition: if Phase 4 wrote code, there is always something to test.
+### STEP-51: automation-barriers-section
+**Phase:** 5 | **Description:** Phase 5 emits Section 2 wrapped in `!!! <LOCALIZED-MUST-TEST-PHRASE> !!!` ONLY for items where automation is structurally impossible. Detection is call-graph-based — NOT spec keyword-based. Five trigger patterns: (a) DOM API / render() / document.* calls — visual layout; (b) HTTP fetch or third-party SDK calls to non-localhost hosts with no mock in the test suite — live API; (c) file writes outside test temp dirs — filesystem side effect; (d) shell/subprocess invocation without mock — OS-level side effect; (e) production-only env vars read at runtime — prod env dependency. Each item cites file:line and one sentence explaining why it cannot be automated.
+**Signal:** Session diary contains `!!!` markers wrapping the must-test header, with each item citing a specific file:line and automation-barrier reason.
+**Pass:** Each item in Section 2 maps to a concrete call pattern in Phase 4 code with a file:line citation. No generic spec-keyword items appear.
+**Skip:** When no automation barriers are found after honest call-graph scan (empty-section-omission applies). A fully in-memory, no-external-call feature with complete test coverage produces NO Section 2.
 
 ---
 
