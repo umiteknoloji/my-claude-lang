@@ -26,6 +26,28 @@ Claude Code understood it this way:
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
+5.5. **Technical Challenge Pass** — Before calling AskUserQuestion, silently
+   ask yourself: "Does this spec have a concrete, specific technical problem?"
+
+   Qualifying problems (specific and actionable, not vague):
+   - Algorithmic scale issue (e.g., O(n²) on a large dataset)
+   - Race condition in shared state or concurrent access
+   - N+1 query with no index on the join path
+   - Missing auth check or unescaped input on a trust boundary
+   - Unhandled cascading failure mode
+   - Contradiction with loaded project memory (`.mcl/project.md` patterns)
+
+   **If a concrete problem is found:** add ONE localized line to the response
+   AFTER the translated summary and BEFORE the AskUserQuestion call:
+   - Turkish: `⚠️ Teknik not: [tek cümle spesifik sorun]. Devam edebilirsiniz — onaylamadan önce bu riski değerlendirin.`
+   - English: `⚠️ Technical note: [one sentence specific issue]. You can proceed — evaluate this risk before approving.`
+   Localize to the developer's detected language. One line, one problem, no list.
+
+   **If no concrete problem or only a vague concern:** skip silently. Do NOT
+   add "potential risks" or hedge language — only concrete findings surface.
+
+   This is NOT a gate. The developer can approve even with the note.
+
 6. Then call (since 6.0.0):
 ```
 AskUserQuestion({

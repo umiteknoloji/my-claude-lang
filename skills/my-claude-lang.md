@@ -256,7 +256,11 @@ Spec = SINGLE SOURCE OF TRUTH. All code must satisfy the spec.
 For full verification rules, read `my-claude-lang/phase3-verify.md`
 
 Phase 3 is COMBINED with Phase 2 — when the spec is shown, the developer
-verifies it. The explanation after the spec IS Phase 3, followed by the
+verifies it. The explanation after the spec IS Phase 3. Before calling
+AskUserQuestion, Claude runs a **Technical Challenge Pass**: silently checks
+the spec for concrete technical problems (race conditions, scale issues,
+missing auth, N+1, cascading failures). If a concrete problem is found,
+one `⚠️ Teknik not:` line is added — not a gate, but visible before approval.
 Phase 3 `AskUserQuestion` call with prefix `MCL 7.3.0 | `.
 Developer must understand AND pick an approve-family option in the
 tool_result → then Phase 4 begins (Stop hook flips state).

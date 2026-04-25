@@ -112,9 +112,9 @@ a Pass condition, and a Skip condition.
 ---
 
 ### STEP-22: spec-approval
-**Phase:** 3 | **Description:** After spec emission, Claude calls AskUserQuestion with prefix `MCL X.Y.Z | ` and options Approve/Edit/Cancel. On approval, mcl-stop.sh transitions to Phase 4: `spec_approved=true`, `current_phase=4`.
+**Phase:** 3 | **Description:** After presenting the translated spec summary, Claude runs a Technical Challenge Pass: silently checks for concrete technical problems (scale issues, race conditions, N+1, missing auth, cascading failures). If a concrete problem is found, one localized `⚠️ Teknik not:` line is added BEFORE the AskUserQuestion call — not a gate, but visible to the developer. Then Claude calls AskUserQuestion with prefix `MCL X.Y.Z | ` and options Approve/Edit/Cancel. On approval, mcl-stop.sh transitions to Phase 4: `spec_approved=true`, `current_phase=4`.
 **Signal:** trace.log contains `spec_approved | <hash12>` and `phase_transition | 2 | 4` (or `3 | 4`). audit.log contains `approve-via-askuserquestion | stop`. state.json `spec_approved=true`, `current_phase=4`.
-**Pass:** trace.log has both `spec_approved` and `phase_transition` to 4. state.json `spec_approved=true`.
+**Pass:** trace.log has both `spec_approved` and `phase_transition` to 4. state.json `spec_approved=true`. Technical Challenge Pass ran (silently if no issues found).
 **Skip:** Never skipped — explicit approval is mandatory before Phase 4.
 
 ---
