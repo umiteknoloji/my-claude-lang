@@ -302,3 +302,11 @@ a Pass condition, and a Skip condition.
 **Skip:** When no duplication or clarity improvement is warranted (code is already clean). Expected skip for trivial implementations.
 
 </mcl_phase>
+
+---
+
+### STEP-57: plugin-dispatch-audit
+**Phase:** Post-4.5 (fires on each turn during Phase 4.5) | **Description:** `mcl-activate.sh` sources `hooks/lib/mcl-dispatch-audit.sh` and checks `trace.log` for required Phase 4.5 dispatches (code-review sub-agent, semgrep) whenever `phase_review_state=running`. If any required dispatch is absent after the last `phase_review_pending` event in `trace.log`, `PLUGIN_MISS_NOTICE` is injected into `FULL_CONTEXT`, blocking progression to Phase 4.6/5 until the gap is filled.
+**Signal:** `audit.log` contains `plugin-dispatch-gap | mcl-activate.sh | missing=<list>`. `additionalContext` contains `PLUGIN DISPATCH GAP` block. Session diary shows subsequent Task dispatches for the listed plugins.
+**Pass:** After gap notice, session diary shows dispatches for all listed plugins. On the following turn, `PLUGIN_MISS_NOTICE` is absent — notice cleared automatically because `trace.log` now has the required events.
+**Skip:** When all Phase 4.5 required plugins are dispatched before this check runs (common case). Also skipped when `phase_review_state` is not `running`. Expected skip in most sessions.

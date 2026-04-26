@@ -294,3 +294,32 @@ this survey's partitioning.
   `plugin-integration.md` slash-command path if invoked explicitly.
 - Rearranging `superpowers`' methodology layer into discrete phase
   checkpoints. `superpowers` is ambient by design.
+
+## Dispatch Audit (since 7.9.5)
+
+Phase 4.5 has a mandatory dispatch manifest — specific plugins that MUST
+be dispatched before Phase 4.6/5 can proceed. The audit is enforced by
+`hooks/lib/mcl-dispatch-audit.sh`, called from `mcl-activate.sh` on every
+turn where `phase_review_state=running`.
+
+### Phase 4.5 Manifest
+
+| Dispatch type | Required plugin | Detection |
+|---|---|---|
+| Task sub-agent | `pr-review-toolkit:*` or `code-review:*` or `superpowers:code-reviewer` | `plugin_dispatched` event in `trace.log` after last `phase_review_pending` |
+| Bash tool | semgrep scan | `semgrep_ran` event in `trace.log` after last `phase_review_pending` |
+
+Semgrep is only required when the binary is available and the project stack
+is supported. If `SEMGREP_NOTICE` is present in the current turn's context,
+semgrep is skipped from the manifest automatically.
+
+### Gap Handling
+
+When any manifest entry is missing:
+1. `PLUGIN_MISS_NOTICE` (`<mcl_audit name="plugin-dispatch-gap">`) is
+   injected into `FULL_CONTEXT`.
+2. `audit.log` records `plugin-dispatch-gap | mcl-activate.sh | missing=<list>`.
+3. The `dispatch-audit` constraint in STATIC_CONTEXT blocks Phase 4.6/5
+   until the gap is resolved.
+4. Once dispatched, the notice clears automatically on the next turn
+   (no manual state clearing required).

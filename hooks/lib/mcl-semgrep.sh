@@ -39,6 +39,8 @@ fi
 source "$SCRIPT_DIR/mcl-state.sh"
 # shellcheck source=mcl-stack-detect.sh
 source "$SCRIPT_DIR/mcl-stack-detect.sh"
+# shellcheck source=mcl-trace.sh
+[ -f "$SCRIPT_DIR/mcl-trace.sh" ] && source "$SCRIPT_DIR/mcl-trace.sh"
 
 MCL_SEMGREP_CACHE_DIR="${MCL_SEMGREP_CACHE_DIR:-$HOME/.mcl/semgrep-cache}"
 MCL_SEMGREP_CACHE_TTL_DAYS=7
@@ -294,6 +296,7 @@ print(json.dumps({
     return 1
   fi
   mcl_audit_log "semgrep-scan" "mcl-semgrep" "ok files=$#"
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append semgrep_ran "$#"
   printf '%s\n' "$normalized"
   return 0
 }
