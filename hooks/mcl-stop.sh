@@ -211,6 +211,77 @@ if [ -n "$ASKQ_RECORD" ]; then
   ASKQ_SELECTED="${ASKQ_RECORD#*|}"
 fi
 
+# Plain-text approval fallback (since 7.9.8):
+# Developers sometimes type approval words in the chat input instead of
+# clicking the AskUserQuestion button. When no tool-based spec-approve
+# was detected AND current_phase=2 AND spec_hash is set, scan the most
+# recent USER message for approve-family text. If found, synthesize a
+# spec-approve intent so the phase-advance branch below fires.
+_PLAINTEXT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+_PLAINTEXT_HASH="$(mcl_state_get spec_hash 2>/dev/null)"
+if [ "$ASKQ_INTENT" != "spec-approve" ] && \
+   [ "$_PLAINTEXT_PHASE" = "2" ] && \
+   [ -n "$_PLAINTEXT_HASH" ] && \
+   [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] && \
+   command -v python3 >/dev/null 2>&1; then
+  _PT_RESULT="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
+import json, sys
+
+path = sys.argv[1]
+approve_words = {
+    "onayla", "onaylıyorum", "onayliyorum", "onaylıyorum", "evet", "kabul", "tamam",
+    "approve", "yes", "confirm", "ok", "proceed", "accept",
+    "aprobar", "sí", "si", "confirmar",
+    "approuver", "oui", "confirmer",
+    "genehmigen", "bestätigen", "ja",
+    "承認", "はい", "確認", "了解",
+    "승인", "네", "확인", "예",
+    "批准", "是", "确认",
+    "موافق", "نعم",
+    "אשר", "כן",
+    "स्वीकार", "हाँ", "हां",
+    "setujui", "ya",
+    "aprovar", "sim",
+    "одобрить", "да",
+}
+last_user_text = None
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            msg = obj if "role" in obj else obj.get("message", {})
+            if not isinstance(msg, dict):
+                continue
+            if msg.get("role") == "user":
+                content = msg.get("content", "")
+                if isinstance(content, str):
+                    last_user_text = content.strip()
+                elif isinstance(content, list):
+                    parts = [b.get("text","") for b in content if isinstance(b,dict) and b.get("type")=="text"]
+                    last_user_text = " ".join(parts).strip()
+except Exception:
+    pass
+
+if last_user_text:
+    norm = last_user_text.lower().strip(" .,!?")
+    if norm in approve_words or any(norm.startswith(w) for w in approve_words):
+        print(f"approve|{last_user_text}")
+PYEOF
+)"
+  if [ -n "$_PT_RESULT" ]; then
+    ASKQ_INTENT="spec-approve"
+    ASKQ_SELECTED="${_PT_RESULT#*|}"
+    mcl_audit_log "plaintext-approve-detected" "stop" "text=${ASKQ_SELECTED}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plaintext_approve_detected "${ASKQ_SELECTED}"
+  fi
+fi
+
 # Helper: is $1 an "approve family" option string?
 # Lowercase substring match on a fixed 14-language whitelist.
 _mcl_is_approve_option() {
