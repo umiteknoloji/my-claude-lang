@@ -341,9 +341,6 @@ backend_patterns = [
     r"(^|/)supabase/migrations(/|$)",
     r"(^|/)migrations(/|$)",
     r"(^|/)\.env(\.|$)",             # .env, .env.local, .env.production
-    r"(^|/)vite\.config\.",
-    r"(^|/)next\.config\.",
-    r"(^|/)nuxt\.config\.",
     r"(^|/)vercel\.json$",
     r"(^|/)netlify\.toml$",
     r"(^|/)server\.(js|ts|mjs)$",

@@ -40,16 +40,23 @@ neutrality rules, read `my-claude-lang/phase4a-ui-build/styles.md`.
 
 While `ui_sub_phase = "BUILD_UI"`, the pre-tool hook:
 
-- **Allows** frontend paths: `src/**/*.{tsx,jsx,vue,svelte,html,css,scss}`,
+- **Allows** frontend paths AND build-tool config:
+  `src/**/*.{tsx,jsx,vue,svelte,html,css,scss}`,
   `src/components/**`, `src/app/**`, `src/pages/**`,
   `src/**/__fixtures__/**`, `src/**/mocks/**`, `public/**`, `*.html`,
-  `src/styles/**`, `tailwind.config.*`, `.mcl/**`.
-- **Denies** backend paths: `src/api/**`, `src/server/**`,
+  `src/styles/**`, `tailwind.config.*`, `tsconfig*.json`, `jsconfig.json`,
+  `postcss.config.*`, `vite.config.*`, `next.config.*`, `nuxt.config.*`,
+  `package.json`, `.mcl/**`.
+- **Denies** true backend paths: `src/api/**`, `src/server/**`,
   `src/services/**`, `src/lib/db/**`, `.env*`, `prisma/**`,
-  `drizzle/**`, `vite.config.*`, `next.config.*`, `vercel.json`,
-  `server.{js,ts,mjs}`.
+  `drizzle/**`, `vercel.json`, `netlify.toml`, `server.{js,ts,mjs}`.
 
-If Claude attempts to write a backend path, the DENY reason says:
+Build tool configs (`vite.config.*`, `next.config.*`, `nuxt.config.*`,
+`tailwind.config.*`, `tsconfig*`, `postcss.config.*`) are **explicitly
+allowed** — they are needed to run `npm run dev` in Phase 4a. Writing
+them in Phase 4a is correct and required.
+
+If Claude attempts to write a true backend path, the DENY reason says:
 > MCL UI-BUILD LOCK — backend is unlocked in Phase 4c after the UI
 > is approved. Keep dummy fixtures in the component for now.
 
@@ -67,13 +74,18 @@ promotion details.
 2. Detect framework from `mcl-stack-detect.sh` tags:
    `react-frontend` / `vue-frontend` / `svelte-frontend` / `html-static`
    / none (fallback to HTML + inline JS).
-3. Write the component(s) under appropriate frontend path(s). Use
+3. **Write build-tool config files FIRST** — `package.json` (if absent),
+   `vite.config.ts`, `tsconfig.json`, `tailwind.config.js`,
+   `postcss.config.js`, or equivalent for the detected framework.
+   These files are required for `npm run dev` to work. Without them
+   the developer cannot see the UI. Do NOT defer them to Phase 4c.
+4. Write the component(s) under appropriate frontend path(s). Use
    dummy data ONLY — inline constants or `__fixtures__/*.ts`. No
    `fetch` / `axios` / database call / env read.
-4. Include dev-toggleable state — `const [mockState, setMockState]`
+5. Include dev-toggleable state — `const [mockState, setMockState]`
    or `?state=loading` query param — so the developer can eyeball
    loading / empty / error / success states.
-5. **Run the dev server and open it in the developer's browser.**
+6. **Run the dev server and open it in the developer's browser.**
    Prior releases asked the developer to copy-paste a run snippet, then
    pushed an `AskUserQuestion` at them before they had seen anything.
    Since 6.5.0 MCL does the launching itself, because a developer
