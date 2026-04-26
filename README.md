@@ -257,7 +257,7 @@ your PATH.
 Clone and run one command. No configuration. No language settings.
 
 ```bash
-git clone https://github.com/umiteknoloji/my-claude-lang.git
+git clone https://github.com/YZ-LLM/my-claude-lang.git
 bash my-claude-lang/setup.sh
 ```
 

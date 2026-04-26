@@ -258,7 +258,7 @@ tekrar çalıştırabilirsin. `claude` CLI'nin PATH'te olması gerekir.
 Klonla, tek komut çalıştır. Ayar yok. Dil seçimi yok.
 
 ```bash
-git clone https://github.com/umiteknoloji/my-claude-lang.git
+git clone https://github.com/YZ-LLM/my-claude-lang.git
 bash my-claude-lang/setup.sh
 ```
 

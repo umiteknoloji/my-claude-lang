@@ -1,9 +1,9 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "umiteknoloji-my-claude-lang",
+  "name": "YZ-LLM-my-claude-lang",
   "description": "The age of AI doesn't speak English. It speaks yours.",
   "owner": {
-    "name": "umiteknoloji",
+    "name": "YZ-LLM",
     "email": "ayseumitduman@gmail.com"
   },
   "plugins": [
@@ -12,10 +12,10 @@
       "description": "Semantic development bridge for non-English-speaking developers. NOT a translator — a meaning verification system.",
       "source": {
         "source": "url",
-        "url": "https://github.com/umiteknoloji/my-claude-lang.git"
+        "url": "https://github.com/YZ-LLM/my-claude-lang.git"
       },
       "category": "productivity",
-      "homepage": "https://github.com/umiteknoloji/my-claude-lang"
+      "homepage": "https://github.com/YZ-LLM/my-claude-lang"
     }
   ]
 }

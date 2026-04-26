@@ -8,7 +8,7 @@ set -u
 
 _BT='`'  # literal backtick for heredoc embedding without command substitution
 MCL_REPO_PATH="${MCL_REPO_PATH:-$HOME/my-claude-lang}"
-MCL_REPO_RAW="https://raw.githubusercontent.com/umiteknoloji/my-claude-lang/main/VERSION"
+MCL_REPO_RAW="https://raw.githubusercontent.com/YZ-LLM/my-claude-lang/main/VERSION"
 
 # Self-project guard: do not wrap the MCL repo itself.
 _MCL_CWD_REAL="$(cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" 2>/dev/null && pwd || true)"

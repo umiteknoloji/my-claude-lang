@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Semantic development bridge for non-English-speaking developers. Three-phase mutual understanding verification between developer and Claude Code. NOT a translator — a meaning verification system.",
   "author": {
-    "name": "umiteknoloji"
+    "name": "YZ-LLM"
   },
   "license": "MIT"
 }
