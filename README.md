@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 7.9.2
+# my-claude-lang 🌐 MCL 7.9.3
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -116,9 +116,9 @@ Phase 5.5: The full English report is formally translated back to
 
 Every closed-ended gate (Phase 1 summary, Phase 3 spec approval, each
 Phase 4.5 risk, each Phase 4.6 impact, plugin consent, git-init consent,
-drift resolution, `mcl-update` / `mcl-finish` / pasted-CLI confirmation)
+drift resolution, `/mcl-update` / `/mcl-finish` / pasted-CLI confirmation)
 now arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 7.9.2 | `. You pick an option in the UI — no typing
+question prefix `MCL 7.9.3 | `. You pick an option in the UI — no typing
 "yes" or "✅ MCL APPROVED" required. Open-ended Phase 1 gathering stays
 as a plain-text conversation.
 
@@ -127,7 +127,7 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 7.9.2` so you always know the bridge is active.
+Every response starts with `🌐 MCL 7.9.3` so you always know the bridge is active.
 
 ### UI Build / Review Sub-Phases (since 6.2.0)
 
@@ -280,7 +280,7 @@ Once per 24 hours, the hook fetches the upstream `VERSION` file in the backgroun
 🌐 MCL 5.4.1 (⚠️ 5.4.2 available — type mcl-update)
 ```
 
-To update, send the literal message `mcl-update`. MCL skips the normal pipeline (no spec, no phases) and runs:
+To update, send the literal message `/mcl-update`. MCL skips the normal pipeline (no spec, no phases) and runs:
 
 ```
 cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
@@ -298,9 +298,9 @@ Since 5.15.0, MCL detects the truncation at the Stop-hook layer: if a `📋 Spec
 
 ---
 
-## Token & Cost Accounting — `mcl-doctor`
+## Token & Cost Accounting — `/mcl-doctor`
 
-MCL logs the size of its context injection on every turn. Type `mcl-doctor` to see a breakdown:
+MCL logs the size of its context injection on every turn. Type `/mcl-doctor` to see a breakdown:
 
 - **MCL injection overhead** per turn (chars → estimated tokens)
 - **Cache write vs cache read** cost (Sonnet 4.6 rates)
@@ -312,20 +312,20 @@ To reset the counter: `rm .mcl/cost.json`
 
 ---
 
-## Cross-Session Finish Mode — `mcl-finish`
+## Cross-Session Finish Mode — `/mcl-finish`
 
 Phase 4.6 surfaces downstream impacts one at a time during execution. Many of those impacts are genuine "I'll verify this next week" items — they belong to a horizon that doesn't fit inside a single session.
 
-`mcl-finish` is the checkpoint that carries them across.
+`/mcl-finish` is the checkpoint that carries them across.
 
-Every Phase 5 Verification Report ends with a localized reminder line pointing at the command. When you're ready, type the literal message `mcl-finish` and MCL will:
+Every Phase 5 Verification Report ends with a localized reminder line pointing at the command. When you're ready, type the literal message `/mcl-finish` and MCL will:
 
 1. Aggregate every Phase 4.6 impact written to `.mcl/impact/` since the last checkpoint
 2. Run a full-project Semgrep rescan on supported stacks (silently skipped on unsupported ones)
 3. Emit a project-level finish report in your language
 4. Write a new checkpoint to `.mcl/finish/NNNN-YYYY-MM-DD.md`
 
-The next `mcl-finish` starts a fresh window from that checkpoint — closed impacts stay in the archive, new ones pile up for the next pass. No git commits, no remote pushes, no external reporting — pure local state.
+The next `/mcl-finish` starts a fresh window from that checkpoint — closed impacts stay in the archive, new ones pile up for the next pass. No git commits, no remote pushes, no external reporting — pure local state.
 
 Phase 4.5 risks are NOT accumulated: they're resolved in-session.
 
@@ -337,11 +337,11 @@ Two ways to activate:
 
 ### 1. Explicit (recommended)
 
-Type `/mcl` or `@mcl` before your message:
+Type `/mcl` or `/mcl` before your message:
 
 ```
 /mcl bir login sayfası yap
-@mcl ログインページを作って
+ログインページを作って
 /mcl 做一个登录页面
 ```
 

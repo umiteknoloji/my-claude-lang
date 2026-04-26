@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 7.9.2
+# my-claude-lang 🌐 MCL 7.9.3
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -116,9 +116,9 @@ Aşama 5.5: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
 
 Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 3 spec onayı, her Aşama 4.5
 risk, her Aşama 4.6 etki, plugin onayı, git-init onayı, drift çözümü,
-`mcl-update` / `mcl-finish` / yapıştırılan-CLI onayı) artık yerleşik
+`/mcl-update` / `/mcl-finish` / yapıştırılan-CLI onayı) artık yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 7.9.2 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+`MCL 7.9.3 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
 "evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
 açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
 kalıyor.
@@ -128,7 +128,7 @@ Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
 bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
 onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
-Her yanıt `🌐 MCL 7.9.2` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 7.9.3` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ### UI Build / Review Alt-Fazları (6.2.0'dan itibaren)
 
@@ -281,7 +281,7 @@ Hook, 24 saatte bir arka planda repodaki `VERSION` dosyasını çeker. Yeni sür
 🌐 MCL 5.4.1 (⚠️ 5.4.2 mevcut — mcl-update yaz)
 ```
 
-Güncellemek için mesaj olarak sadece `mcl-update` yaz. MCL normal akışı (spec, fazlar) tamamen atlar ve şu komutu çalıştırır:
+Güncellemek için mesaj olarak sadece `/mcl-update` yaz. MCL normal akışı (spec, fazlar) tamamen atlar ve şu komutu çalıştırır:
 
 ```
 cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
@@ -299,9 +299,9 @@ Uzun spec'ler rate-limit, ağ kesintisi veya süreç kill ile yarıda kesilebili
 
 ---
 
-## Token & Maliyet Muhasebesi — `mcl-doctor`
+## Token & Maliyet Muhasebesi — `/mcl-doctor`
 
-MCL her turda context injection boyutunu loglar. `mcl-doctor` yazarak şunları görebilirsin:
+MCL her turda context injection boyutunu loglar. `/mcl-doctor` yazarak şunları görebilirsin:
 
 - **MCL injection overhead** tur başına (karakter → tahmini token)
 - **Cache write ve cache read** maliyeti (Sonnet 4.6 fiyatlandırması)
@@ -313,20 +313,20 @@ Sayacı sıfırlamak için: `rm .mcl/cost.json`
 
 ---
 
-## Oturumlar Arası Bitirme Modu — `mcl-finish`
+## Oturumlar Arası Bitirme Modu — `/mcl-finish`
 
 Phase 4.6 execution sırasında downstream etkileri teker teker yüzeye çıkarır. Bu etkilerin çoğu "haftaya bir kontrol edeyim" türünden gerçek maddelerdir — tek bir oturuma sığmayan, ileri tarihli kontroller.
 
-`mcl-finish` bu maddeleri oturumlar arasında taşıyan checkpoint mekanizmasıdır.
+`/mcl-finish` bu maddeleri oturumlar arasında taşıyan checkpoint mekanizmasıdır.
 
-Her Phase 5 Doğrulama Raporu, bu komuta işaret eden senin dilinde bir hatırlatıcı satırla biter. Hazır olduğunda mesaj olarak sadece `mcl-finish` yaz ve MCL şunları yapar:
+Her Phase 5 Doğrulama Raporu, bu komuta işaret eden senin dilinde bir hatırlatıcı satırla biter. Hazır olduğunda mesaj olarak sadece `/mcl-finish` yaz ve MCL şunları yapar:
 
 1. Son checkpoint'ten bu yana `.mcl/impact/` dizinine yazılmış tüm Phase 4.6 etkilerini toplar
 2. Desteklenen stack'lerde full-project Semgrep taraması çalıştırır (desteklenmeyenlerde sessizce atlanır)
 3. Senin dilinde proje seviyesi bir bitirme raporu emit eder
 4. `.mcl/finish/NNNN-YYYY-MM-DD.md` olarak yeni bir checkpoint yazar
 
-Bir sonraki `mcl-finish` bu checkpoint'ten itibaren yeni bir pencere açar — kapanan etkiler arşivde kalır, yeniler bir sonraki pass için birikmeye başlar. Git commit yok, remote push yok, external reporting yok — tamamen yerel state.
+Bir sonraki `/mcl-finish` bu checkpoint'ten itibaren yeni bir pencere açar — kapanan etkiler arşivde kalır, yeniler bir sonraki pass için birikmeye başlar. Git commit yok, remote push yok, external reporting yok — tamamen yerel state.
 
 Phase 4.5 riskleri biriktirilmez: onlar oturum içinde çözülür.
 
@@ -338,12 +338,12 @@ Phase 4.5 riskleri biriktirilmez: onlar oturum içinde çözülür.
 
 ### 1. Manuel (önerilen)
 
-Mesajının başına `/mcl` veya `@mcl` yaz:
+Mesajının başına `/mcl` veya `/mcl` yaz:
 
 ```
 /mcl bir login sayfası yap
 /mcl hızlı bir dashboard lazım
-@mcl bu API'yi düzelt
+bu API'yi düzelt
 ```
 
 Bu **garanti** aktivasyon. Bir kere yaz, konuşma boyunca aktif kalır.

@@ -189,18 +189,18 @@ Bkz. Phase 1 bölümü.
 
 | Komut | Açıklama |
 |---|---|
-| `mcl-update` | MCL'yi git pull + setup.sh ile günceller |
-| `mcl-restart` | Tüm faz ve spec state'ini sıfırlar |
-| `mcl-finish` | Birikmiş Phase 4.6 etkilerini özetler + Semgrep taraması |
-| `mcl-doctor` | Token & maliyet raporu (7.8.0+) |
-| `mcl check-up` | Sağlık kontrolü — tüm STEP'ler değerlendirilir |
+| `/mcl-update` | MCL'yi git pull + setup.sh ile günceller |
+| `/mcl-restart` | Tüm faz ve spec state'ini sıfırlar |
+| `/mcl-finish` | Birikmiş Phase 4.6 etkilerini özetler + Semgrep taraması |
+| `/mcl-doctor` | Token & maliyet raporu (7.8.0+) |
+| `/mcl-checkup` | Sağlık kontrolü — tüm STEP'ler değerlendirilir |
 
 ---
 
 ## Token & Maliyet Muhasebesi (7.8.0)
 
 - Her tur `FULL_CONTEXT` karakter sayısı `.mcl/cost.json`'a loglanır
-- `mcl-doctor` komutu:
+- `/mcl-doctor` komutu:
   - MCL injection overhead (karakter → tahmini token)
   - Cache write (ilk tur) / cache read (sonraki turlar) maliyet dökümü
   - "MCL açık vs kapalı" karşılaştırması

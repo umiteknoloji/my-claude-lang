@@ -21,7 +21,7 @@ with open(path, 'w') as f:
     json.dump(state, f)
 " "$_rs_dir/.mcl/state.json"
 
-_out="$(run_activate_hook "$_rs_dir" "mcl-restart")"
+_out="$(run_activate_hook "$_rs_dir" "/mcl-restart")"
 
 assert_json_valid  "mcl-restart → valid JSON"           "$_out"
 assert_contains    "mcl-restart → MCL_RESTART_MODE"     "$_out" "MCL_RESTART_MODE"
