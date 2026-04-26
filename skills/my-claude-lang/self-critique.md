@@ -6,7 +6,7 @@ The self-critique loop is a MANDATORY quality gate that wraps every MCL
 output. It runs in ALL phases. It is never skipped. By default it runs
 silently — the developer sees only the final clean answer. The developer
 can surface the process for a specific response by including the
-`(mcl-oz)` tag in that message.
+`/mcl-self-q` tag in that message.
 
 ## When It Runs
 
@@ -50,7 +50,7 @@ Semantic intent (preserve exactly when translating):
 
 When the developer writes in Japanese, the four questions run in
 Japanese. In Spanish, Spanish. In Arabic, Arabic. Only the literal
-tag `(mcl-oz)` stays in ASCII — everything else follows the developer.
+tag `/mcl-self-q` stays in ASCII — everything else follows the developer.
 
 ## The Loop
 
@@ -85,10 +85,10 @@ By default the critique is ENTIRELY INTERNAL. The developer NEVER sees:
 The developer sees ONLY the final, clean answer — as if it came out
 right on the first try.
 
-## Making Critique Visible: `(mcl-oz)` Tag
+## Making Critique Visible: `/mcl-self-q` Tag
 
 The developer can inspect the critique process for a specific response
-by including the literal ASCII tag `(mcl-oz)` anywhere in that message.
+by including the literal ASCII tag `/mcl-self-q` anywhere in that message.
 
 - **Detection**: case-insensitive substring match on the current user
   message only. `(MCL-OZ)`, `(Mcl-Oz)`, `(mcl-OZ)` all trigger. System
@@ -104,7 +104,7 @@ by including the literal ASCII tag `(mcl-oz)` anywhere in that message.
 - **No state**: there is no configuration file, no session flag, no
   environment variable. The tag IS the toggle.
 
-Example layout when `(mcl-oz)` is present:
+Example layout when `/mcl-self-q` is present:
 
 ```
 🔍 Öz-Eleştiri Süreci:
@@ -185,20 +185,20 @@ No balancing statement like "but still be nice" — honesty is the rule.
 - **Factual error found during critique**: silently correct; do NOT
   apologize in the final output ("sorry, I was wrong about...")
 - **Iteration 3 still dirty**: ship the best-available draft; do not
-  block the user. Under `(mcl-oz)` show the dirty state explicitly.
+  block the user. Under `/mcl-self-q` show the dirty state explicitly.
 - **Critique produces no concrete flaw**: exit early, don't fabricate
   problems to justify iteration
 - **Language switch mid-conversation**: re-translate the four questions
   to the new language for the very next response
-- **`(mcl-oz)` inside a quote or code block**: still triggers — the
+- **`/mcl-self-q` inside a quote or code block**: still triggers — the
   rule stays simple (substring match, case-insensitive)
 
 ## What Self-Critique Is NOT
 
-- Not a visible deliberation step (unless `(mcl-oz)` is present)
+- Not a visible deliberation step (unless `/mcl-self-q` is present)
 - Not an excuse to delay responses
 - Not a replacement for any phase logic — it WRAPS the phase output
-- Not adjustable by configuration files — the only toggle is `(mcl-oz)`
+- Not adjustable by configuration files — the only toggle is `/mcl-self-q`
 - Not a translation of the user's input — that's handled by Gates 1/2/3
 
 ## Why This Exists
@@ -215,6 +215,6 @@ With self-critique:
 - Sycophantic language is filtered out — absolutely, not "with balance"
 - The developer gets the equivalent of a senior engineer who drafts,
   reviews, and revises before speaking
-- With `(mcl-oz)` the developer can audit the process when needed
+- With `/mcl-self-q` the developer can audit the process when needed
 
 </mcl_constraint>
