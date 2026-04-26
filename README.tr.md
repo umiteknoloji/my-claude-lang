@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 7.8.1
+# my-claude-lang 🌐 MCL 7.9.2
 
 ### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
 
@@ -44,13 +44,25 @@ Sen (kendi dilinde)
   ▼
 Aşama 1: MCL ne istediğini anlamak için tek tek soru soruyor.
          Hiçbir belirsizlik geçemiyor. Özeti onaylıyorsun.
+         MCL aynı zamanda mimari cevaplarını da sorgulayabilir:
+         "JWT" deyip sunucu tarafı oturum akışı tarif edersen,
+         MCL çelişkiyi yüzeye çıkarır ve spec yazmadan önce
+         hangisini kastettiğini sorar.
+  │
+  ▼
+Aşama 1.5 (görünmez): Onaylanan niyetin katı bir çevirmen
+         geçişinden (kullanıcı dili → EN) geçiyor. Yorum yok,
+         ekleme yok — sadece doğal dil çevriliyor; teknik terimler
+         olduğu gibi kalıyor. Ortaya çıkan İngilizce Engineering
+         Brief, spec üretiminin tek girdisi oluyor.
   │
   ▼
 Aşama 2+3: Onaylanan niyetin, görünür bir İngilizce teknik
            spesifikasyona (📋 Spec:) dönüşüyor — 15+ yıl deneyimli
            kıdemli bir mühendis gibi yazılıyor — ve MCL spec'i
            sana kendi dilinde açıklıyor; ikisi aynı turda, tek
-           AskUserQuestion onayıyla.
+           AskUserQuestion onayıyla. Spec bloğu daraltılabilir —
+           okuduktan sonra tıklayarak küçültebilirsin.
   │
   ▼
 Aşama 4: Kod yazılıyor. Bu aşamanın içinde kademeli TDD
@@ -84,10 +96,18 @@ Aşama 4.6 (Etki İncelemesi): MCL projenin geri kalanını,
          her birini senin kararın için önüne koyuyor.
   │
   ▼
-Aşama 5: Doğrulama Raporu — spec-uyum uyuşmazlıkları (varsa) ve
-         çalışır bir ortamda doğrulaman gereken maddelerin
-         yerelleştirilmiş "!!! MUTLAKA TEST ETMENİZ GEREKENLER !!!"
-         listesi.
+Aşama 5: Doğrulama Raporu — Spec Kapsama tablosu (her MUST/SHOULD
+         gereksinimi, onu kapsayan teste bağlı: ✅ dosya:satır ile,
+         ⚠️ kısmi, ❌ test yazılmamış). Ardından: kodunun call
+         graph'ından tespit edilen otomasyon engelleri — yalnızca
+         gerçekten otomatize edilemeyen maddeler (canlı API,
+         DOM layout, prod ortam değişkenleri).
+  │
+  ▼
+Aşama 5.5: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
+         kullanıcı dili) senin diline çevriliyor — yorum yok,
+         ekleme yok. Teknik tokenlar (dosya:satır, test isimleri)
+         olduğu gibi korunuyor.
 ```
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Açık onayın olmadan hiçbir şey ilerlemez.
@@ -98,7 +118,7 @@ Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 3 spec onayı, her Aşama 4.5
 risk, her Aşama 4.6 etki, plugin onayı, git-init onayı, drift çözümü,
 `mcl-update` / `mcl-finish` / yapıştırılan-CLI onayı) artık yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 7.8.1 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+`MCL 7.9.2 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
 "evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
 açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
 kalıyor.
@@ -108,7 +128,7 @@ Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
 bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
 onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
-Her yanıt `🌐 MCL 7.8.1` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 7.9.2` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ### UI Build / Review Alt-Fazları (6.2.0'dan itibaren)
 
@@ -276,6 +296,20 @@ cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
 Uzun spec'ler rate-limit, ağ kesintisi veya süreç kill ile yarıda kesilebilir. 5.15.0 öncesi, sonraki turda senden gelen bir `evet` bu yarıda kalmış spec'i sessizce EXECUTE fazına geçiriyordu — çünkü MCL'in state makinesi sadece approval token'ına bakıyordu, spec body'nin yapısal tamlığına bakmıyordu. Gereksinimlerinin yarısı eksik onaylanmış bir spec ile kalıyordun ve tek çıkış yolu manuel `rm .mcl/state.json` idi.
 
 5.15.0 ile MCL bu kesintiyi Stop-hook katmanında tespit ediyor: bir `📋 Spec:` bloğu yedi zorunlu bölümden (Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope) herhangi birini kapsamıyorsa, state'e `partial_spec=true` bayrağı yazılır. Bir sonraki aktivasyon Claude'a spec'i tam olarak yeniden yayınlamasını söyler — ve bayrak temiz spec ile sıfırlanana kadar hiçbir approval token'ı dinlenmez. Kesintiyi fark etmek zorunda değilsin; MCL senin için fark eder.
+
+---
+
+## Token & Maliyet Muhasebesi — `mcl-doctor`
+
+MCL her turda context injection boyutunu loglar. `mcl-doctor` yazarak şunları görebilirsin:
+
+- **MCL injection overhead** tur başına (karakter → tahmini token)
+- **Cache write ve cache read** maliyeti (Sonnet 4.6 fiyatlandırması)
+- **MCL açık vs kapalı karşılaştırması** — bu session'da MCL'nin net maliyeti
+- **Session token özeti** gerçek session log'undan
+
+Fiyatlar tahmini. Gerçek fatura için Claude Console'u kontrol et.
+Sayacı sıfırlamak için: `rm .mcl/cost.json`
 
 ---
 

@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 7.8.1
+# my-claude-lang 🌐 MCL 7.9.2
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -44,12 +44,25 @@ You (your language)
   ▼
 Phase 1: MCL gathers what you want — one question at a time.
          No ambiguity passes. You confirm the summary.
+         MCL may also challenge your architectural answers: if you
+         say "JWT" but describe a server-side session flow, MCL
+         surfaces the mismatch and asks which you meant — before
+         any spec is written.
+  │
+  ▼
+Phase 1.5 (invisible): Your confirmed intent passes through a strict
+         translator pass (user_lang → EN). No interpretation, no
+         additions — only natural language is translated; technical
+         terms stay intact. The resulting English Engineering Brief
+         is the sole input for spec generation.
   │
   ▼
 Phase 2+3: Your confirmed intent becomes a visible English spec
            (📋 Spec:) written like a senior engineer with 15+ years
            experience — and MCL explains it back in your language,
            all in the same turn. One AskUserQuestion, one approval.
+           The spec block is collapsible — click to hide once you've
+           read it.
   │
   ▼
 Phase 4: Code gets written. Incremental TDD runs inside this
@@ -83,9 +96,18 @@ Phase 4.6 (Impact Review): MCL scans the rest of the project for
          your decision.
   │
   ▼
-Phase 5: Verification Report — spec-compliance mismatches (if any)
-         and a localized "!!! YOU MUST TEST THESE !!!" list of
-         items you should verify in a running environment.
+Phase 5: Verification Report — Spec Coverage traceability table
+         (each MUST/SHOULD requirement linked to the test that
+         covers it: ✅ with file:line, ⚠️ partial, ❌ not tested).
+         Then: automation barriers detected from your code's call
+         graph — only items that genuinely can't be automated
+         (live APIs, DOM layout, production env vars).
+  │
+  ▼
+Phase 5.5: The full English report is formally translated back to
+         your language — same strict translator pass, no
+         interpretation. Technical tokens (file:line, test names)
+         stay verbatim.
 ```
 
 **No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit approval.
@@ -96,7 +118,7 @@ Every closed-ended gate (Phase 1 summary, Phase 3 spec approval, each
 Phase 4.5 risk, each Phase 4.6 impact, plugin consent, git-init consent,
 drift resolution, `mcl-update` / `mcl-finish` / pasted-CLI confirmation)
 now arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 7.8.1 | `. You pick an option in the UI — no typing
+question prefix `MCL 7.9.2 | `. You pick an option in the UI — no typing
 "yes" or "✅ MCL APPROVED" required. Open-ended Phase 1 gathering stays
 as a plain-text conversation.
 
@@ -105,7 +127,7 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 7.8.1` so you always know the bridge is active.
+Every response starts with `🌐 MCL 7.9.2` so you always know the bridge is active.
 
 ### UI Build / Review Sub-Phases (since 6.2.0)
 
@@ -273,6 +295,20 @@ cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
 Long specs can get cut off mid-stream by a rate-limit, a network drop, or a process kill. Before 5.15.0, a follow-up `yes` from you would silently promote that truncated spec to EXECUTE — because MCL's state machine only listened for the approval token, not the structural completeness of the spec body. You'd end up with an approved spec that was missing half its requirements, and the only way out was a manual `rm .mcl/state.json`.
 
 Since 5.15.0, MCL detects the truncation at the Stop-hook layer: if a `📋 Spec:` block is missing any of the seven required sections (Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope), a `partial_spec=true` flag is raised in state. The next activation tells Claude to re-emit the full spec — and ignores any approval token until the flag is cleared by a complete spec. Defense-in-depth: the developer doesn't need to notice the interrupt; MCL notices for them.
+
+---
+
+## Token & Cost Accounting — `mcl-doctor`
+
+MCL logs the size of its context injection on every turn. Type `mcl-doctor` to see a breakdown:
+
+- **MCL injection overhead** per turn (chars → estimated tokens)
+- **Cache write vs cache read** cost (Sonnet 4.6 rates)
+- **MCL on vs off comparison** — net cost of running MCL this session
+- **Session token summary** from your actual session log
+
+Pricing is estimated. For exact billing, check Claude Console.
+To reset the counter: `rm .mcl/cost.json`
 
 ---
 
