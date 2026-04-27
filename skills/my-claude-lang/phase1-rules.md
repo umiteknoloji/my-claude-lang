@@ -241,7 +241,9 @@ gerektiriyor — JWT'nin stateless yapısıyla çelişiyor.
 - One conflict, one question — never a list
 - Only fire for concrete technical incompatibility — not style preference
 - Vague concern → skip silently
-- If user insists: pressure-resistance rule applies (hold position without new evidence)
+- If user insists without new evidence: pressure-resistance rule applies (hold position)
+- If user makes an explicit decision ("proceed", "I accept the risk"): human authority
+  rule applies — close the topic, do not circle back (see self-critique.md)
 
 ## Nested Conditional Requirements
 
