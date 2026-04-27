@@ -582,9 +582,9 @@ except Exception:
     _PR_R2="${_PR_R1#*|}"
     _PR_TEST="${_PR_R2%%|*}"
     _PR_COMPLIANCE="${_PR_R2#*|}"
-    PATTERN_RULES_NOTICE="<mcl_audit name=\"pattern-rules\">\nCODEBASE PATTERN RULES (Phase 3.5 — enforced in all Phase 4 code)\n• Naming:        ${_PR_NAMING}\n• Error Handling: ${_PR_ERROR}\n• Test Pattern:   ${_PR_TEST}\n</mcl_audit>\n\n"
+    PATTERN_RULES_NOTICE="<mcl_audit name=\\\"pattern-rules\\\">\\nCODEBASE PATTERN RULES (Phase 3.5 — enforced in all Phase 4 code)\\n• Naming:         ${_PR_NAMING}\\n• Error Handling: ${_PR_ERROR}\\n• Test Pattern:   ${_PR_TEST}\\n</mcl_audit>\\n\\n"
     if [ "$_PR_COMPLIANCE" = "1" ]; then
-      PATTERN_RULES_NOTICE="${PATTERN_RULES_NOTICE}<mcl_audit name=\"pattern-compliance\">\nPHASE 4.5 COMPLIANCE — check each Phase 4 file against the three rules above.\nReport violations as risk items: which file, which rule, what was found vs what is required.\n</mcl_audit>\n\n"
+      PATTERN_RULES_NOTICE="${PATTERN_RULES_NOTICE}<mcl_audit name=\\\"pattern-compliance\\\">\\nPHASE 4.5 COMPLIANCE — check each Phase 4 file against the three rules above.\\nReport violations as risk items: which file, which rule, what was found vs what is required.\\n</mcl_audit>\\n\\n"
     fi
   fi
 fi
