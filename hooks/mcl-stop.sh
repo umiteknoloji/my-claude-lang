@@ -432,6 +432,54 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
   fi
 fi
 
+# --- Phase 3.5 pattern-scan clearance (runs before early exit) ---
+# Must run before the spec/askq gate below because the Phase 3.5 turn has
+# no spec block and no AskUQ — the early exit would skip this otherwise.
+_PS_DUE_EARLY="$(mcl_state_get pattern_scan_due 2>/dev/null)"
+_PS_PHASE_EARLY="$(mcl_state_get current_phase 2>/dev/null)"
+if [ "$_PS_DUE_EARLY" = "true" ] && [ "$_PS_PHASE_EARLY" = "4" ] \
+   && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+  _PS_SUMMARY_EARLY="$(python3 - "$TRANSCRIPT_PATH" << 'PYPS_EARLY'
+import json, re, sys
+path = sys.argv[1]
+HEADING_RE = re.compile(
+    r'\*\*Naming Convention:\*\*\s*(.+?)(?:\n|$).*?'
+    r'\*\*Error Handling Pattern:\*\*\s*(.+?)(?:\n|$).*?'
+    r'\*\*Test Pattern:\*\*\s*(.+?)(?:\n|$)',
+    re.DOTALL)
+last_text = ''
+try:
+    with open(path, encoding='utf-8', errors='replace') as f:
+        for raw in f:
+            raw = raw.strip()
+            if not raw: continue
+            try: obj = json.loads(raw)
+            except Exception: continue
+            msg = obj if 'role' in obj else obj.get('message', obj)
+            if not isinstance(msg, dict) or msg.get('role') != 'assistant': continue
+            content = msg.get('content', '')
+            text = content if isinstance(content, str) else '\n'.join(
+                item.get('text','') for item in content
+                if isinstance(item, dict) and item.get('type') == 'text')
+            if text.strip(): last_text = text
+except Exception: pass
+m = HEADING_RE.search(last_text)
+if m:
+    print(json.dumps({"naming": m.group(1).strip(), "error": m.group(2).strip(), "test": m.group(3).strip()}))
+else:
+    print('null')
+PYPS_EARLY
+  2>/dev/null)"
+  if [ -n "$_PS_SUMMARY_EARLY" ] && [ "$_PS_SUMMARY_EARLY" != "null" ]; then
+    mcl_state_set pattern_summary "$_PS_SUMMARY_EARLY" >/dev/null 2>&1 || true
+    mcl_audit_log "pattern-summary-stored" "stop" "early"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_summary_stored
+  fi
+  mcl_state_set pattern_scan_due false >/dev/null 2>&1 || true
+  mcl_audit_log "pattern-scan-cleared" "stop" "early"
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_cleared
+fi
+
 # If neither spec nor AskUserQuestion approval present, nothing to do.
 if [ -z "$SPEC_HASH" ] && [ -z "$ASKQ_INTENT" ]; then
   exit 0
@@ -661,13 +709,69 @@ if [ "$ASKQ_INTENT" = "ui-review" ]; then
   fi
 fi
 
-# --- Phase 3.5 pattern-scan clearance ---
-# Once per Phase 4 session: after the first Phase 4 turn completes (whether
-# Claude read pattern files or not), lift the write block so Phase 4 code
-# can proceed. The one-turn pause was the opportunity; we don't enforce more.
+# --- Phase 3.5 pattern-scan clearance (late fallback for code-write turns) ---
+# Handles the case where pattern_scan_due=true but a Write call happened in the
+# same turn — the early block above ran, so this is now a no-op guard.
 _PS_DUE="$(mcl_state_get pattern_scan_due 2>/dev/null)"
 _PS_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-if [ "$_PS_DUE" = "true" ] && [ "$_PS_PHASE" = "4" ]; then
+if [ "$_PS_DUE" = "true" ] && [ "$_PS_PHASE" = "4" ] && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+  _PS_SUMMARY="$(python3 - "$TRANSCRIPT_PATH" << 'PYPS'
+import json, re, sys
+
+path = sys.argv[1]
+HEADING_RE = re.compile(
+    r'\*\*Naming Convention:\*\*\s*(.+?)(?:\n|$)'
+    r'.*?'
+    r'\*\*Error Handling Pattern:\*\*\s*(.+?)(?:\n|$)'
+    r'.*?'
+    r'\*\*Test Pattern:\*\*\s*(.+?)(?:\n|$)',
+    re.DOTALL
+)
+
+last_text = ''
+try:
+    with open(path, encoding='utf-8', errors='replace') as f:
+        for raw in f:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+            except Exception:
+                continue
+            msg = obj if 'role' in obj else obj.get('message', obj)
+            if not isinstance(msg, dict) or msg.get('role') != 'assistant':
+                continue
+            content = msg.get('content', '')
+            text = ''
+            if isinstance(content, str):
+                text = content
+            elif isinstance(content, list):
+                text = '\n'.join(
+                    item.get('text', '')
+                    for item in content
+                    if isinstance(item, dict) and item.get('type') == 'text'
+                )
+            if text.strip():
+                last_text = text
+except Exception:
+    pass
+
+m = HEADING_RE.search(last_text)
+if m:
+    naming = m.group(1).strip()
+    error  = m.group(2).strip()
+    test   = m.group(3).strip()
+    print(json.dumps({"naming": naming, "error": error, "test": test}))
+else:
+    print('null')
+PYPS
+  2>/dev/null)"
+  if [ -n "$_PS_SUMMARY" ] && [ "$_PS_SUMMARY" != "null" ]; then
+    mcl_state_set pattern_summary "$_PS_SUMMARY" >/dev/null 2>&1 || true
+    mcl_audit_log "pattern-summary-stored" "stop" ""
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_summary_stored
+  fi
   mcl_state_set pattern_scan_due false >/dev/null 2>&1 || true
   mcl_audit_log "pattern-scan-cleared" "stop" ""
   command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_cleared

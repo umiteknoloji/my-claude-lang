@@ -68,6 +68,7 @@ _mcl_state_default() {
   "pattern_files": [],
   "rollback_sha": null,
   "rollback_notice_shown": false,
+  "pattern_summary": null,
   "last_update": ${now}
 }
 JSON
