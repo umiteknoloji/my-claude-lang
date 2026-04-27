@@ -27,6 +27,8 @@ INSTALLED_VERSION="${INSTALLED_VERSION:-unknown}"
 source "$SCRIPT_DIR/lib/mcl-state.sh"
 # shellcheck source=lib/mcl-trace.sh
 [ -f "$SCRIPT_DIR/lib/mcl-trace.sh" ] && source "$SCRIPT_DIR/lib/mcl-trace.sh"
+# shellcheck source=lib/mcl-test-runner.sh
+[ -f "$SCRIPT_DIR/lib/mcl-test-runner.sh" ] && source "$SCRIPT_DIR/lib/mcl-test-runner.sh"
 # shellcheck source=lib/mcl-log-append.sh
 [ -f "$SCRIPT_DIR/lib/mcl-log-append.sh" ] && source "$SCRIPT_DIR/lib/mcl-log-append.sh"
 
@@ -394,6 +396,28 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
         "prev=${_PR_REVIEW_STATE} phase=${_PR_PHASE} code=${_PR_CODE}"
       command -v mcl_trace_append >/dev/null 2>&1 && \
         mcl_trace_append phase_review_pending "${_PR_REVIEW_STATE:-null}"
+
+      # Regression guard — run full test suite on FIRST transition to pending.
+      # Sticky re-triggers (already pending) skip re-run to avoid slowdown.
+      if [ "$_PR_CODE" = "true" ] && [ "$_PR_REVIEW_STATE" != "pending" ] \
+         && command -v mcl_test_run >/dev/null 2>&1; then
+        _RG_OUTPUT="$(mcl_test_run "regression-guard" 2>/dev/null)"
+        if printf '%s' "$_RG_OUTPUT" | grep -q "^❌ Tests: RED"; then
+          # Store failing output (JSON-safe, truncated to 1KB)
+          _RG_JSON="$(printf '%s' "$_RG_OUTPUT" | python3 -c \
+            'import json,sys; print(json.dumps(sys.stdin.read()[:1024]))' 2>/dev/null || echo '""')"
+          mcl_state_set regression_block_active true >/dev/null 2>&1 || true
+          mcl_state_set regression_output "$_RG_JSON" >/dev/null 2>&1 || true
+          mcl_audit_log "regression-guard-red" "stop" "prev=${_PR_REVIEW_STATE}"
+          command -v mcl_trace_append >/dev/null 2>&1 && \
+            mcl_trace_append regression_guard_red
+        else
+          # GREEN or no test command — clear any stale block
+          mcl_state_set regression_block_active false >/dev/null 2>&1 || true
+          mcl_state_set regression_output '""' >/dev/null 2>&1 || true
+          [ -n "$_RG_OUTPUT" ] && mcl_audit_log "regression-guard-green" "stop" ""
+        fi
+      fi
 
       # Return decision:block so Claude is forced to continue.
       printf '%s\n' "{

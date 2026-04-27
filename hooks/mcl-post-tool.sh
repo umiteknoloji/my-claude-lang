@@ -81,4 +81,38 @@ if [ -n "$MSG" ] && command -v mcl_log_append >/dev/null 2>&1; then
   mcl_log_append "$MSG"
 fi
 
+# Regression guard clearance: when Claude runs tests via mcl-test-runner.sh
+# and they pass (GREEN), clear regression_block_active so Phase 4.5 unblocks.
+TOOL_NAME_POST="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json,sys
+try: print(json.loads(sys.stdin.read()).get("tool_name",""))
+except: pass
+' 2>/dev/null)"
+if [ "$TOOL_NAME_POST" = "Bash" ]; then
+  TOOL_OUTPUT="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json,sys
+try:
+    obj = json.loads(sys.stdin.read())
+    out = obj.get("tool_response","") or obj.get("output","") or ""
+    print(str(out)[:200])
+except: pass
+' 2>/dev/null)"
+  if printf '%s' "$TOOL_OUTPUT" | grep -q "✅ Tests: GREEN"; then
+    _SCRIPT_DIR_PT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    _STATE_LIB_PT="$_SCRIPT_DIR_PT/lib/mcl-state.sh"
+    if [ -f "$_STATE_LIB_PT" ]; then
+      source "$_STATE_LIB_PT" 2>/dev/null
+      mcl_state_init 2>/dev/null || true
+      _RG_WAS="$(mcl_state_get regression_block_active 2>/dev/null)"
+      if [ "$_RG_WAS" = "true" ]; then
+        mcl_state_set regression_block_active false >/dev/null 2>&1 || true
+        mcl_state_set regression_output '""' >/dev/null 2>&1 || true
+        mcl_audit_log "regression-guard-cleared" "mcl-post-tool.sh" "tests-green"
+        [ -f "$_SCRIPT_DIR_PT/lib/mcl-trace.sh" ] && source "$_SCRIPT_DIR_PT/lib/mcl-trace.sh" 2>/dev/null
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append regression_cleared
+      fi
+    fi
+  fi
+fi
+
 exit 0

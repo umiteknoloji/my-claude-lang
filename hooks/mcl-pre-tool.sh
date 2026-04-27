@@ -259,8 +259,13 @@ import json, re, sys
 try:
     obj = json.loads(sys.stdin.read())
     cmd = (obj.get("tool_input") or {}).get("command","") or ""
-    # Detect writes targeting .mcl/state.json (any form of redirection or tee)
-    if re.search(r"\.mcl/state\.json", cmd) and re.search(r"(>>?\s*[^&\s]|tee)", cmd):
+    # Detect writes where the state file is the DIRECT target of >> or tee.
+    # A >/dev/null or >> elsewhere in the command must NOT trigger.
+    hits = re.findall(r">>?\s*([^\s;|&]+)", cmd)
+    direct_write = any("state.json" in h for h in hits)
+    tee_write = bool(re.search(r"\btee\b", cmd) and "state.json" in cmd
+                     and not re.search(r"tee.*[|;&].*state\.json", cmd))
+    if direct_write or tee_write:
         print("block")
     else:
         print("")
