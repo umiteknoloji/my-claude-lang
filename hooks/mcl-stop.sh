@@ -582,6 +582,28 @@ PYEXTRACT
       mcl_audit_log "scope-paths-set" "stop" "count=${_SCOPE_COUNT} hash=${CURRENT_HASH:0:12}"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_init "${_SCOPE_COUNT}"
     fi
+    # Pattern Matching — Phase 3.5. Find existing sibling files for the
+    # declared scope so Claude reads them BEFORE writing Phase 4 code.
+    # pattern_scan_due=true blocks writes in pre-tool until first Phase 4
+    # turn completes (stop hook clears it below).
+    _PATSCAN_LIB="$_MCL_HOOK_DIR/lib/mcl-pattern-scan.py"
+    if [ -f "$_PATSCAN_LIB" ] && command -v python3 >/dev/null 2>&1; then
+      _PAT_FILES="$(printf '%s' "${_SCOPE_VALID:-[]}" \
+        | python3 "$_PATSCAN_LIB" "$(pwd)" 2>/dev/null || echo '[]')"
+      _PAT_VALID="$(printf '%s' "${_PAT_FILES:-[]}" | python3 -c \
+        'import json,sys; a=json.loads(sys.stdin.read()); print(json.dumps(a)) if isinstance(a,list) else print("[]")' \
+        2>/dev/null || echo '[]')"
+      _PAT_COUNT="$(printf '%s' "$_PAT_VALID" | python3 -c \
+        'import json,sys; print(len(json.loads(sys.stdin.read())))' 2>/dev/null || echo 0)"
+      mcl_state_set pattern_files "${_PAT_VALID}" >/dev/null 2>&1 || true
+      if [ "$_PAT_COUNT" -gt 0 ] 2>/dev/null; then
+        mcl_state_set pattern_scan_due true >/dev/null 2>&1 || true
+        mcl_audit_log "pattern-scan-pending" "stop" "count=${_PAT_COUNT} hash=${CURRENT_HASH:0:12}"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_pending "${_PAT_COUNT}"
+      else
+        mcl_state_set pattern_scan_due false >/dev/null 2>&1 || true
+      fi
+    fi
   else
     mcl_debug_log "stop" "askq-ignored-wrong-phase" "phase=${CURRENT_PHASE}"
   fi
@@ -629,6 +651,18 @@ if [ "$ASKQ_INTENT" = "ui-review" ]; then
     mcl_audit_log "ui-review-noop" "stop" "selected=${ASKQ_SELECTED}"
     mcl_debug_log "stop" "ui-review-noop" "selected=${ASKQ_SELECTED}"
   fi
+fi
+
+# --- Phase 3.5 pattern-scan clearance ---
+# Once per Phase 4 session: after the first Phase 4 turn completes (whether
+# Claude read pattern files or not), lift the write block so Phase 4 code
+# can proceed. The one-turn pause was the opportunity; we don't enforce more.
+_PS_DUE="$(mcl_state_get pattern_scan_due 2>/dev/null)"
+_PS_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+if [ "$_PS_DUE" = "true" ] && [ "$_PS_PHASE" = "4" ]; then
+  mcl_state_set pattern_scan_due false >/dev/null 2>&1 || true
+  mcl_audit_log "pattern-scan-cleared" "stop" ""
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_cleared
 fi
 
 # --- Session log: turn summary with actual token counts (since 6.5.7) ---

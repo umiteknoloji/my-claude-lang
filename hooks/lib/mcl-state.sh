@@ -64,6 +64,8 @@ _mcl_state_default() {
   "ui_build_hash": null,
   "ui_reviewed": false,
   "scope_paths": [],
+  "pattern_scan_due": false,
+  "pattern_files": [],
   "last_update": ${now}
 }
 JSON

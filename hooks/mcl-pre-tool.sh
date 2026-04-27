@@ -498,6 +498,20 @@ print("allow|")
   fi
 fi
 
+# -------- Branch: Pattern Matching guard (Phase 3.5) --------
+# When pattern_scan_due=true, Claude must read existing sibling files before
+# writing anything. One-turn grace: after the first Phase 4 turn the stop
+# hook clears the flag and writes are unblocked.
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "4" ]; then
+  _PS_DUE_PT="$(mcl_state_get pattern_scan_due 2>/dev/null)"
+  if [ "$_PS_DUE_PT" = "true" ]; then
+    _PAT_FILES_PT="$(mcl_state_get pattern_files 2>/dev/null)"
+    REASON="MCL PHASE 3.5 — Pattern scan pending. Before writing any Phase 4 code, read the existing sibling files listed in the PATTERN_MATCHING_NOTICE to extract naming, error handling, import style, and test structure patterns. Write nothing this turn — use Read tool on each listed file, note the patterns, then end the turn. Writes will unblock automatically on the next turn."
+    mcl_audit_log "pattern-scan-block" "pre-tool" "tool=${TOOL_NAME}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_block
+  fi
+fi
+
 # -------- Branch: Scope Guard (Phase 4) --------
 # When scope_paths is non-empty (spec listed explicit file paths / globs),
 # block writes to paths that don't match any declared pattern.

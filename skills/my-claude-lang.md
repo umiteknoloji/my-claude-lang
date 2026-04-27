@@ -54,7 +54,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 8.0.6` on its own line. This tells the developer
+Every response MUST start with `🌐 MCL 8.0.7` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 ## AskUserQuestion Protocol (since 6.0.0)
@@ -65,7 +65,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 partial-spec recovery, mcl-update, mcl-finish, pasted-CLI
 passthrough — uses Claude Code's native `AskUserQuestion` tool with
-`question` prefixed `MCL 8.0.6 | `. The Stop hook parses tool_use/tool_result
+`question` prefixed `MCL 8.0.7 | `. The Stop hook parses tool_use/tool_result
 pairs to advance MCL state. The legacy `✅ MCL APPROVED` text marker is
 DEAD in 6.0.0 — Claude must never emit it; it carries no state effect.
 
@@ -204,7 +204,7 @@ For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
    public API breaking changes, irreversible data consequences, security
    boundaries. Heuristic: can you write the spec without this answer? Yes → silent.
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 8.0.6 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 8.0.7 | <localized-is-this-correct>",
    options: ["<approve-family-in-language>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns an approve-family option does the
    Stop hook advance state — THEN call Phase 2. Not before.
@@ -233,7 +233,7 @@ processes the request AS IF a native English engineer wrote it.
    Observability / Reversibility+Rollback / Data Contract.
    See `phase2-spec.md` for triggers and templates.
 5. After the spec, explain in developer's language what it says
-6. Call `AskUserQuestion({question: "MCL 8.0.6 | <localized-spec-approval
+6. Call `AskUserQuestion({question: "MCL 8.0.7 | <localized-spec-approval
    e.g. Bu spec'i onaylıyor musun? / Approve this spec?>", options:
    [{label: "<approve-verb-only>", description: "..."},
     {label: "<edit-verb>",         description: "..."},
@@ -262,7 +262,7 @@ AskUserQuestion, Claude runs a **Technical Challenge Pass**: silently checks
 the spec for concrete technical problems (race conditions, scale issues,
 missing auth, N+1, cascading failures). If a concrete problem is found,
 one `⚠️ Teknik not:` line is added — not a gate, but visible before approval.
-Phase 3 `AskUserQuestion` call with prefix `MCL 8.0.6 | `.
+Phase 3 `AskUserQuestion` call with prefix `MCL 8.0.7 | `.
 Developer must understand AND pick an approve-family option in the
 tool_result → then Phase 4 begins (Stop hook flips state).
 
@@ -460,7 +460,7 @@ in the developer's language. Does NOT start Phase 1 automatically.
 
 ## Proje Hafızası — `.mcl/project.md`
 
-Introduced in MCL 8.0.6. MCL, her tamamlanan task'ın Phase 5 sonunda `.mcl/project.md`
+Introduced in MCL 8.0.7. MCL, her tamamlanan task'ın Phase 5 sonunda `.mcl/project.md`
 dosyasını yazar veya günceller. Dosya şu bölümleri içerir:
 
 - **Mimari** — kalıcı mimari kararlar (JWT, API prefix, vb.)
