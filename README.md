@@ -1,4 +1,4 @@
-# my-claude-lang 🌐 MCL 8.0.7
+# my-claude-lang 🌐 MCL 8.0.8
 
 ### The age of AI doesn't speak English. It speaks yours.
 
@@ -118,7 +118,7 @@ Every closed-ended gate (Phase 1 summary, Phase 3 spec approval, each
 Phase 4.5 risk, each Phase 4.6 impact, plugin consent, git-init consent,
 drift resolution, `/mcl-update` / `/mcl-finish` / pasted-CLI confirmation)
 now arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 8.0.7 | `. You pick an option in the UI — no typing
+question prefix `MCL 8.0.8 | `. You pick an option in the UI — no typing
 "yes" or "✅ MCL APPROVED" required. Open-ended Phase 1 gathering stays
 as a plain-text conversation.
 
@@ -127,7 +127,7 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 8.0.7` so you always know the bridge is active.
+Every response starts with `🌐 MCL 8.0.8` so you always know the bridge is active.
 
 ### UI Build / Review Sub-Phases (since 6.2.0)
 

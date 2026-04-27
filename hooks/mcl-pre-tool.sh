@@ -292,6 +292,31 @@ case "$TOOL_NAME" in
   *) exit 0 ;;
 esac
 
+# -------- Security: secret / credential scan (all phases) --------
+# Runs before the phase gate so credentials are blocked even in Phase 1-3.
+# Never blocks on scanner error (fallback = safe).
+_SECRET_SCAN_LIB="$SCRIPT_DIR/lib/mcl-secret-scan.py"
+if [ -f "$_SECRET_SCAN_LIB" ] && command -v python3 >/dev/null 2>&1; then
+  _SEC_RESULT="$(printf '%s' "$RAW_INPUT" | python3 "$_SECRET_SCAN_LIB" 2>/dev/null || echo safe)"
+  if [ "${_SEC_RESULT%%|*}" = "block" ]; then
+    _SEC_REASON="${_SEC_RESULT#block|}"
+    mcl_audit_log "secret-scan-block" "pre-tool" "tool=${TOOL_NAME}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append secret_scan_block
+    python3 -c '
+import json, sys
+reason = sys.argv[1]
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL SECURITY — " + reason
+    }
+}))
+' "$_SEC_REASON" 2>/dev/null
+    exit 0
+  fi
+fi
+
 # Mutating tool attempted — consult state.
 CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
 SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
