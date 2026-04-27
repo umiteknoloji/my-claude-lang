@@ -414,11 +414,19 @@ state_file = os.environ.get("MCL_STATE_FILE",
 try:
     obj = json.loads(open(state_file).read())
     lg = obj.get("tdd_last_green")
-    if isinstance(lg, dict) and lg.get("result") == "GREEN":
-        age = time.time() - float(lg.get("ts", 0))
-        print("true" if age < 120 else "false")
-    else:
-        print("false")
+    if not (isinstance(lg, dict) and lg.get("result") == "GREEN"):
+        print("false"); raise SystemExit
+    green_ts = float(lg.get("ts", 0))
+    age = time.time() - green_ts
+    if age >= 120:
+        print("false"); raise SystemExit
+    # Stale if any write happened after the green-verify
+    lw = obj.get("last_write_ts")
+    if lw is not None and float(lw) > green_ts:
+        print("false"); raise SystemExit
+    print("true")
+except SystemExit:
+    pass
 except Exception:
     print("false")
 PYEOF

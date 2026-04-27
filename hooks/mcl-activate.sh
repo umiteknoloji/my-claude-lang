@@ -235,6 +235,7 @@ except Exception:
     mcl_state_set rollback_notice_shown false >/dev/null 2>&1 || true
     mcl_state_set pattern_summary null >/dev/null 2>&1 || true
     mcl_state_set tdd_last_green null >/dev/null 2>&1 || true
+    mcl_state_set last_write_ts null >/dev/null 2>&1 || true
   fi
 fi
 

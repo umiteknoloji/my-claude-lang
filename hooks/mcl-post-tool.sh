@@ -88,6 +88,18 @@ import json,sys
 try: print(json.loads(sys.stdin.read()).get("tool_name",""))
 except: pass
 ' 2>/dev/null)"
+
+# Track last write timestamp for Regression Guard smart-skip staleness check.
+if printf '%s' "$TOOL_NAME_POST" | grep -qE '^(Write|Edit|MultiEdit|NotebookEdit)$' 2>/dev/null; then
+  _SCRIPT_DIR_WT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  _STATE_LIB_WT="$_SCRIPT_DIR_WT/lib/mcl-state.sh"
+  if [ -f "$_STATE_LIB_WT" ]; then
+    source "$_STATE_LIB_WT" 2>/dev/null
+    mcl_state_init 2>/dev/null || true
+    _WT_NOW="$(date +%s 2>/dev/null || echo 0)"
+    mcl_state_set last_write_ts "$_WT_NOW" >/dev/null 2>&1 || true
+  fi
+fi
 if [ "$TOOL_NAME_POST" = "Bash" ]; then
   TOOL_OUTPUT="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json,sys
