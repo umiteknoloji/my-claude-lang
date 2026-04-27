@@ -249,6 +249,37 @@ if [ "$TOOL_NAME" = "Task" ]; then
   exit 0
 fi
 
+# -------- Branch: protect .mcl/state.json from direct Bash writes --------
+# MCL's state machine is owned exclusively by the hook system (mcl-state.sh).
+# Direct writes to .mcl/state.json via Bash (cat >, echo >, tee, etc.) bypass
+# phase transitions — e.g. manually setting current_phase=4 skips Phase 4a/4b.
+if [ "$TOOL_NAME" = "Bash" ] && command -v python3 >/dev/null 2>&1; then
+  _STATE_WRITE="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, re, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    cmd = (obj.get("tool_input") or {}).get("command","") or ""
+    # Detect writes targeting .mcl/state.json (any form of redirection or tee)
+    if re.search(r"\.mcl/state\.json", cmd) and re.search(r"(>>?\s*[^&\s]|tee)", cmd):
+        print("block")
+    else:
+        print("")
+except Exception:
+    pass
+' 2>/dev/null)"
+  if [ "$_STATE_WRITE" = "block" ]; then
+    mcl_audit_log "block-state-write" "pre-tool" "cmd=direct-write-to-state-json"
+    python3 -c '
+import json, sys
+print(json.dumps({
+    "decision": "block",
+    "reason": "MCL STATE PROTECTION — Direct writes to .mcl/state.json via Bash are forbidden. State transitions are owned exclusively by the hook system (mcl-stop.sh, mcl-state.sh). If spec approval is not advancing phase, it means the AskUserQuestion tool_result was not processed yet — do NOT manually patch state. Wait for the stop hook to run, or ask the developer to re-send their approval."
+}))
+' 2>/dev/null
+    exit 0
+  fi
+fi
+
 # Fast-path: non-mutating tool → allow.
 # Skill, TodoWrite, and Task MCL-specific blocks run BEFORE this fast-path.
 case "$TOOL_NAME" in
