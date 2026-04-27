@@ -66,6 +66,7 @@ _mcl_state_default() {
   "scope_paths": [],
   "pattern_scan_due": false,
   "pattern_files": [],
+  "rollback_sha": null,
   "last_update": ${now}
 }
 JSON

@@ -7,6 +7,13 @@
 
 ## [Unreleased]
 
+## [8.0.9] - 2026-04-27
+
+### Eklendi
+- **Rollback checkpoint:** Spec onayı anında `git rev-parse HEAD` çalıştırılır, SHA `state.rollback_sha`'ya kaydedilir. Phase 4 boyunca her turda `ROLLBACK_NOTICE` context'e enjekte edilir — tam SHA ve `git reset --hard <sha>` komutuyla. Git repo yoksa sessizce geçilir.
+- **Atomic commit hint:** Phase 4.5/4.6/5 çalışırken (`phase_review_state=running`) `ATOMIC_COMMIT_NOTICE` enjekte edilir: `git add <scope_paths>` + `git commit -m "feat: <spec objective>"` komutu hazır olarak sunulur. Auto-commit yok — Claude komutu çalıştırır, developer onaylar.
+- **state.rollback_sha:** Şemaya eklendi (default null); session sınırında temizlenir.
+
 ## [8.0.8] - 2026-04-27
 
 ### Eklendi

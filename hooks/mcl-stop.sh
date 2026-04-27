@@ -518,6 +518,14 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     }
     command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Spec onaylandı. Faz ${CURRENT_PHASE} → 4 geçişi."
     bash "$_MCL_HOOK_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
+    # Rollback checkpoint — record HEAD SHA before any Phase 4 writes.
+    # Stored once; never overwritten on subsequent turns in the same session.
+    _ROLLBACK_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
+    if [ -n "$_ROLLBACK_SHA" ]; then
+      mcl_state_set rollback_sha "\"${_ROLLBACK_SHA}\"" >/dev/null 2>&1 || true
+      mcl_audit_log "rollback-checkpoint" "stop" "sha=${_ROLLBACK_SHA:0:12}"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append rollback_checkpoint "${_ROLLBACK_SHA:0:12}"
+    fi
     # Scope Guard — extract file-path tokens from the spec body and store
     # in state.scope_paths so mcl-pre-tool.sh can block Phase 4 writes
     # that land outside the declared scope. Empty array = no restriction.
