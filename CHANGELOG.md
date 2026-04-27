@@ -7,6 +7,13 @@
 
 ## [Unreleased]
 
+## [8.1.3] - 2026-04-27
+
+### Eklendi
+- **Root Cause Prensibi (Boris Cherny):** Phase 4 Scope Discipline'e Rule 3 eklendi: "Fix the cause, not the symptom. If a patch only makes the test pass without addressing why it failed, surface it as a Phase 4.5 risk item."
+- **Phase 4.5 Root Cause Lens:** `pattern-compliance` mcl_audit bloğuna Root Cause Lens direktifi eklendi. Band-aid kalıpları listelenir: hataları catch/swallow etmek, type constraint genişletmek, test girdilerini özel-case'lemek, failure mode düzeltilmeden retry. Her biri risk item olarak raporlanır.
+- Mekanizma: flag sistemi yok — lens Phase 4.5'te bağımsız tarar.
+
 ## [8.1.2] - 2026-04-27
 
 ### Eklendi
