@@ -319,6 +319,64 @@ print(json.dumps({
   esac
 fi
 
+# -------- Branch: block TodoWrite in Phase 1-3 --------
+# TodoWrite in Phase 1-3 is always superpowers:brainstorming interference —
+# MCL manages phase state via state.json, not todo checklists.
+# Phase 4+ TodoWrite is allowed (legitimate task tracking during code execution).
+if [ "$TOOL_NAME" = "TodoWrite" ] && command -v python3 >/dev/null 2>&1; then
+  _TW_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+  if [ -n "$_TW_PHASE" ] && [ "$_TW_PHASE" -lt 4 ] 2>/dev/null; then
+    mcl_audit_log "block-todowrite" "pre-tool" "phase=${_TW_PHASE}"
+    python3 -c '
+import json, sys
+print(json.dumps({
+    "decision": "block",
+    "reason": "MCL ACTIVE (Phase 1-3) — TodoWrite is blocked. MCL manages phase state via state.json. Todo checklists during Phase 1-3 are a sign of superpowers:brainstorming interference — they duplicate and conflict with MCL phase logic. Proceed directly with MCL Phase 1 parameter gathering."
+}))
+' 2>/dev/null
+    exit 0
+  fi
+fi
+
+# -------- Branch: block Task dispatch of Phase 4.5/4.6/5 as sub-agent --------
+# sub-agent-phase-discipline: Phase 4.5 (Risk Review), 4.6 (Impact Review),
+# and Phase 5 (Verification Report) MUST run in the main MCL session as
+# interactive AskUserQuestion dialogs. Sub-agents cannot substitute them.
+if [ "$TOOL_NAME" = "Task" ] && command -v python3 >/dev/null 2>&1; then
+  _TASK_DESC="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys, re
+try:
+    obj = json.loads(sys.stdin.read())
+    tin = obj.get("tool_input") or {}
+    desc = (tin.get("description") or tin.get("prompt") or "").lower()
+    # Check for Phase 4.5/4.6/5 keywords indicating sub-agent substitution
+    patterns = [
+        r"phase\s*4\.5", r"phase\s*4\.6", r"phase\s*5",
+        r"risk\s+review", r"impact\s+review", r"verification\s+report",
+        r"phase\s+review", r"spec.compliance.review",
+    ]
+    for pat in patterns:
+        if re.search(pat, desc):
+            print("block:" + desc[:80])
+            sys.exit(0)
+except Exception:
+    pass
+print("")
+' 2>/dev/null)"
+  if printf '%s' "$_TASK_DESC" | grep -q "^block:"; then
+    _MATCHED="${_TASK_DESC#block:}"
+    mcl_audit_log "block-task-phase-dispatch" "pre-tool" "desc=${_MATCHED}"
+    python3 -c '
+import json, sys
+print(json.dumps({
+    "decision": "block",
+    "reason": "MCL SUB-AGENT DISCIPLINE — Phase 4.5 (Risk Review), Phase 4.6 (Impact Review), and Phase 5 (Verification Report) cannot be dispatched to sub-agents. These phases require the main MCL session to run the interactive AskUserQuestion dialog directly with the developer. Run them in this session after all code sub-agents complete."
+}))
+' 2>/dev/null
+    exit 0
+  fi
+fi
+
 REASON=""
 if [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null; then
   REASON="MCL LOCK — current_phase=${CURRENT_PHASE} (${PHASE_NAME}). Mutating tool \`${TOOL_NAME}\` is blocked until Phase 4 (EXECUTE). Emit the 📋 Spec: block, get the developer's explicit approval via AskUserQuestion, then proceed."
