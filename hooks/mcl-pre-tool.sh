@@ -147,8 +147,10 @@ print(json.dumps({
 fi
 
 # Fast-path: non-mutating tool → allow.
+# Exception: Skill and TodoWrite are intercepted by MCL blocks below.
 case "$TOOL_NAME" in
   Write|Edit|MultiEdit|NotebookEdit) ;;
+  Skill|TodoWrite|Task) ;;  # MCL intercepts these — fall through to MCL blocks
   *) exit 0 ;;
 esac
 
@@ -325,7 +327,11 @@ fi
 # Phase 4+ TodoWrite is allowed (legitimate task tracking during code execution).
 if [ "$TOOL_NAME" = "TodoWrite" ] && command -v python3 >/dev/null 2>&1; then
   _TW_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-  if [ -n "$_TW_PHASE" ] && [ "$_TW_PHASE" -lt 4 ] 2>/dev/null; then
+  # Default: block if phase unknown (no state yet = new session = Phase 1).
+  # Allow only when phase is explicitly >= 4.
+  _TW_ALLOW=0
+  [ -n "$_TW_PHASE" ] && [ "$_TW_PHASE" -ge 4 ] 2>/dev/null && _TW_ALLOW=1
+  if [ "$_TW_ALLOW" = "0" ]; then
     mcl_audit_log "block-todowrite" "pre-tool" "phase=${_TW_PHASE}"
     python3 -c '
 import json, sys
