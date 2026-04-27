@@ -83,6 +83,7 @@ _mcl_state_auth_check() {
     "$hooks_dir"/mcl-activate.sh)    return 0 ;;
     "$hooks_dir"/mcl-stop.sh)        return 0 ;;
     "$hooks_dir"/mcl-pre-tool.sh)    return 0 ;;
+    "$hooks_dir"/mcl-post-tool.sh)   return 0 ;;
     "$hooks_dir"/mcl-user-prompt.sh) return 0 ;;
   esac
   return 1

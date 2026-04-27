@@ -342,3 +342,10 @@
 2026-04-25 00:14:02 | set | mcl-activate.sh | field=plugin_gate_active value=false
 2026-04-25 00:14:02 | set | mcl-activate.sh | field=plugin_gate_missing value=[]
 2026-04-25 00:14:02 | set | mcl-activate.sh | field=plugin_gate_session value=08e89c95-fbd4-4328-9cdb-d1999699cf85
+2026-04-27 11:46:16 | block-skill | pre-tool | skill=superpowers:brainstorming reason=mcl-active
+2026-04-27 12:26:49 | block-state-write | pre-tool | cmd=direct-write-to-state-json
+2026-04-27 18:26:09 | block-state-write | pre-tool | cmd=direct-write-to-state-json
+2026-04-27 18:27:00 | block-state-write | pre-tool | cmd=direct-write-to-state-json
+2026-04-27 18:28:28 | block-state-write | pre-tool | cmd=direct-write-to-state-json
+2026-04-27 18:29:35 | block-state-write | pre-tool | cmd=direct-write-to-state-json
+2026-04-27 18:31:47 | block-state-write | pre-tool | cmd=direct-write-to-state-json

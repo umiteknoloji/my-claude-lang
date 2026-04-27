@@ -21,16 +21,19 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Save hook dir before sourcing libs — some lib files (mcl-test-runner.sh)
+# reset SCRIPT_DIR to their own directory, clobbering the hook's own path.
+_MCL_HOOK_DIR="$SCRIPT_DIR"
 INSTALLED_VERSION="$(grep -oE '🌐 MCL [0-9]+\.[0-9]+\.[0-9]+' "$SCRIPT_DIR/mcl-activate.sh" 2>/dev/null | head -1 | awk '{print $3}')"
 INSTALLED_VERSION="${INSTALLED_VERSION:-unknown}"
 # shellcheck source=lib/mcl-state.sh
-source "$SCRIPT_DIR/lib/mcl-state.sh"
+source "$_MCL_HOOK_DIR/lib/mcl-state.sh"
 # shellcheck source=lib/mcl-trace.sh
-[ -f "$SCRIPT_DIR/lib/mcl-trace.sh" ] && source "$SCRIPT_DIR/lib/mcl-trace.sh"
+[ -f "$_MCL_HOOK_DIR/lib/mcl-trace.sh" ] && source "$_MCL_HOOK_DIR/lib/mcl-trace.sh"
 # shellcheck source=lib/mcl-test-runner.sh
-[ -f "$SCRIPT_DIR/lib/mcl-test-runner.sh" ] && source "$SCRIPT_DIR/lib/mcl-test-runner.sh"
+[ -f "$_MCL_HOOK_DIR/lib/mcl-test-runner.sh" ] && source "$_MCL_HOOK_DIR/lib/mcl-test-runner.sh"
 # shellcheck source=lib/mcl-log-append.sh
-[ -f "$SCRIPT_DIR/lib/mcl-log-append.sh" ] && source "$SCRIPT_DIR/lib/mcl-log-append.sh"
+[ -f "$_MCL_HOOK_DIR/lib/mcl-log-append.sh" ] && source "$_MCL_HOOK_DIR/lib/mcl-log-append.sh"
 
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
@@ -151,7 +154,7 @@ fi
 # Unchanged from 5.x. Claude must re-emit a complete spec before the
 # AskUserQuestion approval call can advance state; while partial_spec
 # is true, any approval tool_result is ignored as defense-in-depth.
-PARTIAL_MISSING="$(bash "$SCRIPT_DIR/lib/mcl-partial-spec.sh" check "$TRANSCRIPT_PATH" 2>/dev/null)"
+PARTIAL_MISSING="$(bash "$_MCL_HOOK_DIR/lib/mcl-partial-spec.sh" check "$TRANSCRIPT_PATH" 2>/dev/null)"
 PARTIAL_RC=$?
 PARTIAL_STATE="$(mcl_state_get partial_spec 2>/dev/null)"
 case "$PARTIAL_RC" in
@@ -187,7 +190,7 @@ esac
 #   summary-confirm   — Phase 1 summary confirmation (audit-only here)
 #   ui-review         — Phase 4b UI review approval
 #   other             — recognized MCL question but not state-transitioning
-ASKQ_SCANNER="$SCRIPT_DIR/lib/mcl-askq-scanner.py"
+ASKQ_SCANNER="$_MCL_HOOK_DIR/lib/mcl-askq-scanner.py"
 if [ -f "$ASKQ_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
   ASKQ_JSON="$(python3 "$ASKQ_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
 else
@@ -365,7 +368,7 @@ CURRENT_PHASE="$(mcl_state_get current_phase)"
 # "pending" is STICKY: once set, the BLOCK re-fires on every subsequent turn
 # until askuq=true clears it. This prevents a Bash-only or text-only follow-up
 # turn from silently escaping the enforcement gate.
-_PR_GUARD="$SCRIPT_DIR/lib/mcl-phase-review-guard.py"
+_PR_GUARD="$_MCL_HOOK_DIR/lib/mcl-phase-review-guard.py"
 if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   _PR_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
@@ -490,7 +493,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     # TSX, Tailwind, shadcn, components/ui, etc.), we flip the flag here
     # so Phase 4a BUILD_UI engages and mcl-pre-tool.sh path-exception
     # locks backend paths until the developer reviews the UI.
-    SPEC_INTENT_SCANNER="$SCRIPT_DIR/lib/mcl-spec-ui-intent.py"
+    SPEC_INTENT_SCANNER="$_MCL_HOOK_DIR/lib/mcl-spec-ui-intent.py"
     if [ "$UI_FLOW_ON" != "true" ] && [ -f "$SPEC_INTENT_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
       UI_INTENT="$(python3 "$SPEC_INTENT_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
       if [ "$UI_INTENT" = "true" ]; then
@@ -514,7 +517,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
       [ "$UI_FLOW_ON" = "true" ] && mcl_trace_append ui_flow_enabled
     }
     command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Spec onaylandı. Faz ${CURRENT_PHASE} → 4 geçişi."
-    bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
+    bash "$_MCL_HOOK_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
   else
     mcl_debug_log "stop" "askq-ignored-wrong-phase" "phase=${CURRENT_PHASE}"
   fi
@@ -565,8 +568,8 @@ if [ "$ASKQ_INTENT" = "ui-review" ]; then
 fi
 
 # --- Session log: turn summary with actual token counts (since 6.5.7) ---
-_STOP_LOG_LIB="$SCRIPT_DIR/lib/mcl-log-append.sh"
-_STOP_TURN_SCRIPT="$SCRIPT_DIR/lib/mcl-log-turn.py"
+_STOP_LOG_LIB="$_MCL_HOOK_DIR/lib/mcl-log-append.sh"
+_STOP_TURN_SCRIPT="$_MCL_HOOK_DIR/lib/mcl-log-turn.py"
 if [ -f "$_STOP_LOG_LIB" ] && [ -f "$_STOP_TURN_SCRIPT" ] \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] \
    && command -v python3 >/dev/null 2>&1; then
