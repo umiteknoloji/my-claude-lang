@@ -518,6 +518,70 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     }
     command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Spec onaylandı. Faz ${CURRENT_PHASE} → 4 geçişi."
     bash "$_MCL_HOOK_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
+    # Scope Guard — extract file-path tokens from the spec body and store
+    # in state.scope_paths so mcl-pre-tool.sh can block Phase 4 writes
+    # that land outside the declared scope. Empty array = no restriction.
+    _SCOPE_PATHS_LIB="$_MCL_HOOK_DIR/lib/mcl-spec-paths.py"
+    if [ -f "$_SCOPE_PATHS_LIB" ] && command -v python3 >/dev/null 2>&1; then
+      _SCOPE_JSON="$(python3 - "$TRANSCRIPT_PATH" "$_SCOPE_PATHS_LIB" 2>/dev/null << 'PYEXTRACT'
+import json, re, sys, subprocess
+
+transcript_path, paths_lib = sys.argv[1], sys.argv[2]
+spec_line_re = re.compile(
+    r'^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:', re.MULTILINE)
+
+spec_body = ''
+try:
+    with open(transcript_path, encoding='utf-8', errors='replace') as fh:
+        for raw in fh:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+            except Exception:
+                continue
+            msg = obj if 'role' in obj else obj.get('message', obj)
+            if not isinstance(msg, dict) or msg.get('role') != 'assistant':
+                continue
+            content = msg.get('content', '')
+            text = ''
+            if isinstance(content, str):
+                text = content
+            elif isinstance(content, list):
+                text = '\n'.join(
+                    item.get('text', '')
+                    for item in content
+                    if isinstance(item, dict) and item.get('type') == 'text'
+                )
+            if spec_line_re.search(text):
+                spec_body = text  # keep last spec-bearing turn
+except Exception:
+    pass
+
+if not spec_body:
+    print('[]')
+    sys.exit(0)
+
+r = subprocess.run(['python3', paths_lib], input=spec_body.encode(),
+                   capture_output=True, timeout=10)
+result = r.stdout.decode().strip()
+try:
+    parsed = json.loads(result)
+    print(json.dumps(parsed) if isinstance(parsed, list) else '[]')
+except Exception:
+    print('[]')
+PYEXTRACT
+      )"
+      _SCOPE_VALID="$(printf '%s' "${_SCOPE_JSON:-[]}" | python3 -c \
+        'import json,sys; a=json.loads(sys.stdin.read()); print(json.dumps(a)) if isinstance(a,list) else print("[]")' \
+        2>/dev/null || echo '[]')"
+      mcl_state_set scope_paths "${_SCOPE_VALID}" >/dev/null 2>&1 || true
+      _SCOPE_COUNT="$(printf '%s' "$_SCOPE_VALID" | python3 -c \
+        'import json,sys; print(len(json.loads(sys.stdin.read())))' 2>/dev/null || echo 0)"
+      mcl_audit_log "scope-paths-set" "stop" "count=${_SCOPE_COUNT} hash=${CURRENT_HASH:0:12}"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_init "${_SCOPE_COUNT}"
+    fi
   else
     mcl_debug_log "stop" "askq-ignored-wrong-phase" "phase=${CURRENT_PHASE}"
   fi

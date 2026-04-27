@@ -498,6 +498,88 @@ print("allow|")
   fi
 fi
 
+# -------- Branch: Scope Guard (Phase 4) --------
+# When scope_paths is non-empty (spec listed explicit file paths / globs),
+# block writes to paths that don't match any declared pattern.
+# Empty scope_paths = spec had no explicit paths = no restriction.
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "4" ] && command -v python3 >/dev/null 2>&1; then
+  _SCOPE_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, fnmatch, os, sys
+
+try:
+    obj = json.loads(sys.stdin.read())
+except Exception:
+    print("allow"); sys.exit(0)
+
+tin = obj.get("tool_input") or {}
+# Write/Edit use file_path; MultiEdit uses file_path[]; NotebookEdit uses notebook_path
+paths_to_check = []
+fp = tin.get("file_path") or tin.get("notebook_path")
+if fp:
+    paths_to_check.append(str(fp))
+# MultiEdit: edits is a list of {file_path: ...}
+edits = tin.get("edits")
+if isinstance(edits, list):
+    for e in edits:
+        if isinstance(e, dict) and e.get("file_path"):
+            paths_to_check.append(str(e["file_path"]))
+
+if not paths_to_check:
+    print("allow"); sys.exit(0)
+
+# Read scope_paths from state.json directly
+import os
+state_file = os.path.join(os.getcwd(), ".mcl", "state.json")
+try:
+    with open(state_file, encoding="utf-8") as sf:
+        state = json.load(sf)
+    scope_paths = state.get("scope_paths") or []
+    if not isinstance(scope_paths, list):
+        scope_paths = []
+except Exception:
+    scope_paths = []
+
+if not scope_paths:
+    print("allow"); sys.exit(0)  # No declared paths — no restriction
+
+def matches(file_abs, patterns):
+    """True if file_abs matches any pattern (relative glob or absolute)."""
+    file_abs = os.path.normpath(file_abs)
+    for pat in patterns:
+        pat = pat.lstrip("./")
+        if not pat:
+            continue
+        # Absolute match
+        if fnmatch.fnmatch(file_abs, pat):
+            return True
+        # Suffix match: pattern relative to any parent dir
+        if fnmatch.fnmatch(file_abs, "*/" + pat):
+            return True
+        # Exact suffix without glob
+        if file_abs.endswith("/" + pat) or file_abs == pat:
+            return True
+    return False
+
+# Check all paths; report the first out-of-scope path
+for p in paths_to_check:
+    if not matches(p, scope_paths):
+        # Skip .mcl/ internals and temp files — always allowed
+        norm = p.replace("\\\\", "/")
+        if "/.mcl/" in norm or norm.endswith("/.mcl") or "/tmp/" in norm:
+            continue
+        print("deny|" + p)
+        sys.exit(0)
+
+print("allow")
+' 2>/dev/null || echo "allow")"
+  if [ "${_SCOPE_VERDICT%%|*}" = "deny" ]; then
+    _SCOPE_DENIED_PATH="${_SCOPE_VERDICT#deny|}"
+    REASON="MCL SCOPE GUARD — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. Phase 4 writes must target files listed in the approved spec (or matching its glob patterns). To add this file: surface it as a risk in Phase 4.5 and request a scope extension, OR if you genuinely need it now, ask the developer to confirm via AskUserQuestion before writing."
+    mcl_audit_log "scope-guard-block" "pre-tool" "path=${_SCOPE_DENIED_PATH} tool=${TOOL_NAME}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_block "${_SCOPE_DENIED_PATH}"
+  fi
+fi
+
 if [ -n "$REASON" ]; then
   mcl_audit_log "deny-tool" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
   mcl_debug_log "pre-tool" "deny" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"

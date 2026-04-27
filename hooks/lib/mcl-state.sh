@@ -63,6 +63,7 @@ _mcl_state_default() {
   "ui_sub_phase": null,
   "ui_build_hash": null,
   "ui_reviewed": false,
+  "scope_paths": [],
   "last_update": ${now}
 }
 JSON
