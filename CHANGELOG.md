@@ -7,6 +7,13 @@
 
 ## [Unreleased]
 
+## [8.1.0] - 2026-04-27
+
+### Değişti
+- `ROLLBACK_NOTICE` artık her Phase 4 turunda değil, yalnızca ilk turda gösteriliyor (`rollback_notice_shown` flag). 5-10 turluk görevlerde aynı SHA tekrar etmez.
+- `/mcl-rollback` komutu eklendi: flag'ı sıfırlar, bir sonraki turda notice yeniden görünür; full SHA + reset komutu + atomic commit önerisi gösterir.
+- `state.rollback_notice_shown` şemaya eklendi; session sınırında sıfırlanır.
+
 ## [8.0.9] - 2026-04-27
 
 ### Eklendi

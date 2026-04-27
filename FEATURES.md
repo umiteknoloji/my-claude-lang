@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.0.9
+**Güncel sürüm:** 8.1.0
 
 ---
 
@@ -214,6 +214,7 @@ Mimari GATE cevabı alındıktan sonra teknik tutarlılık kontrolü. Bkz. Phase
 | `/mcl-doctor` | Token & maliyet raporu |
 | `/mcl-checkup` | Sağlık kontrolü — tüm STEP'ler değerlendirilir |
 | `/mcl-self-q` | O yanıt için self-critique sürecini görünür yapar (inline, per-message) |
+| `/mcl-rollback` | Rollback checkpoint SHA'sını ve atomic commit komutunu gösterir; bir sonraki turda `ROLLBACK_NOTICE` yeniden görünür |
 
 ---
 
