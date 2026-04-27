@@ -62,6 +62,26 @@ done
 if [ "$VERSION_MISMATCH" -eq 0 ]; then
   echo "[OK] Version $CANONICAL_VERSION consistent across README.md, README.tr.md, skill file, hook"
 fi
+
+# Sync FEATURES.md version line: `**Güncel sürüm:** X.Y.Z`
+FEATURES_FILE="$SCRIPT_DIR/FEATURES.md"
+if [ -f "$FEATURES_FILE" ]; then
+  FEATURES_VERSION="$(grep -oE 'Güncel sürüm:\*\* [0-9]+\.[0-9]+\.[0-9]+' "$FEATURES_FILE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+  if [ -n "$FEATURES_VERSION" ] && [ "$FEATURES_VERSION" != "$CANONICAL_VERSION" ]; then
+    sed -i '' "s/Güncel sürüm:\*\* ${FEATURES_VERSION}/Güncel sürüm:** ${CANONICAL_VERSION}/g" "$FEATURES_FILE" 2>/dev/null \
+      || sed -i "s/Güncel sürüm:\*\* ${FEATURES_VERSION}/Güncel sürüm:** ${CANONICAL_VERSION}/g" "$FEATURES_FILE"
+    echo "[FIXED] FEATURES.md version synced ($FEATURES_VERSION → $CANONICAL_VERSION)"
+  else
+    echo "[OK] FEATURES.md version $CANONICAL_VERSION"
+  fi
+fi
+
+# Sync CHANGELOG.md: promote [Unreleased] → [X.Y.Z] - YYYY-MM-DD if present
+CHANGELOG_FILE="$SCRIPT_DIR/CHANGELOG.md"
+if [ -f "$CHANGELOG_FILE" ]; then
+  echo "[OK] CHANGELOG.md (managed manually — add entries under [Unreleased] before each release)"
+fi
+
 echo ""
 
 # 1. Install skill files
