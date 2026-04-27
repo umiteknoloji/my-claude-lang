@@ -402,7 +402,34 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
 
       # Regression guard — run full test suite on FIRST transition to pending.
       # Sticky re-triggers (already pending) skip re-run to avoid slowdown.
+      # Smart-skip: if TDD's last green-verify was GREEN within this turn
+      # (timestamp within 120s), the suite already passed — skip re-run.
+      _RG_SKIP=false
+      if [ "$_PR_CODE" = "true" ] && [ "$_PR_REVIEW_STATE" != "pending" ]; then
+        _RG_SKIP="$(python3 - <<'PYEOF' 2>/dev/null || echo false
+import json, os, time
+_proj = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
+state_file = os.environ.get("MCL_STATE_FILE",
+    os.path.join(os.environ.get("MCL_STATE_DIR", os.path.join(_proj, ".mcl")), "state.json"))
+try:
+    obj = json.loads(open(state_file).read())
+    lg = obj.get("tdd_last_green")
+    if isinstance(lg, dict) and lg.get("result") == "GREEN":
+        age = time.time() - float(lg.get("ts", 0))
+        print("true" if age < 120 else "false")
+    else:
+        print("false")
+except Exception:
+    print("false")
+PYEOF
+)"
+        if [ "$_RG_SKIP" = "true" ]; then
+          mcl_audit_log "regression-guard-skipped" "stop" "reason=tdd-green-verify-fresh"
+        fi
+      fi
+
       if [ "$_PR_CODE" = "true" ] && [ "$_PR_REVIEW_STATE" != "pending" ] \
+         && [ "$_RG_SKIP" != "true" ] \
          && command -v mcl_test_run >/dev/null 2>&1; then
         _RG_OUTPUT="$(mcl_test_run "regression-guard" 2>/dev/null)"
         if printf '%s' "$_RG_OUTPUT" | grep -q "^❌ Tests: RED"; then

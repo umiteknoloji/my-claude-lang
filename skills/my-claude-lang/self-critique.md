@@ -214,6 +214,9 @@ and closes the topic, even if MCL's technical position was correct.
 The two rules are complementary. MCL holds ground until the developer
 decides; once the developer decides, MCL follows without circling back.
 
+Example: "X yapma" → Human Authority (decision made, close the topic).
+"X yanlış" without new evidence → Pressure resistance (hold position).
+
 ## Edge Cases
 
 - **Trivial responses** (e.g., "evet", "anlaşıldı"): critique still

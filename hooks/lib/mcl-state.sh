@@ -69,6 +69,7 @@ _mcl_state_default() {
   "rollback_sha": null,
   "rollback_notice_shown": false,
   "pattern_summary": null,
+  "tdd_last_green": null,
   "last_update": ${now}
 }
 JSON

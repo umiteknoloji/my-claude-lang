@@ -276,6 +276,14 @@ mcl_test_run() {
       audit_fields="label=${label} ${audit_fields}"
     fi
     mcl_audit_log "test-run" "runner" "$audit_fields"
+
+    # Record last green-verify timestamp for Regression Guard smart-skip.
+    # Only written when label=green-verify AND result=GREEN.
+    if [ "$label" = "green-verify" ] && [ "$result" = "GREEN" ]; then
+      _now_ts="$(date +%s 2>/dev/null || echo 0)"
+      mcl_state_set tdd_last_green "{\"ts\":${_now_ts},\"result\":\"GREEN\"}" \
+        >/dev/null 2>&1 || true
+    fi
   )
 }
 
