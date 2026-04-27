@@ -613,7 +613,7 @@ print("allow")
 ' 2>/dev/null || echo "allow")"
   if [ "${_SCOPE_VERDICT%%|*}" = "deny" ]; then
     _SCOPE_DENIED_PATH="${_SCOPE_VERDICT#deny|}"
-    REASON="MCL SCOPE GUARD — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. Phase 4 writes must target files listed in the approved spec (or matching its glob patterns). To add this file: surface it as a risk in Phase 4.5 and request a scope extension, OR if you genuinely need it now, ask the developer to confirm via AskUserQuestion before writing."
+    REASON="MCL SCOPE GUARD (Rule 2 — File Scope) — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. This also likely violates Rule 1 (Spec-Only): if this file needs changes, it should have been in the spec. Options: (A) surface as a Phase 4.5 risk and request scope extension; (B) if genuinely required now, ask the developer via AskUserQuestion BEFORE writing — never silently touch out-of-scope files."
     mcl_audit_log "scope-guard-block" "pre-tool" "path=${_SCOPE_DENIED_PATH} tool=${TOOL_NAME}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_block "${_SCOPE_DENIED_PATH}"
   fi
