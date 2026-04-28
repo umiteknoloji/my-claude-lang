@@ -28,7 +28,7 @@ skill files, captured-rules blocks), read
 
 ## Devtime Plan Critique (subagent)
 
-When producing a plan during an MCL development session (devtime — you + Ümit), automatically launch a `superpowers:code-reviewer` subagent to critique the plan before presenting it. The subagent applies five lenses:
+When producing a plan during an MCL development session (devtime — you + Ümit), automatically launch a `general-purpose` subagent with a plan-critique prompt to evaluate the plan before presenting it. (`superpowers:code-reviewer` is for code artifacts — wrong tool for plan text.) The subagent applies five lenses:
 
 1. **Root cause depth** — was the root cause genuinely found, or did the plan stay at the surface symptom?
 2. **Side-effect estimation** — were downstream effects estimated (Phase 4.6 logic: imports, shared state, contract breakage, schema effects)?
