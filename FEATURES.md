@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.1.3
+**Güncel sürüm:** 8.2.6
 
 ---
 
@@ -14,6 +14,7 @@ Phase 1   → Anlama (intent, constraints, success_criteria, context)
 Phase 1.5 → Engineering Brief (kullanıcı dili → EN çevirisi, yorumsuz)
 Phase 2   → Spec üretimi
 Phase 3   → Spec doğrulama + geliştirici onayı
+Phase 3.5 → Pattern Matching (proje kodu okunur, convention çıkarılır)
 Phase 4   → Kod yazımı (TDD ile)
   Phase 4a → BUILD_UI  — dummy data ile çalışan frontend
   Phase 4b → UI_REVIEW — geliştirici UI'ı tarayıcıda görür, onaylar
@@ -35,6 +36,7 @@ Phase 5.5 → Lokalize rapor (EN → geliştirici dili çevirisi)
 | `mcl-activate.sh` | Her `UserPromptSubmit` | STATIC_CONTEXT + durum bildirimleri inject eder |
 | `mcl-stop.sh` | Her `Stop` | Faz geçişlerini yönetir, session log yazar |
 | `mcl-pre-tool.sh` | Her `PreToolUse` | Phase 4.5 state advance, respec koruması, hook dominance blokları |
+| `mcl-post-tool.sh` | Her `PostToolUse` | Session diary — her araç çağrısı için tek satır log |
 
 **Hook Dominance İlkesi** (8.0.x)
 Behavioral kurallar yerine hook kararları (`decision:block`) tercih edilir — bunlar model talimatlarından önce gelir ve override edilemez. Aşağıdaki araç çağrıları hook seviyesinde bloke edilir:
@@ -106,6 +108,13 @@ Tüm kapalı uçlu MCL etkileşimleri `MCL X.Y.Z | ` prefix'li native `AskUserQu
 - "Devam etmek için bir mesaj gönderin" ve tüm dil eşdeğerleri yasaklı
 - `.mcl/hooks/*.sh` dosyaları debug amaçlı okunamaz
 
+
+**Phase 3.5 Pattern Matching** (8.0.7, derinleşti 8.1.1)
+Spec onayı sonrası Phase 4 başlamadan önce mevcut sibling dosyalar okunur:
+- **Naming Convention**, **Error Handling Pattern**, **Test Pattern** — 3 zorunlu başlık
+- 4 seviyeli cascade: sibling → proje geneli → ekosistem standardı → kullanıcıya sor
+- Sonuçlar Phase 4 boyunca `PATTERN_RULES_NOTICE` olarak context'te tutulur
+
 ### Phase 4 — Kod Yazımı
 
 **Incremental TDD** (7.3.1)
@@ -151,6 +160,17 @@ Phase 4 kodunun her MUST/SHOULD'u karşılayıp karşılamadığı kontrol edili
 **TDD Re-verify + Test Coverage**
 Tüm riskler çözüldükten sonra tam suite çalıştırılır.
 
+**Root Cause Chain** (8.1.9)
+Her bug fix veya davranış değişikliği için çok seviyeli kök sebep zinciri:
+1. Görünür süreç — düşünce zinciri açık yazılır
+2. Removal test — sebep kalkarsa üst problem çözülür mü?
+3. Falsification — sebep doğruysa kontrol edilebilir X gözlemlenmeli
+Her halkada uygulanır; müdahale noktası sıfır yan etki üreten halka.
+
+**Regression Guard Smart-Skip** (8.1.5/8.1.6)
+TDD green-verify GREEN + son yazımdan sonra → Regression Guard suite koşmaz.
+`last_write_ts` ve `tdd_last_green` state'e yazılır; ikisi birlikte kontrol edilir.
+
 **Session Recovery** (7.4.0)
 Phase 4.5 yarıda kesilebilir. `.mcl/risk-session.md` her karar sonrası güncellenir.
 
@@ -180,7 +200,34 @@ Call-graph tabanlı "gerçekten otomatize edilemeyen" liste. Hiçbiri tetiklenme
 
 ---
 
+---
+
+## Hook Güvenlik Katmanları (8.0.x+)
+
+**Güvenlik Refleksleri** (8.0.8)
+Write/Edit çağrıları credential ve secret taramasından geçer:
+- Tier 1: `.env`, `*.pem`, `*.key`, `credentials.json` — gerçek değer içeriyorsa blok
+- Tier 2: Bilinen token pattern'leri (`sk-...`, `ghp_...`, `AKIA...`, JWT vb.)
+- Tier 3: Yüksek entropi assignment (Shannon ≥ 3.5, uzunluk ≥ 20)
+
+**Scope Guard** (8.0.6)
+Phase 4'te Write/Edit sadece spec'te bildirilen dosya yollarına izin verir. Glob pattern desteği (`src/auth/*.ts`).
+
+**Scope Discipline** (8.1.2)
+Her Phase 4 turunda üç kural:
+- Rule 1 SPEC-ONLY: spec'in MUST/SHOULD'larında olmayan hiçbir şey yapılmaz
+- Rule 2 FILE SCOPE: sadece spec'te geçen dosyalar değiştirilir
+- Rule 3 ROOT CAUSE: semptomu değil sebebi düzelt
+
+**Rollback Checkpoint** (8.0.9)
+Spec onayında `git rev-parse HEAD` → `state.rollback_sha`. Her turda SHA ve `git reset --hard` komutu gösterilir (ilk tur, `/mcl-rollback` ile yeniden).
+
+---
+
 ## Genel Mekanizmalar
+
+### Devtime Plan Critique (8.2.4)
+Plan üretildiğinde `general-purpose` subagent (claude-sonnet-4-6, extended thinking) planı 10 lens ile eleştirir: kök sebep derinliği, yan etki tahmini, boş/eksik durumlar, disambiguation eksiği, plan belirsizliği, halüsinasyon kontrolü, mevcut özelliklerle çakışma, extension/modification, kullanıcı görünürlüğü, test edilebilirlik. Sadece devtime.
 
 ### Anti-Sycophancy (7.3.4)
 - **Verdict-first formatı**: Olumsuz bulgu varsa ilk cümlede söylenir
@@ -193,6 +240,9 @@ Mesaj içine yazılınca o yanıt için self-critique süreci görünür hale ge
 
 ### Kural Yakalama (Rule Capture)
 Geliştirici bir fix'i genel kural yapmak istediğinde kapsam seçimi + preview + onay akışı çalışır.
+
+### Human Authority — Karar Kapanışı (8.1.4)
+Geliştirici açık karar verdikten sonra (ret, seçim, risk kabulü) MCL konuyu yeniden açmaz. Pressure resistance (kanıtsız baskıya direnç) ile tamamlayıcı — biri pozisyonu korur, diğeri kararı kapatır.
 
 ### GATE Answer Coherence (7.7.0)
 Mimari GATE cevabı alındıktan sonra teknik tutarlılık kontrolü. Bkz. Phase 1 bölümü.
@@ -230,6 +280,9 @@ Mimari GATE cevabı alındıktan sonra teknik tutarlılık kontrolü. Bkz. Phase
 
 ### State Dosyası (`.mcl/state.json`)
 Hook sistemi tarafından yönetilir — doğrudan Bash yazımı bloke edilir (8.0.3+).
+
+**`mcl_get_active_phase()`** (8.2.3)
+Tüm state field'larını (`current_phase`, `spec_approved`, `phase_review_state`, `ui_sub_phase`, vb.) okuyup tek bir effective phase string döndürür: `"1"`, `"2"`, `"3"`, `"3.5"`, `"4"`, `"4a"`, `"4b"`, `"4c"`, `"4.5"`, `"?"`. Hook'lardaki çift-okuma noktaları bu helper'ı kullanır.
 
 `phase_review_state` lifecycle:
 ```
@@ -271,6 +324,13 @@ Shell komutu yapıştırıldığında MCL Phase 1'i atlar. Destructive operasyon
 git clone https://github.com/YZ-LLM/my-claude-lang.git ~/my-claude-lang
 cd ~/my-claude-lang && bash setup.sh
 ```
+
+`setup.sh` her çalışmada:
+**Kaldırma:**
+```bash
+bash uninstall.sh
+```
+`uninstall.sh`: settings.json'dan hook kayıtlarını çıkarır, skill ve hook dosyalarını siler. Per-project `.mcl/` elle temizlenir.
 
 `setup.sh` her çalışmada:
 - Skill dosyalarını `~/.claude/skills/` altına kopyalar
