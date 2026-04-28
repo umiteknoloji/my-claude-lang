@@ -207,13 +207,22 @@ For full Phase 1 rules, read `my-claude-lang/phase1-rules.md`
    `AskUserQuestion({question: "MCL 8.1.3 | <localized-is-this-correct>",
    options: ["<approve-family-in-language>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns an approve-family option does the
-   Stop hook advance state — THEN call Phase 2. Not before.
+   Stop hook advance state — THEN call Phase 1.5. Not before.
 
 **⛔ STOP RULE:** After asking an open-ended clarifying question OR after
 calling `AskUserQuestion` for the summary confirmation, your response ENDS.
 Do not write anything else. Do not call tools beyond the AskUserQuestion
-itself. The summary is NOT permission to start Phase 2 — only the
+itself. The summary is NOT permission to start Phase 1.5 — only the
 developer's approve-family selection in the tool_result is.
+
+## Phase 1.5: Engineering Brief
+
+For full Phase 1.5 rules, read `my-claude-lang/phase1-5-engineering-brief.md`
+
+Produces an internal English Engineering Brief from the confirmed Phase 1
+parameters. Skipped silently when source language is English. Not shown
+to the developer. Emits `engineering-brief` audit entry in all cases.
+After Phase 1.5 → Phase 2 begins.
 
 ## Phase 2: Generate English Spec — MANDATORY, NEVER SKIP
 
@@ -431,6 +440,17 @@ AI did the right thing. Phase 4.5 does NOT end without this report.
 
 ⛔ STOP RULE: Do NOT write "all steps completed" or "done" without
 producing the 3-section Verification Report after Phase 4.5 finishes.
+
+## Phase 5.5: Localize Report
+
+For full Phase 5.5 rules, read `my-claude-lang/phase5-5-localize-report.md`
+
+After Phase 5 content is generated, Phase 5.5 localizes all developer-facing
+text into the developer's detected language before emission. Section headers,
+verdict words, and prose are rendered in the developer's language. File paths,
+code identifiers, CLI commands, and `📋 Spec:` block content stay in English.
+Skipped silently when source language is English. Emits `localize-report`
+audit entry in all cases.
 
 ## `/mcl-checkup` — Session Health Check
 

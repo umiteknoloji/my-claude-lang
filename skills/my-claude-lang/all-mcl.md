@@ -310,3 +310,15 @@ a Pass condition, and a Skip condition.
 **Signal:** `audit.log` contains `plugin-dispatch-gap | mcl-activate.sh | missing=<list>`. `additionalContext` contains `PLUGIN DISPATCH GAP` block. Session diary shows subsequent Task dispatches for the listed plugins.
 **Pass:** After gap notice, session diary shows dispatches for all listed plugins. On the following turn, `PLUGIN_MISS_NOTICE` is absent — notice cleared automatically because `trace.log` now has the required events.
 **Skip:** When all Phase 4.5 required plugins are dispatched before this check runs (common case). Also skipped when `phase_review_state` is not `running`. Expected skip in most sessions.
+
+### STEP-58: engineering-brief
+**Phase:** 1.5 (between Phase 1 approval and Phase 2 spec generation) | **Description:** After Phase 1 AskUserQuestion returns approve-family, MCL produces an internal Engineering Brief — a structured English restatement of the confirmed parameters. The brief is not shown to the developer; it is the context bridge that Phase 2 spec generation builds on. Skipped silently when the developer's detected language is English. An `engineering-brief` audit entry is always emitted regardless of skip.
+**Signal:** `audit.log` contains `engineering-brief | phase1-5 | lang=<detected> skipped=<true|false>`.
+**Pass:** `audit.log` has `engineering-brief` entry for this session. `skipped=false` for non-English sessions. Phase 2 spec accurately reflects the developer's non-English intent without translation artifacts.
+**Skip:** When developer language is English (`skipped=true`). Audit entry still required.
+
+### STEP-59: localize-report
+**Phase:** 5.5 (after Phase 5 content is generated, before emission) | **Description:** After Phase 5 Verification Report is produced, Phase 5.5 localizes all developer-facing text — section headers, verdict words, prose — into the developer's detected language before the response is emitted. File paths, code identifiers, CLI commands, and `📋 Spec:` block content stay in English. Skipped silently when developer language is English. A `localize-report` audit entry is always emitted.
+**Signal:** `audit.log` contains `localize-report | phase5-5 | lang=<detected> skipped=<true|false>`.
+**Pass:** `audit.log` has `localize-report` entry for this session. `skipped=false` for non-English sessions. Developer sees Phase 5 report in their language with English technical tokens preserved.
+**Skip:** When developer language is English (`skipped=true`). Audit entry still required.
