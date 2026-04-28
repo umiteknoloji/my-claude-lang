@@ -8,26 +8,31 @@ When the developer types `/mcl-rollback`, perform these steps in order:
 
 2. Read `.mcl/state.json` and extract `rollback_sha`, `scope_paths`, and `spec_hash`.
 
-3. If `rollback_sha` is null or missing, respond:
-   > Rollback checkpoint yok. Spec henüz onaylanmamış veya git repo mevcut değil.
+3. If `rollback_sha` is null or missing, respond in the developer's detected language:
+   > (TR) Rollback checkpoint yok. Spec henüz onaylanmamış veya git repo mevcut değil.
+   > (EN) No rollback checkpoint. Spec not yet approved or no git repo present.
+   Render the message in the developer's language, not hardcoded Turkish.
 
-4. If `rollback_sha` is set, display in the developer's language:
+4. If `rollback_sha` is set, display the following in the developer's detected language:
 
    ```
    🔙 Rollback Checkpoint
    SHA:      <full sha>
-   Kısa:     <sha[:12]>
+   Short:    <sha[:12]>
 
-   Tüm Phase 4 değişikliklerini geri almak için:
+   To revert all Phase 4 changes:
      git reset --hard <full sha>
 
-   ⚠️  Bu komut dosyaları silmez — sadece HEAD'i geri taşır.
-       Önce git stash veya commit ile mevcut çalışmayı koruyun.
+   ⚠️  This does NOT delete files — it only moves HEAD back.
+       Protect current work first with git stash or a commit.
 
-   Atomic commit (Phase 5 sonrası):
-     git add <scope_paths veya ".">
+   Atomic commit (after Phase 5):
+     git add <scope_paths or ".">
      git commit -m "feat: <spec objective>"
    ```
+
+   Translate all prose labels into the developer's language. Technical tokens
+   (git commands, SHA, `scope_paths`) stay in English.
 
 5. Do NOT run `git reset` automatically. Show only — the developer decides.
 

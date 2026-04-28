@@ -7,6 +7,15 @@
 
 ## [Unreleased]
 
+## [8.2.2] - 2026-04-28
+
+### Eklendi
+- **`docs/root-cause-discipline.en.md`:** Root Cause Discipline tam İngilizce çevirisi (9 bölüm). MCL iç dili İngilizce olduğu için operasyonel referans bu dosya; Türkçe versiyon insan referansı olarak kalıyor.
+
+### Değişti
+- **CLAUDE.md:** Root Cause Discipline referansı `.en.md`'ye güncellendi.
+- **`mcl-rollback.md`:** Hardcoded Türkçe çıktı kaldırıldı. Satır 12 (checkpoint yok mesajı) ve satır 19-29 (rollback template) artık developer'ın algılanan diline göre üretiliyor. Teknik tokenlar (git komutları, SHA) İngilizce kalıyor.
+
 ## [8.2.1] - 2026-04-28
 
 ### Değişti
