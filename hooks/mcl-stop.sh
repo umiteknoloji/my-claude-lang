@@ -673,14 +673,20 @@ PYEXTRACT
       mcl_audit_log "scope-paths-set" "stop" "count=${_SCOPE_COUNT} hash=${CURRENT_HASH:0:12}"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_init "${_SCOPE_COUNT}"
     fi
-    # Pattern Matching — Phase 3.5. Find existing sibling files for the
-    # declared scope so Claude reads them BEFORE writing Phase 4 code.
+    # Pattern Matching — Phase 3.5. Cascade: Level 1 (siblings) → Level 2
+    # (project-wide recent) → Level 3 (ecosystem default) → Level 4 (ask user).
     # pattern_scan_due=true blocks writes in pre-tool until first Phase 4
     # turn completes (stop hook clears it below).
     _PATSCAN_LIB="$_MCL_HOOK_DIR/lib/mcl-pattern-scan.py"
     if [ -f "$_PATSCAN_LIB" ] && command -v python3 >/dev/null 2>&1; then
+      # Capture both stdout and exit code; stderr suppressed
       _PAT_FILES="$(printf '%s' "${_SCOPE_VALID:-[]}" \
-        | python3 "$_PATSCAN_LIB" "$(pwd)" 2>/dev/null || echo '[]')"
+        | python3 "$_PATSCAN_LIB" "$(pwd)" 2>/dev/null)"
+      _PAT_EXIT=$?
+      # exit 3 means "no files found at any project level — use ecosystem"
+      if [ "$_PAT_EXIT" = "3" ]; then
+        _PAT_FILES='[]'
+      fi
       _PAT_VALID="$(printf '%s' "${_PAT_FILES:-[]}" | python3 -c \
         'import json,sys; a=json.loads(sys.stdin.read()); print(json.dumps(a)) if isinstance(a,list) else print("[]")' \
         2>/dev/null || echo '[]')"
@@ -688,11 +694,56 @@ PYEXTRACT
         'import json,sys; print(len(json.loads(sys.stdin.read())))' 2>/dev/null || echo 0)"
       mcl_state_set pattern_files "${_PAT_VALID}" >/dev/null 2>&1 || true
       if [ "$_PAT_COUNT" -gt 0 ] 2>/dev/null; then
+        # Level 1 or 2: real files found
+        _PAT_LEVEL="$([ "$_PAT_EXIT" = "0" ] && echo 1 || echo 2)"
+        mcl_state_set pattern_level "$_PAT_LEVEL" >/dev/null 2>&1 || true
         mcl_state_set pattern_scan_due true >/dev/null 2>&1 || true
-        mcl_audit_log "pattern-scan-pending" "stop" "count=${_PAT_COUNT} hash=${CURRENT_HASH:0:12}"
+        mcl_state_set pattern_ask_pending false >/dev/null 2>&1 || true
+        mcl_audit_log "pattern-scan-pending" "stop" "level=${_PAT_LEVEL} count=${_PAT_COUNT} hash=${CURRENT_HASH:0:12}"
         command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_pending "${_PAT_COUNT}"
+      elif [ "$_PAT_EXIT" = "3" ]; then
+        # Level 3: no project files — determine ecosystem from scope_paths extension
+        _ECO_EXT="$(printf '%s' "${_SCOPE_VALID:-[]}" | python3 -c '
+import json,sys,os
+paths = json.loads(sys.stdin.read())
+exts = [os.path.splitext(p)[-1].lstrip(".").lower() for p in paths if p]
+ts_like = {"ts","tsx","mts","cts"}
+js_like = {"js","jsx","mjs","cjs"}
+eco_map = {
+  **{e: "typescript" for e in ts_like},
+  **{e: "javascript" for e in js_like},
+  "py": "python",
+  "go": "go",
+  "rs": "rust",
+  "java": "java",
+  "rb": "ruby",
+  "php": "php",
+  "cs": "csharp",
+  "kt": "kotlin",
+  "swift": "swift",
+}
+for e in exts:
+  if e in eco_map:
+    print(eco_map[e]); break
+else:
+  print("unknown")
+' 2>/dev/null || echo 'unknown')"
+        mcl_state_set pattern_level 3 >/dev/null 2>&1 || true
+        mcl_state_set pattern_scan_due true >/dev/null 2>&1 || true
+        mcl_state_set pattern_ask_pending false >/dev/null 2>&1 || true
+        # Store ecosystem as a synthetic "file" signal for activate hook
+        _ECO_JSON="$(printf '["%s-ecosystem-standard"]' "$_ECO_EXT")"
+        mcl_state_set pattern_files "$_ECO_JSON" >/dev/null 2>&1 || true
+        mcl_audit_log "pattern-scan-ecosystem" "stop" "ecosystem=${_ECO_EXT} hash=${CURRENT_HASH:0:12}"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_ecosystem "$_ECO_EXT"
       else
-        mcl_state_set pattern_scan_due false >/dev/null 2>&1 || true
+        # No files and not exit 3 — fall to Level 4: ask user
+        mcl_state_set pattern_level 4 >/dev/null 2>&1 || true
+        mcl_state_set pattern_scan_due true >/dev/null 2>&1 || true
+        mcl_state_set pattern_ask_pending true >/dev/null 2>&1 || true
+        mcl_state_set pattern_files '[]' >/dev/null 2>&1 || true
+        mcl_audit_log "pattern-scan-ask" "stop" "hash=${CURRENT_HASH:0:12}"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_ask
       fi
     fi
   else

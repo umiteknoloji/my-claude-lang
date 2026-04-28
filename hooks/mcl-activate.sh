@@ -236,6 +236,8 @@ except Exception:
     mcl_state_set pattern_summary null >/dev/null 2>&1 || true
     mcl_state_set tdd_last_green null >/dev/null 2>&1 || true
     mcl_state_set last_write_ts null >/dev/null 2>&1 || true
+    mcl_state_set pattern_level null >/dev/null 2>&1 || true
+    mcl_state_set pattern_ask_pending false >/dev/null 2>&1 || true
   fi
 fi
 
@@ -534,22 +536,56 @@ try:
     due = obj.get("pattern_scan_due")
     phase = obj.get("current_phase")
     files = obj.get("pattern_files") or []
-    if due is True and str(phase) == "4" and files:
-        print("pending|" + json.dumps(files))
+    level = obj.get("pattern_level") or 1
+    ask = obj.get("pattern_ask_pending") is True
+    if due is True and str(phase) == "4":
+        print(f"{level}|{int(ask)}|" + json.dumps(files))
     else:
         print("")
 except Exception:
     pass
 ' "$STATE_FILE" 2>/dev/null)"
-  if [ -n "$_PM_DATA" ] && [ "${_PM_DATA%%|*}" = "pending" ]; then
-    _PM_FILES_JSON="${_PM_DATA#pending|}"
-    _PM_LIST="$(printf '%s' "$_PM_FILES_JSON" | python3 -c '
+  if [ -n "$_PM_DATA" ]; then
+    _PM_LEVEL="${_PM_DATA%%|*}"
+    _PM_REST="${_PM_DATA#*|}"
+    _PM_ASK="${_PM_REST%%|*}"
+    _PM_FILES_JSON="${_PM_REST#*|}"
+
+    if [ "$_PM_ASK" = "1" ]; then
+      # Level 4 — no files, no ecosystem match: ask user
+      PATTERN_MATCHING_NOTICE="<mcl_audit name=\"phase-3.5-pattern-scan\">\nPHASE 3.5 — PATTERN NOT FOUND\n\nNo existing code files were found in this project to infer patterns from. Before writing Phase 4 code, ask the developer one question in their language:\n\n\"Bu projede henüz kod yok. Hangi kod stilini kullanalım?\" (adapt to developer's language)\n\nOffer 3-4 concrete options appropriate to the detected stack (e.g. for TypeScript: strict ESLint + Prettier defaults / Airbnb style guide / Standard TS / custom). After the developer answers, write the PATTERN SUMMARY in exactly this format:\n\n**PATTERN SUMMARY**\n**Naming Convention:** <rule>\n**Error Handling Pattern:** <rule>\n**Test Pattern:** <rule>\n\nThen proceed to Phase 4. Writes unlock after the summary turn.\n</mcl_audit>\n\n"
+      mcl_audit_log "pattern-matching-notice" "mcl-activate.sh" "level=4 ask=true"
+    elif [ "$_PM_LEVEL" = "3" ]; then
+      # Level 3 — ecosystem standard
+      _ECO_NAME="$(printf '%s' "$_PM_FILES_JSON" | python3 -c '
+import json,sys
+files = json.loads(sys.stdin.read())
+eco = files[0].replace("-ecosystem-standard","") if files else "unknown"
+labels = {"typescript":"TypeScript strict (noImplicitAny, strict: true, ESLint recommended)",
+          "javascript":"JavaScript Standard (ESLint recommended, no semicolons optional)",
+          "python":"Python PEP 8 (black formatter, type hints, pytest)",
+          "go":"Go idiomatic (gofmt, errors as values, table-driven tests)",
+          "rust":"Rust idiomatic (clippy clean, Result<T,E>, #[cfg(test)])",
+          "java":"Java standard (checkstyle, Optional over null, JUnit 5)",
+          "ruby":"Ruby idiomatic (rubocop, frozen_string_literal, RSpec)",
+          "php":"PHP PSR-12 (PHPStan level 5+, PHPUnit)",
+          "csharp":"C# idiomatic (nullable enabled, xUnit, StyleCop)",
+          "kotlin":"Kotlin idiomatic (ktlint, coroutines, JUnit 5)",
+          "swift":"Swift idiomatic (SwiftLint, XCTest, value types preferred)"}
+print(labels.get(eco, eco + " standard conventions"))
+' 2>/dev/null || echo 'standard conventions')"
+      PATTERN_MATCHING_NOTICE="<mcl_audit name=\"phase-3.5-pattern-scan\">\nPHASE 3.5 — NO PROJECT FILES FOUND — USING ECOSYSTEM DEFAULTS\n\nNo existing code files were found in this project to read patterns from. Apply the following ecosystem standard as the PATTERN SUMMARY:\n\n**PATTERN SUMMARY**\n**Naming Convention:** ${_ECO_NAME} — naming conventions\n**Error Handling Pattern:** ${_ECO_NAME} — error handling conventions\n**Test Pattern:** ${_ECO_NAME} — test conventions\n\nWrite the actual pattern lines (not placeholders) based on your knowledge of ${_ECO_NAME}. These become ENFORCED conventions for all Phase 4 code. End the turn after the summary — writes unlock on the next turn.\n</mcl_audit>\n\n"
+      mcl_audit_log "pattern-matching-notice" "mcl-activate.sh" "level=3 ecosystem=$(printf '%s' "$_PM_FILES_JSON" | python3 -c 'import json,sys; f=json.loads(sys.stdin.read()); print(f[0].replace("-ecosystem-standard","") if f else "unknown")' 2>/dev/null)"
+    elif [ -n "$_PM_FILES_JSON" ] && [ "$_PM_FILES_JSON" != "[]" ]; then
+      # Level 1 or 2 — real files
+      _PM_LIST="$(printf '%s' "$_PM_FILES_JSON" | python3 -c '
 import json,sys
 files = json.loads(sys.stdin.read())
 print("\n".join(f"  - {f}" for f in files))
 ' 2>/dev/null)"
-    PATTERN_MATCHING_NOTICE="<mcl_audit name=\"phase-3.5-pattern-scan\">\nPHASE 3.5 — PATTERN SCAN REQUIRED (one-time, this turn only)\n\nThis turn: READ ONLY — no file writes. Read the files below, then write a PATTERN SUMMARY in exactly this format (three bold headings, one line each):\n\n**PATTERN SUMMARY**\n**Naming Convention:** <one concrete rule — e.g. camelCase functions, PascalCase types, kebab-case files>\n**Error Handling Pattern:** <one concrete rule — e.g. Result<T,E> type, never throw, always log at boundary>\n**Test Pattern:** <one concrete rule — e.g. describe/it, Arrange-Act-Assert, jest.mock for all external deps>\n\nFiles to read:\n${_PM_LIST}\n\nThese three rules become ENFORCED conventions for all Phase 4 code and are checked in Phase 4.5 compliance scan. Write only what is actually present in the codebase — do not invent conventions. If a pattern is absent or inconsistent, write: [not established].\n\nEnd the turn after the summary — writes unlock on the next turn.\n</mcl_audit>\n\n"
-    mcl_audit_log "pattern-matching-notice" "mcl-activate.sh" "shown"
+      PATTERN_MATCHING_NOTICE="<mcl_audit name=\"phase-3.5-pattern-scan\">\nPHASE 3.5 — PATTERN SCAN REQUIRED (one-time, this turn only)\n\nThis turn: READ ONLY — no file writes. Read the files below, then write a PATTERN SUMMARY in exactly this format (three bold headings, one line each):\n\n**PATTERN SUMMARY**\n**Naming Convention:** <one concrete rule — e.g. camelCase functions, PascalCase types, kebab-case files>\n**Error Handling Pattern:** <one concrete rule — e.g. Result<T,E> type, never throw, always log at boundary>\n**Test Pattern:** <one concrete rule — e.g. describe/it, Arrange-Act-Assert, jest.mock for all external deps>\n\nFiles to read:\n${_PM_LIST}\n\nThese three rules become ENFORCED conventions for all Phase 4 code and are checked in Phase 4.5 compliance scan. Write only what is actually present in the codebase — do not invent conventions. If a pattern is absent or inconsistent, write: [not established].\n\nEnd the turn after the summary — writes unlock on the next turn.\n</mcl_audit>\n\n"
+      mcl_audit_log "pattern-matching-notice" "mcl-activate.sh" "level=${_PM_LEVEL} shown"
+    fi
   fi
 fi
 

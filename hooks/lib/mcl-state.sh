@@ -71,6 +71,8 @@ _mcl_state_default() {
   "pattern_summary": null,
   "tdd_last_green": null,
   "last_write_ts": null,
+  "pattern_level": null,
+  "pattern_ask_pending": false,
   "last_update": ${now}
 }
 JSON

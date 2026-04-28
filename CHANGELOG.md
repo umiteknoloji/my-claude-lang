@@ -7,6 +7,18 @@
 
 ## [Unreleased]
 
+## [8.2.1] - 2026-04-28
+
+### Değişti
+- **Phase 3.5 kademeli arama (boş pattern_summary fix):** `mcl-pattern-scan.py` tek seviyeden 4 seviyeli cascade'e dönüştürüldü.
+  - **Level 1 (mevcut):** scope_paths sibling dosyaları
+  - **Level 2 (yeni):** sibling yoksa proje genelinde aynı uzantılı dosyalar, en son değiştirilen 8 tane
+  - **Level 3 (yeni):** proje dosyası yoksa ekosistem standardı (TypeScript strict, Python PEP 8, Go idiomatic, vb.) — `mcl-activate.sh` build-in knowledge'dan PATTERN SUMMARY yazar
+  - **Level 4 (yeni):** ekosistem tespit edilemezse kullanıcıya tek soru
+- `mcl-stop.sh`: exit code 3 → Level 3/4 dallanması; `pattern_level` ve `pattern_ask_pending` state'e yazılır
+- `mcl-activate.sh`: PATTERN_MATCHING_NOTICE level'a göre farklılaştı — Level 1/2 dosya listesi, Level 3 ekosistem direktifi, Level 4 kullanıcıya sor
+- `mcl-state.sh`: `pattern_level` ve `pattern_ask_pending` schema'ya eklendi
+
 ## [8.2.0] - 2026-04-28
 
 ### Eklendi
