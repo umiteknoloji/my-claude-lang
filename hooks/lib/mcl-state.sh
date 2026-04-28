@@ -292,6 +292,94 @@ mcl_audit_log() {
     >> "$dir/audit.log" 2>/dev/null || true
 }
 
+mcl_get_active_phase() {
+  # Returns a single effective phase string from the combination of
+  # current_phase, spec_approved, phase_review_state, ui_sub_phase,
+  # pattern_scan_due, and spec_hash (Phase 3 detection).
+  #
+  # Effective phase values:
+  #   "1"    Phase 1 — gathering parameters
+  #   "2"    Phase 2 — spec being written (spec block not yet emitted)
+  #   "3"    Phase 3 — spec emitted, awaiting developer approval
+  #   "3.5"  Phase 3.5 — pattern scan turn (first Phase 4 turn, writes blocked)
+  #   "4"    Phase 4 — executing (no UI flow, or UI complete)
+  #   "4a"   Phase 4a — UI BUILD (writing frontend with dummy data)
+  #   "4b"   Phase 4b — UI REVIEW (awaiting developer approval of UI)
+  #   "4c"   Phase 4c — BACKEND (wiring real data, UI approved)
+  #   "4.5"  Phase 4.5 — post-code risk review dialog
+  #   "4.6"  Phase 4.6 — post-risk impact review dialog
+  #   "5"    Phase 5 — verification report
+  #   "5.5"  Phase 5.5 — localize report (non-English sessions)
+  #   "?"    indeterminate (state inconsistent or unreadable)
+  #
+  # Optional arg: path to state.json (default: $MCL_STATE_FILE)
+  local state_file="${1:-${MCL_STATE_FILE}}"
+  [ -f "$state_file" ] || { echo "1"; return 0; }
+
+  python3 - "$state_file" 2>/dev/null <<'PYEOF'
+import json, sys
+
+try:
+    obj = json.loads(open(sys.argv[1]).read())
+except Exception:
+    print("?"); sys.exit(0)
+
+phase       = int(obj.get("current_phase") or 1)
+approved    = obj.get("spec_approved") is True
+pr_state    = obj.get("phase_review_state") or ""   # null/"pending"/"running"
+ui_active   = obj.get("ui_flow_active") is True
+ui_sub      = obj.get("ui_sub_phase") or ""         # BUILD_UI/REVIEW/BACKEND
+spec_hash   = obj.get("spec_hash")                  # set when spec block emitted
+scan_due    = obj.get("pattern_scan_due") is True
+
+# Phase 1: collecting parameters
+if phase <= 1:
+    print("1"); sys.exit(0)
+
+# Phase 2/3: spec being written or awaiting approval
+if phase == 2:
+    # Phase 3: spec block was emitted (spec_hash set) but not yet approved
+    if spec_hash:
+        print("3")
+    else:
+        print("2")
+    sys.exit(0)
+
+# phase >= 4: spec approved, executing or reviewing
+if not approved:
+    # Shouldn't happen (phase=4 requires approved=true), but guard it
+    print("?"); sys.exit(0)
+
+# Phase 4.5 / 4.6 — review dialog
+if pr_state == "running":
+    # Distinguish 4.5 vs 4.6: 4.6 is pure-dialog (no code written this turn)
+    # We can't distinguish 4.5 from 4.6 from state alone without
+    # transcript analysis — return "4.5" as the coarser bucket.
+    # Callers that need 4.6 precision should check additional signals.
+    print("4.5"); sys.exit(0)
+
+if pr_state == "pending":
+    # Code written, review not yet started — still in Phase 4 (blocked)
+    if ui_active:
+        sub_map = {"BUILD_UI": "4a", "REVIEW": "4b", "BACKEND": "4c"}
+        print(sub_map.get(ui_sub, "4")); sys.exit(0)
+    if scan_due:
+        print("3.5"); sys.exit(0)
+    print("4"); sys.exit(0)
+
+# pr_state is null — Phase 4 not yet written code, or post-review
+if ui_active:
+    sub_map = {"BUILD_UI": "4a", "REVIEW": "4b", "BACKEND": "4c"}
+    if ui_sub in sub_map:
+        print(sub_map[ui_sub]); sys.exit(0)
+
+if scan_due:
+    print("3.5"); sys.exit(0)
+
+print("4")
+PYEOF
+}
+
 # CLI dispatch — only when invoked directly, not when sourced.
 # READ-ONLY from CLI. All write operations (set/init/reset) are gated by
 # `_mcl_state_auth_check` and will be denied from this entry point —
