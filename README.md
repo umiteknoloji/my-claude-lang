@@ -1,5 +1,4 @@
-# my-claude-lang 🌐 MCL 8.1.3
-
+# my-claude-lang
 ### The age of AI doesn't speak English. It speaks yours.
 
 ---
