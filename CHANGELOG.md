@@ -7,6 +7,17 @@
 
 ## [Unreleased]
 
+## [8.2.6] - 2026-04-28
+
+### Değişti
+- **`mcl_get_active_phase()` migration — 4 çift-okuma noktası:**
+  - `mcl-stop.sh:374-376`: Phase Review Guard'daki `current_phase` + `spec_approved` çift okuması kaldırıldı, `mcl_get_active_phase()` ile değiştirildi
+  - `mcl-stop.sh:474`: Pattern scan early clearance'daki `current_phase` okuması kaldırıldı
+  - `mcl-stop.sh:802`: Pattern scan late fallback'deki `current_phase` okuması kaldırıldı
+  - `mcl-activate.sh:353-354`: Respec Guard'daki `spec_approved + current_phase >= 4` Python inline okuması kaldırıldı
+  - Tüm noktalar `grep -qE '^(4|4a|4b|4c|4\.5|3\.5)$'` koşuluyla helper sonucunu kullanıyor
+  - Mevcut state field'lar dokunulmadı (extension over modification)
+
 ## [8.2.5] - 2026-04-28
 
 ### Değişti

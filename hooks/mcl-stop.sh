@@ -371,11 +371,11 @@ CURRENT_PHASE="$(mcl_state_get current_phase)"
 _PR_GUARD="$_MCL_HOOK_DIR/lib/mcl-phase-review-guard.py"
 if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
-  _PR_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-  _PR_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
+  _PR_ACTIVE_PHASE="$(mcl_get_active_phase 2>/dev/null)"
   _PR_REVIEW_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
 
-  if [ "$_PR_PHASE" = "4" ] && [ "$_PR_APPROVED" = "true" ]; then
+  # Phase 4+ means approved and executing (4, 4a, 4b, 4c, 4.5, 3.5 all qualify)
+  if echo "$_PR_ACTIVE_PHASE" | grep -qE '^(4|4a|4b|4c|3\.5)$'; then
     _PR_JSON="$(python3 "$_PR_GUARD" "$TRANSCRIPT_PATH" 2>/dev/null)"
     _PR_CODE="$(printf '%s' "$_PR_JSON" | python3 -c \
       'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("code_written") else "false")' 2>/dev/null)"
@@ -471,8 +471,8 @@ fi
 # Must run before the spec/askq gate below because the Phase 3.5 turn has
 # no spec block and no AskUQ — the early exit would skip this otherwise.
 _PS_DUE_EARLY="$(mcl_state_get pattern_scan_due 2>/dev/null)"
-_PS_PHASE_EARLY="$(mcl_state_get current_phase 2>/dev/null)"
-if [ "$_PS_DUE_EARLY" = "true" ] && [ "$_PS_PHASE_EARLY" = "4" ] \
+_PS_ACTIVE_PHASE_EARLY="$(mcl_get_active_phase 2>/dev/null)"
+if [ "$_PS_DUE_EARLY" = "true" ] && echo "$_PS_ACTIVE_PHASE_EARLY" | grep -qE '^(4|4a|4b|4c|3\.5)$' \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   _PS_SUMMARY_EARLY="$(python3 - "$TRANSCRIPT_PATH" << 'PYPS_EARLY'
 import json, re, sys
@@ -799,8 +799,8 @@ fi
 # Handles the case where pattern_scan_due=true but a Write call happened in the
 # same turn — the early block above ran, so this is now a no-op guard.
 _PS_DUE="$(mcl_state_get pattern_scan_due 2>/dev/null)"
-_PS_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-if [ "$_PS_DUE" = "true" ] && [ "$_PS_PHASE" = "4" ] && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+_PS_ACTIVE_PHASE="$(mcl_get_active_phase 2>/dev/null)"
+if [ "$_PS_DUE" = "true" ] && echo "$_PS_ACTIVE_PHASE" | grep -qE '^(4|4a|4b|4c|3\.5)$' && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   _PS_SUMMARY="$(python3 - "$TRANSCRIPT_PATH" << 'PYPS'
 import json, re, sys
 

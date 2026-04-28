@@ -345,17 +345,11 @@ fi
 # backstop; this dynamic notice is the per-turn enforcement signal.
 RESPEC_GUARD_NOTICE=""
 if [ -f "$STATE_FILE" ] && command -v python3 >/dev/null 2>&1; then
-  _RG_ACTIVE="$(python3 -c '
-import json, sys
-try:
-    with open(sys.argv[1], "r", encoding="utf-8") as f:
-        obj = json.load(f)
-    approved = obj.get("spec_approved") is True
-    phase = int(obj.get("current_phase") or 0)
-    print("true" if approved and phase >= 4 else "false")
-except Exception:
-    print("false")
-' "$STATE_FILE" 2>/dev/null)"
+  _RG_EFF_PHASE="$(mcl_get_active_phase "$STATE_FILE" 2>/dev/null)"
+  _RG_ACTIVE="false"
+  if echo "$_RG_EFF_PHASE" | grep -qE '^(4|4a|4b|4c|4\.5|3\.5)$'; then
+    _RG_ACTIVE="true"
+  fi
   if [ "$_RG_ACTIVE" = "true" ]; then
     RESPEC_GUARD_NOTICE="<mcl_audit name=\\\"spec-approved-no-respec\\\">\\nSPEC ALREADY APPROVED — Phase 4 active. STRICT PROHIBITION: Do NOT emit a new ${_BT}📋 Spec:${_BT} block this turn. Do NOT call AskUserQuestion to re-request spec approval. The approved spec is the canonical and immutable blueprint for this session.\\n\\nIf Phase 4 execution found an unexpected constraint, blocker, or environment mismatch: surface it as ONE AskUserQuestion bridge question only — state the issue in one sentence, offer 2–3 concrete resolution options (workaround / scope-trim / cancel) — then STOP and WAIT. Do NOT regenerate the spec, do NOT re-run Phase 1/2/3.\\n</mcl_audit>\\n\\n"
   fi
