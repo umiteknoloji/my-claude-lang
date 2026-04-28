@@ -26,6 +26,20 @@ skill files, captured-rules blocks), read
 - Always implement behavioral MCL features as dedicated phase/skill/hook artifacts. A feature that exists only as a model behavioral prior (no skill file, no hook enforcement, no audit trail) is incomplete. If dedicated implementation is not feasible, add a detection control: a Phase 4.5 lens item, an audit log entry, or a post-check that surfaces skips. This applies to every MCL feature, not only phases. <!-- loc: TR: Behavioral olarak çalışan her MCL özelliği dedicated faz/skill/hook olarak implement edilmeli. Yalnızca model davranış önceliği olarak var olan (skill dosyası yok, hook enforcement yok, audit trail yok) bir özellik eksiktir. Dedicated implementasyon mümkün değilse atlama tespit eden bir kontrol eklenmeli: Phase 4.5 lens maddesi, audit log kaydı veya atlamayı ortaya çıkaran post-check. Bu kural yalnızca fazlar için değil, tüm MCL özellikleri için geçerlidir. -->
 - Always use a line-anchored regex (MULTILINE mode with optional leading whitespace, list markers, or heading markers) when checking whether an assistant text contains a `📋 Spec:` block, in every MCL hook or library that performs such a containment check. Never use a loose `search` that would match `📋 Spec:` appearing inline in prose. <!-- loc: TR: MCL'de bir asistan text'inin `📋 Spec:` bloğu içerip içermediğini kontrol eden her hook veya kütüphanede her zaman satır-başı ankrajlı regex kullan (MULTILINE modu + opsiyonel başta boşluk / liste işareti / başlık işareti). Prose içinde gömülü `📋 Spec:` referanslarını da eşleştirecek gevşek bir `search` asla kullanma. -->
 
+## Devtime Plan Critique (subagent)
+
+When producing a plan during an MCL development session (devtime — you + Ümit), automatically launch a `superpowers:code-reviewer` subagent to critique the plan before presenting it. The subagent applies five lenses:
+
+1. **Root cause depth** — was the root cause genuinely found, or did the plan stay at the surface symptom?
+2. **Side-effect estimation** — were downstream effects estimated (Phase 4.6 logic: imports, shared state, contract breakage, schema effects)?
+3. **Null/empty cases** — did the plan consider "what if this is empty / missing / never triggered"?
+4. **Disambiguation completeness** — are there unanswered questions that would change the approach? Any hidden assumption?
+5. **Plan ambiguity** — is any step underspecified, or does any step assume context that was not confirmed?
+
+Present the critique alongside the plan. If Ümit rejects the critique, discard it and proceed with the original plan. If accepted, incorporate the improvements before execution.
+
+**Scope: devtime only.** This rule does NOT apply during runtime (user project sessions). Ümit may skip critique at any point — no enforcement. <!-- loc: TR: Devtime plan critique: subagent plan üretilince otomatik eleştiri yapar, 5 lens uygular. Ümit kabul/red eder. Sadece devtime. -->
+
 ## Root Cause Discipline
 
 Full specification: `docs/root-cause-discipline.en.md` (TR: `docs/root-cause-discipline.md`)

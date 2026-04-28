@@ -7,6 +7,11 @@
 
 ## [Unreleased]
 
+## [8.2.4] - 2026-04-28
+
+### Eklendi
+- **Devtime Plan Critique (CLAUDE.md):** MCL geliştirme oturumlarında plan üretildiğinde otomatik olarak `superpowers:code-reviewer` subagent açılır ve planı 5 lens ile eleştirir: (1) kök sebep derinliği, (2) yan etki tahmini, (3) boş/eksik durumlar, (4) disambiguation eksiği, (5) plan belirsizliği. Critique plan'la birlikte sunulur; Ümit kabul/red eder. Sadece devtime — runtime'da tetiklenmez.
+
 ## [8.2.3] - 2026-04-28
 
 ### Eklendi
