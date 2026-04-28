@@ -53,14 +53,35 @@ Assumed defaults: <[assumed: X] items from Phase 1>
    MCL announces "Generating the specification..." → Phase 2 begins.
    The brief is the invisible bridge between the two.
 
+## Failure Path
+
+If the brief contradicts Phase 1 confirmed parameters (adds scope not
+present in Phase 1, or drops a confirmed constraint), silent fallback
+is FORBIDDEN.
+
+Retry with maximum effort, changing the approach each attempt — a retry
+that uses the same formulation as the previous attempt does not count.
+If the root cause is missing information, ask the developer one clarifying
+question in their language, then retry with the clarified input. Continue
+until a consistent brief is produced.
+
+A consistent brief is one where:
+- Every goal and actor maps to a confirmed Phase 1 parameter
+- No constraint from Phase 1 is absent
+- No new scope appears that was not in Phase 1
+
+Once consistent, continue to Phase 2.
+
 ## Audit
 
 Every Phase 1.5 execution emits an audit entry:
 ```
-engineering-brief | phase1-5 | lang=<detected> skipped=<true|false>
+engineering-brief | phase1-5 | lang=<detected> skipped=<true|false> retries=<N> clarification=<true|false>
 ```
 
-If skipped (English source), `skipped=true`. If produced, `skipped=false`.
+If skipped (English source), `skipped=true` and `retries=0`. If produced
+without contradiction, `retries=0`. `clarification=true` when the developer
+was asked a question during the failure path.
 This entry is the detection control required by the behavioral→dedicated rule:
 even when Phase 1.5 is a no-op, the audit confirms it was evaluated.
 

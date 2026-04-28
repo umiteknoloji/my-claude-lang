@@ -85,7 +85,7 @@ one-impact-per-turn conversation**. For each impact MCL surfaces:
    AskUserQuestion({
      question: "MCL 6.0.0 | <localized impact decision prompt>",
      options: [
-       "<apply-fix-in-language>",    # MCL patches the consumer
+       "<apply-fix-in-language>",    # MCL patches the consumer in-place (see below)
        "<skip-in-language>",         # accept the impact as-is
        "<make-rule-in-language>"     # triggers Rule Capture
      ]
@@ -94,6 +94,13 @@ one-impact-per-turn conversation**. For each impact MCL surfaces:
 3. MCL STOPS and waits for the tool_result **in the next message**.
 4. On tool_result: execute the chosen action, then present the next
    impact.
+   - **"Apply fix"** means MCL edits the affected downstream file directly
+     within Phase 4.6 — not a return to Phase 4. The spec is already
+     approved; `scope_paths` and `phase_review_state=running` remain active
+     throughout. There is no "go back to Phase 4" mechanism. If the required
+     fix is too large for an in-place patch (e.g. requires architectural
+     changes to the original Phase 4 deliverable), surface it as a new task
+     for the next session instead of attempting it here.
 5. Repeat until all impacts are resolved.
 
 ⛔ STOP RULE: After presenting an impact and calling `AskUserQuestion`,
