@@ -7,6 +7,11 @@
 
 ## [Unreleased]
 
+## [8.2.5] - 2026-04-28
+
+### Değişti
+- **Devtime Plan Critique — 10 lens + model seçimi:** Lens listesi 5'ten 10'a genişledi: halüsinasyon kontrolü, mevcut özelliklerle çakışma, extension over modification, kullanıcı görünürlüğü, test edilebilirlik eklendi. Subagent modeli `claude-sonnet-4-6` extended thinking olarak explicit belirtildi — ana oturum (Opus 4.7) ile farklı model, gerçek ikinci göz bias çeşitliliği; critique reasoning için ideal, ~5x daha ucuz.
+
 ## [8.2.4] - 2026-04-28
 
 ### Eklendi

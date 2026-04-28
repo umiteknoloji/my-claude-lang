@@ -28,17 +28,22 @@ skill files, captured-rules blocks), read
 
 ## Devtime Plan Critique (subagent)
 
-When producing a plan during an MCL development session (devtime — you + Ümit), automatically launch a `general-purpose` subagent with a plan-critique prompt to evaluate the plan before presenting it. (`superpowers:code-reviewer` is for code artifacts — wrong tool for plan text.) The subagent applies five lenses:
+When producing a plan during an MCL development session (devtime — you + Ümit), automatically launch a `general-purpose` subagent (model: `claude-sonnet-4-6`, extended thinking enabled) with a plan-critique prompt to evaluate the plan before presenting it. Using a different model than the main session (Opus 4.7) provides genuine second-opinion bias diversity; Sonnet 4.6 with extended thinking is ideal for critique reasoning at ~5x lower cost. (`superpowers:code-reviewer` is scoped to code artifacts — wrong tool for plan text.) The subagent applies ten lenses:
 
 1. **Root cause depth** — was the root cause genuinely found, or did the plan stay at the surface symptom?
 2. **Side-effect estimation** — were downstream effects estimated (Phase 4.6 logic: imports, shared state, contract breakage, schema effects)?
 3. **Null/empty cases** — did the plan consider "what if this is empty / missing / never triggered"?
 4. **Disambiguation completeness** — are there unanswered questions that would change the approach? Any hidden assumption?
 5. **Plan ambiguity** — is any step underspecified, or does any step assume context that was not confirmed?
+6. **Hallucination check** — are factual claims in the plan verified? Any "X tool exists" or "Y behaves like Z" assertions that were not confirmed against the actual codebase or docs?
+7. **Conflict with existing features** — does the planned feature overlap with something already in FEATURES.md? Would two parts of the system do the same job?
+8. **Extension over modification** — does the plan extend existing code or modify it? Modification without necessity violates the CLAUDE.md rule.
+9. **User visibility** — is the feature technically correct but invisible to the user? Avoid "it exists but nobody sees it" features unless the value is explicit.
+10. **Testability** — is the plan deterministically testable, or only behavioral? If behavioral, is there a skip-detection control (lens, audit entry, post-check)?
 
 Present the critique alongside the plan. If Ümit rejects the critique, discard it and proceed with the original plan. If accepted, incorporate the improvements before execution.
 
-**Scope: devtime only.** This rule does NOT apply during runtime (user project sessions). Ümit may skip critique at any point — no enforcement. <!-- loc: TR: Devtime plan critique: subagent plan üretilince otomatik eleştiri yapar, 5 lens uygular. Ümit kabul/red eder. Sadece devtime. -->
+**Scope: devtime only.** This rule does NOT apply during runtime (user project sessions). Ümit may skip critique at any point — no enforcement. <!-- loc: TR: Devtime plan critique: general-purpose subagent (Sonnet 4.6, extended thinking), 10 lens, Ümit kabul/red eder. Sadece devtime. -->
 
 ## Root Cause Discipline
 
