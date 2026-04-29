@@ -7,6 +7,52 @@
 
 ## [Unreleased]
 
+## [8.7.1] - 2026-04-29
+
+### Eklendi — Hook entegrasyonu (8.7.0'da ertelenmişti)
+
+#### L2 — Phase 4 incremental scan (`hooks/mcl-pre-tool.sh`)
+Edit/Write/MultiEdit branch'inde HIGH-only quick scan eklendi. Tetikleme: `tool_name ∈ {Edit, Write, MultiEdit}` AND source ext (ts/tsx/js/jsx/py/rb/go/rs/java/kt/swift/cs/php/cpp/c/h/lua/vue/svelte) AND `current_phase=4` AND `MCL_STATE_DIR` set. Mekanizma:
+1. Hypothetical post-edit content temp dosyaya yazılır (Edit: old→new bellek apply; MultiEdit: edits sırayla; Write: content doğrudan)
+2. `mcl-security-scan.py --mode=incremental --target <tmp>` çağrılır
+3. HIGH bulgu varsa `decision:deny` JSON döner; reason: `MCL SECURITY — <rule_id> (OWASP <ref>) at <file>:<line> — <message>. Fix the issue and retry.` Audit: `security-scan-block | mcl-pre-tool | rule=... tool=... file=... severity=HIGH`
+4. MEDIUM/LOW sessiz, audit only (`security-scan-incremental | mcl-pre-tool | file=... high=N med=N low=N skipped_via_cache=...`)
+
+Recursion safety: pre-tool MCL'in kendi tool'larını intercept etmiyor; harici Edit/Write çağrılarına özel.
+
+#### L3 — Phase 4.5 START gate (`hooks/mcl-stop.sh`)
+Mevcut Phase 4.5 enforcement state machine'inin pending dalına security scan tetikleme eklendi. Mekanizma:
+1. State `pending` AND `phase4_5_security_scan_done=false` ise `mcl-security-scan.py --mode=full` (timeout 120s, cache'li → tipik <5s)
+2. **HIGH ≥ 1:** state `pending`'de kalır (advance yok), `decision:block` döner; reason'da ilk 5 HIGH bulgu listesi (rule_id + OWASP + file:line + mesaj). Standart Phase 4.5 reminder mesajı **bypass edilir**. Audit: `security-scan-block | mcl-stop | full-scan high=N`. Geliştirici fix yaptıkça L2 incremental tetikler; tüm HIGH'lar fix'lendiğinde sonraki Stop'ta scan tekrar çalışır → HIGH=0 olur.
+3. **HIGH = 0:** `phase4_5_security_scan_done=true` set'lenir. Standart Phase 4.5 reminder block emit'ler ama reason'a MEDIUM bulgu listesi (max 8 satır) eklenir — "surface each one as a [Security] item in the Phase 4.5 sequential dialog". MEDIUM'lar Lens (d) etiketli risk turn'ü olarak işlenir.
+4. **LOW** her zaman audit-only, dialog'a girmez.
+
+Idempotency: `phase4_5_security_scan_done` field'ı state'e eklendi (default false). Phase 4.5 cycle başında reset davranışı mevcut state lifecycle'ına bağlı (session_start → state default).
+
+#### State şema değişikliği
+- `mcl-state.sh` `_mcl_state_default` schema'sına `phase4_5_security_scan_done: false` eklendi. v2 schema bumped değil — yeni field default false ile geriye dönük uyumlu.
+
+### Test sonuçları
+- T1 Pre-tool L2: phase=4, Write `cursor.execute("..." + name)` → `decision:deny` doğru reason ("G01-sql-string-concat (OWASP A03) at .../app.py:2 — ..."), audit `security-scan-incremental` (high=2) + `security-scan-block` (rule=G01-sql-string-concat) PASS
+- T2 Stop L3: durum cycle smoke test — pending'de scan tetiklenir (regression suite üzerinden doğrulandı)
+- T3 Mevcut suite: 19/0/2 — regresyonsuz PASS
+
+### Updated files
+- `hooks/lib/mcl-state.sh` (schema'ya `phase4_5_security_scan_done` field'ı)
+- `hooks/mcl-pre-tool.sh` (Phase 4 incremental scan branch eklendi, secret-scan-block JSON pattern'i mirror'landı)
+- `hooks/mcl-stop.sh` (Phase 4.5 START security gate, mevcut enforcement'a entegre)
+- `VERSION` (8.7.0 → 8.7.1)
+- `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (8.7.0'dan devralınmış, hâlâ geçerli)
+
+- A04 Insecure Design + A09 Logging/Monitoring sadece L1 design-time
+- ASVS L1 subset (V2/V3/V4/V5/V6/V7/V8); L2/L3 kapsam dışı
+- BOLA/IDOR semantik — heuristic decorator yokluğu yakalar; logic flaw'ları yakalayamaz
+- SCA tool yokluğunda ilgili stack için A06 skip
+- 14 dilden TR + EN tam lokalize, diğer 12 dil EN fallback
+- 100k+ mono-repo Phase 4.5 full scan dakikalarca sürebilir; cache ilk runda etkisiz
+
 ## [8.7.0] - 2026-04-29
 
 ### Eklendi — Backend Security (3-tier OWASP+ASVS L1)

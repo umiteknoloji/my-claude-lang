@@ -558,6 +558,108 @@ CURRENT_PHASE="${CURRENT_PHASE:-1}"
 SPEC_APPROVED="${SPEC_APPROVED:-false}"
 PHASE_NAME="${PHASE_NAME:-COLLECT}"
 
+# -------- Branch: Phase 4 incremental security scan (since 8.7.1) --------
+# Edit/Write/MultiEdit to source files trigger HIGH-only quick scan.
+# Cache-keyed (file SHA1 + rules version), MEDIUM/LOW silent audit only.
+_SEC_SCAN_LIB="$SCRIPT_DIR/lib/mcl-security-scan.py"
+if [ "$CURRENT_PHASE" = "4" ] \
+   && [ -f "$_SEC_SCAN_LIB" ] \
+   && command -v python3 >/dev/null 2>&1 \
+   && [ -n "${MCL_STATE_DIR:-}" ]; then
+  case "$TOOL_NAME" in
+    Edit|Write|MultiEdit)
+      _SEC_TARGET_PATH="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    print((obj.get("tool_input") or {}).get("file_path") or "")
+except Exception:
+    pass' 2>/dev/null)"
+      _SEC_EXT="${_SEC_TARGET_PATH##*.}"
+      case "$_SEC_EXT" in
+        ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|java|kt|swift|cs|php|cpp|cc|c|h|hpp|lua|vue|svelte|scala|dart)
+          # Build hypothetical post-edit content into a temp file with same ext.
+          _SEC_TMP="$(mktemp -t mcl-sec-pre.XXXXXX)" || _SEC_TMP=""
+          if [ -n "$_SEC_TMP" ]; then
+            _SEC_TMP_EXT="${_SEC_TMP}.${_SEC_EXT}"
+            mv "$_SEC_TMP" "$_SEC_TMP_EXT" 2>/dev/null && _SEC_TMP="$_SEC_TMP_EXT"
+            printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+from pathlib import Path
+data = json.loads(sys.stdin.read())
+tool = data.get("tool_name", "")
+ti = data.get("tool_input", {}) or {}
+target_real = ti.get("file_path") or ""
+out = sys.argv[1]
+content = ""
+if tool == "Write":
+    content = ti.get("content") or ""
+else:
+    try:
+        content = Path(target_real).read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        content = ""
+    if tool == "Edit":
+        old, new = ti.get("old_string", ""), ti.get("new_string", "")
+        if old and old in content:
+            content = content.replace(old, new, 1)
+    elif tool == "MultiEdit":
+        for ed in (ti.get("edits") or []):
+            old, new = ed.get("old_string", ""), ed.get("new_string", "")
+            if old and old in content:
+                content = content.replace(old, new, 1)
+Path(out).write_text(content, encoding="utf-8")
+' "$_SEC_TMP" 2>/dev/null
+            _SEC_RESULT_JSON="$(python3 "$_SEC_SCAN_LIB" \
+              --mode=incremental \
+              --state-dir "$MCL_STATE_DIR" \
+              --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
+              --target "$_SEC_TMP" \
+              --lang "${MCL_USER_LANG:-tr}" 2>/dev/null || echo '{}')"
+            _SEC_BLOCK="$(printf '%s' "$_SEC_RESULT_JSON" | python3 -c '
+import json, sys
+try:
+    r = json.loads(sys.stdin.read() or "{}")
+except Exception:
+    sys.exit(0)
+high = [f for f in r.get("findings", []) if f.get("severity") == "HIGH"]
+if not high:
+    sys.exit(0)
+top = high[0]
+real = sys.argv[1] if len(sys.argv) > 1 else top.get("file", "")
+rule = top.get("rule_id", "?")
+owasp = top.get("owasp") or ""
+line = top.get("line", 0)
+msg = top.get("message", "")
+suffix = " (OWASP " + owasp + ")" if owasp else ""
+print(rule + suffix + " at " + real + ":" + str(line) + " — " + msg)
+' "$_SEC_TARGET_PATH" 2>/dev/null)"
+            rm -f "$_SEC_TMP" 2>/dev/null
+            if [ -n "$_SEC_BLOCK" ]; then
+              # Audit + block.
+              _SEC_RULE="$(printf '%s' "$_SEC_BLOCK" | awk '{print $1}')"
+              mcl_audit_log "security-scan-block" "mcl-pre-tool" "rule=${_SEC_RULE} tool=${TOOL_NAME} file=${_SEC_TARGET_PATH} severity=HIGH"
+              python3 -c '
+import json, sys
+reason = sys.argv[1]
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL SECURITY — " + reason + ". Fix the issue and retry."
+    }
+}))
+' "$_SEC_BLOCK" 2>/dev/null
+              exit 0
+            fi
+          fi
+          ;;
+      esac
+      ;;
+  esac
+fi
+# -------- end of Phase 4 incremental security scan --------
+
 # --- Just-in-time askq advance (since 6.5.6) ---
 # Stop hook only fires at end-of-turn. When the model chains
 # summary-askq → spec → approve-askq → Write in a single turn, Stop has
