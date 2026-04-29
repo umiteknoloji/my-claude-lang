@@ -142,4 +142,50 @@ AskUserQuestion({
    - Config, auto-detect, or spec inference already resolved the command.
    - Mid-session (Phase 4 / 4.5 / 4.6 / 5) is already in progress.
 
+## Scope Changes Callout (since 8.4.0)
+
+Phase 1.5 became upgrade-translator in 8.4.0 — vague verbs in the
+developer's prompt are upgraded to surgical English in the brief, and
+verb-implied standard patterns are annotated as
+`[default: X, changeable]`. Phase 3 spec verification MUST surface
+these upgrades back to the developer in their language so they can
+correct anything that was added without their explicit ask.
+
+**Trigger:** the session's `engineering-brief` audit emits
+`upgraded=true` (one or more vague verbs were transformed).
+
+**Skip:** `upgraded=false` (no upgrades; no callout needed).
+
+**Format:** include a "Scope Changes" section in Phase 3 prose
+**before** the AskUserQuestion spec-approval call. Render in the
+developer's detected language. Each upgrade is one bullet:
+
+```
+**Spec'e eklenen mühendislik standartları:**
+- Pagination [listele verbinden çıkarıldı, varsayılan: cursor-based — değiştirilebilir]
+- Empty/loading/error UI states [render verbinden çıkarıldı, UI bağlamında]
+- HTTP CRUD endpoints [yönet verbinden çıkarıldı, varsayılan: GET/POST/PUT/DELETE — değiştirilebilir]
+
+İstemediğin bir ekleme varsa "düzenle" seç ve hangi maddeyi
+kaldırmak istediğini belirt.
+```
+
+Localize per detected language (Turkish above; English / Spanish /
+Japanese / 14 supported languages get the same structure with
+translated section title and bullet wording).
+
+**Source for each bullet:** the brief's "Verb upgrades" line lists
+`<vague> → <surgical>` mappings; each surgical verb's `[default: X,
+changeable]` markers in the spec become the callout bullets. Phase 3
+prose author's job is purely to surface these — no judgment call,
+no editing of the underlying upgrades.
+
+**Why this exists:** developer reads Phase 3 spec via reverse
+translation; without an explicit callout, invisible scope additions
+look like part of the original intent. The callout makes the
+upgrade-translator's work auditable to the very person it's supposed
+to serve. Combined with Phase 4.5 Lens (e), it gives the developer
+both pre-implementation visibility (Phase 3) and post-implementation
+verification (Phase 4.5).
+
 </mcl_phase>

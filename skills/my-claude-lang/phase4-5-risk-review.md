@@ -87,25 +87,69 @@ step entirely and proceed silently to the SAST scan.
 
 ## Integrated Quality Scan (per-turn, before each risk-dialog turn)
 
-Before each risk-dialog turn, MCL applies four embedded lenses
+Before each risk-dialog turn, MCL applies five embedded lenses
 **simultaneously** — these are continuous practices designed into the
 review from the start, not isolated checkpoints bolted on at the end:
 
 | Lens | What to look for |
 |------|-----------------|
-| **Code Review** | Correctness, logic errors, error handling, dead code, missing validations |
-| **Simplify** | Unnecessary complexity, premature abstraction, over-engineering, duplicate logic |
-| **Performance** | N+1 queries, unbounded loops, blocking synchronous calls, memory leaks, large allocations |
-| **Security** | Injection (SQL, command, XSS), auth bypass, CSRF, sensitive data exposure, insecure defaults |
+| **(a) Code Review** | Correctness, logic errors, error handling, dead code, missing validations |
+| **(b) Simplify** | Unnecessary complexity, premature abstraction, over-engineering, duplicate logic |
+| **(c) Performance** | N+1 queries, unbounded loops, blocking synchronous calls, memory leaks, large allocations |
+| **(d) Security** | Injection (SQL, command, XSS), auth bypass, CSRF, sensitive data exposure, insecure defaults |
+| **(e) Brief-Phase-1 Scope Drift** (since 8.4.0) | Implementation elements that lack traceability to a Phase 1 confirmed parameter AND lack a `[default: X, changeable]` marker — likely Phase 1.5 upgrade-translator hallucination |
 
 Security and performance are **not separate gate steps** — they are
 facets of every risk assessment, surfaced naturally as part of the
 same sequential dialog. A finding from any lens is presented as one
-risk turn with a label (e.g. `[Security]`, `[Performance]`).
+risk turn with a label (e.g. `[Security]`, `[Performance]`,
+`[Brief-Drift]`).
 
 Semgrep SAST findings (HIGH/MEDIUM with unambiguous autofix) are
 applied silently and merged into the lens output. The overall scan is
 invisible unless it produces surfaceable risks.
+
+### Lens (e): Brief-Phase-1 Scope Drift (since 8.4.0)
+
+Phase 1.5 became upgrade-translator in 8.4.0 — it transforms vague
+verbs ("list", "show", "manage") into surgical English ("render
+paginated table", "expose CRUD") and may add `[default: X, changeable]`
+markers for verb-implied standard patterns. This lens guards against
+**hallucinated scope** — invented features that lack both Phase 1
+traceability AND a `[default]` marker.
+
+**When this lens runs:** mandatory when the session's
+`engineering-brief` audit shows `upgraded=true`. Skipped silently when
+`upgraded=false` (no upgrade happened, no drift possible).
+
+**Procedure per implementation element:**
+1. Walk Phase 4 code: each function, route, schema field, dependency
+   added in this session.
+2. For each element ask:
+   - Is it traceable to a Phase 1 confirmed parameter the user said?
+   - If not, is it carried by a `[default: X, changeable]` marker in
+     the brief or spec?
+   - If neither: it is **untraced scope** — surface as a Brief-Drift
+     risk.
+3. Surface format (one risk per drift):
+   ```
+   [Brief-Drift] Implementation includes <X> (file:line). User did
+   not mention <X> in Phase 1; brief/spec has no [default: X,
+   changeable] marker for it. Likely Phase 1.5 upgrade-translator
+   hallucination.
+
+   Options:
+     (a) Remove from spec + Phase 4 code (revert to user intent)
+     (b) Mark as [default: <X>, changeable] in spec (user accepts
+         the upgrade-translator addition)
+     (c) Rule-capture: developer wants this default for all future
+         specs of similar shape (writes to CLAUDE.md / .mcl/project.md)
+   ```
+4. Wait for developer reply before next risk.
+
+This is the safety net for Phase 1.5's contract relaxation. Without it,
+upgrade-translator could silently introduce scope the developer never
+asked for.
 
 ## Automated SAST Pre-Scan (Semgrep)
 

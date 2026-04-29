@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.3.3
+**Güncel sürüm:** 8.4.0
 
 ---
 
@@ -12,7 +12,7 @@ MCL her geliştirici mesajını sıralı fazlardan geçirir. Bir faz eksik param
 ```
 Phase 1   → Anlama (intent, constraints, success_criteria, context)
 Phase 1.7 → Precision Audit (7 core boyut + stack add-on; SILENT-ASSUME / SKIP-MARK / GATE)
-Phase 1.5 → Engineering Brief (kullanıcı dili → EN çevirisi, yorumsuz)
+Phase 1.5 → Engineering Brief (8.4.0+ upgrade-translator: çeviri + vague verb → surgical verb)
 Phase 2   → Spec üretimi
 Phase 3   → Spec doğrulama + geliştirici onayı
 Phase 3.5 → Pattern Matching (proje kodu okunur, convention çıkarılır)
@@ -86,6 +86,24 @@ Phase 1 "completeness" sağlar; Phase 1.7 "precision" sağlar. Phase 1 onayı so
 **Stack add-on'lar:** typescript/javascript/react, python (FastAPI/Django), go/rust, cli, data-pipeline (spark/beam), mobile (swift/kotlin), ml-inference. Her add-on 2-5 delta boyut içerir. Vue/Svelte/Angular gelecek genişleme için TODO işaretlendi.
 
 İngilizce session'da skip — audit entry yine emit edilir (`skipped=true`) detection control olarak. **Hard enforcement (8.3.2):** `mcl-stop.sh` Phase 1→2 transition'ında audit'te `precision-audit` entry yoksa hem `precision-audit-skipped-warn` (8.3.0 detection signal, backward compat) hem `precision-audit-block` audit'leri yazar VE `decision:block` JSON döndürür — Phase 1→2 transition rewind edilir, Claude aynı response içinde Phase 1.7'i çalıştırıp spec'i yeniden emit etmek zorunda. Phase 4.5 ile aynı tier. İngilizce session safety valve: `skipped=true` audit emit edildiğinde block fire etmez.
+
+### Phase 1.5 — Engineering Brief (Upgrade-Translator, 8.4.0+)
+
+**Contract change:** 8.4.0 öncesi Phase 1.5 yalnızca faithful translator'dı (`do NOT add scope, do NOT subtract scope`). 8.4.0'dan itibaren brief iki görevi var:
+
+1. **Translate** — non-İngilizce Phase 1 parametrelerini İngilizce'ye sadık çeviri (English source için identity)
+2. **Upgrade vague verbs** — `list`/`listele` → `render a paginated table`, `manage`/`yönet` → `expose CRUD operations`, `build`/`yap` → `implement`, vb. (14 dil için verb tablosu)
+
+Surgical verb'lerin **standart teknik default'ları** `[default: X, changeable]` marker'larıyla annotate edilir (örn. `paginate` → `[default: cursor pagination, changeable]`). Yasak eklemeler: yeni entity, feature, NFR, auth, audit, persistence — bunlar kullanıcının açıkça mention etmesini gerektirir.
+
+**Hallucination koruması (3 katmanlı):**
+- Skill dosyasında Allowed/Forbidden boundary + 13 calibration example
+- **Phase 3 Scope Changes Callout:** kullanıcı kendi dilinde tüm upgrade'leri görür ve "edit" seçeneğiyle düzeltebilir
+- **Phase 4.5 Lens (e) Brief-Phase-1 Scope Drift:** implementation Phase 1 confirmed parametrelere izlenebilir mi kontrol; izlenemeyen + `[default]` marker'sız scope risk olarak surface
+
+**Audit signal:** `engineering-brief | phase1-5 | lang=<...> skipped=<...> retries=<N> clarification=<...> upgraded=<bool> verbs_upgraded=<count>`. `upgraded=true` olduğunda Phase 3 callout ve Phase 4.5 Lens (e) zorunlu.
+
+**Phase 5.5 simetrisi:** asimetrik kabul edildi — input upgrade (1.5), output faithful (5.5). Geri çeviride teknik kelime kaybı olabilir; spec/audit trail surgical İngilizce'de korunur.
 
 ### Phase 2 — Spec Üretimi
 
