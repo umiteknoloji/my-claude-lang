@@ -150,6 +150,41 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /mcl-perf-report keyword (since 8.14.0) --------
+if [ "$PROMPT_NORM" = "/mcl-perf-report" ]; then
+  PERF_HELPER="$(dirname "$0")/lib/mcl-perf-scan.py"
+  PERF_HELPER_ESC="$(printf '%s' "$PERF_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  STATE_DIR_PERF_ESC="$(printf '%s' "${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}/.mcl}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_PERF_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_PERF="${MCL_USER_LANG:-tr}"
+  cat <<PERF_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_PERF_REPORT_MODE — the developer typed ${_BT}/mcl-perf-report${_BT}. SKIP the entire MCL pipeline.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — perf-report${_BT}.\n2. Run via the Bash tool: ${_BT}python3 \"${PERF_HELPER_ESC}\" --mode=report --state-dir \"${STATE_DIR_PERF_ESC}\" --project-dir \"${PROJECT_DIR_PERF_ESC}\" --lang ${USER_LANG_FOR_PERF} --markdown${_BT}.\n3. Present the full stdout as-is. Categories: bundle, CWV (Lighthouse — runs only if MCL_UI_URL is set), image. Bundle size measured from build output (dist/, build/, .next/static/chunks/, out/) — if missing, advisory.\n4. STOP.\n</mcl_core>"
+  }
+}
+PERF_OUTPUT
+  exit 0
+fi
+
+# -------- Branch: /mcl-perf-lighthouse keyword (since 8.14.0) --------
+if [ "$PROMPT_NORM" = "/mcl-perf-lighthouse" ]; then
+  PERF_LH_HELPER="$(dirname "$0")/lib/mcl-perf-lighthouse.sh"
+  PERF_LH_HELPER_ESC="$(printf '%s' "$PERF_LH_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_PLH_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_PLH="${MCL_USER_LANG:-tr}"
+  cat <<PLH_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_PERF_LIGHTHOUSE_MODE — the developer typed ${_BT}/mcl-perf-lighthouse${_BT}. SKIP the entire MCL pipeline.\n\nExecute these steps and respond ONLY in the developer's detected language:\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — perf-lighthouse${_BT}.\n2. Run via the Bash tool: ${_BT}bash \"${PERF_LH_HELPER_ESC}\" \"${PROJECT_DIR_PLH_ESC}\" ${USER_LANG_FOR_PLH}${_BT}.\n3. Present the full stdout as-is. If MCL_UI_URL is unset, the helper prints a localized advisory — relay verbatim, do not invent metrics. (MCL_UI_URL is shared with /mcl-ui-axe — set it once, both tools work.)\n4. STOP.\n</mcl_core>"
+  }
+}
+PLH_OUTPUT
+  exit 0
+fi
+
 # -------- Branch: /mcl-ops-report keyword (since 8.13.0) --------
 if [ "$PROMPT_NORM" = "/mcl-ops-report" ]; then
   OPS_HELPER="$(dirname "$0")/lib/mcl-ops-scan.py"

@@ -7,6 +7,94 @@
 
 ## [Unreleased]
 
+## [8.14.0] - 2026-04-30
+
+### Eklendi — Performance Budget (İŞ 5, son iş)
+
+8.7-8.13 product / DB / UI / ops disiplini tamamlandı; **runtime performans** boştu — 4MB JS bundle production'a gidebilir, LCP 6 saniye, hero image 2MB PNG. 8.14.0 üç performans ekseninde FE-only enforcement ekler (8.9.0/8.13.0 mirror 3-tier).
+
+#### Yeni dosyalar
+- **`hooks/lib/mcl-perf-rules.py`** — 3 rule pack, 11 rule, `category=perf-*` field:
+  - **Bundle** (4): PRF-B01 over-budget-critical (>2× budget HIGH), B02 over-budget (100-200% MEDIUM), B03 no-build-output (LOW advisory), B04 large-chunk (>50KB tek chunk LOW).
+  - **CWV** (4): PRF-C01 LCP-poor (>4s HIGH), C02 LCP-needs-improvement (2.5-4s MEDIUM), C03 CLS-poor (>0.25 MEDIUM), C04 TBT-poor (>600ms MEDIUM).
+  - **Image** (3): PRF-I01 image-huge (>500KB HIGH), I02 image-large (100-500KB MEDIUM), I03 png-no-webp-fallback (LOW).
+- **`hooks/lib/mcl-perf-bundle.sh`** — build output walker: `dist/`, `build/`, `.next/static/chunks/`, `out/` taranır; `*.js` dosyaları `gzip.compress` ile aggregate edilir. **Build invoke etmez** — kullanıcı `npm run build` çalıştırmamışsa PRF-B03 advisory.
+- **`hooks/lib/mcl-perf-lighthouse.sh`** — `MCL_UI_URL` env reuse (8.9.0 axe ile aynı env — kullanıcı tek URL set eder, hem axe hem lighthouse çalışır). Yoksa lokalize advisory; varsa `npx lighthouse --output=json --only-categories=performance`; LCP/CLS/TBT/TTI/FCP extract. `--json` flag orchestrator dispatch için.
+- **`hooks/lib/mcl-perf-scan.py`** — orchestrator: bundle delegate + image walk (5 standart asset dir) + (optional) lighthouse delegate; lokalize markdown render (TR/EN).
+
+#### State şeması
+- `phase4_5_perf_scan_done: false` — idempotency flag
+- `phase4_5_high_baseline.perf: 0` — Phase 6 (b) regression baseline (8.11.0/8.13.0 schema extend)
+- `phase1_perf: {budget_tier}` — Phase 1.7 dimension state
+
+#### Hook entegrasyonu
+- **`hooks/mcl-stop.sh`** — Ops gate sonrası: Phase 4.5 START Perf gate. Sıra: sticky-pause → security → db → ui → ops → **perf** → standart Phase 4.5 reminder → Phase 6 gate. HIGH ≥ 1 → state `pending`'de + `decision:block` (kategori listesi); HIGH = 0 → done=true + baseline.perf=0; MEDIUM listesi standart reminder reason'a `[Perf-<sub>]` etiketli inject. **Lighthouse L3'te çalışmaz** (60s overhead); sadece `/mcl-perf-report` keyword'ünde.
+- **`hooks/mcl-activate.sh`** — `/mcl-perf-report` + `/mcl-perf-lighthouse` keyword block'ları.
+
+#### Konfigürasyon
+- `$MCL_STATE_DIR/perf-config.json` (8.5.0 isolation):
+  ```json
+  {"perf": {"bundle_budget_kb": 200, "bundle_critical_multiplier": 2,
+            "image_high_kb": 500, "image_medium_kb": 100,
+            "lcp_high_ms": 4000, "lcp_medium_ms": 2500,
+            "cls_high": 0.25, "tbt_high_ms": 600}}
+  ```
+- Defaults: bundle 200KB JS gzip, image 100/500KB, LCP 2.5/4s, CLS 0.25, TBT 600ms.
+
+#### Karar matrisi (kabul edilen + kullanıcı değişikliği)
+- Bundle: **walker-only** (build invoke etme)
+- CWV env: **`MCL_UI_URL` reuse** (8.9.0 axe ile shared — kullanıcı isteği)
+- Image scope: **5 standart dir** (`public`, `static`, `assets`, `src/assets`, `app/static`)
+- Bundle threshold: **200KB JS gzip**, configurable
+- Image format: **WebP only** suggestion (AVIF 8.14.x)
+- Lighthouse: **desktop profile** + 90s timeout
+- Phase 1 keyword (fast/scale/mobile/low-latency): **GATE**
+- Build output: **4 standart dir** (dist / build / .next/static/chunks / out)
+
+#### Trigger condition
+**FE stack-tag tespit edildiğinde** (`react-frontend|vue-frontend|svelte-frontend|html-static`). Backend-only / lib / CLI / data-pipeline projelerinde tüm perf pipeline skip; audit `perf-scan-skipped reason=no-fe-stack-tag`.
+
+#### Audit events
+- `perf-scan-full | mcl-stop | high=N med=N low=N duration_ms=N categories=bundle,cwv,image bundle_kb=<n>`
+- `perf-scan-block | mcl-stop | full-scan high=N`
+- `perf-scan-skipped | mcl-stop | reason=no-fe-stack-tag`
+- `perf-bundle-delegate | mcl-perf-scan | total_gzip_kb=N file_count=N output_dir=<path>`
+- `perf-bundle-skip | mcl-perf-scan | reason=no-build-output`
+- `perf-lighthouse-delegate | mcl-perf-scan | url=<u> lcp_ms=N cls=<f> tbt_ms=N`
+- `perf-lighthouse-skip | mcl-activate | reason=no-MCL_UI_URL` (reuse)
+- `mcl-perf-report | mcl-activate | invoked`
+- `mcl-perf-lighthouse | mcl-activate | invoked url_set=<bool>`
+
+### Test sonuçları
+- T1 `/mcl-perf-report` keyword: STATIC_CONTEXT 812 byte, `MCL_PERF_REPORT_MODE` mevcut PASS
+- T2 `/mcl-perf-lighthouse` keyword: STATIC_CONTEXT 660 byte, `MCL_PERF_LIGHTHOUSE_MODE` mevcut PASS
+- T3 Synthetic React project (`dist/main.js` 800KB random + `public/hero.png` 600KB): 2 HIGH (PRF-B01 bundle critical 781.5KB > 2× 200KB budget + PRF-I01 hero.png 586KB > 500KB) + 2 LOW (PRF-B04 large chunk + PRF-I03 PNG no-WebP fallback) PASS
+- T4 Bundle delegate: gzip aggregation 781.5KB, file count 1, output_dir=dist PASS
+- T5 CWV delegate skip: MCL_UI_URL yok → cwv ran=false (advisory yerine silent in --json mode) PASS
+- T6 Mevcut suite: 19/0/2 — regresyonsuz PASS
+
+### Updated files
+- `hooks/lib/mcl-perf-rules.py` (yeni, 11 rule)
+- `hooks/lib/mcl-perf-bundle.sh` (yeni, build output gzip walker)
+- `hooks/lib/mcl-perf-lighthouse.sh` (yeni, MCL_UI_URL opt-in lighthouse)
+- `hooks/lib/mcl-perf-scan.py` (yeni, orchestrator)
+- `hooks/lib/mcl-state.sh` (3 yeni state field)
+- `hooks/mcl-stop.sh` (Perf gate, sıra: security → db → ui → ops → perf → reminder → phase6)
+- `hooks/mcl-activate.sh` (`/mcl-perf-report` + `/mcl-perf-lighthouse` keywords)
+- `VERSION`, `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (8.14.x patch'lerine ertelendi)
+
+- **Build invocation MVP'de yok**: kullanıcı `npm run build` yapmazsa PRF-B03 LOW advisory; auto-build (Phase 4.5'te invoke) 8.14.x'te konfigürasyona bağlı flag.
+- **L2 per-Edit perf scan MVP'de yok**: image >500KB Edit'i Phase 4'te yakalanmıyor — sadece L3 Phase 4.5 START full scan + manuel `/mcl-perf-report`. 8.14.x'te image-only L2 block.
+- **Phase 1.7 Performance Budget dimension** state field eklendi (`phase1_perf.budget_tier`) ama skill prose talimatı yok — model-behavioral.
+- **Lighthouse desktop-only**: MVP desktop profile (faster, deterministic); mobile profile (Moto G4 emulation) 8.14.x'te.
+- **Bundle gzip-only**: brotli sıkıştırma 8.14.x'te (production CDN'lerde brotli daha küçük).
+- **AVIF support**: PRF-I03 yalnızca WebP suggestion; AVIF 8.14.x'te (browser support 2024+ artık yeterli).
+- **Image walker scope**: 5 standart dir; project-spesifik convention'lar (`assets/images/`, `wwwroot/`) `.mcl/perf-config.json`'da configurable 8.14.x'te.
+- **CSS/font bundle measurement yok**: yalnızca JS gzip ölçülüyor; CSS/font bundle ayrı budget 8.14.x'te.
+- **Tree-shaking detection MVP'de zayıf**: PRF-B04 sadece chunk size; export usage analizi 8.14.x'te.
+
 ## [8.13.0] - 2026-04-30
 
 ### Eklendi — Operasyonel Disiplin (İŞ 4)
