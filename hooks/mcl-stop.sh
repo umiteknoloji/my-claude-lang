@@ -589,6 +589,120 @@ PYEOF
   fi
 fi
 
+# --- Root Cause Chain all-mode keyword scan (since 8.2.9 — Gap 2 expansion) ---
+# Runs every turn, not only after ExitPlanMode. When the LAST USER message
+# contains a problem/anomaly trigger keyword (14-lang heuristic) AND the LAST
+# ASSISTANT text + tool inputs are missing any of the 3 keyword pairs, audit
+# `root-cause-chain-skipped-warn` with `source=all-mode`. Coexists with the
+# block above — both can fire on the same turn; auto-display reads only the
+# event name so duplicate audit entries don't change visible behavior.
+if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] && command -v python3 >/dev/null 2>&1; then
+  _RCC_ALLMODE_RESULT="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
+import json, sys
+
+path = sys.argv[1]
+
+trigger_words = {
+    # TR
+    "neden", "niye", "bug", "çalışmıyor", "hata", "sorun", "kırıldı",
+    # EN
+    "why", "broken", "error", "fail", "issue", "wrong",
+    # ES
+    "por qué", "falla", "roto", "problema",
+    # FR
+    "pourquoi", "erreur", "bogue", "cassé", "problème",
+    # DE
+    "warum", "fehler", "kaputt", "problem",
+    # JA
+    "なぜ", "バグ", "エラー", "壊れ", "問題",
+    # KO
+    "왜", "버그", "오류", "깨졌", "문제",
+    # ZH
+    "为什么", "错误", "崩溃", "问题", "故障",
+    # AR
+    "لماذا", "خطأ", "عطل", "مشكلة",
+    # HE
+    "למה", "שגיאה", "תקלה", "בעיה",
+    # HI
+    "क्यों", "गलती", "समस्या", "टूट",
+    # ID
+    "kenapa", "mengapa", "rusak", "masalah",
+    # PT
+    "por que", "erro", "quebrado",
+    # RU
+    "почему", "ошибка", "сбой", "проблема", "сломан",
+}
+
+last_user_text = ""
+last_assistant_text = []
+last_assistant_inputs = []
+
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+            except Exception:
+                continue
+            msg = obj.get("message") or obj
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role")
+            content = msg.get("content")
+            if role == "user":
+                if isinstance(content, str):
+                    last_user_text = content
+                elif isinstance(content, list):
+                    parts = [b.get("text", "") for b in content
+                             if isinstance(b, dict) and b.get("type") == "text"]
+                    last_user_text = " ".join(parts)
+            elif role == "assistant":
+                text_parts, tool_inputs = [], []
+                if isinstance(content, str):
+                    text_parts.append(content)
+                elif isinstance(content, list):
+                    for item in content:
+                        if not isinstance(item, dict):
+                            continue
+                        t = item.get("type")
+                        if t == "text":
+                            v = item.get("text", "")
+                            if isinstance(v, str):
+                                text_parts.append(v)
+                        elif t == "tool_use":
+                            inp = item.get("input", {})
+                            if isinstance(inp, dict):
+                                for v in inp.values():
+                                    if isinstance(v, str):
+                                        tool_inputs.append(v)
+                last_assistant_text, last_assistant_inputs = text_parts, tool_inputs
+except Exception:
+    pass
+
+user_lower = last_user_text.lower()
+if not any(kw in user_lower for kw in trigger_words):
+    print("")
+    sys.exit(0)
+
+haystack = "\n".join(last_assistant_text + last_assistant_inputs).lower()
+pairs = [
+    ("removal test",   "kaldırma testi"),
+    ("falsification",  "yanlışlama"),
+    ("visible process","görünür süreç"),
+]
+missing = [en for en, tr in pairs if (en not in haystack and tr not in haystack)]
+print(",".join(missing) if missing else "OK")
+PYEOF
+)"
+  if [ -n "$_RCC_ALLMODE_RESULT" ] && [ "$_RCC_ALLMODE_RESULT" != "OK" ]; then
+    mcl_audit_log "root-cause-chain-skipped-warn" "mcl-stop.sh" "source=all-mode missing=$_RCC_ALLMODE_RESULT"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append root_cause_chain_skipped_warn "all-mode:$_RCC_ALLMODE_RESULT"
+  fi
+fi
+
 # --- Phase 3.5 pattern-scan clearance (runs before early exit) ---
 # Must run before the spec/askq gate below because the Phase 3.5 turn has
 # no spec block and no AskUQ — the early exit would skip this otherwise.

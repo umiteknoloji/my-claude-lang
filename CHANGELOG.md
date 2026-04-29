@@ -7,6 +7,29 @@
 
 ## [Unreleased]
 
+## [8.2.9] - 2026-04-29
+
+### Eklendi
+- **Gap 2 expansion — Root cause chain enforcement all-mode scope (`mcl-activate.sh`, `mcl-stop.sh`, `all-mcl.md`):**
+  - **Activate user-message trigger:** 14 dilli heuristik keyword seti (`neden`, `çalışmıyor`, `bug`, `why`, `broken`, `error`, vb. — TR/EN/ES/FR/DE/JA/KO/ZH/AR/HE/HI/ID/PT/RU) `PROMPT_NORM` içinde substring match edilir. Eşleşirse `ROOT_CAUSE_DISCIPLINE_NOTICE` enjekte edilir. Plan-mode tetikleyici varsa o kazanır (yeni blok `[ -z "$ROOT_CAUSE_DISCIPLINE_NOTICE" ]` guard'ı ile atlanır) — tek audit, tek inject. Yeni audit detail: `source=user-message`.
+  - **Stop always-on scan:** `mcl-stop.sh`'a Gap 2 ExitPlanMode bloğunun yanında ikinci scan eklendi. Her turda transcript'ten son user mesajı + son assistant text+tool inputs okunur. User mesajında trigger varsa assistant 3 keyword çifti için (EN/TR) taranır; eksikse audit `root-cause-chain-skipped-warn | source=all-mode missing=<list>`. Trigger yoksa scan atlanır (no audit). 8.2.8 ExitPlanMode bloğu bit-for-bit korundu — iki blok aynı turda fire edebilir, `source=` alanıyla ayırt edilir, auto-display her ikisini de yakalar.
+  - **STEP-62 güncellendi:** Phase satırı `Plan-mode (devtime) + Any turn (user-message trigger, since 8.2.9)`. Signal/Pass/Skip bölümleri yeni `source=user-message` ve `source=all-mode` audit alanlarıyla detaylandırıldı.
+
+### Test
+- TR trigger user-message (`bu neden çalışmıyor`) → notice + `source=user-message` audit PASS
+- EN trigger user-message (`the login is broken`) → notice PASS
+- Plan file + user trigger aynı anda → tek audit, plan-mode kazanır PASS
+- Nötr prompt → notice/audit yok PASS
+- Stop always-on: TR trigger + 3 check eksik → `source=all-mode missing=...` audit PASS
+- Stop always-on: trigger + 3 EN check var → warn yok PASS
+- Stop always-on: trigger yok → scan atlanır, warn yok PASS
+- Gap 2 ExitPlanMode bloğu regression: hala `missing=...` (source field yok) yazıyor PASS
+- Activate JSON valid (4 case: no notice / user-msg / plan-mode / both) PASS
+- Mevcut test suite: 19 pass, 0 fail, 2 skip (regresyonsuz)
+
+### Bilinen risk (kabul edilmiş)
+- Common-word false positives (`fail`, `error`, `bug`, `issue` EN'de çok yaygın): notice non-blocking olduğundan kabul edildi.
+
 ## [8.2.8] - 2026-04-29
 
 ### Eklendi

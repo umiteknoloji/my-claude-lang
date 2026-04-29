@@ -827,6 +827,53 @@ PYEOF
   fi
 fi
 
+# Root Cause Discipline — user-message trigger (since 8.2.9 — Gap 2 all-mode).
+# Fires when the developer's prompt contains a problem/anomaly indicator
+# keyword in any of the 14 supported MCL languages. Same NOTICE text as the
+# plan-mode block. Guarded so the plan-mode trigger wins if both fire.
+if [ -z "$ROOT_CAUSE_DISCIPLINE_NOTICE" ] && [ -n "$PROMPT_NORM" ] && command -v python3 >/dev/null 2>&1; then
+  _RCD_MSG_HIT="$(python3 - "$PROMPT_NORM" 2>/dev/null <<'PYEOF'
+import sys
+prompt = sys.argv[1] if len(sys.argv) > 1 else ""
+trigger_words = {
+    # TR
+    "neden", "niye", "bug", "çalışmıyor", "hata", "sorun", "kırıldı",
+    # EN
+    "why", "broken", "error", "fail", "issue", "wrong",
+    # ES
+    "por qué", "falla", "roto", "problema",
+    # FR
+    "pourquoi", "erreur", "bogue", "cassé", "problème",
+    # DE
+    "warum", "fehler", "kaputt", "problem",
+    # JA
+    "なぜ", "バグ", "エラー", "壊れ", "問題",
+    # KO
+    "왜", "버그", "오류", "깨졌", "문제",
+    # ZH
+    "为什么", "错误", "崩溃", "问题", "故障",
+    # AR
+    "لماذا", "خطأ", "عطل", "مشكلة",
+    # HE
+    "למה", "שגיאה", "תקלה", "בעיה",
+    # HI
+    "क्यों", "गलती", "समस्या", "टूट",
+    # ID
+    "kenapa", "mengapa", "rusak", "masalah",
+    # PT
+    "por que", "erro", "quebrado",
+    # RU
+    "почему", "ошибка", "сбой", "проблема", "сломан",
+}
+print("hit" if any(kw in prompt for kw in trigger_words) else "")
+PYEOF
+)"
+  if [ "$_RCD_MSG_HIT" = "hit" ]; then
+    ROOT_CAUSE_DISCIPLINE_NOTICE="<mcl_audit name=\\\"root-cause-discipline\\\">\\nDEVTIME ROOT CAUSE DISCIPLINE — MANDATORY for this plan turn:\\nBefore finalizing the plan, show visible chain:\\n  1. Visible process: write out the reasoning path\\n  2. Removal test: if this cause removed → parent problem resolves?\\n  3. Falsification: what observable X confirms this cause?\\nThese three MUST appear in the plan text or in your response.\\nOmitting them means the plan is incomplete.\\n</mcl_audit>\\n\\n"
+    mcl_audit_log "root-cause-discipline-notice" "mcl-activate.sh" "source=user-message"
+  fi
+fi
+
 # Root Cause Chain Skipped notice (since 8.2.8 — Gap 2 auto-display).
 # Fires when the previous plan turn's keyword scan in mcl-stop.sh found a
 # missing chain check (one of removal-test / falsification / visible-process)
