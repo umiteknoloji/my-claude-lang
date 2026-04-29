@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.2.11
+**Güncel sürüm:** 8.2.12
 
 ---
 
@@ -332,6 +332,44 @@ Spec onayı sonrası yeni spec bloğu veya Phase 1/2/3 yeniden çalıştırma ya
 
 **Pasted CLI Passthrough**
 Shell komutu yapıştırıldığında MCL Phase 1'i atlar. Destructive operasyonlar yine de onay alır.
+
+---
+
+## Bilinen Sınırlamalar / Known Limitations
+
+### post-tool hook race — paralel tool batch (8.2.12'de dokümante edildi)
+
+**Sorun.** Claude Code'un resmi hook lifecycle belgelerine göre:
+- `PreToolUse` hook'ları **serileşik** fire eder (race yok).
+- `PostToolUse` hook'ları **async, non-deterministic sırada** fire eder — Claude tek bir assistant mesajında 2+ paralel `tool_use` bloğu emit ettiğinde her tool'un `PostToolUse`'u biten sıraya göre eşzamanlı çalışabilir.
+- `PostToolBatch` (TS SDK senkronizasyon noktası) **shell hook'larda mevcut değil** — MCL kullanamaz.
+
+Kaynak: [code.claude.com/docs/en/hooks.md](https://code.claude.com/docs/en/hooks.md)
+
+**MCL'deki etki.** `mcl-post-tool.sh` iki state alanı yazar:
+- `state.last_write_ts` — Write/Edit/MultiEdit/NotebookEdit sonrası epoch
+- `state.regression_block_active`, `state.regression_output` — Bash GREEN test çıktısında temizlik
+
+`mcl-state.sh::_mcl_state_write_raw` tmp+rename atomik, ama **field-level merge yok** — tüm dosya overwrite. İki paralel `mcl-post-tool.sh` aynı snapshot'ı okuyup farklı field yazarsa, son yazar kazanır → diğer field'ın update'i kaybolur.
+
+**Somut senaryo.** Claude tek mesajda paralel `Write` + `Bash` (test runner) çağırırsa:
+1. post-tool A (Write) snapshot okur → `last_write_ts=null, regression_block_active=true`
+2. post-tool B (Bash GREEN) aynı snapshot okur (eşzamanlı)
+3. post-tool A yazar: `{last_write_ts=100, regression_block_active=true}`
+4. post-tool B yazar: `{last_write_ts=null, regression_block_active=false}` — A'nın `last_write_ts` update'i silindi
+
+**Etki seviyesi: düşük-orta.**
+- `last_write_ts` kaybı → regression-guard smart-skip yanlış değerlendirir → gereksiz suite re-run (perf only, korrektlik etkisi yok)
+- `regression_block_active=false` kaybı → Phase 4.5 BLOCK kalkmaz görünür ama `mcl-stop.sh` regression-guard'ı re-evaluate eder, sonraki turda kapanır (gecikmeli ama eventual consistency)
+
+**Mitigasyon kasıtlı eklenmedi.** Seçenekler:
+- `flock` etrafında `mcl_state_set` — ek bağımlılık (POSIX flock veya Linux/macOS fcntl), shell wrapper karmaşıklığı
+- Field-level merge — `mcl-state.sh` `mcl_state_set` semantiğini değiştirir, tüm hook'larda regresyon riski
+- **Kabul edilen yol:** complexity > value. Audit trail (`audit.log`) append-only olduğu için forensic olarak kayıp yok; state.json field kaybı stop hook'un re-evaluation pattern'i ile telafi edilir.
+
+### Diğer hook'lar
+- `mcl-pre-tool.sh` state yazımları **güvenli** — PreToolUse serileşik (resmi garanti).
+- `mcl-activate.sh` ve `mcl-stop.sh` turda 1 kez fire eder — race yok.
 
 ---
 
