@@ -703,6 +703,49 @@ PYEOF
   fi
 fi
 
+# --- Plan critique skip detection (since 8.2.10 — Gap 3 meta-control) ---
+# When ExitPlanMode tool_use appears in the LAST assistant turn AND state
+# `plan_critique_done` is still false at stop time, the pre-tool hook blocked
+# the call (or should have) — record the skip attempt in audit. State-driven
+# read; transcript scan only runs when state is false to avoid wasted I/O.
+_PCS_DONE="$(mcl_state_get plan_critique_done 2>/dev/null)"
+if [ "$_PCS_DONE" != "true" ] && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] \
+   && command -v python3 >/dev/null 2>&1; then
+  _PCS_HIT="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
+import json, sys
+path = sys.argv[1]
+last_tools = []
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+            except Exception:
+                continue
+            msg = obj.get("message") or obj
+            if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                continue
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            tools = [item.get("name", "") for item in content
+                     if isinstance(item, dict) and item.get("type") == "tool_use"]
+            if tools:
+                last_tools = tools
+except Exception:
+    pass
+print("hit" if "ExitPlanMode" in last_tools else "")
+PYEOF
+)"
+  if [ "$_PCS_HIT" = "hit" ]; then
+    mcl_audit_log "plan-critique-skipped-warn" "mcl-stop.sh" "tool=ExitPlanMode plan_critique_done=false"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_skipped_warn
+  fi
+fi
+
 # --- Phase 3.5 pattern-scan clearance (runs before early exit) ---
 # Must run before the spec/askq gate below because the Phase 3.5 turn has
 # no spec block and no AskUQ — the early exit would skip this otherwise.

@@ -280,9 +280,53 @@ print(json.dumps({
     exit 0
   fi
 fi
+# -------- Branch: plan critique done detection (Gap 3, since 8.2.10) --------
+# Task with subagent_type containing "general-purpose" AND model containing
+# "sonnet" marks plan_critique_done=true so the next ExitPlanMode passes.
+if [ "$TOOL_NAME" = "Task" ] && command -v python3 >/dev/null 2>&1; then
+  _PCD_TASK_INFO="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    tin = obj.get("tool_input") or {}
+    sub = (tin.get("subagent_type") or "").lower()
+    mdl = (tin.get("model") or "").lower()
+    if "general-purpose" in sub and "sonnet" in mdl:
+        print(sub + "|" + mdl)
+except Exception:
+    pass
+' 2>/dev/null)"
+  if [ -n "$_PCD_TASK_INFO" ]; then
+    _PCD_SUB="${_PCD_TASK_INFO%%|*}"
+    _PCD_MDL="${_PCD_TASK_INFO#*|}"
+    mcl_state_set plan_critique_done true >/dev/null 2>&1 || true
+    mcl_audit_log "plan-critique-done" "pre-tool" "subagent=${_PCD_SUB} model=${_PCD_MDL}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_done "${_PCD_MDL}"
+  fi
+fi
+
 # Non-phase-dispatch Task calls pass through — allow.
 if [ "$TOOL_NAME" = "Task" ]; then
   exit 0
+fi
+
+# -------- Branch: ExitPlanMode gate (Gap 3, since 8.2.10) --------
+# Block ExitPlanMode when plan_critique_done is false. Critique subagent
+# (Sonnet 4.6) must run before plan approval to avoid bias-aligned plans.
+if [ "$TOOL_NAME" = "ExitPlanMode" ]; then
+  _PLAN_CRITIQUE_DONE="$(mcl_state_get plan_critique_done 2>/dev/null)"
+  if [ "$_PLAN_CRITIQUE_DONE" != "true" ]; then
+    mcl_audit_log "plan-critique-block" "pre-tool" "tool=ExitPlanMode plan_critique_done=false"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_block
+    python3 -c '
+import json, sys
+print(json.dumps({
+    "decision": "block",
+    "reason": "MCL PLAN CRITIQUE GATE — Plan critique subagent (Sonnet 4.6) must run before plan approval. Call Agent (Task) with subagent_type containing \"general-purpose\" AND model containing \"sonnet\" to critique the plan, then re-attempt ExitPlanMode."
+}))
+' 2>/dev/null
+    exit 0
+  fi
 fi
 
 # -------- Branch: protect .mcl/state.json from direct Bash writes --------
@@ -671,6 +715,34 @@ print(json.dumps({
 ' "$REASON"
   exit 0
 fi
+
+# -------- Plan critique reset on plan-file modification (Gap 3, since 8.2.10) --------
+# When Write/Edit/MultiEdit targets a `.claude/plans/*.md` file, the plan
+# content is changing — a fresh critique is required for the new plan.
+# Runs after all gating decisions so we only reset on tool calls that the
+# pre-tool hook is actually allowing through.
+case "$TOOL_NAME" in
+  Write|Edit|MultiEdit)
+    _PCR_PATH="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    print((obj.get("tool_input") or {}).get("file_path","") or "")
+except Exception:
+    pass
+' 2>/dev/null)"
+    case "$_PCR_PATH" in
+      */.claude/plans/*.md|.claude/plans/*.md)
+        _PCR_NOW="$(mcl_state_get plan_critique_done 2>/dev/null)"
+        if [ "$_PCR_NOW" = "true" ]; then
+          mcl_state_set plan_critique_done false >/dev/null 2>&1 || true
+          mcl_audit_log "plan-critique-reset" "pre-tool" "path=${_PCR_PATH}"
+          command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_reset "${_PCR_PATH}"
+        fi
+        ;;
+    esac
+    ;;
+esac
 
 mcl_debug_log "pre-tool" "allow" "tool=${TOOL_NAME} phase=${CURRENT_PHASE}"
 exit 0

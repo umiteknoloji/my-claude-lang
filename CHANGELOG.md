@@ -7,6 +7,27 @@
 
 ## [Unreleased]
 
+## [8.2.10] - 2026-04-29
+
+### Eklendi
+- **Gap 3 — Plan critique subagent enforcement trinity (`mcl-state.sh`, `mcl-pre-tool.sh`, `mcl-activate.sh`, `mcl-stop.sh`):**
+  - **State schema:** `plan_critique_done: false` alanı eklendi (`mcl-state.sh` default state). Session boundary'de `mcl-activate.sh` resetler.
+  - **Hook (`mcl-pre-tool.sh`):** İki intercept eklendi: (a) `Task` çağrısı `subagent_type=*general-purpose*` + `model=*sonnet*` ise `plan_critique_done=true` set edilir; (b) `ExitPlanMode` çağrısı `plan_critique_done=false` durumundayken `decision:block` ile reddedilir, audit `plan-critique-block | tool=ExitPlanMode plan_critique_done=false` yazılır. Block reason'ı Claude'a `Task(general-purpose, sonnet)` çağırmasını söyler.
+  - **Reset on plan-file Write/Edit:** `mcl-pre-tool.sh` end-of-flow'a yeni blok eklendi — Write/Edit/MultiEdit `*/.claude/plans/*.md` veya `.claude/plans/*.md` patterni'ne uyduğunda `plan_critique_done=false` resetlenir. Plan içeriği değiştiyse yeni critique gerekir.
+  - **Auto-display (`mcl-activate.sh`):** Her turda `.claude/plans/*.md` dosyası varsa ve `plan_critique_done!=true` ise `PLAN_CRITIQUE_PENDING_NOTICE` enjekte edilir. Pre-tool gate'in proaktif sinyali — Claude'a critique yapmadan ExitPlanMode'un bloklanacağı önceden bildirilir.
+  - **Meta-control (`mcl-stop.sh`):** Eğer son assistant turda `ExitPlanMode` tool_use var VE state hâlâ `plan_critique_done=false` ise audit'e `plan-critique-skipped-warn | tool=ExitPlanMode plan_critique_done=false` yazılır. Pre-tool blokladıysa state değişmemiş olur — defense-in-depth.
+
+### Test
+- ExitPlanMode + plan_critique_done=false → `decision:block` + audit PASS
+- Task(general-purpose, sonnet) → state=true → ExitPlanMode passes PASS
+- Plan exists + state=false → `PLAN_CRITIQUE_PENDING_NOTICE` injected PASS
+- Plan exists + state=true (same session) → notice yok PASS
+- Write to .claude/plans/foo.md (Phase 4) → state false'a resetlenir + audit PASS
+- Stop ExitPlanMode + state=false → `plan-critique-skipped-warn` audit PASS
+- Stop ExitPlanMode + state=true → audit warn yok PASS
+- Block decision JSON valid + activate JSON valid PASS
+- Mevcut test suite (19 pass, 0 fail, 2 skip) regresyonsuz
+
 ## [8.2.9] - 2026-04-29
 
 ### Eklendi

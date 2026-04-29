@@ -266,6 +266,7 @@ except Exception:
     mcl_state_set last_write_ts null >/dev/null 2>&1 || true
     mcl_state_set pattern_level null >/dev/null 2>&1 || true
     mcl_state_set pattern_ask_pending false >/dev/null 2>&1 || true
+    mcl_state_set plan_critique_done false >/dev/null 2>&1 || true
   fi
 fi
 
@@ -920,6 +921,33 @@ PYEOF
   fi
 fi
 
+# Plan Critique Pending notice (since 8.2.10 — Gap 3). Fires every turn when a
+# `.claude/plans/*.md` file exists in the project AND `plan_critique_done` is
+# not yet true. Tells Claude the next ExitPlanMode will be blocked until the
+# critique subagent runs. The pre-tool gate enforces the block; this notice is
+# the proactive signal so the developer/AI knows to call Task(general-purpose,
+# sonnet) before attempting plan approval.
+PLAN_CRITIQUE_PENDING_NOTICE=""
+if command -v python3 >/dev/null 2>&1; then
+  _PCP_PLANS_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/plans"
+  if [ -d "$_PCP_PLANS_DIR" ]; then
+    _PCP_PLAN_EXISTS="$(python3 - "$_PCP_PLANS_DIR" 2>/dev/null <<'PYEOF'
+import os, sys, glob
+plans_dir = sys.argv[1]
+files = glob.glob(os.path.join(plans_dir, "*.md"))
+print("yes" if files else "")
+PYEOF
+)"
+    if [ "$_PCP_PLAN_EXISTS" = "yes" ]; then
+      _PCP_DONE="$(mcl_state_get plan_critique_done 2>/dev/null)"
+      if [ "$_PCP_DONE" != "true" ]; then
+        PLAN_CRITIQUE_PENDING_NOTICE="<mcl_audit name=\\\"plan-critique-pending\\\">\\nPLAN CRITIQUE PENDING — a plan file exists under .claude/plans/ but the critique subagent has not yet run. The next ExitPlanMode call will be BLOCKED by the MCL pre-tool hook until you dispatch a Task with subagent_type containing \\\"general-purpose\\\" AND model containing \\\"sonnet\\\" (Sonnet 4.6) to critique the plan. Run the critique now if you intend to finalize the plan; the block clears automatically once the critique Task fires.\\n</mcl_audit>\\n\\n"
+        mcl_audit_log "plan-critique-pending-notice" "mcl-activate.sh" "shown"
+      fi
+    fi
+  fi
+fi
+
 # Plugin dispatch audit — fires when Phase 4.5 is running to check whether
 # required plugins (code-review sub-agent, semgrep) were actually dispatched.
 PLUGIN_MISS_NOTICE=""
@@ -965,7 +993,7 @@ print(json.dumps(sys.stdin.read().strip())[1:-1])
   fi
 fi
 
-FULL_CONTEXT="${UPDATE_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
+FULL_CONTEXT="${UPDATE_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
 
 # Log MCL injection size for cost accounting (mcl-doctor)
 if command -v python3 >/dev/null 2>&1; then

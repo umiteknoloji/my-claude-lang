@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.2.9
+**Güncel sürüm:** 8.2.10
 
 ---
 
@@ -208,6 +208,9 @@ Dört MCL hook'u (stop / activate / pre_tool / post_tool) son başarılı çalı
 8.2.8 plan-mode tespiti: bu session içinde `.claude/plans/*.md` dosyalarından biri modify edildiyse `mcl-activate.sh`, `ROOT_CAUSE_DISCIPLINE_NOTICE` enjekte ederek 3-check zincirini zorunlu kılar (visible process / removal test / falsification). `mcl-stop.sh`, `ExitPlanMode` çağrısı yapılan son assistant turunda metin + tool input'ları üç keyword çifti için (EN/TR, case-insensitive) tarar: `removal test`/`kaldırma testi`, `falsification`/`yanlışlama`, `visible process`/`görünür süreç`. Bir çiftin ne EN ne de TR formu yoksa audit'e `root-cause-chain-skipped-warn` yazılır; bir sonraki turda `mcl-activate.sh` `ROOT_CAUSE_CHAIN_WARN_NOTICE` ile Claude'a planı yeniden emit etmesini söyler.
 
 8.2.9 all-mode genişletme: 14 dilli (TR/EN/ES/FR/DE/JA/KO/ZH/AR/HE/HI/ID/PT/RU) heuristik trigger keyword seti (`neden`, `çalışmıyor`, `bug`, `why`, `broken`, `error`, vb.) kullanıcı prompt'unda görüldüğünde plan-mode bypass edilse bile `ROOT_CAUSE_DISCIPLINE_NOTICE` enjekte edilir (plan-mode hâlâ kazanır, çift inject yapılmaz). `mcl-stop.sh`'a always-on keyword scan eklendi — her turda son user mesajında trigger varsa son assistant cevabını 3 check için tarar; eksikse audit'e `source=all-mode missing=<list>` yazılır. False-positive riski (`fail`, `error`, `bug`, `issue` çok yaygın) kabul edilmiş gürültü; warn non-blocking.
+
+**Plan Critique Subagent Enforcement** (8.2.10)
+Plan onayı (`ExitPlanMode`) öncesinde plan critique subagent'ının (Sonnet 4.6) çağrılmasını zorunlu kılar. State alanı `plan_critique_done` (default: `false`); session boundary'de ve `.claude/plans/*.md` dosyasına Write/Edit yapıldığında otomatik resetlenir. Pre-tool hook akışı: (1) `Task` çağrısı `subagent_type=*general-purpose*` + `model=*sonnet*` ise `plan_critique_done=true` set edilir; (2) `ExitPlanMode` çağrısı ile `plan_critique_done=false` ise `decision:block` ile reddedilir; (3) `.claude/plans/*.md` dosyasına Write/Edit/MultiEdit yapıldığında `plan_critique_done=false` resetlenir. Activate hook her turda plan dosyası varsa ve critique yapılmadıysa `PLAN_CRITIQUE_PENDING_NOTICE` enjekte eder. Stop hook ExitPlanMode tool_use bu turda var ve state hâlâ `false` ise audit'e `plan-critique-skipped-warn` yazar.
 
 ---
 

@@ -73,6 +73,7 @@ _mcl_state_default() {
   "last_write_ts": null,
   "pattern_level": null,
   "pattern_ask_pending": false,
+  "plan_critique_done": false,
   "last_update": ${now}
 }
 JSON
