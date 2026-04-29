@@ -118,49 +118,151 @@ Stack tag returned by `mcl-stack-detect.sh detect "$(pwd)"`. Multi-stack
 projects union all matching add-ons; deduplicate dimensions that appear in
 more than one add-on.
 
-<!-- TODO(post-8.3.0): split typescript/javascript/react add-on by framework.
-     Vue, Svelte, Solid, Angular have framework-specific dimensions (reactivity
-     model, store conventions, hydration semantics) that warrant their own
-     entries. v1 lumps them under the generic JS/TS/React heading; future
-     iterations should add `### vue`, `### svelte`, etc. with framework-specific
-     deltas, and update mcl-stack-detect.sh to return the finer-grained tag. -->
+<!-- TODO(post-8.4.1): finer framework splits when needed. Solid, Angular,
+     Qwik have distinct reactivity / hydration models that may warrant their
+     own entries. Same for kotlin-mobile vs kotlin-backend (currently lumped
+     under `### mobile`). Add new sections + corresponding mcl-stack-detect.sh
+     tag patterns when usage demands. -->
 
-### typescript / javascript / react
+### typescript / javascript
+
+Generic web base — applies to any TS/JS web project regardless of framework.
+Framework-specific deltas live in their own sections below
+(`react-frontend`, `vue-frontend`, `svelte-frontend`).
+
 - **Pagination type** — cursor / offset / no-pagination?
 - **Search semantics** — client-side filter, server-side search, hybrid?
 - **Empty / Loading / Error UI states** — per design system, distinct copy for filtered-empty vs system-empty? (UX state lives here, not in core failure modes.)
 - **Route permission gate** — guard at router level, layout level, or per-component?
 - **SSR / CSR / hybrid** — does this feature run on the server, client, or both? Hydration impact?
 
+### react-frontend
+
+React-specific deltas (applied in addition to `typescript`/`javascript` base).
+
+- **Hook patterns** — useState/useReducer choice; custom hook extraction conventions; effect cleanup discipline
+- **Suspense boundaries** — for data fetching and code splitting; where they live in the tree
+- **Server vs client components** — RSC awareness (Next.js App Router, etc.); `"use client"` directive boundaries
+- **State management** — built-in (useState/useContext) / Zustand / Redux Toolkit / Jotai / TanStack Query for server state
+
+### vue-frontend
+
+Vue-specific deltas (applied in addition to `typescript`/`javascript` base).
+
+- **Composition vs Options API** — project convention; `<script setup>` shorthand?
+- **State management** — Pinia (Vue 3) / Vuex (Vue 2 legacy)
+- **SFC structure** — template/script/style block organization, scoped vs global styles
+- **Reactivity primitives** — `ref` / `reactive` / `computed` / `watchEffect` choice per use case
+- **Rendering target** — Nuxt SSR / Vite SPA / Vite SSG / hybrid
+
+### svelte-frontend
+
+Svelte-specific deltas (applied in addition to `typescript`/`javascript` base).
+
+- **Stores vs runes** — Svelte 4 stores vs Svelte 5 runes (`$state`, `$derived`, `$effect`)
+- **Server vs client islands** — SvelteKit form actions, server load functions, progressive enhancement
+- **Reactivity model** — `$:` reactive declarations (legacy) vs runes (modern)
+- **Compiler optimizations** — opt-in vs default behaviors; `<svelte:options>` per-component
+
+### html-static
+
+For static site projects (no JS framework detected; `index.html` or static HTML files).
+
+- **Asset bundling** — none (raw HTML+CSS+JS) / Vite / esbuild / Webpack / 11ty / Astro
+- **SEO** — meta tags, Open Graph, sitemap.xml, robots.txt, structured data
+- **Accessibility** — ARIA usage, semantic HTML, keyboard navigation, contrast ratios
+- **Deployment target** — static hosting (Netlify/Vercel/CDN) vs Apache/Nginx vs GitHub Pages
+
 ### python (FastAPI / Django / Flask / REST)
+
 - **API contract versioning** — URI (`/v1/`), header (`Accept: ...`), or none?
 - **Rate limiting strategy** — per-IP, per-user, per-token? sliding window or fixed?
 - **Request validation depth** — pydantic schemas, where? marshmallow? manual?
 - **Async vs sync handler** — does this path need async I/O or is sync acceptable?
 
 ### go / rust
+
 - **Concurrency model** — goroutine pool, channel-based, Tokio runtime, single-threaded?
 - **Error propagation pattern** — `error` return / `Result<T,E>` / panic? wrapping convention?
 - **Lifetime / ownership impact (Rust)** — does this feature introduce new shared state, `Arc`, `Rc`, or borrow boundaries?
 
+### java
+
+- **Framework** — Spring Boot / Quarkus / Micronaut / vanilla servlet
+- **Build tool** — Maven / Gradle (Kotlin DSL or Groovy)
+- **Reactive vs blocking I/O** — WebFlux / MVC / Project Loom virtual threads
+- **Persistence** — JPA (Hibernate) / JDBC / R2DBC / MyBatis
+- **Java version target** — LTS (8 / 11 / 17 / 21) / latest stable
+
+### csharp
+
+- **Framework** — ASP.NET Core / .NET MAUI / WPF / Unity / Console
+- **Async pattern** — `Task` / `ValueTask` / `IAsyncEnumerable` / channel-based
+- **DI convention** — built-in `IServiceCollection` / Autofac / Simple Injector
+- **ORM** — EF Core / Dapper / no ORM (raw SQL)
+- **Target runtime** — .NET 6 / 7 / 8 (LTS) vs .NET Framework 4.x legacy
+
+### ruby
+
+- **Framework** — Rails (full-stack) / Rails (API mode) / Sinatra / Hanami / Roda
+- **ORM** — ActiveRecord / Sequel / ROM
+- **Background jobs** — Sidekiq / GoodJob / SolidQueue (Rails 7.1+)
+- **API mode vs full-stack** — JSON-only, ERB views, or hybrid?
+- **Test framework** — RSpec / Minitest
+
+### php
+
+- **Framework** — Laravel / Symfony / vanilla / WordPress (CMS context — different concerns)
+- **ORM** — Eloquent (Laravel) / Doctrine (Symfony) / no ORM
+- **Job queue** — Laravel Horizon / Symfony Messenger / vanilla (cron + DB)
+- **PHP version target** — 7.x legacy / 8.x modern (typed properties, enums, readonly)
+
+### cpp
+
+- **Standard target** — C++17 / C++20 / C++23
+- **Build system** — CMake / Bazel / Make / MSBuild / xmake
+- **Memory management** — RAII + smart pointers / manual / hybrid (legacy boundary)
+- **Concurrency** — `std::thread` / coroutines (C++20) / TBB / OpenMP / platform-specific
+- **Platform** — cross-platform / Windows-specific / embedded (no STL?) / game console
+
+### lua
+
+- **Runtime** — Lua 5.x / LuaJIT / Roblox Luau / NeoVim plugin runtime
+- **Coroutine usage** — async-style patterns, scheduler
+- **Module system** — `require` / `package.path` conventions
+- **C interop** — LuaJIT FFI / hand-written C bindings / no FFI (pure Lua)
+
 ### cli (any stack)
-- **stdin contract** — accepts piped data? format? required or optional?
-- **Exit code semantics** — 0 success / non-zero? specific codes for specific failures?
+
+Triggered by `cli` tag (`mcl-stack-detect.sh` since 8.4.1 — bin entries
+in language manifests, `bin/` dir, `cmd/` Go convention, etc.).
+
+- **stdin contract** — accepts piped data? format (json / line-delim / binary)? required or optional?
+- **Exit code semantics** — 0 success / non-zero? specific codes for specific failure modes?
 - **Flag naming** — `--kebab-case`, single-letter aliases, POSIX vs GNU style?
 - **TTY vs non-TTY behavior** — color output, progress bars, prompts when not interactive?
 
-### data-pipeline (spark / beam / batch jobs)
+### data-pipeline (spark / beam / airflow / dbt / prefect / dagster)
+
+Triggered by `data-pipeline` tag (since 8.4.1 — Airflow `dags/`, dbt
+project file, Prefect config, or batch/stream framework deps).
+
 - **Batch vs stream** — one-shot batch, scheduled batch, continuous stream?
 - **Watermark / exactly-once semantics** — at-least-once with dedup? exactly-once with checkpointing?
 - **Replay semantics** — can the job be re-run on the same input window? backfill strategy?
 - **Schema evolution policy** — adding/removing fields, backward/forward compatibility?
 
 ### mobile (swift / kotlin)
+
 - **Offline mode** — feature works offline? graceful degrade? sync on reconnect?
 - **Push notification handling** — does this feature emit or consume push notifications?
 - **OS version compatibility** — minimum iOS/Android version supported?
 
 ### ml-inference
+
+Triggered by `ml-inference` tag (since 8.4.1 — model artifact files,
+ML library deps in requirements/pyproject, mlflow/mlruns dirs).
+
 - **Input validation** — schema enforcement, range checks, distribution guards?
 - **Model version pinning** — explicit version in request, or "latest" with migration path?
 - **Drift detection / monitoring** — how is input/output drift surfaced?

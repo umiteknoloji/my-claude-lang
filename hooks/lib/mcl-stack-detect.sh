@@ -122,6 +122,81 @@ mcl_stack_detect() {
     _mcl_stack_add csharp
   fi
 
+  # ---- Domain-shape tags (since 8.4.1) ----
+  # These are NOT language tags — they classify the project's domain
+  # shape so Phase 1.7 can pick the right stack add-on. False positives
+  # are accepted (Phase 1.7 dimensions are general enough to misfire
+  # without breaking the spec).
+
+  # CLI — bin entries in language manifests, bin/ dir, or cmd/ Go convention.
+  _mcl_is_cli=0
+  if [ -f "$dir/package.json" ] && grep -q '"bin"\s*:' "$dir/package.json" 2>/dev/null; then
+    _mcl_is_cli=1
+  fi
+  if [ -f "$dir/pyproject.toml" ] && grep -qE '\[(project|tool\.poetry)\.scripts\]' "$dir/pyproject.toml" 2>/dev/null; then
+    _mcl_is_cli=1
+  fi
+  if [ -f "$dir/Cargo.toml" ] && grep -q '\[\[bin\]\]' "$dir/Cargo.toml" 2>/dev/null; then
+    _mcl_is_cli=1
+  fi
+  if [ -f "$dir/go.mod" ] && [ -d "$dir/cmd" ]; then
+    _mcl_is_cli=1
+  fi
+  if [ -d "$dir/bin" ] && compgen -G "$dir/bin/*" >/dev/null; then
+    # bin/ dir with at least one entry — exclude empty bin/ placeholders.
+    _mcl_is_cli=1
+  fi
+  if [ "$_mcl_is_cli" = "1" ]; then
+    _mcl_stack_add cli
+  fi
+  unset _mcl_is_cli
+
+  # Data pipeline — orchestrators (Airflow / dbt / Prefect / Dagster) or
+  # batch/stream framework deps in Python requirements.
+  _mcl_is_dp=0
+  [ -f "$dir/airflow.cfg" ] && _mcl_is_dp=1
+  [ -d "$dir/dags" ] && _mcl_is_dp=1
+  [ -f "$dir/dbt_project.yml" ] && _mcl_is_dp=1
+  [ -f "$dir/prefect.yaml" ] && _mcl_is_dp=1
+  [ -f "$dir/prefect.toml" ] && _mcl_is_dp=1
+  if compgen -G "$dir/requirements*.txt" >/dev/null; then
+    if grep -hqE '^(apache-beam|pyspark|dagster|dask|luigi)([[:space:]]|=|<|>|~|$)' "$dir"/requirements*.txt 2>/dev/null; then
+      _mcl_is_dp=1
+    fi
+  fi
+  if [ "$_mcl_is_dp" = "1" ]; then
+    _mcl_stack_add data-pipeline
+  fi
+  unset _mcl_is_dp
+
+  # ML inference — model artifact files OR ML library deps OR mlflow dirs.
+  _mcl_is_ml=0
+  for ext in pkl onnx pt h5 safetensors pb; do
+    if compgen -G "$dir/*.$ext" >/dev/null \
+       || compgen -G "$dir/**/*.$ext" >/dev/null 2>&1; then
+      _mcl_is_ml=1
+      break
+    fi
+  done
+  [ -d "$dir/mlflow" ] && _mcl_is_ml=1
+  [ -d "$dir/mlruns" ] && _mcl_is_ml=1
+  [ -f "$dir/model_card.md" ] && _mcl_is_ml=1
+  [ -f "$dir/MODEL.md" ] && _mcl_is_ml=1
+  if [ "$_mcl_is_ml" = "0" ] && compgen -G "$dir/requirements*.txt" >/dev/null; then
+    if grep -hqE '^(torch|tensorflow|transformers|scikit-learn|xgboost|lightgbm|bentoml|mlflow)([[:space:]]|=|<|>|~|$)' "$dir"/requirements*.txt 2>/dev/null; then
+      _mcl_is_ml=1
+    fi
+  fi
+  if [ "$_mcl_is_ml" = "0" ] && [ -f "$dir/pyproject.toml" ]; then
+    if grep -qE '"(torch|tensorflow|transformers|scikit-learn|xgboost|lightgbm|bentoml|mlflow)"' "$dir/pyproject.toml" 2>/dev/null; then
+      _mcl_is_ml=1
+    fi
+  fi
+  if [ "$_mcl_is_ml" = "1" ]; then
+    _mcl_stack_add ml-inference
+  fi
+  unset _mcl_is_ml
+
   if [ "${#detected[@]}" -gt 0 ]; then
     printf '%s\n' "${detected[@]}"
   fi

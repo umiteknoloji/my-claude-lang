@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.4.0
+**Güncel sürüm:** 8.4.1
 
 ---
 
@@ -83,7 +83,14 @@ Phase 1 "completeness" sağlar; Phase 1.7 "precision" sağlar. Phase 1 onayı so
 
 **Core 7 boyut (her projede):** Permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry. UX state'leri (empty/loading/error UI) UI stack add-on'larında — core'da değil.
 
-**Stack add-on'lar:** typescript/javascript/react, python (FastAPI/Django), go/rust, cli, data-pipeline (spark/beam), mobile (swift/kotlin), ml-inference. Her add-on 2-5 delta boyut içerir. Vue/Svelte/Angular gelecek genişleme için TODO işaretlendi.
+**Stack add-on'lar (8.4.1 genişletmesi):**
+- **Web base:** typescript/javascript (modül sistemi, async patterns, package manager, deployment target).
+- **Frontend frameworks (dedicated add-on):** react-frontend, vue-frontend, svelte-frontend, html-static. Her biri base TS/JS add-on'una **ek olarak** uygulanır (multi-tag union — örn. React projesi `[typescript, react-frontend]`).
+- **Backend dilleri:** python (FastAPI/Django), java (Spring/Quarkus), csharp (ASP.NET), ruby (Rails/Sinatra), php (Laravel/Symfony), go, rust.
+- **Sistem dilleri:** cpp, lua.
+- **Mobile:** swift, kotlin.
+- **Domain-shape (içerik tabanlı, dil değil):** cli, data-pipeline (Airflow/dbt/Prefect/Dagster + Beam/Spark), ml-inference (model artifact / torch/tensorflow/scikit-learn/mlflow). 8.4.1'de `mcl-stack-detect.sh` heuristik tespit eder; daha önce TODO idi.
+- Her add-on 2-5 delta boyut içerir. Solid/Angular/Qwik ve kotlin-mobile vs kotlin-backend ayrımı gelecek genişleme için TODO.
 
 İngilizce session'da skip — audit entry yine emit edilir (`skipped=true`) detection control olarak. **Hard enforcement (8.3.2):** `mcl-stop.sh` Phase 1→2 transition'ında audit'te `precision-audit` entry yoksa hem `precision-audit-skipped-warn` (8.3.0 detection signal, backward compat) hem `precision-audit-block` audit'leri yazar VE `decision:block` JSON döndürür — Phase 1→2 transition rewind edilir, Claude aynı response içinde Phase 1.7'i çalıştırıp spec'i yeniden emit etmek zorunda. Phase 4.5 ile aynı tier. İngilizce session safety valve: `skipped=true` audit emit edildiğinde block fire etmez.
 
