@@ -1,260 +1,13 @@
-# my-claude-lang 
-### Gerçek AI çağı İngilizce konuşmuyor. Senin dilini konuşuyor.
+# my-claude-lang (MCL)
+
+[![Sürüm](https://img.shields.io/badge/sürüm-8.13.0-blue.svg)](VERSION)
+[![Lisans](https://img.shields.io/badge/lisans-MIT-green.svg)](LICENSE)
+
+MCL, Claude Code'a iki kanat ekleyen bir plugin: bir **dil köprüsü** — geliştirici kendi dilinde düşünür, Claude senior seviye İngilizce mühendislik çıktısı üretir; ve bir **AI disiplini** katmanı — her değişikliği deterministik bir faz pipeline'ından (Phase 1 → 1.5 → 1.7 → 2 → 3 → 3.5 → 4 → 4.5 → 5 → 6) geçirir, güvenlik / DB tasarımı / UI erişilebilirliği / operasyonel hijyen için hook-enforced gate'ler uygular. Her şey projenin **dışında** çalışır — 8.5.0'dan itibaren projene sıfır dosya yazılır.
 
 ---
 
-Bugüne kadar dünyanın en iyi AI kodlama araçlarını kullanmak için İngilizce bilmen gerekiyordu. Artık gerekmiyor.
-
-**my-claude-lang**, Claude Code için bir eklenti. Yazılımı kendi ana dilinde geliştirmeni sağlıyor — sıfır İngilizce bilgisiyle. Ayar yok. Dil seçimi yok. Sadece konuşmaya başla. O anlıyor.
-
-Bu bir çevirmen değil. Çevirmenler kelimeleri çevirir. my-claude-lang **anlamı** çevirir.
-
-### 5.0.0'dan itibaren — Evrensel Aktivasyon
-
-my-claude-lang artık sadece İngilizce bilmeyenler için değil. MCL **her** mesajda devreye giriyor — İngilizce dahil — çünkü anlam doğrulama, kıdemli mühendis kalitesinde spec üretimi ve anti-yalakalık, kaynak dilden bağımsız olarak değerli. İngilizce bilmeyen kullanıcı için çeviri köprüsü de çalışmaya devam ediyor; İngilizce kullanıcı için çeviri katmanı identity'ye düşüyor, ama diğer tüm katmanlar (faz kapıları, öz-eleştiri, disambiguation, Faz 5 doğrulama) tamamen çalışıyor.
-
----
-
-## Kimsenin Konuşmadığı Sorun
-
-Claude Code dünyanın en güçlü AI kodlama aracı. Kıdemli bir mühendis gibi planlıyor, koddan önce test yazıyor, kendi işini inceliyor ve production-kalitesinde yazılım çıkarıyor.
-
-Ama İngilizce düşünüyor. Ve İngilizce bilmiyorsan, tüm bunların dışındasın.
-
-Çevirmen kullanabilirsin. Ama isteğini İngilizce'ye çevirip Claude Code'a yapıştırdığında şu oluyor:
-
-- Niyetin düz kelimelere düşüyor
-- İncelikler kayboluyor — "hızlı olsun" hıza dönüşüyor, sadeliğe değil
-- Bağlam buharlaşıyor — kısıtlamaların, tercihlerin, "tabii ki şunu kastediyordum..." — hepsi gidiyor
-- Teknik olarak doğru ama yanlış şeyi yapan kod alıyorsun
-- Saatlerce, token'larca, sabrınla ödüyorsun
-
-**my-claude-lang var çünkü çeviri, anlama değildir.**
-
----
-
-## my-claude-lang Gerçekte Ne Yapıyor
-
-Tek bir satır kod yazılmadan önce **yedi aşamalı karşılıklı anlama döngüsü** kuruyor:
-
-```
-Sen (kendi dilinde)
-  │
-  ▼
-Aşama 1: MCL ne istediğini anlamak için tek tek soru soruyor.
-         Hiçbir belirsizlik geçemiyor. Özeti onaylıyorsun.
-         MCL aynı zamanda mimari cevaplarını da sorgulayabilir:
-         "JWT" deyip sunucu tarafı oturum akışı tarif edersen,
-         MCL çelişkiyi yüzeye çıkarır ve spec yazmadan önce
-         hangisini kastettiğini sorar.
-  │
-  ▼
-Aşama 1.5 (görünmez): Onaylanan niyetin katı bir çevirmen
-         geçişinden (kullanıcı dili → EN) geçiyor. Yorum yok,
-         ekleme yok — sadece doğal dil çevriliyor; teknik terimler
-         olduğu gibi kalıyor. Ortaya çıkan İngilizce Engineering
-         Brief, spec üretiminin tek girdisi oluyor.
-  │
-  ▼
-Aşama 2+3: Onaylanan niyetin, görünür bir İngilizce teknik
-           spesifikasyona (📋 Spec:) dönüşüyor — 15+ yıl deneyimli
-           kıdemli bir mühendis gibi yazılıyor — ve MCL spec'i
-           sana kendi dilinde açıklıyor; ikisi aynı turda, tek
-           AskUserQuestion onayıyla. Spec bloğu daraltılabilir —
-           okuduktan sonra tıklayarak küçültebilirsin.
-  │
-  ▼
-Aşama 4: Kod yazılıyor. Bu aşamanın içinde kademeli TDD
-         çalışıyor — her kabul kriteri için: bir failing test
-         (RED), onu geçecek minimum kod (GREEN), ardından refactor.
-         Döngü her kriter için tekrar eder; sonda tam suite tekrar
-         koşulur. Claude Code'un çalışma sırasında sorduğu her
-         soru köprüden geçiyor — NEDEN sorduğunu ve hangi cevabın
-         NE değiştireceğini açıklayarak.
-
-         UI yüzeyi tespit edildiğinde (varsayılan: ON), Aşama 4 üçe bölünür:
-         ├─ 4a BUILD_UI  — sadece dummy data ile çalışır frontend.
-         │                 Çalıştırma komutu verilir; MCL tarayıcıyı açar.
-         ├─ 4b UI_REVIEW — backend başlamadan önce UI'ı onaylarsın.
-         │                 Opt-in Playwright görsel incelemesi mevcut.
-         └─ 4c BACKEND   — gerçek API çağrıları, data layer, async bağlantı.
-                           Yalnızca UI onayından sonra çalışır.
-  │
-  ▼
-Aşama 4.5 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
-         performans kararlarının doğru uygulandığını doğrular; ardından
-         atlanmış riskleri tarar — uç durumlar, gerilemeler — ve her
-         birini seninle tek tek konuşur. Risk düzeltmeleri bittikten
-         sonra TDD testleri yeniden koşar: hepsi yeşil → geçer; kırmızı
-         → ilgili kod düzeltilir; çelişki → sen karar verirsin.
-  │
-  ▼
-Aşama 4.6 (Etki İncelemesi): MCL projenin geri kalanını,
-         değişikliğin gerçek downstream etkileri için tarıyor —
-         çağıranlar, ortak yardımcılar, şema/API kaymaları — ve
-         her birini senin kararın için önüne koyuyor.
-  │
-  ▼
-Aşama 5: Doğrulama Raporu — Spec Kapsama tablosu (her MUST/SHOULD
-         gereksinimi, onu kapsayan teste bağlı: ✅ dosya:satır ile,
-         ⚠️ kısmi, ❌ test yazılmamış). Ardından: kodunun call
-         graph'ından tespit edilen otomasyon engelleri — yalnızca
-         gerçekten otomatize edilemeyen maddeler (canlı API,
-         DOM layout, prod ortam değişkenleri).
-  │
-  ▼
-Aşama 5.5: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
-         kullanıcı dili) senin diline çevriliyor — yorum yok,
-         ekleme yok. Teknik tokenlar (dosya:satır, test isimleri)
-         olduğu gibi korunuyor.
-```
-
-**Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Açık onayın olmadan hiçbir şey ilerlemez.
-
-### AskUserQuestion ile Onaylar (6.0.0'dan itibaren)
-
-Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 3 spec onayı, her Aşama 4.5
-risk, her Aşama 4.6 etki, plugin onayı, git-init onayı, drift çözümü,
-`/mcl-update` / `/mcl-finish` / yapıştırılan-CLI onayı) artık yerleşik
-Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 8.1.3 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
-"evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
-açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
-kalıyor.
-
-Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
-**yalnızca uyarı**: yazma araçları asla engellenmiyor, ama MCL her turda
-bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
-onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
-
-Her yanıt `🌐 MCL 8.1.3` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
-
-### UI Build / Review Alt-Fazları (6.2.0'dan itibaren)
-
-Görevin bir UI yüzeyi olduğunda (her projede varsayılan), Phase 4 üç
-alt-faza ayrılıyor — böylece MCL değiştirmek istediğin bir UI'ın
-üstüne backend yazarken seyretmek zorunda kalmıyorsun:
-
-1. **Phase 4a (BUILD_UI)** — MCL sadece dummy data ile çalıştırılabilir
-   bir frontend yazıyor. Stack'ine göre React / Vue / Svelte / statik
-   HTML. Çalıştırma komutu veriyor (`npm run dev` vb.); MCL
-   tarayıcıyı otomatik açar, sen incelersin.
-2. **Phase 4b (UI_REVIEW)** — MCL backend'e geçmeden önce UI doğru
-   mu diye soruyor. Dört seçenek: onay / revize / **sen de bak ve
-   raporla** / iptal. "Sen de bak ve raporla" opt-in bir boru hattı:
-   Playwright + screenshot + Claude'un multimodal görüsü ile MCL
-   kendi yazdığı UI'a gerçekten bakıp ne gördüğünü anlatıyor —
-   `playwright` kurulu olmasını gerektirir, asla otomatik kurmaz.
-3. **Phase 4c (BACKEND)** — ancak onayladıktan sonra MCL dummy
-   fixture'ları gerçek API çağrılarına dönüştürüyor, data layer'ı
-   yazıyor, error ve loading state'lerini gerçek async'e bağlıyor.
-
-Phase 1 özet onayında "onay, UI atlayacağız" seçersen Phase 4
-ayrılmadan çalışır (6.1.1 davranışının aynısı). UI default ON çünkü
-projelerin çoğunun UI yüzeyi var; bash script'leri ve yalnızca-backend
-değişiklikleri tek tıkla opt-out yapıyor.
-
----
-
-## Kör Cevaplar Değil, Bilinçli Kararlar
-
-Claude Code sana çalışma sırasında bir soru sorduğunda, MCL sadece çevirmekle kalmıyor. Şunları da ekliyor:
-
-1. **Bu soru neden soruluyor** — Claude neye karar vermek istiyor
-2. **Hangi cevap ne değiştirir** — cevap vermeden önce sonuçlarını biliyorsun
-
-Asla tahmin etmiyorsun. Tam bağlamla karar veriyorsun — sanki kıdemli bir mühendis her karar noktasını senin dilinde açıklıyor.
-
----
-
-## Kanıtlanmış Sonuçlar: İngilizce Yazmaktan Bile Daha İyi
-
-MCL'yi 13 dilde test ettik ve sonuçları 15+ yıl deneyimli kıdemli bir İngilizce mühendise aynı isteği doğrudan İngilizce yazdırdığımızdaki çıktıyla karşılaştırdık.
-
-**Sonuç: 2 EŞIT, 11 MCL DAHA İYİ.**
-
-MCL sadece İngilizce mühendis kalitesine yetişmiyor — 13 dilin 11'inde **daha iyi** spec üretiyor.
-
-| # | Dil | Kıdemli Mühendise Karşı | Neden |
-|---|-----|------------------------|-------|
-| 1 | 🇹🇷 Türkçe | EŞIT | Optimize edilmiş — MCL Türkçe üzerinde geliştirildi |
-| 2 | 🇯🇵 Japonca | EŞIT | Japonca zaten kesin ve yapılandırılmış |
-| 3 | 🇩🇪 Almanca | **MCL DAHA İYİ** | Daha fazla edge case yakalıyor |
-| 4 | 🇨🇳 Çince | **MCL DAHA İYİ** | Analojileri somut spec'lere kırıyor |
-| 5 | 🇰🇷 Korece | **MCL DAHA İYİ** | Kültürel ifadeleri koruyor |
-| 6 | 🇪🇸 İspanyolca | **MCL DAHA İYİ** | Olumsuzlamayı pozitif spec'e çeviriyor |
-| 7 | 🇫🇷 Fransızca | **MCL DAHA İYİ** | Başkalarının kaçırdığı belirsizliği fark ediyor |
-| 8 | 🇮🇩 Endonezyaca | **MCL DAHA İYİ** | Belirsiz terimleri çalıştırmadan önce çözüyor |
-| 9 | 🇸🇦 Arapça | **MCL DAHA İYİ** | Eksik detayları tamamlıyor |
-| 10 | 🇧🇷 Portekizce | **MCL DAHA İYİ** | Teknik homonimleri + denetim izini yakalıyor |
-| 11 | 🇷🇺 Rusça | **MCL DAHA İYİ** | Gizli alt görevleri parçalıyor |
-| 12 | 🇮🇳 Hintçe | **MCL DAHA İYİ** | Belirsiz isteklerde gizlilik endişelerini işaretliyor |
-| 13 | 🇮🇱 İbranice | **MCL DAHA İYİ** | Yetkilendirme modellerini netleştiriyor |
-
-### Neden Bu 13 Dil?
-
-Bu diller dünyanın ana yazı sistemi ailelerini temsil etmek için seçildi:
-
-- **Latin** — Türkçe, Almanca, İspanyolca, Fransızca, Endonezyaca, Portekizce
-- **CJK** — Çince (Hanzi), Japonca (Kanji + Hiragana + Katakana), Korece (Hangul)
-- **Kiril** — Rusça
-- **Devanagari** — Hintçe
-- **Arap yazısı (sağdan sola)** — Arapça
-- **İbrani yazısı (sağdan sola)** — İbranice
-
-Bu, dünyanın geliştiricilerinin büyük çoğunluğunun kullandığı yazı sistemi ailelerini kapsıyor — soldan sağa, sağdan sola, karakter tabanlı ve hece tabanlı sistemler. MCL bunların hepsinde çalışıyorsa, senin dilinde de çalışır.
-
-### MCL Neden İngilizce'yi Geçiyor?
-
-Çünkü avantaj dilsel değil — **prosedürel**.
-
-Kıdemli bir mühendis İngilizce "Build a notification system" yazıyor ve Claude kodlamaya başlıyor. Belki Claude netleştirici sorular soruyor. Belki sormuyor. **Garantisi yok.**
-
-MCL belirsizlik çözmeyi **zorunlu** kılıyor, opsiyonel değil:
-- Her belirsiz terim sorgulanıyor
-- Her gizli alt görev yüzeye çıkarılıyor
-- Her kültürel ifade çözümleniyor
-- Tek bir satır kod yazılmadan önce her varsayım doğrulanıyor
-
-**MCL, Claude'a senin dilini öğretmiyor. Claude'a mühendislik disiplini dayatıyor. Ve bu, tek başına İngilizce'den daha iyi sonuç üretiyor.**
-
----
-
-## Kurulum
-
-### 1. Adım — Gerekli Claude Code plugin'lerini kur (MCL'DEN ÖNCE)
-
-6.1.0'dan itibaren MCL, curated orkestrasyon plugin'leri (`superpowers`,
-`security-guidance`) ve stack'ine göre tespit edilen LSP plugin'leri
-kurulu değilse kendini sert-kilitler. Önce platformuna uygun installer'ı
-çalıştır:
-
-```bash
-# macOS / Linux
-chmod +x install-claude-plugins.sh
-./install-claude-plugins.sh
-```
-
-```powershell
-# Windows (PowerShell)
-.\install-claude-plugins.ps1
-```
-
-Script'ler önce resmi `claude-plugins-official` marketplace'ini ve
-topluluk `obra/superpowers-marketplace` marketplace'ini kaydeder,
-ardından curated orkestrasyon setini ve Claude Code'un desteklediği
-tüm LSP plugin'lerini kurar. Her iki script de idempotent — tekrar
-tekrar çalıştırabilirsin. `claude` CLI'nin PATH'te olması gerekir.
-
-> **Neden önce bu?** Bu adımı atlarsan MCL'in PreToolUse hook'u her
-> session'ın ilk mesajında `Write` / `Edit` / `MultiEdit` /
-> `NotebookEdit` ve writer-Bash komutlarını (`rm`, `git commit`,
-> paket kurulumu, shell yönlendirmesi, ...) reddeder; gate sadece
-> yeni bir session açıldığında tekrar kontrol eder.
-
-### 2. Adım — MCL'i kur
-
-8.5.0'dan itibaren MCL **projelerine sıfır dosya yazıyor**. State, hook, skill ve audit log dosyaları `~/.mcl/projects/<proje-key>/` altında, repo'nun dışında saklanıyor.
+## Hızlı kurulum
 
 ```bash
 git clone https://github.com/YZ-LLM/my-claude-lang.git
@@ -262,171 +15,138 @@ bash my-claude-lang/install.sh
 ```
 
 Bu kurar:
-- **Kütüphane** → `~/.mcl/lib/` (klonlanan repo — tek kaynak)
-- **Wrapper launcher** → `~/.local/bin/mcl-claude` (symlink)
-- **Proje-bazlı state kökü** → `~/.mcl/projects/<sha1(realpath PWD)>/` (ilk çalıştırmada otomatik yaratılır)
+- **Kütüphane:** `~/.mcl/lib/` (klonlanan repo — tek kaynak)
+- **Wrapper launcher:** `~/.local/bin/mcl-claude` (symlink)
+- **Proje-bazlı state kökü:** `~/.mcl/projects/<sha1(realpath)>/` (ilk çalıştırmada otomatik yaratılır)
 
-Herhangi bir projede `claude` yerine `mcl-claude` çalıştır:
+Sonra herhangi bir projede `claude` yerine `mcl-claude` çalıştır:
 
 ```bash
 cd ~/projects/my-app
 mcl-claude
 ```
 
-Wrapper, `$PWD`'nin realpath'inden stable bir project key türetir, ilk çalıştırmada `~/.mcl/projects/<key>/` scaffolding'ini oluşturur, hook'lar için `MCL_STATE_DIR` env var'ını export eder, sonra izole `--settings` ve `--plugin-dir` ile `claude`'u `exec` eder. Tüm Claude Code bayrakları transparan geçer.
+Wrapper, `$PWD`'nin realpath'inden stable bir project key türetir, ilk çalıştırmada `~/.mcl/projects/<key>/` scaffolding'ini oluşturur, hook'lar için `MCL_STATE_DIR` env'ini export eder, sonra izole `--settings` + `--plugin-dir` ile `claude`'u `exec` eder. **Tüm Claude Code bayrakları transparan geçer.** Projen hiçbir şey almaz — `.mcl/`, `.claude/`, settings dosyası yok.
 
-**8.5 öncesinden geliyorsan?** Mevcut `<proje>/.mcl/` ve `<proje>/.claude/` dizinleri orphan kalır. Manuel taşıma reçetesi için [CHANGELOG 8.5.0](CHANGELOG.md).
+**Güncelleme:**
+```bash
+cd ~/.mcl/lib && git pull --ff-only && bash install.sh
+```
+Veya bir oturumun içinde `/mcl-update` yaz.
 
 ---
 
-## Güncelleme
+## Özellik kataloğu (8.13.0)
 
-MCL, pasif bir güncelleme kontrolü ve tek kelimeyle self-update özelliğiyle gelir.
+### Dil köprüsü
+İlk mesajdan geliştiricinin dilini tespit eder; her clarifying question, risk dialog, doğrulama raporu, section başlığı o dilde kalır. İç mühendislik çıktısı (spec, kod, teknik token) İngilizce. 14 dil desteği (TR / EN / AR / DE / ES / FR / HE / HI / ID / JA / KO / PT / RU / ZH); araç çıktıları için TR + EN tam lokalize, diğerleri scan rapor metinlerinde İngilizce fallback.
 
-Hook, 24 saatte bir arka planda repodaki `VERSION` dosyasını çeker. Yeni sürüm varsa, her yanıttaki banner'ın yanında senin dilinde lokalize bir uyarı belirir, örneğin:
+### Per-project izolasyon (8.5.0+)
+MCL projene **sıfır dosya yazar**. State, hook, skill, agent, audit log, scan cache, dev-server log — her şey `~/.mcl/projects/<key>/` altında. Project key'ler `realpath($PWD)` SHA1; rename'de state kaybolur (kasıtlı, migration yok). Birden çok projede paralel çalışırken state çakışması olmaz.
+
+### Codebase scan (8.6.0) — `/codebase-scan`
+Projeyi tek seferde 12 pattern extractor'la tarar (P1–P12: stack tespiti, mimari işaretler, naming convention, error handling stili, test pattern, API stili, state management, DB layer, logging, lint sıkılığı, build/deploy, README intent). Yüksek güvenlikli bulgular `project.md`'ye `<!-- mcl-auto -->` marker'ları arasına yazılır (Phase 5 bölümleri korunur); orta/düşük güven `project-scan-report.md`'ye.
+
+### Backend güvenlik — 3-katmanlı (8.7.0 / 8.7.1) — `/mcl-security-report`
+13 generic core kural + 7 stack add-on (Django ALLOWED_HOSTS, FastAPI CORS, React unsafe HTML setter, Spring CSRF disabled, Rails strong params, Laravel debug, …) + Semgrep `p/default` entegrasyonu + SCA tool dispatch (npm/pip/cargo/go/bundle audit). OWASP Top 10 + ASVS L1 alt kümesi. Severity-tiered: HIGH=`decision:deny` block, MEDIUM=Phase 4.5 sequential dialog, LOW=audit log.
+- **L1 Phase 1.7** — 5 design-time dimension (auth model, authz unit, CSRF stance, secret management, deserialization input)
+- **L2 Phase 4 per-Edit** — Edit/Write/MultiEdit'te incremental scan; HIGH ise `decision:deny`
+- **L3 Phase 4.5 START gate** — full scan; HIGH varsa state `pending`'de kalır, fix edilene kadar Phase 4.5 dialog başlamaz
+
+### DB tasarım disiplini (8.8.0) — `/mcl-db-report`, `/mcl-db-explain`
+10 generic core kural (eksik PK, SELECT *, eksik FK index, WHERE'siz UPDATE/DELETE, validation'sız JSONB, timezone'suz TIMESTAMP, text-id-not-UUID, enum-as-text, kullanıcı verisinde cascade-delete, statik N+1) + 8 ORM add-on × 3 anchor (Prisma, SQLAlchemy, Django ORM, ActiveRecord, Sequelize, TypeORM, GORM, Eloquent) = 34 kural. External delegate'ler: `squawk` (Postgres migration linter) + `alembic check`. Opsiyonel `MCL_DB_URL` env, `/mcl-db-explain` ile canlı `EXPLAIN` plan analizi sunar (default `ANALYZE` yok — production güvenliği).
+
+### UI enforcement (8.9.0) — `/mcl-ui-report`, `/mcl-ui-axe`
+10 generic core HTML/a11y kuralı (img-no-alt, button-no-name, link-no-href, input-no-label, div-onClick-no-keyboard, heading-skip, hardcoded color/spacing/font-size, magic breakpoint) + 12 framework add-on React / Vue / Svelte / HTML-static = 22 kural. **Severity UI iteration tempo'suna göre tunelendi:** sadece a11y-critical bulgular (9 kural — örn. img-no-alt, controlled-input-without-onChange, html-no-lang) HIGH `decision:deny` tetikler; design tokens / reuse / responsive / naming = MEDIUM dialog; advisory = LOW audit. Design tokens C3 hibrit detect: project'in `tailwind.config` / CSS vars / `theme.ts` / `design-tokens.json`'u; yoksa MCL default 8px grid + Tailwind-ish scale fallback. Opsiyonel `MCL_UI_URL` env ile `/mcl-ui-axe` Playwright üzerinden runtime `axe-core` taramasını etkinleştirir.
+
+### Pause-on-error (8.10.0) — `/mcl-resume`
+Scan helper crash, validator malformed JSON, audit log write fail, hook script crash veya external delegate non-graceful failure durumlarında MCL **explicit pause** yapar — silent fail-open yerine: state.paused_on_error.active=true, sonraki her tool `decision:deny` döner, error context + suggested fix + last-known phase'le. `/mcl-resume <çözümün>` (free-form doğal dil argüman) ya da skill-driven doğal dil ack ile resume edilir. Session boundary'ları arasında sticky — paused state Claude Code restart'ından sağ çıkar. Dev server (8.12.0) build hataları aynı kanaldan beslenir.
+
+### Phase 6 Double-check (8.11.0) — `/mcl-phase6-report`
+Phase 5 verification sonrası, üç ortogonal check session kapanmadan önce çalışır:
+- **(a) Audit trail tamlığı** — gerekli STEP audit event'leri emit edildi mi? (Sessizce atlanan fazları yakalar.)
+- **(b) Final scan kümülasyonu** — security + DB + UI taramaları tekrar koşar; Phase 4.5 START baseline'ından sonra yeni HIGH bulgu = regression block.
+- **(c) Söz-vs-teslimat** — Phase 1 confirmed parametreleri (intent + constraints) modified source dosyalarda keyword olarak match edilir (ters Lens-e izlenebilirliği).
+
+Skip imkânsız: state field `phase6_double_check_done` `decision:block` ile enforce edilir.
+
+### Interactive design loop (8.12.0) — `/mcl-design-approve`, `/mcl-dev-server-start`, `/mcl-dev-server-stop`
+Phase 4a UI build sonrası MCL arka planda dev server başlatır (10 stack detect: vite, next, cra, vue-cli, sveltekit, rails, django, flask, expo, static), port atar (default + 4 fallback), PID'yi `$MCL_STATE_DIR/dev-server.pid`'de takip eder, URL'yi state üzerinden surface eder. `dev-server.log`'tan tespit edilen build hataları (stack-spesifik regex haritası) pause-on-error tetikler. Headless ortamlar (`MCL_HEADLESS`, `CI`, Linux SSH no-DISPLAY) auto-start atlar, manuel talimat verir. Loop `/mcl-design-approve` ile kapanır (`ui_reviewed=true` set, Phase 4c BACKEND'e geçer).
+
+### Operasyonel disiplin (8.13.0) — `/mcl-ops-report`
+4 rule pack × 20 kural — deployment / monitoring / test coverage / documentation:
+- **Deployment** (8): no-CI, workflow YAML hatası, Dockerfile root user, `:latest` tag, `HEALTHCHECK` yok, `.env.example` eksik, env drift, secret docs yok
+- **Monitoring** (4): structured logger yok (winston/pino/loguru/structlog), `/metrics` endpoint yok, error tracker yok (Sentry/Bugsnag/Rollbar), level'sız logger
+- **Testing** (3): coverage threshold altı (configurable: HIGH < %50, MEDIUM < %70), test framework yok, değiştirilmiş dosya test'siz
+- **Docs** (5): README yok, install bölümü yok, usage bölümü yok, OpenAPI/Swagger'sız API surface, düşük fonksiyon-level docstring coverage
+
+Coverage delegate'i vitest / jest / pytest / go-test / cargo-tarpaulin (binary yoksa graceful skip). Konfigürasyon `$MCL_STATE_DIR/ops-config.json` üzerinden.
+
+---
+
+## Keyword referansı
+
+Tüm keyword'ler normal MCL pipeline'ını atlar ve özel bir mod çalıştırır. Keyword'ü tüm prompt olarak yaz.
+
+| Keyword | Amaç |
+|---|---|
+| `/mcl-doctor` | Token & maliyet raporu (per-turn injection overhead, oturum toplamları) |
+| `/mcl-update` | MCL repo'yu `git pull` + yeniden kur (`bash install.sh`) |
+| `/mcl-restart` | Aynı oturumda MCL state'i Phase 1'e sıfırla (proje korunur) |
+| `/codebase-scan` | 12-pattern codebase taraması, `project.md` + `project-scan-report.md` yaz |
+| `/mcl-security-report` | Tam backend güvenlik taraması (generic + stack + Semgrep + SCA), lokalize markdown |
+| `/mcl-db-report` | Tam DB tasarım taraması (generic + ORM + migration delegate), lokalize markdown |
+| `/mcl-db-explain` | Kayıtlı sorgu dosyalarında `EXPLAIN` çalıştır (`MCL_DB_URL` env gerekir) |
+| `/mcl-ui-report` | Tam UI taraması (generic + framework + token + ESLint a11y delegate), lokalize markdown |
+| `/mcl-ui-axe` | Playwright üzerinden runtime `axe-core` erişilebilirlik taraması (`MCL_UI_URL` env gerekir) |
+| `/mcl-resume <çözüm>` | `paused_on_error` state'ini free-form çözüm metniyle temizle |
+| `/mcl-phase6-report` | On-demand Phase 6 double-check raporu (audit trail + regression + söz-teslimat) |
+| `/mcl-design-approve` | Dev server'ı durdur, Phase 4b UI_REVIEW'dan Phase 4c BACKEND'e geç |
+| `/mcl-dev-server-start` | Dev server'ı manuel başlat (auto-detect stack) |
+| `/mcl-dev-server-stop` | Dev server'ı manuel durdur (loop açık kalır) |
+| `/mcl-ops-report` | Tam operasyonel disiplin taraması (deployment + monitoring + testing + docs) |
+
+---
+
+## Faz pipeline
+
+Her geliştirici mesajı bu sıradan akar. Bir faz, gerekli parametreleri olmadan ilerlemez.
 
 ```
-🌐 MCL 5.4.1 (⚠️ 5.4.2 mevcut — mcl-update yaz)
+Phase 1     Anlama                     intent / constraints / success / context
+Phase 1.5   Engineering Brief          translator + verb yükseltme (vague → surgical İngilizce)
+Phase 1.7   Precision Audit            7 core boyut + stack add-on + 5 security + 7 DB; SILENT-ASSUME / SKIP-MARK / GATE
+Phase 2     Spec emission              📋 Spec block, MUST/SHOULD gereksinimleriyle
+Phase 3     Doğrulama + onay           geliştirici scope-changes callout'u inceler, onaylar
+Phase 3.5   Pattern matching           proje kodunu okur, convention çıkarır
+Phase 4     Kod yazımı (TDD)           4a BUILD_UI dummy data → 4b UI_REVIEW (dev server) → 4c BACKEND
+Phase 4.5   Risk Review                sticky-pause → security gate → db gate → ui gate → ops gate → standart reminder
+Phase 4.6   Etki analizi               fix'lerin downstream etkilerini izle
+Phase 5     Doğrulama raporu           spec coverage + manuel-test surface + process trace + 5.5 lokalize
+Phase 6     Double-check               audit trail + final scan regression + söz-vs-teslimat
 ```
 
-Güncellemek için mesaj olarak sadece `/mcl-update` yaz. MCL normal akışı (spec, fazlar) tamamen atlar ve şu komutu çalıştırır:
-
-```
-cd $MCL_REPO_PATH && git pull --ff-only && bash install.sh
-```
-
-`MCL_REPO_PATH` varsayılan olarak `$HOME/my-claude-lang`. Klonun başka bir yerdeyse environment variable ile ayarla. Güncellenen hook ve skill dosyaları her prompt'ta yeniden okunduğu için aynı oturumdaki bir sonraki mesajın yeni kuralları kullanır — oturum yeniden başlatmaya gerek yok.
+Tüm gate'lerde severity tier: **HIGH** = `decision:deny` / `decision:block`; **MEDIUM** = sequential dialog item; **LOW** = audit-only.
 
 ---
 
-## Parçalı Spec Kurtarma — Rate-Limit Kesinti Savunması
+## Bilinen sınırlar
 
-Uzun spec'ler rate-limit, ağ kesintisi veya süreç kill ile yarıda kesilebilir. 5.15.0 öncesi, sonraki turda senden gelen bir `evet` bu yarıda kalmış spec'i sessizce EXECUTE fazına geçiriyordu — çünkü MCL'in state makinesi sadece approval token'ına bakıyordu, spec body'nin yapısal tamlığına bakmıyordu. Gereksinimlerinin yarısı eksik onaylanmış bir spec ile kalıyordun ve tek çıkış yolu manuel `rm .mcl/state.json` idi.
+- **Proje rename** state kaybeder (path-SHA1 keying; setup-free için kasıtlı).
+- **Headless ortamlarda `/mcl-ui-axe` ve `/mcl-db-explain`** explicit env var gerektirir (`MCL_UI_URL`, `MCL_DB_URL`); yoksa lokalize advisory ile skip.
+- **External tool delegate'leri** (Semgrep, squawk, hadolint, eslint-plugin-jsx-a11y, `axe-core`, `playwright`, `pip-audit`, `cargo-audit`, `govulncheck`, `bundle-audit`) binary yoksa graceful skip — tam kapsam için kur.
+- **14 dil destekli, ama tool raporları için sadece TR + EN tam lokalize.** Diğerleri scan çıktısı için İngilizce fallback (clarifying question + risk dialog yine geliştirici dilinde, skill prose ile).
+- **N+1 detection statik-only**; runtime profiling (test runner entegrasyonu) 8.x patch'lerine ertelendi.
+- **Phase 5 `phase5-verify` audit event'i** model-behavioral; eski skill dosyaları emit etmiyor. Phase 6 (a) yokluğu LOW soft fail kabul ediyor + transcript fallback (`Verification Report` / `Doğrulama Raporu` string match).
+- **L2 ops scan** (per-Edit Dockerfile / workflow / README block) 8.13.x'e ertelendi; 8.13.0 sadece L3 + manuel `/mcl-ops-report`.
+- **Cloud DB** (BigQuery / Snowflake / DynamoDB) stack-tag seviyesinde tespit ediliyor; dialect-spesifik kural paketleri 8.8.x'e ertelendi.
 
-5.15.0 ile MCL bu kesintiyi Stop-hook katmanında tespit ediyor: bir `📋 Spec:` bloğu yedi zorunlu bölümden (Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope) herhangi birini kapsamıyorsa, state'e `partial_spec=true` bayrağı yazılır. Bir sonraki aktivasyon Claude'a spec'i tam olarak yeniden yayınlamasını söyler — ve bayrak temiz spec ile sıfırlanana kadar hiçbir approval token'ı dinlenmez. Kesintiyi fark etmek zorunda değilsin; MCL senin için fark eder.
-
----
-
-## Token & Maliyet Muhasebesi — `/mcl-doctor`
-
-MCL her turda context injection boyutunu loglar. `/mcl-doctor` yazarak şunları görebilirsin:
-
-- **MCL injection overhead** tur başına (karakter → tahmini token)
-- **Cache write ve cache read** maliyeti (Sonnet 4.6 fiyatlandırması)
-- **MCL açık vs kapalı karşılaştırması** — bu session'da MCL'nin net maliyeti
-- **Session token özeti** gerçek session log'undan
-
-Fiyatlar tahmini. Gerçek fatura için Claude Console'u kontrol et.
-Sayacı sıfırlamak için: `rm .mcl/cost.json`
+Sürüm-bazlı tam ayrıntı için: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## Oturumlar Arası Bitirme Modu — `/mcl-finish`
+## Repository
 
-Phase 4.6 execution sırasında downstream etkileri teker teker yüzeye çıkarır. Bu etkilerin çoğu "haftaya bir kontrol edeyim" türünden gerçek maddelerdir — tek bir oturuma sığmayan, ileri tarihli kontroller.
-
-`/mcl-finish` bu maddeleri oturumlar arasında taşıyan checkpoint mekanizmasıdır.
-
-Her Phase 5 Doğrulama Raporu, bu komuta işaret eden senin dilinde bir hatırlatıcı satırla biter. Hazır olduğunda mesaj olarak sadece `/mcl-finish` yaz ve MCL şunları yapar:
-
-1. Son checkpoint'ten bu yana `.mcl/impact/` dizinine yazılmış tüm Phase 4.6 etkilerini toplar
-2. Desteklenen stack'lerde full-project Semgrep taraması çalıştırır (desteklenmeyenlerde sessizce atlanır)
-3. Senin dilinde proje seviyesi bir bitirme raporu emit eder
-4. `.mcl/finish/NNNN-YYYY-MM-DD.md` olarak yeni bir checkpoint yazar
-
-Bir sonraki `/mcl-finish` bu checkpoint'ten itibaren yeni bir pencere açar — kapanan etkiler arşivde kalır, yeniler bir sonraki pass için birikmeye başlar. Git commit yok, remote push yok, external reporting yok — tamamen yerel state.
-
-Phase 4.5 riskleri biriktirilmez: onlar oturum içinde çözülür.
-
----
-
-## Kullanım
-
-İki yol var:
-
-### 1. Manuel (önerilen)
-
-Mesajının başına `/mcl` veya `/mcl` yaz:
-
-```
-/mcl bir login sayfası yap
-/mcl hızlı bir dashboard lazım
-bu API'yi düzelt
-```
-
-Bu **garanti** aktivasyon. Bir kere yaz, konuşma boyunca aktif kalır.
-
-### 2. Otomatik (hook ile)
-
-Sadece kendi dilinde yaz. Hook kuruluysa, MCL her İngilizce olmayan mesajda otomatik devreye girer — prefix gerekmez. Hook kurulu değilse, `/mcl` yazarak aktive et.
-
----
-
-## Çeviriden Farkı Ne
-
-Bir çevirmen şunu görür:
-
-> "kullanıcı giriş yaptıktan sonra ana sayfaya yönlendirilsin"
-
-Ve şunu üretir:
-
-> "redirect user to main page after login"
-
-my-claude-lang aynı cümleyi görür ve sana şunları sorar:
-
-- Hangi kimlik doğrulama yöntemi? Session mı? JWT mi? OAuth mı?
-- Yönlendirme client tarafında mı yoksa sunucu tarafında mı?
-- Yönlendirme sırasında oturum süresi dolarsa ne olacak?
-- "Beni hatırla" seçeneği olacak mı?
-- Başarısız giriş nereye yönlendirecek?
-- Yükleniyor durumu nasıl görünecek?
-
-Sonra tüm bu soruları sana çeviriyor — her sorunun neden sorulduğunu ve cevabının ne değiştireceğini açıklayarak. Cevaplarını alıyor, İngilizce'ye çeviriyor ve ANCAK O ZAMAN Claude Code'un inşa etmeye başlamasına izin veriyor.
-
-**Bu çeviri değil. Bu senin dilini konuşan bir kıdemli mühendis.**
-
----
-
-## Teknik Terimler Nasıl Çalışıyor
-
-- Evrensel terimler İngilizce kalıyor: API, REST, GraphQL, Docker, Git, database
-- Yarı teknik terimler iki dilde veriliyor: "endpoint (erişim noktası)"
-- Kavramsal terimler senin dilinde tam açıklanıyor, ilk kullanımda İngilizce parantez içinde
-- Dilinde karşılığı olmayan terimler İngilizce kalıyor — uydurma çeviri yok
-
----
-
-## Her Şeyle Çalışıyor
-
-my-claude-lang tüm Claude Code ekosistemine entegre:
-
-- **Superpowers** — beyin fırtınası ve planlama soruları köprüden geçiyor
-- **Local-Review** — kod inceleme sonuçları sadece çevrilmiyor, açıklanıyor
-- **Claude-Mem** — oturum hafızası köprüyle birlikte çalışıyor
-- **Seninle konuşan her plugin** — tüm iletişim my-claude-lang üzerinden yönlendiriliyor
-
----
-
-## Desteklenen Diller
-
-Claude'un desteklediği her dil. Otomatik algılama. Ayar yok.
-
----
-
-## Gerçek AI Çağı
-
-Yıllarca AI kodlama araçlarının görünmez bir kapısı vardı: İngilizce bilmek.
-
-İstanbul'da, São Paulo'da, Tokyo'da, Kahire'de veya Seul'de büyüdüysen — ve yol boyunca İngilizce öğrenmediysen — dünyanın en güçlü geliştirme araçları tırmanamayacağın bir duvarın arkasındaydı.
-
-my-claude-lang o duvarı kaldırıyor.
-
-Sana İngilizce öğreterek değil. Araçları basitleştirerek değil. Senin niyetinin, inceliklerinin, uzmanlığının her zerresini koruyan ve Claude Code'a en iyi düşündüğü dilde ileten bir köprü kurarak.
-
-**Gerçek AI çağı, İngilizce çalışan araçların çağı değil. Senin dilinde çalışan araçların çağı.**
-
----
-
-## Lisans
-
-MIT — özgürce kullan, değiştir ve dağıt.
+- Kaynak: <https://github.com/YZ-LLM/my-claude-lang>
+- Issue / tartışma: yukarıdaki repo'da GitHub Issues
+- Lisans: [MIT](LICENSE)
