@@ -29,6 +29,33 @@ if [ -n "$_MCL_REPO_SG" ] && [ "$_MCL_CWD_SG" = "$_MCL_REPO_SG" ]; then
   exit 0
 fi
 
+# Hook health timestamp (since 8.2.7) — writes hook_last_run_ts to
+# .mcl/hook-health.json so `mcl check-up` can detect an unregistered or
+# silently broken hook (no recent timestamp = WARN).
+_HH_FILE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/hook-health.json"
+mkdir -p "$(dirname "$_HH_FILE")" 2>/dev/null || true
+python3 - "$_HH_FILE" "stop" "$(date +%s)" 2>/dev/null <<'PYEOF' || true
+import json, os, sys
+path, hook, ts = sys.argv[1], sys.argv[2], int(sys.argv[3])
+data = {}
+try:
+    if os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+except Exception:
+    data = {}
+data[hook] = ts
+tmp = path + ".tmp"
+try:
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    os.replace(tmp, path)
+except Exception:
+    pass
+PYEOF
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Save hook dir before sourcing libs — some lib files (mcl-test-runner.sh)
 # reset SCRIPT_DIR to their own directory, clobbering the hook's own path.
@@ -474,6 +501,19 @@ PYEOF
       exit 0
     fi
   fi
+fi
+
+# --- Phase 5 skip detection (since 8.2.7) ---
+# When phase_review_state="running" persists at stop AND no MCL-prefixed
+# AskUserQuestion ran this turn (ASKQ_INTENT empty), the Phase 4.5/4.6 dialog
+# has ended but Phase 5 Verification Report did not clear the state — Phase 5
+# was skipped. Audit-only (non-blocking); mcl-activate.sh injects the warn
+# next turn as PHASE5_SKIP_NOTICE. Detection is state-driven (no transcript
+# scan) so abnormal session exits still surface the skip.
+_PR_FINAL_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
+if [ "$_PR_FINAL_STATE" = "running" ] && [ -z "$ASKQ_INTENT" ]; then
+  mcl_audit_log "phase5-skipped-warn" "mcl-stop.sh" "phase_review_state=running"
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase5_skipped_warn
 fi
 
 # --- Phase 3.5 pattern-scan clearance (runs before early exit) ---

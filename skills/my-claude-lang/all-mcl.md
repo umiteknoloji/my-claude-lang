@@ -322,3 +322,15 @@ a Pass condition, and a Skip condition.
 **Signal:** `audit.log` contains `localize-report | phase5-5 | lang=<detected> skipped=<true|false>`.
 **Pass:** `audit.log` has `localize-report` entry for this session. `skipped=false` for non-English sessions. Developer sees Phase 5 report in their language with English technical tokens preserved.
 **Skip:** When developer language is English (`skipped=true`). Audit entry still required.
+
+### STEP-60: phase5-skip-detection
+**Phase:** Stop (post-Phase 4.5/4.6) | **Description:** `mcl-stop.sh` checks `phase_review_state` at every stop. If state is `running` AND `ASKQ_INTENT` is empty (no MCL-prefixed AskUserQuestion ran this turn), Phase 4.5/4.6 dialog has ended but Phase 5 Verification Report did not clear the state — Phase 5 was skipped. Detection is state-driven (no transcript scan) so abnormal session exits still surface the skip. Audit-only (non-blocking); `mcl-activate.sh` injects the warn next turn as `PHASE5_SKIP_NOTICE`, instructing Claude to run Phase 5 before answering the developer's current message.
+**Signal:** `audit.log` contains `phase5-skipped-warn | mcl-stop.sh | phase_review_state=running`. `additionalContext` on the next turn contains `PHASE 5 SKIPPED` block. `trace.log` records `phase5_skipped_warn`.
+**Pass:** When the Phase 4.5 → 4.6 → 5 sequence runs to completion, `phase_review_state` clears or stays `running` only during in-flight risk/impact dialog turns (those turns have non-empty `ASKQ_INTENT`). No `phase5-skipped-warn` audit entry is written.
+**Skip:** When `phase_review_state` is `null` or `pending` at stop (no Phase 4.5 dialog has begun). Expected skip — no warning needed.
+
+### STEP-61: hook-health-check
+**Phase:** Pre-session / `mcl check-up` | **Description:** Each MCL hook (`mcl-stop.sh`, `mcl-activate.sh`, `mcl-pre-tool.sh`, `mcl-post-tool.sh`) writes its last successful invocation epoch timestamp to `.mcl/hook-health.json` under the keys `stop`, `activate`, `pre_tool`, `post_tool`. The file is updated atomically (tmp + rename) so concurrent writes from multiple hooks cannot corrupt JSON. `mcl check-up` reads `hook-health.json` and reports WARN when any field is missing OR older than 24 hours — that signals a hook that has been unregistered, removed from `~/.claude/settings.json`, or is silently failing before reaching its write point.
+**Signal:** `.mcl/hook-health.json` exists and has the four keys. Each value is a recent epoch timestamp.
+**Pass:** All four hook timestamps present and within 24h of `mcl check-up` run time.
+**Skip:** When `.mcl/hook-health.json` is absent on the very first session before any hook has fired. Expected skip — re-evaluate after the first MCL turn.

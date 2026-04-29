@@ -25,6 +25,33 @@ if [ -n "$_MCL_REPO_SG" ] && [ "$_MCL_CWD_SG" = "$_MCL_REPO_SG" ]; then
   exit 0
 fi
 
+# Hook health timestamp (since 8.2.7) — writes hook_last_run_ts to
+# .mcl/hook-health.json so `mcl check-up` can detect an unregistered or
+# silently broken hook (no recent timestamp = WARN).
+_HH_FILE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/hook-health.json"
+mkdir -p "$(dirname "$_HH_FILE")" 2>/dev/null || true
+python3 - "$_HH_FILE" "pre_tool" "$(date +%s)" 2>/dev/null <<'PYEOF' || true
+import json, os, sys
+path, hook, ts = sys.argv[1], sys.argv[2], int(sys.argv[3])
+data = {}
+try:
+    if os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+except Exception:
+    data = {}
+data[hook] = ts
+tmp = path + ".tmp"
+try:
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    os.replace(tmp, path)
+except Exception:
+    pass
+PYEOF
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/mcl-state.sh
 source "$SCRIPT_DIR/lib/mcl-state.sh"

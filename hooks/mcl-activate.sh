@@ -18,6 +18,34 @@ if [ -n "$_MCL_REPO_REAL" ] && [ "$_MCL_CWD_REAL" = "$_MCL_REPO_REAL" ]; then
   printf '{"hookSpecificOutput":{"additionalContext":""}}'
   exit 0
 fi
+
+# Hook health timestamp (since 8.2.7) — writes hook_last_run_ts to
+# .mcl/hook-health.json so `mcl check-up` can detect an unregistered or
+# silently broken hook (no recent timestamp = WARN).
+_HH_FILE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/hook-health.json"
+mkdir -p "$(dirname "$_HH_FILE")" 2>/dev/null || true
+python3 - "$_HH_FILE" "activate" "$(date +%s)" 2>/dev/null <<'PYEOF' || true
+import json, os, sys
+path, hook, ts = sys.argv[1], sys.argv[2], int(sys.argv[3])
+data = {}
+try:
+    if os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+except Exception:
+    data = {}
+data[hook] = ts
+tmp = path + ".tmp"
+try:
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    os.replace(tmp, path)
+except Exception:
+    pass
+PYEOF
+
 CACHE_DIR="$HOME/.claude/cache"
 CACHE_FILE="$CACHE_DIR/mcl-version.json"
 CACHE_TTL=86400  # 24 hours
@@ -707,6 +735,51 @@ except Exception:
   fi
 fi
 
+# Phase 5 skip notice (since 8.2.7) — fires when mcl-stop.sh wrote a
+# `phase5-skipped-warn` audit entry in the current session (after the last
+# `session_start` event in trace.log). Tells Claude that Phase 5 Verification
+# Report was skipped and must run now. Pattern matches REGRESSION_BLOCK_NOTICE.
+PHASE5_SKIP_NOTICE=""
+if [ -f "$STATE_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  _P5_AUDIT="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  _P5_TRACE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ -f "$_P5_AUDIT" ]; then
+    _P5_HIT="$(python3 - "$_P5_AUDIT" "$_P5_TRACE" 2>/dev/null <<'PYEOF'
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        with open(trace_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if "| session_start |" in line:
+                    parts = line.split("|", 1)
+                    if parts:
+                        session_ts = parts[0].strip()
+except Exception:
+    pass
+hit = False
+try:
+    with open(audit_path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "phase5-skipped-warn" not in line:
+                continue
+            ts = line.split("|", 1)[0].strip()
+            if not session_ts or ts >= session_ts:
+                hit = True
+                break
+except Exception:
+    pass
+print("hit" if hit else "")
+PYEOF
+)"
+    if [ "$_P5_HIT" = "hit" ]; then
+      PHASE5_SKIP_NOTICE="<mcl_audit name=\\\"phase5-skipped\\\">\\nPHASE 5 SKIPPED — the prior turn ended with phase_review_state=running but no Phase 5 Verification Report was emitted. The MCL contract requires Phase 4.5 → 4.6 → 5 to run before the session can close.\\n\\nRequired actions in this turn:\\n1. Acknowledge in the developer's detected language (one sentence) that Phase 5 must run before continuing.\\n2. Produce the full Phase 5 Verification Report now: Spec Coverage table (one row per MUST/SHOULD), the localized !!! YOU MUST TEST THESE !!! section (only structurally-non-automatable items), and the Process Trace section (read .mcl/trace.log).\\n3. Run Phase 5.5 Localized Report after Phase 5.\\n4. Only AFTER Phase 5/5.5 are complete → answer the developer's current message.\\n\\nThis is MANDATORY and non-skippable. The developer's message is queued, not ignored.\\n</mcl_audit>\\n\\n"
+      mcl_audit_log "phase5-skip-notice" "mcl-activate.sh" "shown"
+    fi
+  fi
+fi
+
 # Plugin dispatch audit — fires when Phase 4.5 is running to check whether
 # required plugins (code-review sub-agent, semgrep) were actually dispatched.
 PLUGIN_MISS_NOTICE=""
@@ -752,7 +825,7 @@ print(json.dumps(sys.stdin.read().strip())[1:-1])
   fi
 fi
 
-FULL_CONTEXT="${UPDATE_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
+FULL_CONTEXT="${UPDATE_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
 
 # Log MCL injection size for cost accounting (mcl-doctor)
 if command -v python3 >/dev/null 2>&1; then

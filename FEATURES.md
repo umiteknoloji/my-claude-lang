@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.2.6
+**Güncel sürüm:** 8.2.7
 
 ---
 
@@ -197,6 +197,12 @@ Yeni yazılan kodun projenin BAŞKA bölümlerine gerçek etkileri:
 
 **Automation Barriers** (7.6.0)
 Call-graph tabanlı "gerçekten otomatize edilemeyen" liste. Hiçbiri tetiklenmezse omit edilir.
+
+**Phase 5 Skip Detection** (8.2.7)
+`mcl-stop.sh` her stop'ta `phase_review_state` kontrol eder. State `running` ise ve bu turda MCL prefix'li AskUserQuestion çalışmamışsa (Phase 4.5/4.6 dialog bitmiş ama Phase 5 state'i temizlememiş), audit'e `phase5-skipped-warn` yazılır. `mcl-activate.sh` bir sonraki turda `PHASE5_SKIP_NOTICE` enjekte eder — Claude'a Phase 5 raporunu çalıştırmasını söyler.
+
+**Hook Health Check** (8.2.7)
+Dört MCL hook'u (stop / activate / pre_tool / post_tool) son başarılı çalışma timestamp'ini `.mcl/hook-health.json`'a yazar. `mcl check-up` (STEP-61) eksik veya 24 saatten eski bir alan bulursa WARN üretir — hook'un kayıt dışı kaldığını veya sessizce başarısız olduğunu yakalar.
 
 ---
 
