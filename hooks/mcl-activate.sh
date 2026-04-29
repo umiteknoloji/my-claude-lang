@@ -150,6 +150,24 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /codebase-scan keyword (since 8.6.0) --------
+if [ "$PROMPT_NORM" = "/codebase-scan" ]; then
+  SCAN_HELPER="$(dirname "$0")/lib/mcl-codebase-scan.py"
+  SCAN_HELPER_ESC="$(printf '%s' "$SCAN_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  STATE_DIR_ESC="$(printf '%s' "${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}/.mcl}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_SCAN_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_SCAN="${MCL_USER_LANG:-tr}"
+  cat <<SCAN_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_CODEBASE_SCAN_MODE — the developer typed the literal keyword ${_BT}/codebase-scan${_BT}. SKIP the entire MCL pipeline. Do NOT run Phase 1/spec/3/4/4.5/4.6/5. Do NOT ask clarifying questions. Do NOT emit a spec block.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — codebase-scan${_BT}.\n2. Run via the Bash tool, in ONE call: ${_BT}python3 \"${SCAN_HELPER_ESC}\" --state-dir \"${STATE_DIR_ESC}\" --project-dir \"${PROJECT_DIR_SCAN_ESC}\" --lang ${USER_LANG_FOR_SCAN}${_BT}.\n3. Present the full stdout of that command to the developer as-is (it is already markdown-formatted in the developer's language).\n4. After the report, tell the developer the two output file paths in one localized sentence: project.md (high-confidence findings, mcl-auto markers) and project-scan-report.md (all findings including medium/low confidence).\n5. STOP. No clarifying questions. No phase report. ${_BT}/codebase-scan${_BT} is unambiguous — run the scan and present the result.\n</mcl_core>"
+  }
+}
+SCAN_OUTPUT
+  exit 0
+fi
+
 # -------- Branch: /mcl-doctor keyword --------
 if [ "$PROMPT_NORM" = "/mcl-doctor" ]; then
   COST_HELPER="$(dirname "$0")/lib/mcl-cost.py"

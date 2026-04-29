@@ -7,6 +7,82 @@
 
 ## [Unreleased]
 
+## [8.6.0] - 2026-04-29
+
+### Eklendi — `/codebase-scan` (Codebase Learning)
+
+Manuel keyword komutuyla projeyi P1-P12 pattern set'iyle tarayan ve otomatik project knowledge çıkaran yeni özellik. Kullanıcı `/codebase-scan` yazar; MCL pipeline'ı atlanır; Python script projeyi tarar; iki dosya üretilir.
+
+#### Çıktılar
+- **`$MCL_STATE_DIR/project.md`** — high-confidence bulgular, `<!-- mcl-auto:start -->...<!-- mcl-auto:end -->` marker'ları arasında. Marker dışı bölge (Mimari / Teknik Borç / Bilinen Sorunlar) Phase 5-curated kalır, scan dokunmaz (M3 strategy).
+- **`$MCL_STATE_DIR/project-scan-report.md`** — tüm bulgular (high + medium + low), kullanıcı dilinde başlıklarla, evidence path'leri ve detaylarla.
+
+#### Pattern set (12 dimension)
+
+| ID | Çıkardığı | Yöntem |
+|---|---|---|
+| **P1** Stack | `mcl-stack-detect.sh` tag'leri | subprocess shell source |
+| **P2** Mimari | Monorepo (pnpm/lerna/nx/turbo), Clean/MVC layout | top-dir heuristic |
+| **P3** Naming | camelCase / snake_case / PascalCase / kebab-case dominant ratio | source sample regex |
+| **P4** Error handling | try-catch / Result / raise / panic / throw new dominant | source sample regex |
+| **P5** Test | Framework (vitest/jest/pytest/...) + test dirs | manifest dep + dir presence |
+| **P6** API style | Express/Fastify/FastAPI/Django/GraphQL/tRPC | manifest dep |
+| **P7** State mgmt | Redux/Zustand/Jotai/MobX/Pinia/React-Query/SWR | manifest dep |
+| **P8** DB | Prisma/SQLAlchemy/TypeORM/Drizzle/Mongoose + migration dirs | file + manifest |
+| **P9** Logging | Winston/Pino/Loguru/structlog vs ad-hoc console/print | manifest dep + sample scan |
+| **P10** Lint | TS strict / ESLint / Prettier / Ruff / mypy | config file presence + key fields |
+| **P11** Build/deploy | Dockerfile / GH Actions / Vercel / Netlify / Fly | file presence |
+| **P12** README intent | İlk paragraf | text extraction |
+
+#### Confidence routing
+
+- **high** → `project.md` marker'lı bölüme yazılır (lokalize başlıklarla: Otomatik: Mimari / Stack & Araçlar / Konvansiyonlar / Test / Diğer)
+- **medium / low** → yalnızca `project-scan-report.md`'ye yazılır
+
+#### Lokalizasyon
+
+Script `--lang <iso>` argümanı alır (mcl-activate.sh `MCL_USER_LANG` env'inden geçer, default `tr`). 14 dilden TR ve EN mevcut; diğer diller için EN fallback. Section başlıkları + verdict kelimeleri çevirilir; teknik token'lar (path, dep ismi, framework adı, pattern_id) İngilizce kalır.
+
+#### Tetikleme
+
+`mcl-activate.sh`'ta `/mcl-doctor`/`/mcl-update` ile aynı pattern: `PROMPT_NORM = "/codebase-scan"` eşleşmesi → MCL pipeline skip + Bash tool ile script çağrı talimatı + sonucun olduğu gibi sunulması talimatı. Otomatik tetikleme YOK (kullanıcı kararı).
+
+#### Tarama kapsamı
+
+- Sınırsız derinlik (kullanıcı kararı). Excludes: `.git`, `node_modules`, `dist`, `build`, `.next`, `target`, `vendor`, `.venv`, `__pycache__`, `.cache`, `coverage`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `out`, `.turbo`, `.parcel-cache`, `.svelte-kit`.
+- Source extensions: `.ts/.tsx/.js/.jsx/.mjs/.cjs/.py/.rb/.go/.rs/.java/.kt/.swift/.cs/.php/.cpp/.c/.h/.hpp/.lua/.vue/.svelte/.scala/.dart`.
+- Manifest set: package.json, pyproject.toml, Cargo.toml, go.mod, Gemfile, pom.xml, build.gradle(.kts), composer.json, Package.swift, mix.exs, deno.json, *.csproj.
+- Dosya boyutu cap: 1 MB. Lock dosyaları ve minified asset'ler atlanır.
+
+#### Progress göstergesi
+
+Stderr'a per-pattern ilerleme: `[MCL] Scanning... P3 (3/12)`. Bash tool çıktısında kullanıcı görür.
+
+#### Phase 3.5 ilişkisi (S2 cache-first — partial)
+
+8.6.0'da Phase 3.5 dedicated skill dosyası mevcut değil (Phase 3.5 model-behavioral). Bu nedenle "Phase 3.5 önce project.md cache'ini okur" kuralı **skill düzeyinde** dedicated implementasyona alınamadı. Geçici çözüm: hook STATIC_CONTEXT prose'u Phase 1/3'ten itibaren `project.md` (ve auto bölümü) referans verir; model dosyayı Read edip pattern'leri kullanır. Dedicated `phase3-5-pattern-matching.md` skill'i 8.6.x patch'inde eklenecek (ayrı plan); bu noktaya kadar S2 cache-first behavioral seviyede kalır.
+
+### Test
+- T1 `/codebase-scan` keyword detection → MCL_CODEBASE_SCAN_MODE STATIC_CONTEXT inject (1172 byte) PASS
+- T2 Self-test: MCL repo'sunda script çalıştı, 9 source dosya, P1+P3+P5+P9+P12 bulguları doğru üretildi PASS
+- T3 Marker yok + Phase 5 içerik mevcut → marker'lı bölüm üste enjekte edildi, Mimari/Teknik Borç korundu PASS
+- T4 Marker var + ikinci scan → marker arası replace, Phase 5 içeriği dokunulmadı (idempotent) PASS
+- T5 TR lang flag → "Yüksek güvenilirlikteki bulgular", "Otomatik: Mimari" başlıkları lokalize PASS
+- T6 Mevcut suite 19/0/2 PASS (regresyonsuz)
+
+### Updated files
+- `hooks/lib/mcl-codebase-scan.py` (yeni, ~500 satır)
+- `hooks/mcl-activate.sh` (`/codebase-scan` keyword block)
+- `VERSION` (8.5.0 → 8.6.0)
+- `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (kabul edilmiş)
+
+- **100k+ dosyalı dev mono-repo'larda scan dakikalarca sürebilir** — sınırsız derinlik kullanıcı kararı, performance budget yok. Kullanıcı sorumluluğu.
+- **Phase 3.5 dedicated skill yok** — S2 cache-first 8.6.0'da behavioral seviyede; dedicated skill 8.6.x'te.
+- **14 dil lokalizasyonu kısmi** — TR ve EN tam, diğer 12 dil EN fallback. Tam çeviri sonraki patch.
+- **Naming dominant kuralı sınırlı** — 4 kategori (camel/snake/Pascal/kebab) arasında dominant; karışık projeler "low confidence" olarak sınıflandırılır, project.md'ye yazılmaz.
+
 ## [8.5.0] - 2026-04-29
 
 ### BREAKING — Per-project isolation via wrapper launcher
