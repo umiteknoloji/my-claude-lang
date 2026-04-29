@@ -418,4 +418,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # 8.10.0: top-level try/except — pause-on-error compatible
+    try:
+        sys.exit(main())
+    except Exception as _e:
+        import traceback as _tb
+        _err = {"error": str(_e)[:500], "traceback": _tb.format_exc()[-1500:]}
+        print(json.dumps(_err))
+        sys.exit(3)  # 3 = orchestrator crash (caller pauses)

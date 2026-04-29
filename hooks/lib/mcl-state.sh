@@ -78,6 +78,7 @@ _mcl_state_default() {
   "phase4_5_security_scan_done": false,
   "phase4_5_db_scan_done": false,
   "phase4_5_ui_scan_done": false,
+  "paused_on_error": {"active": false},
   "last_update": ${now}
 }
 JSON
@@ -187,6 +188,11 @@ mcl_state_read() {
   if ! printf '%s' "$body" | _mcl_state_valid; then
     echo "mcl-state: corrupt state file, returning default (keeping corrupt copy at ${MCL_STATE_FILE}.corrupt)" >&2
     cp "$MCL_STATE_FILE" "${MCL_STATE_FILE}.corrupt" 2>/dev/null || true
+    # 8.10.0: corrupt-state recovery is non-blocking (CHANGELOG-documented
+    # exception to silent-fallback rule — recovery safety > silent-pause).
+    # Audit makes it visible.
+    mcl_audit_log "state-corrupt-recovered" "$(basename "${0:-mcl-state.sh}")" \
+      "path=${MCL_STATE_FILE}.corrupt" 2>/dev/null || true
     _mcl_state_default
     return 0
   fi

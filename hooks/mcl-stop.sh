@@ -66,6 +66,19 @@ INSTALLED_VERSION="${INSTALLED_VERSION:-unknown}"
 source "$_MCL_HOOK_DIR/lib/mcl-state.sh"
 # shellcheck source=lib/mcl-trace.sh
 [ -f "$_MCL_HOOK_DIR/lib/mcl-trace.sh" ] && source "$_MCL_HOOK_DIR/lib/mcl-trace.sh"
+# shellcheck source=lib/mcl-pause.sh
+[ -f "$_MCL_HOOK_DIR/lib/mcl-pause.sh" ] && source "$_MCL_HOOK_DIR/lib/mcl-pause.sh"
+
+# 8.10.0 sticky pause check — short-circuit enforcement while paused.
+if command -v mcl_pause_check >/dev/null 2>&1 && [ "$(mcl_pause_check)" = "true" ]; then
+  mcl_audit_log "pause-sticky-block" "mcl-stop" "skip-enforcement"
+  _PAUSE_REASON="$(mcl_pause_block_reason 2>/dev/null)"
+  python3 -c '
+import json, sys
+print(json.dumps({"decision": "block", "reason": sys.argv[1]}))
+' "$_PAUSE_REASON" 2>/dev/null
+  exit 0
+fi
 # shellcheck source=lib/mcl-test-runner.sh
 [ -f "$_MCL_HOOK_DIR/lib/mcl-test-runner.sh" ] && source "$_MCL_HOOK_DIR/lib/mcl-test-runner.sh"
 # shellcheck source=lib/mcl-log-append.sh

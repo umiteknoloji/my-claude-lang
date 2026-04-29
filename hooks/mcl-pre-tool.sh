@@ -57,6 +57,25 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/mcl-state.sh"
 # shellcheck source=lib/mcl-trace.sh
 [ -f "$SCRIPT_DIR/lib/mcl-trace.sh" ] && source "$SCRIPT_DIR/lib/mcl-trace.sh"
+# shellcheck source=lib/mcl-pause.sh
+[ -f "$SCRIPT_DIR/lib/mcl-pause.sh" ] && source "$SCRIPT_DIR/lib/mcl-pause.sh"
+
+# 8.10.0 sticky pause check — short-circuit any tool while paused.
+if command -v mcl_pause_check >/dev/null 2>&1 && [ "$(mcl_pause_check)" = "true" ]; then
+  mcl_audit_log "pause-sticky-block" "mcl-pre-tool" "tool=${TOOL_NAME:-unknown}"
+  _PAUSE_REASON="$(mcl_pause_block_reason 2>/dev/null)"
+  python3 -c '
+import json, sys
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": sys.argv[1]
+    }
+}))
+' "$_PAUSE_REASON" 2>/dev/null
+  exit 0
+fi
 
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
@@ -616,6 +635,11 @@ Path(out).write_text(content, encoding="utf-8")
               --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
               --target "$_SEC_TMP" \
               --lang "${MCL_USER_LANG:-tr}" 2>/dev/null || echo '{}')"
+            if command -v mcl_pause_on_scan_error >/dev/null 2>&1 \
+               && mcl_pause_on_scan_error "mcl-security-scan.py" "$_SEC_RESULT_JSON"; then
+              rm -f "$_SEC_TMP" 2>/dev/null
+              exit 0
+            fi
             _SEC_BLOCK="$(printf '%s' "$_SEC_RESULT_JSON" | python3 -c '
 import json, sys
 try:
@@ -718,6 +742,11 @@ Path(out).write_text(content, encoding="utf-8")
               --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
               --target "$_DB_TMP" \
               --lang "${MCL_USER_LANG:-tr}" 2>/dev/null || echo '{}')"
+            if command -v mcl_pause_on_scan_error >/dev/null 2>&1 \
+               && mcl_pause_on_scan_error "mcl-db-scan.py" "$_DB_RESULT_JSON"; then
+              rm -f "$_DB_TMP" 2>/dev/null
+              exit 0
+            fi
             _DB_BLOCK="$(printf '%s' "$_DB_RESULT_JSON" | python3 -c '
 import json, sys
 try:
@@ -820,6 +849,11 @@ Path(out).write_text(content, encoding="utf-8")
               --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
               --target "$_UI_TMP" \
               --lang "${MCL_USER_LANG:-tr}" 2>/dev/null || echo '{}')"
+            if command -v mcl_pause_on_scan_error >/dev/null 2>&1 \
+               && mcl_pause_on_scan_error "mcl-ui-scan.py" "$_UI_RESULT_JSON"; then
+              rm -f "$_UI_TMP" 2>/dev/null
+              exit 0
+            fi
             _UI_BLOCK="$(printf '%s' "$_UI_RESULT_JSON" | python3 -c '
 import json, sys
 try:

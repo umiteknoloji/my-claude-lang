@@ -150,6 +150,61 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /mcl-resume keyword (since 8.10.0) --------
+if [ "${PROMPT_NORM%% *}" = "/mcl-resume" ] || [ "$PROMPT_NORM" = "/mcl-resume" ]; then
+  # Source pause helper if available (it requires mcl-state.sh which the
+  # activate hook may or may not source; keep this self-contained).
+  _MCL_PAUSE_LIB_PATH="$(dirname "$0")/lib/mcl-pause.sh"
+  _MCL_STATE_LIB_PATH="$(dirname "$0")/lib/mcl-state.sh"
+  if [ -f "$_MCL_PAUSE_LIB_PATH" ] && [ -f "$_MCL_STATE_LIB_PATH" ]; then
+    # Original prompt (with case preserved) for the resolution argument.
+    _RESUME_RESOLUTION="${PROMPT#/mcl-resume }"
+    [ "$_RESUME_RESOLUTION" = "$PROMPT" ] && _RESUME_RESOLUTION=""
+    source "$_MCL_STATE_LIB_PATH" 2>/dev/null
+    source "$_MCL_PAUSE_LIB_PATH" 2>/dev/null
+    if command -v mcl_pause_resume >/dev/null 2>&1; then
+      mcl_pause_resume "$_RESUME_RESOLUTION" 2>/dev/null
+    fi
+  fi
+  RESUME_NOTE_ESC="$(printf '%s' "${_RESUME_RESOLUTION:-(no resolution text provided)}" | sed 's/\\/\\\\/g; s/"/\\"/g' | head -c 400)"
+  cat <<RESUME_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_RESUME — paused_on_error state cleared. The developer typed ${_BT}/mcl-resume${_BT}.\n\nUser resolution noted: ${RESUME_NOTE_ESC}\n\nMCL pipeline resumes from the last recorded phase. Continue normally — the next user prompt is treated as a fresh request and routed through the standard MCL phases. Audit: resume-from-pause logged.\n</mcl_core>"
+  }
+}
+RESUME_OUTPUT
+  exit 0
+fi
+
+# -------- Branch: paused state STATIC_CONTEXT (since 8.10.0) --------
+# If MCL is paused, inject pause notice and short-circuit. All other
+# branches below are skipped while paused (sticky behavior). Resume only
+# via /mcl-resume above OR explicit clearing by the model.
+_MCL_PAUSE_LIB_PATH_C="$(dirname "$0")/lib/mcl-pause.sh"
+_MCL_STATE_LIB_PATH_C="$(dirname "$0")/lib/mcl-state.sh"
+if [ -f "$_MCL_PAUSE_LIB_PATH_C" ] && [ -f "$_MCL_STATE_LIB_PATH_C" ]; then
+  source "$_MCL_STATE_LIB_PATH_C" 2>/dev/null
+  source "$_MCL_PAUSE_LIB_PATH_C" 2>/dev/null
+  if command -v mcl_pause_check >/dev/null 2>&1 && [ "$(mcl_pause_check)" = "true" ]; then
+    PAUSE_BODY="$(mcl_pause_block_reason 2>/dev/null)"
+    PAUSE_BODY_ESC="$(printf '%s' "$PAUSE_BODY" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null)"
+    # Strip surrounding quotes from json.dumps output.
+    PAUSE_BODY_ESC="${PAUSE_BODY_ESC#\"}"
+    PAUSE_BODY_ESC="${PAUSE_BODY_ESC%\"}"
+    cat <<PAUSE_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_paused>\n${PAUSE_BODY_ESC}\n\nDO NOT proceed with normal MCL phases. Either acknowledge resolution explicitly via the ${_BT}/mcl-resume <resolution>${_BT} keyword, or if the developer's current message contains a clear resolution acknowledgment, run ${_BT}bash \"$(dirname "$0")/lib/mcl-pause.sh\"; mcl_pause_resume \"<their resolution>\"${_BT} via the Bash tool, then continue with the developer's actual request.\n</mcl_paused>"
+  }
+}
+PAUSE_OUTPUT
+    exit 0
+  fi
+fi
+
 # -------- Branch: /mcl-ui-report keyword (since 8.9.0) --------
 if [ "$PROMPT_NORM" = "/mcl-ui-report" ]; then
   UI_HELPER="$(dirname "$0")/lib/mcl-ui-scan.py"

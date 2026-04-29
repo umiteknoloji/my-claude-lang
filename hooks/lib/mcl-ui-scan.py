@@ -308,4 +308,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as _e:
+        import traceback as _tb
+        print(json.dumps({"error": str(_e)[:500], "traceback": _tb.format_exc()[-1500:]}))
+        sys.exit(3)

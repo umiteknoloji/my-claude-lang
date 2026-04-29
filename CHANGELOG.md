@@ -7,6 +7,67 @@
 
 ## [Unreleased]
 
+## [8.10.0] - 2026-04-29
+
+### Eklendi — Pause-on-error (İŞ 1)
+
+CLAUDE.md "never silently fall back when a corruption is detected" kuralının yapısal uygulaması. MCL'in scan helper Python crash, validator JSON parse error, state.json corrupt, audit write fail, hook crash, delegate non-graceful failure gibi durumlarda silent fail-open yerine **explicit pause** mekanizması ekler. Kullanıcı her hatayı görür, çözümünü açıklar, MCL kaldığı phase'den devam eder.
+
+#### Yeni dosya
+- **`hooks/lib/mcl-pause.sh`** — sourceable helper:
+  - `mcl_pause_on_error <source> <tool> <error_msg> <suggested_fix>` — state.paused_on_error.active=true + audit
+  - `mcl_pause_check` — paused mı kontrolü (true/false)
+  - `mcl_pause_resume <resolution>` — state temizle + audit
+  - `mcl_pause_block_reason` — `decision:block` reason render
+  - `mcl_pause_on_scan_error <orchestrator> <result_json>` — scan output'unda "error" key varsa otomatik pause + PreToolUse-shaped block JSON emit (caller exit 0)
+
+#### State şeması
+- `state.json`'a `paused_on_error` object field eklendi (default `{"active": false}`); active=true olduğunda `{timestamp, source, tool, error_msg, last_phase, last_phase_name, suggested_fix, user_resolution}` field'ları doluyor. v2 schema bump'sız (geriye uyumlu — eski state'lerde field eksikse default'la doluyor).
+
+#### Hook entegrasyonu
+- **`hooks/mcl-pre-tool.sh`** — (1) Hook başında sticky pause check: `paused_on_error.active=true` ise tüm tool'lar `decision:deny` "MCL PAUSED" reason'la blocklanır, audit `pause-sticky-block`. (2) Üç scan branch'inin (security/db/ui) her birinde scan subprocess sonrası `mcl_pause_on_scan_error` çağrısı — orchestrator exception → state set + block + temp file cleanup + exit 0.
+- **`hooks/mcl-stop.sh`** — Hook başında sticky pause check: paused state'te enforcement skip + `decision:block` "MCL PAUSED" emit. Audit `pause-sticky-block`.
+- **`hooks/mcl-activate.sh`** — (1) `/mcl-resume <resolution>` keyword block: paused_on_error temizler, user_resolution kaydeder, "MCL_RESUME" notice emit. (2) Paused state context: hook ortasına `mcl_pause_check` guard; aktifse `<mcl_paused>` block STATIC_CONTEXT'e inject edilir + diğer tüm branch'ler skip (sticky). Model NL-ack ile resolve etmesi için Bash talimatı dahil.
+
+#### Orchestrator pause hook entegrasyonu
+- `hooks/lib/mcl-security-scan.py`, `mcl-db-scan.py`, `mcl-ui-scan.py`, `mcl-codebase-scan.py` — top-level `try/except` wrapper main() etrafına eklendi. Exception → stdout `{"error": "...", "traceback": "..."}` JSON + exit 3 (orchestrator crash kodu). Caller hook bunu `mcl_pause_on_scan_error` ile yakalar.
+
+#### `state-corrupt-recovered` audit (kullanıcı isteği)
+- `hooks/lib/mcl-state.sh` — corrupt state detected branch'inde `mcl_audit_log "state-corrupt-recovered" path=<corrupt copy path>` event eklendi. Mevcut recovery davranışı (corrupt copy + default reset) **korundu** — pause edilmedi, ama artık görünür. CHANGELOG-documented exception to silent-fallback rule (recovery safety > silent-pause).
+
+#### Karar matrisi (kabul edilen varsayılanlar)
+- T5 corrupt-state: **(b)** mevcut recovery + audit (visible non-blocking)
+- T7 NL-ack: **(a)** /mcl-resume keyword MVP; NL-ack 8.10.x model-behavioral
+- Sticky süresi: **persist** (session boundary'da temizlenmez)
+- Pause vs gate çakışması: **pause öncelikli** (mcl-pre-tool.sh ve mcl-stop.sh hook başında)
+- /mcl-resume argv: **free-form text** (keyword sonrası kalan tüm prompt)
+
+### Test sonuçları
+- T1 `mcl_pause_on_error` çağrısı (manuel state setup) → `paused_on_error.active=true` ✓
+- T2 Sticky pre-tool block: paused state'te Edit → `decision:deny` "MCL PAUSED..." reason; audit `pause-sticky-block` PASS
+- T3 Sticky stop block: paused state'te Stop → `decision:block` "MCL PAUSED..." reason; audit `pause-sticky-block` PASS
+- T4 Activate paused context: paused state'te normal prompt → STATIC_CONTEXT'e `<mcl_paused>` tag + MCL PAUSED reason inject PASS
+- T5 `/mcl-resume binary yüklendi` → `MCL_RESUME` notice; state.paused_on_error.active=false; user_resolution kaydedildi; audit `resume-from-pause resolution_len=16` PASS
+- T6 Mevcut suite: 19/0/2 — regresyonsuz PASS
+
+### Updated files
+- `hooks/lib/mcl-pause.sh` (yeni, 5 helper)
+- `hooks/lib/mcl-state.sh` (`paused_on_error` field + corrupt-recovered audit)
+- `hooks/lib/mcl-security-scan.py`, `mcl-db-scan.py`, `mcl-ui-scan.py`, `mcl-codebase-scan.py` (top-level try/except)
+- `hooks/mcl-pre-tool.sh` (sticky check + scan-error pause integration in 3 branches)
+- `hooks/mcl-stop.sh` (sticky check)
+- `hooks/mcl-activate.sh` (paused-state context + /mcl-resume keyword)
+- `VERSION`, `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (8.10.x patch'lerine ertelendi)
+
+- **NL-ack detection** model-behavioral; hook tarafında detect yok. Skill prose'u model'e talimat verir; fail-safe `/mcl-resume`. Hook-level NL-ack 8.10.x'te (transcript scan ile pattern matching).
+- **state.json corrupt** durumunda mevcut recovery davranışı korundu (pause yerine). CHANGELOG-documented exception. 8.10.x'te flag-based opt-in (hard-pause vs auto-recover) eklenebilir.
+- **Audit log write failure** trigger noktası eklenmedi (audit log'a yazamayan bir sistem pause audit'ini de yazamaz — chicken-and-egg). MVP'de stderr'e mesaj basılır; kullanıcı görmez. 8.10.x'te alternative channel (state.json içinde paused field + on next read).
+- **Hook crash trap** explicit `trap ERR` set edilmedi; mevcut hook'lar `set -uo pipefail` kullanıyor; tam coverage için `trap` infrastructure ileride.
+- **External delegate non-graceful** (squawk/eslint timeout) için pause path eksik; mevcut graceful skip korundu. 8.10.x'te delegate-spesifik timeout pause.
+- **Pause persistence cross-session**: paused state.json'da kalır; yeni mcl-claude session açıldığında paused notice tekrar gelir. Beklenen ve istenen davranış (kullanıcı çözmedikçe MCL pasif).
+
 ## [8.9.0] - 2026-04-29
 
 ### Eklendi — UI Enforcement Layer (3-tier, framework-aware)
