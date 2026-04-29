@@ -150,6 +150,24 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /mcl-ops-report keyword (since 8.13.0) --------
+if [ "$PROMPT_NORM" = "/mcl-ops-report" ]; then
+  OPS_HELPER="$(dirname "$0")/lib/mcl-ops-scan.py"
+  OPS_HELPER_ESC="$(printf '%s' "$OPS_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  STATE_DIR_OPS_ESC="$(printf '%s' "${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}/.mcl}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_OPS_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_OPS="${MCL_USER_LANG:-tr}"
+  cat <<OPS_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_OPS_REPORT_MODE — the developer typed ${_BT}/mcl-ops-report${_BT}. SKIP the entire MCL pipeline.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — ops-report${_BT}.\n2. Run via the Bash tool: ${_BT}python3 \"${OPS_HELPER_ESC}\" --mode=report --state-dir \"${STATE_DIR_OPS_ESC}\" --project-dir \"${PROJECT_DIR_OPS_ESC}\" --lang ${USER_LANG_FOR_OPS} --markdown${_BT}.\n3. Present the full stdout as-is. Categories: deployment, monitoring, testing, docs.\n4. STOP.\n</mcl_core>"
+  }
+}
+OPS_OUTPUT
+  exit 0
+fi
+
 # -------- Branch: /mcl-design-approve keyword (since 8.12.0) --------
 if [ "$PROMPT_NORM" = "/mcl-design-approve" ]; then
   _MCL_STATE_LIB_DA="$(dirname "$0")/lib/mcl-state.sh"

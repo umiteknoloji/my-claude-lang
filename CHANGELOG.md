@@ -7,6 +7,87 @@
 
 ## [Unreleased]
 
+## [8.13.0] - 2026-04-30
+
+### Eklendi — Operasyonel Disiplin (İŞ 4)
+
+8.7-8.9 product kalitesini disiplin altına aldı; operasyonel katman boştu (Dockerfile root, `.env.example` drift, `console.log` yığını, README yarım, coverage %12). 8.13.0 dört kategoriyi tek pipeline'a bağlar — 8.7-8.9 mirror 3-tier.
+
+#### Yeni dosyalar
+- **`hooks/lib/mcl-ops-rules.py`** — 4 rule pack, 20 rule, decorator-registry, `category=ops-*` field:
+  - **Deployment** (8): DEP-G01-no-ci-config, G02-workflow-yaml-error, G03-dockerfile-no-healthcheck, G04-dockerfile-root-user, G05-dockerfile-latest-tag, G06-env-example-missing, G07-env-example-stale, G08-secrets-no-doc
+  - **Monitoring** (4): MON-G01-no-structured-logger, G02-no-metrics-endpoint, G03-no-error-tracking, G04-log-no-level
+  - **Testing** (3): TST-T01-coverage-below-threshold, T02-no-test-framework, T03-changed-file-no-test
+  - **Docs** (5): DOC-G01-no-readme, G02-readme-no-install, G03-readme-no-usage, G04-api-no-docs, G05-function-docstring-low
+- **`hooks/lib/mcl-ops-scan.py`** — orchestrator: file metrics aggregation (env_var_refs, manifest_deps, adhoc_logging_count, loc_total, function_count, function_doc_count, api_routes_count, changed_files_no_test) → coverage delegate → rule dispatch → lokalize markdown.
+- **`hooks/lib/mcl-ops-coverage.sh`** — coverage tool delegate: vitest/jest (`--coverage --coverageReporters=json-summary`), pytest (`--cov --cov-report=json`), go-test (`go tool cover -func`), cargo-tarpaulin. Binary missing graceful skip + audit `ops-coverage-skip`.
+
+#### State şeması
+- `phase4_5_ops_scan_done: false` — idempotency flag
+- `phase4_5_high_baseline.ops: 0` — Phase 6 (b) regression baseline (8.11.0 schema extend)
+- `phase1_ops: {deployment_target, observability_tier, test_policy, doc_level}` — Phase 1.7 4 yeni dimension için
+
+#### Hook entegrasyonu
+- **`hooks/mcl-stop.sh`** — UI START gate'inden sonra Ops START gate. Sıra: sticky-pause → security → db → ui → **ops** → standart Phase 4.5 reminder → Phase 6 gate. HIGH ≥ 1 → state pending'de + `decision:block` (4 kategori listesi); HIGH = 0 → done=true + baseline.ops=0; MEDIUM listesi standart reminder reason'a `[Ops-<sub>]` etiketli inject.
+- **`hooks/mcl-activate.sh`** — `/mcl-ops-report` keyword block (`/mcl-ui-report` mirror).
+
+#### Konfigürasyon
+- `$MCL_STATE_DIR/ops-config.json` (8.5.0 isolation kuralı — proje içine yazma yasak; state dir'da):
+  ```json
+  {"ops": {"coverage_threshold_high": 50, "coverage_threshold_medium": 70}}
+  ```
+- Defaults: HIGH<50%, MEDIUM 50-70%, OK ≥70%.
+
+#### Karar matrisi (kabul edilen varsayılanlar)
+- Coverage threshold: **HIGH<50%, MEDIUM 50-70%** (configurable)
+- DOC-G01 production: **Dockerfile OR CI workflow** (deployment intent heuristic)
+- DEP-G07 stale: **JS/Python/Ruby/Go regex MVP**
+- TST-T03 convention: **4 convention OR + project pattern infer**
+- MON-G01 cutoff: **>10 absolute + LOC>500**
+- Coverage timeout: **30s, skip+warning aşılırsa**
+- Config: **`MCL_STATE_DIR/ops-config.json`**
+
+#### Trigger condition matrix
+- **DEP**: `Dockerfile` OR `.github/workflows/` OR `Procfile` OR `fly.toml` OR `vercel.json` OR `netlify.toml` OR `app.yaml` OR `Jenkinsfile`
+- **MON**: backend stack-tag (python/java/csharp/ruby/php/go/rust + node-backend non-FE-only)
+- **TST**: test framework manifest (vitest/jest/pytest/rspec/junit/go-test/cargo)
+- **DOC**: her proje (always-on)
+
+#### Audit events
+- `ops-scan-incremental | mcl-pre-tool | tool=Edit file=... high=N med=N low=N skipped_via_cache=<bool>` (L2 — MVP eksik, 8.13.x)
+- `ops-scan-block | mcl-stop | full-scan high=N`
+- `ops-scan-full | mcl-stop | high=N med=N low=N duration_ms=N categories=<csv> tags=<csv>`
+- `ops-coverage-delegate | mcl-ops-scan | tool=<jest|pytest|go|cargo> total=<pct> threshold_high=<n>`
+- `ops-coverage-skip | mcl-ops-scan | reason=<binary-missing|no-test-framework>`
+- `mcl-ops-report | mcl-activate | invoked`
+
+### Test sonuçları
+- T1 `/mcl-ops-report` keyword detection: `MCL_OPS_REPORT_MODE` STATIC_CONTEXT mevcut PASS
+- T2 Synthetic project (Dockerfile root + latest tag, no CI, no README, env vars in code, no test framework): 2 HIGH (DEP-G04 + DOC-G01) + 5 MEDIUM (DEP-G01/G03/G05/G06 + TST-T03) + 3 LOW (MON-G02/G03 + TST-T02); 4 categories scanned; coverage skip PASS
+- T3 Audit events doğru: `ops-coverage-skip`, `ops-scan-full high=2 med=5 low=3 categories=...` PASS
+- T4 Mevcut suite: 19/0/2 — regresyonsuz PASS
+
+### Updated files
+- `hooks/lib/mcl-ops-rules.py` (yeni, 20 rule)
+- `hooks/lib/mcl-ops-scan.py` (yeni, orchestrator + metrics aggregation)
+- `hooks/lib/mcl-ops-coverage.sh` (yeni, 4 stack delegate)
+- `hooks/lib/mcl-state.sh` (3 yeni state field)
+- `hooks/mcl-stop.sh` (Ops START gate, sıra: security → db → ui → ops → reminder → phase6)
+- `hooks/mcl-activate.sh` (`/mcl-ops-report` keyword)
+- `VERSION`, `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (8.13.x patch'lerine ertelendi)
+
+- **L2 per-Edit ops scan MVP'de yok**: pre-tool Phase 4 incremental block (Dockerfile/workflow/.env.example/README touch'larında HIGH-only block) 8.13.x'te. Şu an L3 Phase 4.5 START full scan + manuel `/mcl-ops-report` ile yakalanıyor.
+- **Phase 1.7 4 yeni dimension** (deployment_target / observability_tier / test_policy / doc_level) state field eklendi ama skill prose talimatı yok — model-behavioral. 8.13.x'te skill update.
+- **Coverage delegate basit**: vitest/jest threshold map per-file 8.13.x'te (şu an total only).
+- **DEP-G07 env drift**: 4 dil regex (JS/Python/Ruby/Go); Java/C#/Rust/PHP/Swift/Kotlin coverage 8.13.x.
+- **TST-T03 test convention infer**: project'te mevcut test pattern analizi (örn. `*_spec.rb` kullanan repo'da `.test.` aramaktan vazgeç) 8.13.x.
+- **Workflow YAML lint**: lightweight regex (top-level keys); full `actionlint` delegate 8.13.x.
+- **Dockerfile lint**: 4 rule var; `hadolint` delegate 8.13.x'te (DL3007/DL3015/DL3019 vb.).
+- **API route detection**: regex Express/FastAPI; Rails routes / Gin / actix 8.13.x.
+- **Coverage threshold per-file**: total only MVP; per-changed-file gate 8.13.x.
+
 ## [8.12.0] - 2026-04-30
 
 ### Eklendi — Interactive Design Loop (İŞ 3)
