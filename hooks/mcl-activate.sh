@@ -150,6 +150,24 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /mcl-phase6-report keyword (since 8.11.0) --------
+if [ "$PROMPT_NORM" = "/mcl-phase6-report" ]; then
+  P6_HELPER="$(dirname "$0")/lib/mcl-phase6.py"
+  P6_HELPER_ESC="$(printf '%s' "$P6_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  STATE_DIR_P6_ESC="$(printf '%s' "${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}/.mcl}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_P6_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_P6="${MCL_USER_LANG:-tr}"
+  cat <<P6_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_PHASE6_REPORT_MODE — the developer typed ${_BT}/mcl-phase6-report${_BT}. SKIP the entire MCL pipeline.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — phase6-report${_BT}.\n2. Run via the Bash tool: ${_BT}python3 \"${P6_HELPER_ESC}\" --mode=report --state-dir \"${STATE_DIR_P6_ESC}\" --project-dir \"${PROJECT_DIR_P6_ESC}\" --lang ${USER_LANG_FOR_P6} --markdown${_BT}.\n3. Present the full stdout as-is. The report shows three checks: (a) audit trail completeness, (b) final scan aggregation regressions, (c) promise-vs-delivery keyword gaps.\n4. STOP.\n</mcl_core>"
+  }
+}
+P6_OUTPUT
+  exit 0
+fi
+
 # -------- Branch: /mcl-resume keyword (since 8.10.0) --------
 if [ "${PROMPT_NORM%% *}" = "/mcl-resume" ] || [ "$PROMPT_NORM" = "/mcl-resume" ]; then
   # Source pause helper if available (it requires mcl-state.sh which the

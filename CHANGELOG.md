@@ -7,6 +7,80 @@
 
 ## [Unreleased]
 
+## [8.11.0] - 2026-04-30
+
+### Eklendi — Phase 6 Double-check (İŞ 2)
+
+Phase 5 verification katmanı sadece **Phase 4 code → tests** ekseninde çalışıyordu. Üç kritik soru cevapsızdı: (1) MCL pipeline'ı tüm fazlarını gerçekten çalıştırdı mı? (2) Phase 4.5 sonrası fix'ler yeni HIGH bulgu üretti mi? (3) Kullanıcının istediği her şey teslim edildi mi? Phase 6 bu üç soruyu üç check'le bağlar ve Phase 5'ten sonra `decision:block` tier'i ile enforced.
+
+#### Yeni dosya
+- **`hooks/lib/mcl-phase6.py`** — orchestrator. Üç check fonksiyonu + lokalize markdown render. Modes: `run` (enforcement, JSON), `report` (markdown). Top-level try/except → exit 3 (8.10.0 pattern).
+
+#### Üç check
+**(a) Audit trail completeness** — required STEP audit event'leri current session window'da mevcut mu? Window: son `session_start` event'inden itibaren (trace.log anchor); fallback son 200 audit satırı. Required (HIGH): `precision-audit`, `engineering-brief`, `spec-extract|spec-save`, `spec-approve`, `phase-review-pending`, `phase-review-running`, `phase-review-impact`. Soft-required (LOW advisory): `phase5-verify` — 8.10.x ve önce projeler emit etmiyor.
+
+**(b) Final scan aggregation** — 4 scan (codebase/security/db/ui) `--mode=full` tekrar çalıştır; HIGH count'larını `phase4_5_high_baseline` ile karşılaştır. `current > baseline` → regression finding (HIGH). Phase 4.5 START gate'leri HIGH=0 ile geçtiğinde baseline=0 set ediliyor (mcl-stop.sh 3 noktada).
+
+**(c) Promise-vs-delivery** (reverse Lens-e) — Phase 1 `phase1_intent` + `phase1_constraints` state field'larından keyword extract (4+ char alphabetic, stopword filtre, TR+EN); modified source file'larda keyword search; eksik keyword → MEDIUM finding. Phase 1 state'te yoksa LOW skip (8.10.x backward compat — Phase 1 skill'inin `mcl_state_set phase1_intent` çağırması gerek).
+
+#### State şeması
+- `phase6_double_check_done: false` — idempotency flag
+- `phase4_5_high_baseline: {security: 0, db: 0, ui: 0}` — regression baseline
+- `phase1_intent: null`, `phase1_constraints: null` — Phase 1 confirmed params (Phase 1 skill talimatıyla doldurulacak)
+- v2 schema bump'sız (geriye uyumlu)
+
+#### Hook entegrasyonu
+- **`hooks/mcl-stop.sh`** — (1) Phase 4.5 START gate'lerinde HIGH=0 noktasında `phase4_5_high_baseline.{security|db|ui}=0` set'i (3 yerde). (2) Hook sonunda **Phase 6 gate**: `phase_review_state == "running"` AND `phase6_double_check_done != true` AND (audit'te `phase5-verify` event VAR ya da transcript'te "Verification Report" / "Doğrulama Raporu" string'i VAR) ise `mcl-phase6.py --mode=run` çalıştır. Output JSON'da (a/b/c HIGH varsa) → `decision:block` reason'da kategorize edilmiş finding listesi (max 5 her kategori). Pass → `phase6_double_check_done=true` set + audit `phase6-done`.
+- **`hooks/mcl-activate.sh`** — `/mcl-phase6-report` keyword block (`/mcl-ui-report` mirror).
+
+#### Audit events
+- `phase6-run-start | mcl-stop|mcl-phase6 | required_events=N`
+- `phase6-audit-gap | mcl-phase6 | missing=<rule_ids>`
+- `phase6-scan-regression | mcl-phase6 | new_high=N`
+- `phase6-promise-gap | mcl-phase6 | missing=N`
+- `phase6-block | mcl-stop | a=N b=N c=N`
+- `phase6-done | mcl-stop | duration_ms=N`
+- `mcl-phase6-report | mcl-activate | invoked`
+
+### Phase 5 vs Phase 6 sınır
+| Soru | Phase 5 | Phase 6 |
+|---|---|---|
+| Test edildi mi? | ✓ | — |
+| Manuel-test surface | ✓ | — |
+| Process trace | ✓ | — |
+| Pipeline bütünlüğü | — | ✓ (a) |
+| Post-fix regression | — | ✓ (b) |
+| Reverse traceability | — | ✓ (c) |
+
+### Karar matrisi (kabul edilen varsayılanlar)
+- Phase 5 done detection: **(c) hibrit** — `phase_review_state=="running"` + (`phase5-verify` event OR transcript "Verification Report")
+- Keyword algoritması: **regex token** (4+ char alphabetic, TR+EN stopword filter)
+- Phase 1 confirmed param: **(a) state'e ekle** — `phase1_intent` + `phase1_constraints` field'ları
+- `phase5-verify` backward compat: **soft-fail (LOW advisory)**, hard-block değil
+- Phase 6 (b) baseline yokluğu: **0 default güvenilir** (gate skipped → ilgili category baseline=0 anlamlı)
+
+### Test sonuçları
+- T1 `/mcl-phase6-report` keyword detection: STATIC_CONTEXT 779 byte, `MCL_PHASE6_REPORT_MODE` mevcut PASS
+- T2 Synthetic state (Phase 1.7 audit yok, FastAPI projesi): (a) `P6-A-missing-precision-audit` HIGH + `P6-A-missing-phase5-verify` LOW; (b) no scan regression (no-stack scenarios skipped); (c) 7 missing keyword MEDIUM PASS
+- T3 Audit events: `phase6-run-start required_events=6`, `phase6-audit-gap missing=...`, `phase6-promise-gap missing=1` PASS
+- T4 Mevcut suite: 19/0/2 — regresyonsuz PASS
+
+### Updated files
+- `hooks/lib/mcl-phase6.py` (yeni, 3 check orchestrator)
+- `hooks/lib/mcl-state.sh` (4 yeni field: phase6_double_check_done, phase4_5_high_baseline, phase1_intent, phase1_constraints)
+- `hooks/mcl-stop.sh` (Phase 4.5 gate baseline set'leri + hook sonunda Phase 6 gate)
+- `hooks/mcl-activate.sh` (`/mcl-phase6-report` keyword)
+- `VERSION`, `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (8.11.x patch'lerine ertelendi)
+
+- **`phase5-verify` audit event** model-behavioral; mevcut Phase 5 skill prose'u bunu emit etmiyor. Phase 6 trigger fallback: transcript scan ("Verification Report" / "Doğrulama Raporu") — heuristic, lokalize 14 dil için tam coverage yok. 8.11.x'te skill prose'una `mcl_audit_log "phase5-verify" ...` Bash talimatı eklenir.
+- **Phase 1 state field doldurma**: `phase1_intent` + `phase1_constraints` mevcut Phase 1 skill'inde set edilmiyor — boş kalırsa (c) check LOW skip. 8.11.x'te Phase 1 skill prose'una `mcl_state_set phase1_intent` talimatı.
+- **Promise-vs-delivery keyword heuristic**: false-positive yüksek (4+ char regex token; semantic equivalence yok). 8.11.x'te NLP-grade traceability (LLM-driven param-to-implementation mapping).
+- **Phase 6 (b) regression baseline**: tüm 4.5 gate'leri skip ise (no-stack-tag) baseline=0 anlamlı; ama partial scenario (security baseline=2, db=0, ui=skip) baseline tracking accuracy belirsiz. MVP'de güvenilir kabul.
+- **codebase-scan dahil değil (b)**: 4 scan'den codebase-scan severity routing yapmıyor (high_count yerine general findings); Phase 6 (b) regression detection sadece security/db/ui üzerinden. 8.11.x'te codebase-scan severity field'ı eklenip dahil edilebilir.
+- **Phase 6 idempotency boundary**: `phase6_double_check_done=true` session boundary'da sticky. Yeni Phase 4 turn'ünde reset gerekir mi? Mevcut MCL'de `phase_review_state` reset noktaları sınırlı; 8.11.x'te explicit reset.
+
 ## [8.10.0] - 2026-04-29
 
 ### Eklendi — Pause-on-error (İŞ 1)

@@ -650,6 +650,8 @@ print(json.dumps({"decision": "block", "reason": reason}))
         fi
         # HIGH = 0 → mark done; capture MEDIUM list for the standard block reason.
         mcl_state_set phase4_5_security_scan_done true >/dev/null 2>&1 || true
+        # 8.11.0: record baseline for Phase 6 (b) regression detection
+        mcl_state_set phase4_5_high_baseline.security 0 >/dev/null 2>&1 || true
         _SEC_MEDIUM_PROSE="$(printf '%s' "$_SEC_FULL_JSON" | python3 -c '
 import json, sys
 try:
@@ -696,6 +698,7 @@ except Exception:
         if [ "$_DB_NO_STACK" = "true" ]; then
           # No DB stack — mark done, audit (already logged by orchestrator), continue.
           mcl_state_set phase4_5_db_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_5_high_baseline.db 0 >/dev/null 2>&1 || true
         else
           _DB_HIGH_BLOCK="$(printf '%s' "$_DB_FULL_JSON" | python3 -c '
 import json, sys
@@ -741,6 +744,7 @@ print(json.dumps({"decision": "block", "reason": reason}))
             exit 0
           fi
           mcl_state_set phase4_5_db_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_5_high_baseline.db 0 >/dev/null 2>&1 || true
           _DB_MEDIUM_PROSE="$(printf '%s' "$_DB_FULL_JSON" | python3 -c '
 import json, sys
 try:
@@ -784,6 +788,7 @@ except Exception:
 ' 2>/dev/null)"
         if [ "$_UI_NO_FE" = "true" ]; then
           mcl_state_set phase4_5_ui_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_5_high_baseline.ui 0 >/dev/null 2>&1 || true
         else
           _UI_HIGH_BLOCK="$(printf '%s' "$_UI_FULL_JSON" | python3 -c '
 import json, sys
@@ -826,6 +831,7 @@ print(json.dumps({"decision": "block", "reason": reason}))
             exit 0
           fi
           mcl_state_set phase4_5_ui_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_5_high_baseline.ui 0 >/dev/null 2>&1 || true
           _UI_MEDIUM_PROSE="$(printf '%s' "$_UI_FULL_JSON" | python3 -c '
 import json, sys
 try:
@@ -1557,6 +1563,86 @@ PYPS
   mcl_audit_log "pattern-scan-cleared" "stop" ""
   command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_cleared
 fi
+
+# --- Phase 6 Double-check gate (since 8.11.0) ---
+# Triggers when phase 4.5 dialog has been running AND phase5-verify event
+# has been emitted by the model AND phase6_double_check_done != true.
+_PHASE6_LIB="$_MCL_HOOK_DIR/lib/mcl-phase6.py"
+_PHASE6_DONE="$(mcl_state_get phase6_double_check_done 2>/dev/null)"
+_PHASE6_REVIEW_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
+if [ -f "$_PHASE6_LIB" ] && command -v python3 >/dev/null 2>&1 \
+   && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_PHASE6_DONE" != "true" ] \
+   && [ "$_PHASE6_REVIEW_STATE" = "running" ]; then
+  # Trigger detection (hybrid): phase5-verify audit event present OR
+  # transcript contains "Verification Report" / lokalize equivalent.
+  _PHASE6_TRIGGER=0
+  if [ -f "$MCL_STATE_DIR/audit.log" ] && grep -q "phase5-verify" "$MCL_STATE_DIR/audit.log" 2>/dev/null; then
+    _PHASE6_TRIGGER=1
+  elif [ -n "${TRANSCRIPT_PATH:-}" ] && [ -f "$TRANSCRIPT_PATH" ] \
+       && grep -lE "(Verification Report|Doğrulama Raporu)" "$TRANSCRIPT_PATH" >/dev/null 2>&1; then
+    _PHASE6_TRIGGER=1
+  fi
+  if [ "$_PHASE6_TRIGGER" = "1" ]; then
+    _PHASE6_JSON="$(timeout 180 python3 "$_PHASE6_LIB" \
+      --mode=run \
+      --state-dir "$MCL_STATE_DIR" \
+      --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
+      --lang "${MCL_USER_LANG:-tr}" 2>/dev/null || echo '{}')"
+    _PHASE6_BLOCK="$(printf '%s' "$_PHASE6_JSON" | python3 -c '
+import json, sys
+try:
+    r = json.loads(sys.stdin.read() or "{}")
+except Exception:
+    sys.exit(0)
+a = r.get("a_findings", [])
+b = r.get("b_findings", [])
+c = [f for f in r.get("c_findings", []) if f.get("severity") == "HIGH"]
+if not (a or b or c):
+    sys.exit(0)
+parts = []
+if a:
+    parts.append("(a) Audit trail completeness — " + str(len(a)) + " missing required event(s):")
+    for f in a[:5]:
+        parts.append("  - " + f.get("rule_id","?") + " — " + f.get("message","")[:120])
+if b:
+    parts.append("\n(b) Final scan aggregation — " + str(len(b)) + " regression finding(s):")
+    for f in b[:5]:
+        parts.append("  - " + f.get("rule_id","?") + " at " + f.get("file","?") + ":" + str(f.get("line",0)) + " — " + f.get("message","")[:120])
+if c:
+    parts.append("\n(c) Promise-vs-delivery — " + str(len(c)) + " HIGH gap(s):")
+    for f in c[:5]:
+        parts.append("  - " + f.get("rule_id","?") + " — " + f.get("message","")[:120])
+print(str(len(a)) + "|" + str(len(b)) + "|" + str(len(c)) + "|" + "\n".join(parts))
+' 2>/dev/null)"
+    if [ -n "$_PHASE6_BLOCK" ]; then
+      _A_CNT="$(printf '%s' "$_PHASE6_BLOCK" | cut -d'|' -f1)"
+      _B_CNT="$(printf '%s' "$_PHASE6_BLOCK" | cut -d'|' -f2)"
+      _C_CNT="$(printf '%s' "$_PHASE6_BLOCK" | cut -d'|' -f3)"
+      _BODY="$(printf '%s' "$_PHASE6_BLOCK" | cut -d'|' -f4-)"
+      mcl_audit_log "phase6-block" "mcl-stop" "a=${_A_CNT} b=${_B_CNT} c=${_C_CNT}"
+      command -v mcl_trace_append >/dev/null 2>&1 && \
+        mcl_trace_append phase6_block "a=${_A_CNT} b=${_B_CNT} c=${_C_CNT}"
+      python3 -c '
+import json, sys
+body = sys.argv[1]
+reason = ("⚠️ MCL PHASE 6 — Double-check gate\n\n"
+          "Phase 5 verification complete, but Phase 6 double-check found issues:\n\n"
+          + body + "\n\n"
+          "Resolve each item before this session can close. After fixes, the next\n"
+          "Stop will re-run Phase 6 (idempotent — passing Phase 6 sets\n"
+          "phase6_double_check_done=true).")
+print(json.dumps({"decision": "block", "reason": reason}))
+' "$_BODY" 2>/dev/null
+      exit 0
+    fi
+    # Pass — mark done.
+    mcl_state_set phase6_double_check_done true >/dev/null 2>&1 || true
+    _PHASE6_DUR="$(printf '%s' "$_PHASE6_JSON" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read() or "{}").get("duration_ms",0))' 2>/dev/null)"
+    mcl_audit_log "phase6-done" "mcl-stop" "duration_ms=${_PHASE6_DUR:-0}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase6_done ""
+  fi
+fi
+# --- end Phase 6 gate ---
 
 # --- Session log: turn summary with actual token counts (since 6.5.7) ---
 _STOP_LOG_LIB="$_MCL_HOOK_DIR/lib/mcl-log-append.sh"

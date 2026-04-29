@@ -78,6 +78,10 @@ _mcl_state_default() {
   "phase4_5_security_scan_done": false,
   "phase4_5_db_scan_done": false,
   "phase4_5_ui_scan_done": false,
+  "phase4_5_high_baseline": {"security": 0, "db": 0, "ui": 0},
+  "phase6_double_check_done": false,
+  "phase1_intent": null,
+  "phase1_constraints": null,
   "paused_on_error": {"active": false},
   "last_update": ${now}
 }
