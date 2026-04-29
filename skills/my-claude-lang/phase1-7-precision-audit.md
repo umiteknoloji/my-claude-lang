@@ -5,6 +5,20 @@
 Called automatically after Phase 1 AskUserQuestion returns an approve-family
 tool_result, before Phase 1.5 (Engineering Brief).
 
+## Scope and Extensibility
+
+The 7 **core dimensions** below are universal — they apply to every project
+regardless of stack. The **stack add-on list is illustrative, not exhaustive**.
+MCL is a universal tool; the named sections (TypeScript, Python, Go, Rust,
+Swift, Kotlin, etc.) are common-case examples that cover frequent stacks but
+do not enumerate every possible domain. When a new stack tag is added to
+`hooks/lib/mcl-stack-detect.sh`, a new section is appended to this file with
+the corresponding delta dimensions — no logic change required, the
+classification engine is purely data-driven over the markdown sections.
+
+The core layer stays fixed; the stack add-on layer grows as MCL's stack
+coverage grows.
+
 ## Purpose
 
 Phase 1 ensures the developer's parameters are **complete** (all fields gathered).
