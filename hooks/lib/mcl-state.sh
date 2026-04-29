@@ -77,6 +77,7 @@ _mcl_state_default() {
   "restart_turn_ts": null,
   "phase4_5_security_scan_done": false,
   "phase4_5_db_scan_done": false,
+  "phase4_5_ui_scan_done": false,
   "last_update": ${now}
 }
 JSON

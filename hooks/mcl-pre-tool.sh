@@ -763,6 +763,107 @@ print(json.dumps({
 fi
 # -------- end of Phase 4 incremental DB scan --------
 
+# -------- Branch: Phase 4 incremental UI scan (since 8.9.0) --------
+# Edit/Write/MultiEdit to UI files trigger HIGH-only a11y-critical scan.
+# Cache-keyed via mcl-ui-scan.py. Skipped if no fe stack tag.
+_UI_SCAN_LIB="$SCRIPT_DIR/lib/mcl-ui-scan.py"
+if [ "$CURRENT_PHASE" = "4" ] \
+   && [ -f "$_UI_SCAN_LIB" ] \
+   && command -v python3 >/dev/null 2>&1 \
+   && [ -n "${MCL_STATE_DIR:-}" ]; then
+  case "$TOOL_NAME" in
+    Edit|Write|MultiEdit)
+      _UI_TARGET_PATH="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    print((obj.get("tool_input") or {}).get("file_path") or "")
+except Exception:
+    pass' 2>/dev/null)"
+      _UI_EXT="${_UI_TARGET_PATH##*.}"
+      case "$_UI_EXT" in
+        tsx|jsx|ts|js|vue|svelte|html|css|scss)
+          _UI_TMP="$(mktemp -t mcl-ui-pre.XXXXXX)" || _UI_TMP=""
+          if [ -n "$_UI_TMP" ]; then
+            _UI_TMP_EXT="${_UI_TMP}.${_UI_EXT}"
+            mv "$_UI_TMP" "$_UI_TMP_EXT" 2>/dev/null && _UI_TMP="$_UI_TMP_EXT"
+            printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+from pathlib import Path
+data = json.loads(sys.stdin.read())
+tool = data.get("tool_name", "")
+ti = data.get("tool_input", {}) or {}
+target_real = ti.get("file_path") or ""
+out = sys.argv[1]
+content = ""
+if tool == "Write":
+    content = ti.get("content") or ""
+else:
+    try:
+        content = Path(target_real).read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        content = ""
+    if tool == "Edit":
+        old, new = ti.get("old_string", ""), ti.get("new_string", "")
+        if old and old in content:
+            content = content.replace(old, new, 1)
+    elif tool == "MultiEdit":
+        for ed in (ti.get("edits") or []):
+            old, new = ed.get("old_string", ""), ed.get("new_string", "")
+            if old and old in content:
+                content = content.replace(old, new, 1)
+Path(out).write_text(content, encoding="utf-8")
+' "$_UI_TMP" 2>/dev/null
+            _UI_RESULT_JSON="$(python3 "$_UI_SCAN_LIB" \
+              --mode=incremental \
+              --state-dir "$MCL_STATE_DIR" \
+              --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
+              --target "$_UI_TMP" \
+              --lang "${MCL_USER_LANG:-tr}" 2>/dev/null || echo '{}')"
+            _UI_BLOCK="$(printf '%s' "$_UI_RESULT_JSON" | python3 -c '
+import json, sys
+try:
+    r = json.loads(sys.stdin.read() or "{}")
+except Exception:
+    sys.exit(0)
+if r.get("no_fe_stack"):
+    sys.exit(0)
+# Only block on HIGH a11y-critical findings.
+high_a11y = [f for f in r.get("findings", []) if f.get("severity") == "HIGH" and f.get("category") == "ui-a11y"]
+if not high_a11y:
+    sys.exit(0)
+top = high_a11y[0]
+real = sys.argv[1] if len(sys.argv) > 1 else top.get("file", "")
+rule = top.get("rule_id", "?")
+line = top.get("line", 0)
+msg = top.get("message", "")
+print(rule + " at " + real + ":" + str(line) + " — " + msg)
+' "$_UI_TARGET_PATH" 2>/dev/null)"
+            rm -f "$_UI_TMP" 2>/dev/null
+            if [ -n "$_UI_BLOCK" ]; then
+              _UI_RULE="$(printf '%s' "$_UI_BLOCK" | awk '{print $1}')"
+              mcl_audit_log "ui-scan-block" "mcl-pre-tool" "rule=${_UI_RULE} tool=${TOOL_NAME} file=${_UI_TARGET_PATH} severity=HIGH category=ui-a11y"
+              python3 -c '
+import json, sys
+reason = sys.argv[1]
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL UI A11Y — " + reason + ". Fix the accessibility issue and retry."
+    }
+}))
+' "$_UI_BLOCK" 2>/dev/null
+              exit 0
+            fi
+          fi
+          ;;
+      esac
+      ;;
+  esac
+fi
+# -------- end of Phase 4 incremental UI scan --------
+
 # --- Just-in-time askq advance (since 6.5.6) ---
 # Stop hook only fires at end-of-turn. When the model chains
 # summary-askq → spec → approve-askq → Write in a single turn, Stop has

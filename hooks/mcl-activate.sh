@@ -150,6 +150,41 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /mcl-ui-report keyword (since 8.9.0) --------
+if [ "$PROMPT_NORM" = "/mcl-ui-report" ]; then
+  UI_HELPER="$(dirname "$0")/lib/mcl-ui-scan.py"
+  UI_HELPER_ESC="$(printf '%s' "$UI_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  STATE_DIR_UI_ESC="$(printf '%s' "${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}/.mcl}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_UI_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_UI="${MCL_USER_LANG:-tr}"
+  cat <<UI_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_UI_REPORT_MODE — the developer typed the literal keyword ${_BT}/mcl-ui-report${_BT}. SKIP the entire MCL pipeline. Do NOT run Phase 1/spec/3/4/4.5/4.6/5.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — ui-report${_BT}.\n2. Run via the Bash tool, in ONE call: ${_BT}python3 \"${UI_HELPER_ESC}\" --mode=report --state-dir \"${STATE_DIR_UI_ESC}\" --project-dir \"${PROJECT_DIR_UI_ESC}\" --lang ${USER_LANG_FOR_UI} --markdown${_BT}.\n3. Present the full stdout as-is (already markdown, in the developer's language).\n4. After the report, in one localized sentence remind the developer that ${_BT}/mcl-ui-axe${_BT} (with MCL_UI_URL env set + Playwright + @axe-core/playwright installed) runs runtime accessibility checks on a live URL.\n5. STOP.\n</mcl_core>"
+  }
+}
+UI_OUTPUT
+  exit 0
+fi
+
+# -------- Branch: /mcl-ui-axe keyword (since 8.9.0) --------
+if [ "$PROMPT_NORM" = "/mcl-ui-axe" ]; then
+  UI_AXE_HELPER="$(dirname "$0")/lib/mcl-ui-axe.sh"
+  UI_AXE_HELPER_ESC="$(printf '%s' "$UI_AXE_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_UIX_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_UIX="${MCL_USER_LANG:-tr}"
+  cat <<UIX_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_UI_AXE_MODE — the developer typed the literal keyword ${_BT}/mcl-ui-axe${_BT}. SKIP the entire MCL pipeline.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — ui-axe${_BT}.\n2. Run via the Bash tool: ${_BT}bash \"${UI_AXE_HELPER_ESC}\" \"${PROJECT_DIR_UIX_ESC}\" ${USER_LANG_FOR_UIX}${_BT}.\n3. Present the full stdout as-is. If MCL_UI_URL is unset, the helper prints a localized advisory — relay it verbatim, do not invent axe output.\n4. STOP.\n</mcl_core>"
+  }
+}
+UIX_OUTPUT
+  exit 0
+fi
+
 # -------- Branch: /mcl-db-report keyword (since 8.8.0) --------
 if [ "$PROMPT_NORM" = "/mcl-db-report" ]; then
   DB_HELPER="$(dirname "$0")/lib/mcl-db-scan.py"

@@ -305,6 +305,26 @@ Skip STEP-454 when:
 - Phase 4.5 was entirely omitted (no risks found).
 - All four applicable categories are already covered by existing tests.
 
+## Lens (d) expanded — 8.9.0+ (UI Design & A11y)
+
+When a FE stack-tag (`react-frontend|vue-frontend|svelte-frontend|html-static`) is detected, Phase 4.5 START runs the UI orchestrator **after** the security gate (8.7.0+) and DB gate (8.8.0+). Mechanism:
+
+**Step 0c — UI design & a11y scan (8.9.0+, mandatory at Phase 4.5 START when FE stack-tag present):**
+1. Run via Bash tool: `python3 ${MCL_LIB:-$HOME/.mcl/lib}/hooks/lib/mcl-ui-scan.py --mode=full --state-dir "$MCL_STATE_DIR" --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" --lang <user_lang>`
+2. Parse JSON. If `no_fe_stack=true`: skip; mark `phase4_5_ui_scan_done=true` and continue.
+3. Severity routing (E3 — a11y-critical-only block):
+   - **HIGH (only `category=ui-a11y`) → Phase 4.5 START gate.** UI-G01 img-no-alt, UI-G02 button-no-name, UI-G03 link-no-href, UI-G04 input-no-label, UI-G05 div-onClick-no-keyboard, UI-RX-controlled-without-onChange, UI-VU-v-html-untrusted, UI-SV-on-click-no-keyboard, UI-HT-no-html-lang. Phase 4.5 dialog'u BAŞLATMA — her HIGH için Edit/Write yap.
+   - **MEDIUM (token / reuse / responsive / non-critical a11y / naming) → Phase 4.5 sequential dialog'a item.** `[UI-Design]` veya `[UI-A11y]` etiketiyle her MEDIUM tek tek tartışılır.
+   - **LOW → audit-only**, dialog'a girmez. `ui-findings.jsonl`'e kayıt; geliştirici `/mcl-ui-report` ile görebilir.
+4. Auto-fix policy: ESLint `--fix` safe categories (formatting, import order, JSX whitespace) silent OK. **a11y / token / reuse / naming** kategorilerinde **asla silent**.
+5. Coverage: Design tokens (UI-G07-G10 + `mcl-ui-tokens.py` C3 hybrid: project tokens veya MCL default fallback) / Component reuse (AST fingerprint heuristic) / A11y (UI-G01-G06 + framework add-on + `mcl-ui-eslint.sh` D1 delegate + `/mcl-ui-axe` D2 opt-in) / Responsive (UI-G10 + UI-HT-no-meta-viewport) / Naming (framework prop conventions).
+
+**Audit signal:** `ui-scan-full | mcl-stop | high=N med=N low=N duration_ms=N sources=...`
+
+**8.7.0/8.8.0 ile çakışmazlık:** React unsafe-html-setter XSS / target=_blank rel 8.7.0'da kalır; SQL/schema 8.8.0'da kalır; UI scan tekrar etmez. `category=ui-*` field ayrım sağlar.
+
+Eğer `mcl-ui-scan.py` mevcut değilse (8.9.0 öncesi install) bu adım sessizce atlanır.
+
 ## Lens (d) expanded — 8.8.0+ (DB Design)
 
 When a `db-*` stack tag is detected, Phase 4.5 START runs the DB orchestrator **after** the security gate (8.7.0+) has cleared. Mechanism:

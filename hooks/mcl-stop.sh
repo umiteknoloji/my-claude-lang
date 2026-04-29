@@ -750,10 +750,97 @@ print("\\n".join(lines))
       fi
       # ---- end of Phase 4.5 START DB gate ----
 
+      # ---- Phase 4.5 START UI gate (since 8.9.0) ----
+      _UI_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-ui-scan.py"
+      _UI_SCAN_DONE="$(mcl_state_get phase4_5_ui_scan_done 2>/dev/null)"
+      _UI_MEDIUM_PROSE=""
+      if [ -f "$_UI_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
+         && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_UI_SCAN_DONE" != "true" ]; then
+        _UI_FULL_JSON="$(timeout 120 python3 "$_UI_FULL_LIB" \
+          --mode=full \
+          --state-dir "$MCL_STATE_DIR" \
+          --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
+          --lang "${MCL_USER_LANG:-tr}" 2>/dev/null || echo '{}')"
+        _UI_NO_FE="$(printf '%s' "$_UI_FULL_JSON" | python3 -c '
+import json, sys
+try:
+    r = json.loads(sys.stdin.read() or "{}")
+    print("true" if r.get("no_fe_stack") else "false")
+except Exception:
+    print("false")
+' 2>/dev/null)"
+        if [ "$_UI_NO_FE" = "true" ]; then
+          mcl_state_set phase4_5_ui_scan_done true >/dev/null 2>&1 || true
+        else
+          _UI_HIGH_BLOCK="$(printf '%s' "$_UI_FULL_JSON" | python3 -c '
+import json, sys
+try:
+    r = json.loads(sys.stdin.read() or "{}")
+except Exception:
+    sys.exit(0)
+high = [f for f in r.get("findings", []) if f.get("severity") == "HIGH" and f.get("category") == "ui-a11y"]
+if not high:
+    sys.exit(0)
+lines = []
+for f in high[:5]:
+    rid = f.get("rule_id", "?")
+    fl = f.get("file", "?")
+    ln = f.get("line", 0)
+    msg = (f.get("message", "") or "")[:120]
+    lines.append("  - " + rid + " at " + fl + ":" + str(ln) + " — " + msg)
+extra = "" if len(high) <= 5 else "\n  ... (" + str(len(high) - 5) + " more)"
+print(str(len(high)) + "|" + "\n".join(lines) + extra)
+' 2>/dev/null)"
+          if [ -n "$_UI_HIGH_BLOCK" ]; then
+            _UI_HIGH_COUNT="${_UI_HIGH_BLOCK%%|*}"
+            _UI_HIGH_LIST="${_UI_HIGH_BLOCK#*|}"
+            mcl_audit_log "ui-scan-block" "mcl-stop" "full-scan high=${_UI_HIGH_COUNT}"
+            command -v mcl_trace_append >/dev/null 2>&1 && \
+              mcl_trace_append ui_scan_block "high=${_UI_HIGH_COUNT}"
+            python3 -c '
+import json, sys
+count, lst = sys.argv[1], sys.argv[2]
+reason = ("⚠️ MCL UI A11Y — Phase 4.5 START gate\n\n"
+          "Full UI scan found " + count + " HIGH a11y-critical issue(s):\n"
+          + lst + "\n\n"
+          "Phase 4.5 Risk Review CANNOT begin until these are resolved. Required actions:\n"
+          "  1. Read each finding above; identify the rule and file.\n"
+          "  2. Apply Edit/Write to fix: add alt, aria-label, semantic <button>, htmlFor, lang attribute.\n"
+          "  3. Per-Edit incremental UI scan re-validates each fix; if HIGH a11y remains, Edit will be blocked.\n"
+          "  4. Once all HIGH a11y issues are fixed, this gate re-runs on the next Stop.")
+print(json.dumps({"decision": "block", "reason": reason}))
+' "$_UI_HIGH_COUNT" "$_UI_HIGH_LIST" 2>/dev/null
+            exit 0
+          fi
+          mcl_state_set phase4_5_ui_scan_done true >/dev/null 2>&1 || true
+          _UI_MEDIUM_PROSE="$(printf '%s' "$_UI_FULL_JSON" | python3 -c '
+import json, sys
+try:
+    r = json.loads(sys.stdin.read() or "{}")
+except Exception:
+    sys.exit(0)
+med = [f for f in r.get("findings", []) if f.get("severity") == "MEDIUM"]
+if not med:
+    sys.exit(0)
+lines = ["", "UI scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [UI-Design] item in the Phase 4.5 sequential dialog:"]
+for f in med[:8]:
+    rid = f.get("rule_id", "?")
+    fl = f.get("file", "?")
+    ln = f.get("line", 0)
+    msg = (f.get("message", "") or "")[:120]
+    cat = f.get("category") or ""
+    suffix = " [" + cat + "]" if cat else ""
+    lines.append("  - " + rid + suffix + " at " + fl + ":" + str(ln) + " — " + msg)
+print("\\n".join(lines))
+' 2>/dev/null)"
+        fi
+      fi
+      # ---- end of Phase 4.5 START UI gate ----
+
       # Return decision:block so Claude is forced to continue.
       printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written but Phase 4.5 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4.5 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4.5 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4.5 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Phase 4.5 risks are resolved → run Phase 4.6 Impact Review.\n    4. After Phase 4.6 → run Phase 5 Verification Report.\n\nPhase 4.5 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.${_SEC_MEDIUM_PROSE}${_DB_MEDIUM_PROSE}\"
+  \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written but Phase 4.5 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4.5 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4.5 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4.5 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Phase 4.5 risks are resolved → run Phase 4.6 Impact Review.\n    4. After Phase 4.6 → run Phase 5 Verification Report.\n\nPhase 4.5 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.${_SEC_MEDIUM_PROSE}${_DB_MEDIUM_PROSE}${_UI_MEDIUM_PROSE}\"
 }"
       exit 0
     fi

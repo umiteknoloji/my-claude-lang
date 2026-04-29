@@ -7,6 +7,70 @@
 
 ## [Unreleased]
 
+## [8.9.0] - 2026-04-29
+
+### Eklendi — UI Enforcement Layer (3-tier, framework-aware)
+
+8.7.0 backend security ve 8.8.0 DB tasarım disiplininden sonra UI tarafına aynı 3-tier hattını uyguluyoruz: **design system tutarlılığı, component reuse, a11y, responsive davranış, naming convention**. Severity tier UI-spesifik tunelendi: **a11y-critical-only block** (E3) — design tokens / reuse / responsive / naming HIGH değil, dialog/audit. UI iteration tempo'sunu korur ama legal-risk a11y ihlallerini hard-block eder.
+
+#### Yeni dosyalar
+- **`hooks/lib/mcl-ui-rules.py`** — generic core 10 + framework add-on (4 framework × 3 = 12) = **22 rule**. Decorator-registry, `category=ui-*` + `framework` field. Token-aware rules (UI-G07/G08/G09/G10) `mcl-ui-tokens.py`'dan token listesi alır.
+  - Generic core: UI-G01 img-no-alt, UI-G02 button-no-accessible-name, UI-G03 link-no-href, UI-G04 form-input-no-label, UI-G05 interactive-no-keyboard (5 a11y-critical HIGH); UI-G06 heading-skip-level, UI-G07 hardcoded-color, UI-G08 hardcoded-spacing, UI-G09 hardcoded-font-size, UI-G10 magic-breakpoint.
+  - Framework add-on: React (UI-RX-list-no-key, UI-RX-controlled-without-onChange HIGH, UI-RX-fragment-with-key-only), Vue (UI-VU-v-for-no-key, UI-VU-v-html-untrusted HIGH, UI-VU-prop-no-type), Svelte (UI-SV-each-no-key, UI-SV-on-click-no-keyboard HIGH, UI-SV-prop-no-export-let-type), HTML-static (UI-HT-no-html-lang HIGH, UI-HT-no-meta-viewport, UI-HT-button-input-mixup).
+  - **9 HIGH a11y-critical** rule total — bunlar L2 ve L3'te `decision:deny`/`decision:block` tetikler; geri kalan rule'lar dialog/audit.
+- **`hooks/lib/mcl-ui-tokens.py`** — design token detector. **C3 hybrid:** tailwind.config.{js,ts,cjs,mjs} parse, `:root` CSS custom properties, `design-tokens.json` (W3C draft), `theme.ts/js` loose extraction. Project'te token dosyası yoksa MCL default set fallback (8px grid spacing, type ramp 12-60px, breakpoint 640/768/1024/1280/1536). Audit `ui-tokens-detected source=tailwind|css-vars|theme-ts|design-tokens|mcl-default`.
+- **`hooks/lib/mcl-ui-scan.py`** — orchestrator (incremental/full/report/axe modes), `ui-cache.json` (file SHA1 + rules-version composite), token detector dispatch, eslint-a11y delegate çağrı, lokalize markdown render.
+- **`hooks/lib/mcl-ui-eslint.sh`** — external delegate: `eslint-plugin-jsx-a11y` (React) + `eslint-plugin-vuejs-accessibility` (Vue) + `eslint-plugin-svelte` a11y subset; framework-spesifik rule list ile filtered. Binary yoksa graceful skip.
+- **`hooks/lib/mcl-ui-axe.sh`** — `/mcl-ui-axe` keyword backing. `MCL_UI_URL` env yoksa lokalize advisory; varsa Playwright + `@axe-core/playwright` headless single-page scan. MVP single-page; multi-page crawl 8.9.x'te.
+
+#### Hook entegrasyonu (8.7.x/8.8.x mirror)
+- **`hooks/mcl-activate.sh`** — `/mcl-ui-report` + `/mcl-ui-axe` keyword blokları.
+- **`hooks/mcl-pre-tool.sh`** — 8.8.0 DB block sonrası Phase 4 UI incremental block. FE stack-tag check + Edit/Write/MultiEdit + UI ext (.tsx/.jsx/.ts/.js/.vue/.svelte/.html/.css/.scss); **yalnızca `category=ui-a11y` HIGH bulguda `decision:deny`** reason "MCL UI A11Y — `<rule>`...". Token/reuse/responsive/naming HIGH değil, sessiz audit. Audit `ui-scan-incremental`, `ui-scan-block`.
+- **`hooks/mcl-stop.sh`** — 8.8.0 DB START gate'inin yanına paralel Phase 4.5 START UI gate. `phase4_5_ui_scan_done` state field. Sıra: security → db → ui → standart Phase 4.5 reminder. HIGH a11y → state pending'de kalır + `decision:block` (ilk 5 finding listeli); HIGH=0 → done=true; MEDIUM listesi standart block reason'a `[UI-Design]` etiketli inject.
+- **`hooks/lib/mcl-state.sh`** — schema'ya `phase4_5_ui_scan_done: false` field (8.7.1 security + 8.8.0 db paralel; v2 schema bump'sız).
+
+#### Phase 4.5 lens (d) genişletme
+`mcl-ui-scan.py --mode=full` Phase 4.5 START'ta security + DB gate'lerinden sonra çalışır. Severity routing: HIGH ui-a11y → block; MEDIUM ui-tokens/reuse/responsive/naming → `[UI-Design]` veya `[UI-A11y]` dialog item; LOW → audit. Auto-fix: ESLint `--fix` safe categories silent OK; a11y/token/reuse/naming asla silent.
+
+#### Trigger condition (F1)
+**Sadece FE stack-tag tespit edildiğinde** (`react-frontend|vue-frontend|svelte-frontend|html-static` herhangi biri). Backend-only / lib / CLI / data pipeline projelerinde tüm UI pipeline (L1 + L2 + L3) skip edilir; audit `ui-scan-skipped reason=no-fe-stack-tag`.
+
+#### 8.7.0/8.8.0 ile çakışmazlık
+React unsafe-html-setter XSS / target=_blank rel 8.7.0'da kalır; SQL injection / schema design 8.8.0'da kalır. UI scan **tekrar etmez**. `category=ui-tokens|ui-reuse|ui-a11y|ui-responsive|ui-naming` field ayrım. Audit event'leri ayrı namespace: `ui-scan-*`, `ui-axe-*`, `ui-tokens-*`.
+
+### Test sonuçları
+- T1 `/mcl-ui-report` keyword detection: STATIC_CONTEXT 957 byte, `MCL_UI_REPORT_MODE` mevcut PASS
+- T2 `/mcl-ui-axe` keyword: STATIC_CONTEXT 612 byte, `MCL_UI_AXE_MODE` mevcut PASS
+- T3 Full UI scan synthetic React projesi (`<img>` no alt + empty `<button>` + `<div onClick>` + `<input id="email">` no label): 4 HIGH a11y bulgu (UI-G01, UI-G02, UI-G04, UI-G05); tokens=mcl-default (no tailwind config) PASS
+- T4 L2 pre-tool a11y block: phase=4, FE stack-tag, Write `<img src="a.png" />` (no alt) → `decision:deny` reason "MCL UI A11Y — UI-G01-img-no-alt..."; audit `ui-scan-incremental high=1` + `ui-scan-block` PASS
+- T5 Mevcut suite: 19/0/2 — regresyonsuz PASS
+
+### Updated files
+- `hooks/lib/mcl-ui-rules.py` (yeni, 22 rule)
+- `hooks/lib/mcl-ui-tokens.py` (yeni, C3 hybrid token detector)
+- `hooks/lib/mcl-ui-scan.py` (yeni, orchestrator)
+- `hooks/lib/mcl-ui-eslint.sh` (yeni, eslint a11y delegate)
+- `hooks/lib/mcl-ui-axe.sh` (yeni, opt-in axe runner)
+- `hooks/lib/mcl-state.sh` (`phase4_5_ui_scan_done` field)
+- `hooks/mcl-activate.sh` (`/mcl-ui-report` + `/mcl-ui-axe` keywords)
+- `hooks/mcl-pre-tool.sh` (Phase 4 UI incremental block, a11y-critical-only)
+- `hooks/mcl-stop.sh` (Phase 4.5 START UI gate)
+- `skills/my-claude-lang/phase4-5-risk-review.md` (Lens (d) UI extension)
+- `VERSION` (8.8.0 → 8.9.0)
+- `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (kabul edilmiş, 8.9.x patch'lerine ertelendi)
+
+- **Phase 1.7 react-frontend / vue-frontend / svelte-frontend / html-static add-on extension** (5 yeni dimension: design tokens stance, a11y stance, responsive strategy, component reuse policy, naming convention) MVP'de yok — model-behavioral kalıyor. Skill dosyasına dedicated dimension ekleme 8.9.1'de.
+- **Component reuse AST fingerprint detector** MVP'de yok; rule-level eksik. Static heuristic ileri düzey 8.9.x'te.
+- **Storybook integration** (`*.stories.{ts,js,tsx,jsx}` parse + component → story coverage) MVP'de yok; `mcl-ui-storybook.py` ve reuse detector 8.9.x'te.
+- **`/mcl-ui-axe` MVP single-page**: tek URL Playwright + axe; multi-page crawl, multi-viewport runs, login flow 8.9.x'te.
+- **Solid / Angular / Qwik** stack-tag yok (8.4.1 TODO); UI feature tetiklenmez. 8.9.x patch'lerinde framework genişletmesi.
+- **Contrast checking static** sadece literal hex/rgb için; CSS variable runtime resolution `/mcl-ui-axe` ile yakalanır.
+- **MCL default token set** dar — colors boş (any color allowed), spacing/font/breakpoint 8px grid + Tailwind defaults. Project token'ları yokken UI-G07 hardcoded-color silent (false-positive engellemek için).
+- **eslint-plugin yokluğu** (jsx-a11y / vuejs-accessibility / eslint-plugin-svelte install edilmemiş): D1 delegate skip + warning; generic core rule'lar (UI-G01..G10) yine çalışır.
+- **14 dilden yalnızca TR + EN tam lokalize**; diğer 12 dil EN fallback.
+
 ## [8.8.0] - 2026-04-29
 
 ### Eklendi — DB Tasarım Disiplini (3-tier, ORM-aware)
