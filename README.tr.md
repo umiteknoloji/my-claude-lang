@@ -254,19 +254,28 @@ tekrar çalıştırabilirsin. `claude` CLI'nin PATH'te olması gerekir.
 
 ### 2. Adım — MCL'i kur
 
-Klonla, tek komut çalıştır. Ayar yok. Dil seçimi yok.
+8.5.0'dan itibaren MCL **projelerine sıfır dosya yazıyor**. State, hook, skill ve audit log dosyaları `~/.mcl/projects/<proje-key>/` altında, repo'nun dışında saklanıyor.
 
 ```bash
 git clone https://github.com/YZ-LLM/my-claude-lang.git
-bash my-claude-lang/setup.sh
+bash my-claude-lang/install.sh
 ```
 
-Bu her şeyi global olarak kurar:
-- **Skill dosyaları** → `~/.claude/skills/my-claude-lang/` (MCL kuralları, kapılar, fazlar)
-- **Otomatik aktivasyon hook'u** → `~/.claude/hooks/mcl-activate.sh` (İngilizce olmayan girdiyi algılar)
-- **Hook konfigürasyonu** → `~/.claude/settings.json` (hook'u Claude Code'a bağlar)
+Bu kurar:
+- **Kütüphane** → `~/.mcl/lib/` (klonlanan repo — tek kaynak)
+- **Wrapper launcher** → `~/.local/bin/mcl-claude` (symlink)
+- **Proje-bazlı state kökü** → `~/.mcl/projects/<sha1(realpath PWD)>/` (ilk çalıştırmada otomatik yaratılır)
 
-Yeni bir Claude Code oturumu aç ve kendi dilinde yazmaya başla. Hepsi bu.
+Herhangi bir projede `claude` yerine `mcl-claude` çalıştır:
+
+```bash
+cd ~/projects/my-app
+mcl-claude
+```
+
+Wrapper, `$PWD`'nin realpath'inden stable bir project key türetir, ilk çalıştırmada `~/.mcl/projects/<key>/` scaffolding'ini oluşturur, hook'lar için `MCL_STATE_DIR` env var'ını export eder, sonra izole `--settings` ve `--plugin-dir` ile `claude`'u `exec` eder. Tüm Claude Code bayrakları transparan geçer.
+
+**8.5 öncesinden geliyorsan?** Mevcut `<proje>/.mcl/` ve `<proje>/.claude/` dizinleri orphan kalır. Manuel taşıma reçetesi için [CHANGELOG 8.5.0](CHANGELOG.md).
 
 ---
 
@@ -283,7 +292,7 @@ Hook, 24 saatte bir arka planda repodaki `VERSION` dosyasını çeker. Yeni sür
 Güncellemek için mesaj olarak sadece `/mcl-update` yaz. MCL normal akışı (spec, fazlar) tamamen atlar ve şu komutu çalıştırır:
 
 ```
-cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
+cd $MCL_REPO_PATH && git pull --ff-only && bash install.sh
 ```
 
 `MCL_REPO_PATH` varsayılan olarak `$HOME/my-claude-lang`. Klonun başka bir yerdeyse environment variable ile ayarla. Güncellenen hook ve skill dosyaları her prompt'ta yeniden okunduğu için aynı oturumdaki bir sonraki mesajın yeni kuralları kullanır — oturum yeniden başlatmaya gerek yok.

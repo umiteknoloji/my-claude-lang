@@ -7,6 +7,58 @@
 
 ## [Unreleased]
 
+## [8.5.0] - 2026-04-29
+
+### BREAKING — Per-project isolation via wrapper launcher
+
+MCL artık projeye **hiçbir dosya/klasör yazmıyor**. Tüm hook deklarasyonları, state, audit log ve session-context dosyaları `~/.mcl/projects/<sha1(realpath PWD)>/` altında, proje dışında saklanıyor. Kullanım: `claude` yerine `mcl-claude` çalıştır.
+
+#### Yeni mimari
+- **Wrapper script** `bin/mcl-claude`: `$PWD`'nin realpath'inden sha1 ile project key türetir, ilk çalıştırmada `~/.mcl/projects/<key>/` scaffolding'ini (settings.json + state/ + meta.json) oluşturur, `MCL_STATE_DIR` env var'ını export eder, sonra `claude --settings <per-project> --plugin-dir <shared-lib> "$@"` ile pass-through `exec` yapar. Saf wrapper — kendi flag'i yok, tüm Claude Code bayrakları transparan geçer.
+- **Global installer** `install.sh`: `~/.mcl/lib/`'ye git clone (veya pull) ve `~/.local/bin/mcl-claude` symlink. Idempotent.
+- **Plugin manifest** `plugin.json`: minimal manifest — `--plugin-dir` üzerinden Claude Code'un skill/agent discovery'si için tek dosya. Plugin marketplace'a yayın değil.
+- **Hook env contract**: hook'lar zaten `MCL_STATE_DIR` env var'ını destekliyordu (8.x boyunca `<CLAUDE_PROJECT_DIR>/.mcl` fallback'i ile). Wrapper bu değeri `~/.mcl/projects/<key>/state` olarak set'ler → tüm state izole, fallback'i bypass eder.
+- **`mcl-cost.py`**: `MCL_STATE_DIR` env var'ı varsa onu kullanır, yoksa legacy `<proj>/.mcl/` fallback'i (pre-8.5 install kullanıcıları için).
+
+#### Kaldırılan / değişen
+- `setup.sh` **silindi** — projeye dosya yazan eski install kanalı. Yerini `install.sh` (global) aldı.
+- Kullanım komutu değişti: `claude` → `mcl-claude`. Bare `claude` artık MCL hook'larını yüklemez (settings injection wrapper'a özel).
+
+#### Migration: yok (M4)
+Mevcut kullanıcıların `<proj>/.mcl/` ve `<proj>/.claude/` dizinleri 8.5.0'a geçince orphan kalır. Phase progress / audit log korumak isteyenler manuel taşır:
+```bash
+cd <project>
+mcl-claude  # bir kez çalıştır → ~/.mcl/projects/<key>/ yaratılır
+key=$(ls -t ~/.mcl/projects | head -1)  # en son yaratılan
+mv .mcl/* ~/.mcl/projects/$key/state/
+rm -rf .mcl .claude/settings.json .claude/hooks .claude/skills/my-claude-lang
+```
+
+#### Tasarım kararları (referans)
+- **Path X** seçildi (`--settings` merge mode), Path Y (`--bare`) değil — kullanıcının `~/.claude/` skills/MCP/statusline ayarı korunur.
+- **CLAUDE_CONFIG_DIR yolu reddedildi** — undocumented, GitHub issue #25762 hâlâ açık, davranış hybrid/split. POC ile doğrulandı.
+- **Project key K1** (path-sha1) — setup-free, rename-safe değil ama M4 kapsamında kabul.
+- **Minimal plugin.json** kabul edildi — düz dizin felsefesini bozmayan tek dosya, Claude Code'un skill discovery'si için zorunlu.
+
+### Test
+- Wrapper smoke test: `mcl-claude` stub claude ile çalıştırıldı, doğru bayraklar ve env var'lar geçirildi, proje dizini sıfır footprint, `~/.mcl/projects/<key>/` doğru yaratıldı PASS
+- Mevcut suite: 19/0/2 — `MCL_STATE_DIR` zaten destekli olduğundan regresyon yok PASS
+
+### Updated files
+- `bin/mcl-claude` (yeni)
+- `install.sh` (yeni)
+- `plugin.json` (yeni)
+- `setup.sh` (silindi)
+- `hooks/lib/mcl-cost.py` (`MCL_STATE_DIR` env var önceliği)
+- `VERSION` (8.4.2 → 8.5.0)
+- `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (kabul edilmiş)
+
+- **Project rename**: K1 path-sha1 olduğu için proje rename'inde state kaybolur (orphan dir). `mcl-claude --reinit` veya state taşıma komutu MVP'de yok; kullanıcı manuel `mv` yapar.
+- **Plugin.json minimum field doğrulaması**: Claude Code'un plugin spec'i değişirse ek field gerekebilir; şu an `name`/`version`/`description` ile çalışıyor.
+- **STATIC_CONTEXT prose'unda eski `.mcl/foo` mention'ları**: hook'lar dosya IO'yu doğru path'e yapıyor ama bazı model-facing prose hâlâ `.mcl/cost.json` gibi referanslar içeriyor. Cosmetic (model env var'dan absolute path resolve edebiliyor); 8.5.x patch'inde temizlenecek.
+
 ## [8.4.2] - 2026-04-29
 
 ### Düzeltildi — Real-use test'in açtığı 3 kalibrasyon sapması

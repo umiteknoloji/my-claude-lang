@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# mcl-claude — per-project isolated Claude Code launcher.
+#
+# Computes a stable project key from $PWD's realpath, ensures
+# ~/.mcl/projects/<key>/ scaffolding exists, exports MCL_STATE_DIR for
+# hooks, and exec's claude with --settings + --plugin-dir pointing at
+# the per-project config and the shared MCL library.
+#
+# Pure passthrough wrapper: all positional args and flags are forwarded
+# verbatim to claude. No --mcl-* flags, no admin subcommands.
+#
+# Since 8.5.0.
+
+set -euo pipefail
+
+MCL_HOME="${MCL_HOME:-$HOME/.mcl}"
+MCL_LIB="$MCL_HOME/lib"
+
+if [ ! -d "$MCL_LIB" ]; then
+  echo "mcl-claude: MCL library not found at $MCL_LIB" >&2
+  echo "  Run install.sh first: curl -sSL <repo>/install.sh | bash" >&2
+  exit 1
+fi
+
+if ! command -v claude >/dev/null 2>&1; then
+  echo "mcl-claude: 'claude' binary not found on PATH" >&2
+  echo "  Install Claude Code first: https://docs.claude.com/claude-code" >&2
+  exit 1
+fi
+
+# ---- Compute project key from realpath of $PWD ----
+real_pwd="$(cd "$PWD" && pwd -P)"
+
+# sha1 with cross-platform fallback (macOS: shasum, Linux: sha1sum).
+if command -v shasum >/dev/null 2>&1; then
+  key="$(printf '%s' "$real_pwd" | shasum -a 1 | awk '{print $1}')"
+elif command -v sha1sum >/dev/null 2>&1; then
+  key="$(printf '%s' "$real_pwd" | sha1sum | awk '{print $1}')"
+else
+  echo "mcl-claude: neither shasum nor sha1sum available — cannot compute project key" >&2
+  exit 1
+fi
+
+proj_dir="$MCL_HOME/projects/$key"
+state_dir="$proj_dir/state"
+settings_file="$proj_dir/settings.json"
+
+# ---- Auto-init on first run ----
+if [ ! -d "$proj_dir" ]; then
+  mkdir -p "$state_dir"
+
+  mcl_version="$(cat "$MCL_LIB/VERSION" 2>/dev/null || echo unknown)"
+  created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  # settings.json: hook command paths point at shared MCL_LIB.
+  # Variables expand here (heredoc unquoted), so absolute paths are
+  # baked in at init time. Re-init (mcl-claude --mcl-reinit) is not
+  # implemented; user can rm -rf "$proj_dir" to force re-init.
+  cat > "$settings_file" <<JSON
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {"matcher": "", "hooks": [{"type": "command", "command": "$MCL_LIB/hooks/mcl-activate.sh"}]}
+    ],
+    "Stop": [
+      {"matcher": "", "hooks": [{"type": "command", "command": "$MCL_LIB/hooks/mcl-stop.sh"}]}
+    ],
+    "PreToolUse": [
+      {"matcher": "", "hooks": [{"type": "command", "command": "$MCL_LIB/hooks/mcl-pre-tool.sh"}]}
+    ],
+    "PostToolUse": [
+      {"matcher": "", "hooks": [{"type": "command", "command": "$MCL_LIB/hooks/mcl-post-tool.sh"}]}
+    ]
+  }
+}
+JSON
+
+  cat > "$proj_dir/meta.json" <<JSON
+{
+  "key": "$key",
+  "path": "$real_pwd",
+  "created_at": "$created_at",
+  "mcl_version": "$mcl_version"
+}
+JSON
+fi
+
+# ---- Export env for hooks + Claude Code ----
+export MCL_HOME
+export MCL_STATE_DIR="$state_dir"
+export MCL_PROJECT_KEY="$key"
+
+# ---- Exec claude with isolated config ----
+exec claude \
+  --settings "$settings_file" \
+  --plugin-dir "$MCL_LIB" \
+  "$@"

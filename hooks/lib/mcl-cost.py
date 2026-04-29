@@ -5,6 +5,7 @@ Usage: python3 mcl-cost.py <project_dir>
 Output: markdown-formatted report to stdout.
 """
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -56,7 +57,14 @@ def parse_log_turns(mcl_dir):
 
 def main():
     project_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
-    mcl_dir = project_dir / ".mcl"
+    # Since 8.5.0: prefer MCL_STATE_DIR env var (set by mcl-claude
+    # wrapper to ~/.mcl/projects/<key>/state). Fall back to legacy
+    # in-project .mcl/ for users still on the pre-8.5 install.
+    state_dir_env = os.environ.get("MCL_STATE_DIR")
+    if state_dir_env:
+        mcl_dir = Path(state_dir_env)
+    else:
+        mcl_dir = project_dir / ".mcl"
 
     injection_turns = load_cost_json(mcl_dir)
     log_turns = parse_log_turns(mcl_dir)

@@ -253,19 +253,28 @@ your PATH.
 
 ### Step 2 — Install MCL itself
 
-Clone and run one command. No configuration. No language settings.
+Since 8.5.0, MCL writes **zero files into your projects**. State, hooks, skills, and audit logs all live in `~/.mcl/projects/<project-key>/` outside your repo.
 
 ```bash
 git clone https://github.com/YZ-LLM/my-claude-lang.git
-bash my-claude-lang/setup.sh
+bash my-claude-lang/install.sh
 ```
 
-This installs everything globally:
-- **Skill files** → `~/.claude/skills/my-claude-lang/` (MCL rules, gates, phases)
-- **Auto-activation hook** → `~/.claude/hooks/mcl-activate.sh` (detects non-English input)
-- **Hook config** → `~/.claude/settings.json` (wires the hook into Claude Code)
+This sets up:
+- **Library** → `~/.mcl/lib/` (the cloned repo — single source of truth)
+- **Wrapper launcher** → `~/.local/bin/mcl-claude` (symlink)
+- **Per-project state root** → `~/.mcl/projects/<sha1(realpath PWD)>/` (auto-created on first run)
 
-Open a new Claude Code session and start typing in your language. That's it.
+Open any project and run `mcl-claude` instead of `claude`:
+
+```bash
+cd ~/projects/my-app
+mcl-claude
+```
+
+The wrapper computes a stable project key from `$PWD`'s realpath, scaffolds `~/.mcl/projects/<key>/` on first run, exports `MCL_STATE_DIR` for hooks, then `exec`'s `claude` with isolated `--settings` and `--plugin-dir`. All Claude Code flags pass through transparently.
+
+**Migrating from pre-8.5?** Existing `<project>/.mcl/` and `<project>/.claude/` directories become orphans. See [CHANGELOG 8.5.0](CHANGELOG.md) for the manual `mv` recipe.
 
 ---
 
@@ -282,7 +291,7 @@ Once per 24 hours, the hook fetches the upstream `VERSION` file in the backgroun
 To update, send the literal message `/mcl-update`. MCL skips the normal pipeline (no spec, no phases) and runs:
 
 ```
-cd $MCL_REPO_PATH && git pull --ff-only && bash setup.sh
+cd $MCL_REPO_PATH && git pull --ff-only && bash install.sh
 ```
 
 `MCL_REPO_PATH` defaults to `$HOME/my-claude-lang`. Override via environment variable if your clone lives elsewhere. The updated hook and skill files are re-read on every prompt, so the next message in the same session already uses the new rules — no session restart needed.

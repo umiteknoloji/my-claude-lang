@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.4.2
+**Güncel sürüm:** 8.5.0
 
 ---
 
@@ -318,7 +318,7 @@ Mimari GATE cevabı alındıktan sonra teknik tutarlılık kontrolü. Bkz. Phase
 |---|---|
 | `/mcl` | MCL'yi zorla aktive eder |
 | `/mcl-version` | Kurulu sürümü gösterir |
-| `/mcl-update` | MCL'yi git pull + setup.sh ile günceller |
+| `/mcl-update` | MCL'yi git pull + install.sh ile günceller |
 | `/mcl-restart` | Tüm faz ve spec state'ini sıfırlar; aynı session'da JIT promote'un eski askq'leri yeniden onaylamasını engellemek için `restart_turn_ts` damgası yazar (8.2.13) |
 | `/mcl-finish` | Birikmiş Phase 4.6 etkilerini özetler + Semgrep taraması |
 | `/mcl-doctor` | Token & maliyet raporu |
@@ -416,22 +416,28 @@ Kaynak: [code.claude.com/docs/en/hooks.md](https://code.claude.com/docs/en/hooks
 
 ---
 
-## Kurulum
+## Kurulum (8.5.0+)
 
 ```bash
-git clone https://github.com/YZ-LLM/my-claude-lang.git ~/my-claude-lang
-cd ~/my-claude-lang && bash setup.sh
+git clone https://github.com/YZ-LLM/my-claude-lang.git
+bash my-claude-lang/install.sh
 ```
 
-`setup.sh` her çalışmada:
+`install.sh` global tek seferlik kurulum yapar:
+- `~/.mcl/lib/` altına repo'yu klonlar (veya günceller)
+- `~/.local/bin/mcl-claude` symlink'ini oluşturur
+- `~/.mcl/projects/` kökünü hazırlar
+
+**Kullanım:**
+```bash
+cd <herhangi-bir-proje>
+mcl-claude
+```
+
+Wrapper, projenin realpath'inden sha1 ile stable bir key türetir, ilk çalıştırmada `~/.mcl/projects/<key>/` scaffolding'ini yaratır, hook'lar için `MCL_STATE_DIR` set'ler ve izole `--settings` + `--plugin-dir` ile `claude`'u `exec` eder. Tüm Claude Code bayrakları passthrough.
+
 **Kaldırma:**
 ```bash
-bash uninstall.sh
+rm -rf ~/.mcl ~/.local/bin/mcl-claude
 ```
-`uninstall.sh`: settings.json'dan hook kayıtlarını çıkarır, skill ve hook dosyalarını siler. Per-project `.mcl/` elle temizlenir.
-
-`setup.sh` her çalışmada:
-- Skill dosyalarını `~/.claude/skills/` altına kopyalar
-- Hook'ları `~/.claude/hooks/` altına kopyalar
-- `settings.json`'a hook kayıtlarını ekler
-- README, skill, hook, **FEATURES.md** ve **CHANGELOG.md**'deki versiyon string'lerini otomatik sync eder
+Projelerine MCL hiçbir dosya yazmadığı için proje tarafında temizlik gerekmez (8.5.0+ için).
