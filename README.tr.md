@@ -1,6 +1,6 @@
 # my-claude-lang (MCL)
 
-[![Sürüm](https://img.shields.io/badge/sürüm-8.13.0-blue.svg)](VERSION)
+[![Sürüm](https://img.shields.io/badge/sürüm-8.14.0-blue.svg)](VERSION)
 [![Lisans](https://img.shields.io/badge/lisans-MIT-green.svg)](LICENSE)
 
 MCL, Claude Code'a iki kanat ekleyen bir plugin: bir **dil köprüsü** — geliştirici kendi dilinde düşünür, Claude senior seviye İngilizce mühendislik çıktısı üretir; ve bir **AI disiplini** katmanı — her değişikliği deterministik bir faz pipeline'ından (Phase 1 → 1.5 → 1.7 → 2 → 3 → 3.5 → 4 → 4.5 → 5 → 6) geçirir, güvenlik / DB tasarımı / UI erişilebilirliği / operasyonel hijyen için hook-enforced gate'ler uygular. Her şey projenin **dışında** çalışır — 8.5.0'dan itibaren projene sıfır dosya yazılır.
@@ -36,7 +36,7 @@ Veya bir oturumun içinde `/mcl-update` yaz.
 
 ---
 
-## Özellik kataloğu (8.13.0)
+## Özellik kataloğu (8.14.0)
 
 ### Dil köprüsü
 İlk mesajdan geliştiricinin dilini tespit eder; her clarifying question, risk dialog, doğrulama raporu, section başlığı o dilde kalır. İç mühendislik çıktısı (spec, kod, teknik token) İngilizce. 14 dil desteği (TR / EN / AR / DE / ES / FR / HE / HI / ID / JA / KO / PT / RU / ZH); araç çıktıları için TR + EN tam lokalize, diğerleri scan rapor metinlerinde İngilizce fallback.
@@ -82,6 +82,14 @@ Phase 4a UI build sonrası MCL arka planda dev server başlatır (10 stack detec
 
 Coverage delegate'i vitest / jest / pytest / go-test / cargo-tarpaulin (binary yoksa graceful skip). Konfigürasyon `$MCL_STATE_DIR/ops-config.json` üzerinden.
 
+### Performans bütçesi (8.14.0) — `/mcl-perf-report`, `/mcl-perf-lighthouse`
+3 rule pack × 11 kural — **bundle / Core Web Vitals / image** — FE-only trigger:
+- **Bundle** (4): over-budget critical (>2× HIGH), over-budget (100-200% MEDIUM), build çıktısı yok (LOW advisory), large chunk (LOW). `dist/`, `build/`, `.next/static/chunks/`, `out/` taranır; gzipped JS toplamı. Build **invoke edilmez** — `npm run build` çalıştırılmış varsayılır.
+- **Core Web Vitals** (4): LCP poor (>4s HIGH), LCP needs improvement (2.5-4s MEDIUM), CLS poor (>0.25 MEDIUM), TBT poor (>600ms MEDIUM). Lighthouse delegate (`npx lighthouse --output=json --only-categories=performance`); yalnızca `/mcl-perf-lighthouse` veya `/mcl-perf-report` ile tetiklenir (L3 stop-hook gate'inde çalışmaz — 60s overhead).
+- **Image** (3): image huge (>500KB HIGH), image large (100-500KB MEDIUM), WebP/AVIF fallback'siz PNG (LOW). `public/`, `static/`, `assets/`, `src/assets/`, `app/static/` taranır.
+
+`/mcl-perf-lighthouse` `/mcl-ui-axe` (8.9.0) ile aynı **`MCL_UI_URL`** env var'ını kullanır — kullanıcı tek URL set eder, iki runtime tool da çalışır. Audit log'ta `tool=axe|lighthouse` ayrımı. Konfigürasyon `$MCL_STATE_DIR/perf-config.json` üzerinden.
+
 ---
 
 ## Keyword referansı
@@ -105,6 +113,8 @@ Tüm keyword'ler normal MCL pipeline'ını atlar ve özel bir mod çalıştırı
 | `/mcl-dev-server-start` | Dev server'ı manuel başlat (auto-detect stack) |
 | `/mcl-dev-server-stop` | Dev server'ı manuel durdur (loop açık kalır) |
 | `/mcl-ops-report` | Tam operasyonel disiplin taraması (deployment + monitoring + testing + docs) |
+| `/mcl-perf-report` | Tam performans taraması (gzipped bundle + image walk + opt-in Lighthouse CWV) |
+| `/mcl-perf-lighthouse` | Lighthouse üzerinden runtime Core Web Vitals taraması (`MCL_UI_URL` env gerekir, `/mcl-ui-axe` ile shared) |
 
 ---
 
@@ -133,7 +143,8 @@ Tüm gate'lerde severity tier: **HIGH** = `decision:deny` / `decision:block`; **
 ## Bilinen sınırlar
 
 - **Proje rename** state kaybeder (path-SHA1 keying; setup-free için kasıtlı).
-- **Headless ortamlarda `/mcl-ui-axe` ve `/mcl-db-explain`** explicit env var gerektirir (`MCL_UI_URL`, `MCL_DB_URL`); yoksa lokalize advisory ile skip.
+- **Headless `/mcl-ui-axe`, `/mcl-perf-lighthouse` ve `/mcl-db-explain`** explicit env var gerektirir (`MCL_UI_URL` axe + Lighthouse arasında shared; `MCL_DB_URL` DB EXPLAIN); yoksa lokalize advisory ile skip.
+- **Bundle size** sadece mevcut build çıktısından ölçülür — `npm run build` otomatik invoke edilmez; `dist/`/`build/`/`.next/static/chunks/`/`out/` yoksa advisory.
 - **External tool delegate'leri** (Semgrep, squawk, hadolint, eslint-plugin-jsx-a11y, `axe-core`, `playwright`, `pip-audit`, `cargo-audit`, `govulncheck`, `bundle-audit`) binary yoksa graceful skip — tam kapsam için kur.
 - **14 dil destekli, ama tool raporları için sadece TR + EN tam lokalize.** Diğerleri scan çıktısı için İngilizce fallback (clarifying question + risk dialog yine geliştirici dilinde, skill prose ile).
 - **N+1 detection statik-only**; runtime profiling (test runner entegrasyonu) 8.x patch'lerine ertelendi.

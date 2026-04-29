@@ -1,6 +1,6 @@
 # my-claude-lang (MCL)
 
-[![Version](https://img.shields.io/badge/version-8.13.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-8.14.0-blue.svg)](VERSION)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 MCL is a Claude Code plugin that grafts two wings onto every conversation: a **language bridge** that lets developers think in their own language while Claude produces senior-level English engineering output, and an **AI discipline** layer that drags every change through a deterministic phase pipeline (Phase 1 → 1.5 → 1.7 → 2 → 3 → 3.5 → 4 → 4.5 → 5 → 6) with hook-enforced gates for security, DB design, UI accessibility, and operational hygiene. It runs entirely outside your project — zero files written into your repo since 8.5.0.
@@ -36,7 +36,7 @@ Or type `/mcl-update` inside a session.
 
 ---
 
-## Feature catalog (8.13.0)
+## Feature catalog (8.14.0)
 
 ### Language bridge
 Detects the developer's language from the first message, keeps every clarifying question, risk dialog, verification report, and section header in that language. Internal engineering output (specs, code, technical tokens) stays English. 14 languages supported (TR / EN / AR / DE / ES / FR / HE / HI / ID / JA / KO / PT / RU / ZH); TR + EN fully localized for tooling output, others fall back to English for tool reports.
@@ -82,6 +82,14 @@ After Phase 4a UI build, MCL auto-starts a dev server (10 stack detection: vite,
 
 Coverage delegated to vitest / jest / pytest / go-test / cargo-tarpaulin (binary missing → graceful skip). Configurable via `$MCL_STATE_DIR/ops-config.json`.
 
+### Performance budget (8.14.0) — `/mcl-perf-report`, `/mcl-perf-lighthouse`
+3 rule packs × 11 rules across **bundle / Core Web Vitals / image** — FE-only trigger:
+- **Bundle** (4): over-budget critical (>2× HIGH), over-budget (100-200% MEDIUM), no build output (LOW advisory), large chunk (LOW). Walks `dist/`, `build/`, `.next/static/chunks/`, `out/`; gzipped JS aggregation. Build is **not** invoked — assumes `npm run build` already ran.
+- **Core Web Vitals** (4): LCP poor (>4s HIGH), LCP needs improvement (2.5-4s MEDIUM), CLS poor (>0.25 MEDIUM), TBT poor (>600ms MEDIUM). Lighthouse delegate (`npx lighthouse --output=json --only-categories=performance`); runs only when explicitly invoked via `/mcl-perf-lighthouse` or `/mcl-perf-report` (not in the L3 stop-hook gate — 60s overhead).
+- **Image** (3): image huge (>500KB HIGH), image large (100-500KB MEDIUM), PNG without WebP/AVIF fallback (LOW). Walks `public/`, `static/`, `assets/`, `src/assets/`, `app/static/`.
+
+`/mcl-perf-lighthouse` reuses the **`MCL_UI_URL`** env var that `/mcl-ui-axe` (8.9.0) uses — set one URL once, both runtime tools work against it. Audit logs distinguish via `tool=axe|lighthouse`. Configurable via `$MCL_STATE_DIR/perf-config.json`.
+
 ---
 
 ## Keyword reference
@@ -105,6 +113,8 @@ All keywords skip the normal MCL pipeline and run a dedicated mode. Type the key
 | `/mcl-dev-server-start` | Manually start the dev server (auto-detect stack) |
 | `/mcl-dev-server-stop` | Manually stop the dev server (loop stays open) |
 | `/mcl-ops-report` | Full operational discipline scan (deployment + monitoring + testing + docs) |
+| `/mcl-perf-report` | Full performance scan (bundle gzipped + image walk + opt-in Lighthouse CWV) |
+| `/mcl-perf-lighthouse` | Runtime Core Web Vitals scan via Lighthouse (requires `MCL_UI_URL` env, shared with `/mcl-ui-axe`) |
 
 ---
 
@@ -133,7 +143,8 @@ Severity tier across all gates: **HIGH** = `decision:deny` / `decision:block`; *
 ## Known limitations
 
 - **Project rename** loses state (path-SHA1 keying; intentional for setup-free).
-- **Headless `/mcl-ui-axe` and `/mcl-db-explain`** require explicit env vars (`MCL_UI_URL`, `MCL_DB_URL`); skip with localized advisory otherwise.
+- **Headless `/mcl-ui-axe`, `/mcl-perf-lighthouse`, and `/mcl-db-explain`** require explicit env vars (`MCL_UI_URL` shared by axe + Lighthouse; `MCL_DB_URL` for DB EXPLAIN); skip with localized advisory otherwise.
+- **Bundle size** measured from existing build output only — `npm run build` is not invoked automatically; advisory if no `dist/`/`build/`/`.next/static/chunks/`/`out/` present.
 - **External tool delegates** (Semgrep, squawk, hadolint, eslint-plugin-jsx-a11y, `axe-core`, `playwright`, `pip-audit`, `cargo-audit`, `govulncheck`, `bundle-audit`) gracefully skip when binaries are missing — install them for full coverage.
 - **14 languages supported, but only TR + EN are fully localized for tool reports.** Others fall back to English for scan output (clarifying questions and risk dialog still respect the developer's language via skill prose).
 - **N+1 detection is static-only**; runtime profiling (test-runner integration) deferred to 8.x.
