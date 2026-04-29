@@ -9,6 +9,11 @@
 # askq → spec → askq → Write).
 #
 # Input:  argv[1] = path to the current session's transcript jsonl.
+#         argv[2] (optional, since 8.2.13) = min_ts_epoch (integer or
+#                  empty/"null"). When non-zero, transcript entries with
+#                  `timestamp` field strictly before this epoch are
+#                  treated as stale and skipped. Used by /mcl-restart to
+#                  drop pre-restart askq's from the scan.
 # Output: a single JSON object on stdout with fields:
 #   {
 #     "intent":    "spec-approve" | "summary-confirm" | "ui-review" | "other",
@@ -24,10 +29,25 @@
 # Callers that need askq-vs-spec-body drift detection should compare
 # this hash to the state's recorded spec_hash.
 
+import datetime
 import hashlib
 import json
 import re
 import sys
+
+
+def _entry_epoch(obj):
+    """Parse the top-level `timestamp` field (ISO-8601 with optional Z)
+    into a POSIX epoch float. Returns None when the field is missing or
+    unparseable so callers default to "include the entry" (defensive)."""
+    ts = obj.get("timestamp")
+    if not isinstance(ts, str) or not ts:
+        return None
+    try:
+        s = ts.replace("Z", "+00:00")
+        return datetime.datetime.fromisoformat(s).timestamp()
+    except Exception:
+        return None
 
 PREFIX_RE = re.compile(r"^MCL\s+[0-9]+\.[0-9]+\.[0-9]+\s*\|\s*(.+)$", re.DOTALL)
 
@@ -201,7 +221,7 @@ def _compute_spec_hash(last_spec_text):
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
-def scan(path):
+def scan(path, min_ts_epoch=0.0):
     tool_uses = {}
     tool_results = {}
     order = []
@@ -217,6 +237,16 @@ def scan(path):
                     obj = json.loads(line)
                 except Exception:
                     continue
+                # Stale-entry filter (since 8.2.13) — when min_ts_epoch is
+                # non-zero, drop transcript entries whose timestamp is
+                # strictly before the threshold. Used by /mcl-restart so
+                # JIT cannot re-promote using a pre-restart askq still in
+                # the same-session transcript. Entries without parseable
+                # timestamps are kept (defensive: scanner metadata lines).
+                if min_ts_epoch:
+                    entry_epoch = _entry_epoch(obj)
+                    if entry_epoch is not None and entry_epoch < min_ts_epoch:
+                        continue
                 msg = _extract_message(obj)
                 if not isinstance(msg, dict):
                     continue
@@ -308,7 +338,15 @@ def main():
         print(json.dumps({"intent": "", "selected": "", "spec_hash": ""}))
         return 0
     path = sys.argv[1]
-    result = scan(path)
+    min_ts_epoch = 0.0
+    if len(sys.argv) >= 3:
+        raw = (sys.argv[2] or "").strip()
+        if raw and raw.lower() != "null":
+            try:
+                min_ts_epoch = float(raw)
+            except Exception:
+                min_ts_epoch = 0.0
+    result = scan(path, min_ts_epoch=min_ts_epoch)
     print(json.dumps(result, ensure_ascii=False))
     return 0
 

@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.2.12
+**Güncel sürüm:** 8.2.13
 
 ---
 
@@ -276,7 +276,7 @@ Mimari GATE cevabı alındıktan sonra teknik tutarlılık kontrolü. Bkz. Phase
 | `/mcl` | MCL'yi zorla aktive eder |
 | `/mcl-version` | Kurulu sürümü gösterir |
 | `/mcl-update` | MCL'yi git pull + setup.sh ile günceller |
-| `/mcl-restart` | Tüm faz ve spec state'ini sıfırlar |
+| `/mcl-restart` | Tüm faz ve spec state'ini sıfırlar; aynı session'da JIT promote'un eski askq'leri yeniden onaylamasını engellemek için `restart_turn_ts` damgası yazar (8.2.13) |
 | `/mcl-finish` | Birikmiş Phase 4.6 etkilerini özetler + Semgrep taraması |
 | `/mcl-doctor` | Token & maliyet raporu |
 | `/mcl-checkup` | Sağlık kontrolü — tüm STEP'ler değerlendirilir |

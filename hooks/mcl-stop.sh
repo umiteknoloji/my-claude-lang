@@ -309,7 +309,10 @@ esac
 #   other             — recognized MCL question but not state-transitioning
 ASKQ_SCANNER="$_MCL_HOOK_DIR/lib/mcl-askq-scanner.py"
 if [ -f "$ASKQ_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
-  ASKQ_JSON="$(python3 "$ASKQ_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
+  # Pass restart_turn_ts (since 8.2.13) so pre-restart askq's are filtered
+  # out — same defense applied here as in pre-tool's JIT scanner call.
+  ASKQ_RESTART_TS="$(mcl_state_get restart_turn_ts 2>/dev/null)"
+  ASKQ_JSON="$(python3 "$ASKQ_SCANNER" "$TRANSCRIPT_PATH" "$ASKQ_RESTART_TS" 2>/dev/null)"
 else
   ASKQ_JSON=""
 fi

@@ -442,7 +442,11 @@ JIT_SCANNER="$SCRIPT_DIR/lib/mcl-askq-scanner.py"
 if { [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null || [ "$SPEC_APPROVED" != "true" ]; } \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] \
    && [ -f "$JIT_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
-  JIT_JSON="$(python3 "$JIT_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
+  # Pass restart_turn_ts (since 8.2.13) so the scanner drops pre-restart
+  # askq's. Without this filter, /mcl-restart would be defeated by JIT
+  # re-promoting on an old approve askq still in the session transcript.
+  JIT_RESTART_TS="$(mcl_state_get restart_turn_ts 2>/dev/null)"
+  JIT_JSON="$(python3 "$JIT_SCANNER" "$TRANSCRIPT_PATH" "$JIT_RESTART_TS" 2>/dev/null)"
   if [ -n "$JIT_JSON" ]; then
     JIT_INTENT="$(printf '%s' "$JIT_JSON" | python3 -c '
 import json, sys

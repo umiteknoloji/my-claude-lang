@@ -74,6 +74,7 @@ _mcl_state_default() {
   "pattern_level": null,
   "pattern_ask_pending": false,
   "plan_critique_done": false,
+  "restart_turn_ts": null,
   "last_update": ${now}
 }
 JSON

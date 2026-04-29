@@ -174,7 +174,12 @@ if [ "$PROMPT_NORM" = "/mcl-restart" ]; then
     . "$_STATE_LIB"
     mcl_state_init
     mcl_state_reset
-    mcl_audit_log "mcl-restart" "mcl-activate.sh" "all-state-reset"
+    # Mark restart timestamp so JIT scanner (pre-tool / stop) can filter
+    # pre-restart askq's as stale (since 8.2.13). Without this, JIT would
+    # re-promote spec_approved=true using an old approve askq still living
+    # in the same-session transcript, defeating the restart.
+    mcl_state_set restart_turn_ts "$(date +%s)" >/dev/null 2>&1 || true
+    mcl_audit_log "mcl-restart" "mcl-activate.sh" "all-state-reset restart_turn_ts=$(date +%s)"
   fi
   cat <<RESTART_OUTPUT
 {
@@ -267,6 +272,7 @@ except Exception:
     mcl_state_set pattern_level null >/dev/null 2>&1 || true
     mcl_state_set pattern_ask_pending false >/dev/null 2>&1 || true
     mcl_state_set plan_critique_done false >/dev/null 2>&1 || true
+    mcl_state_set restart_turn_ts null >/dev/null 2>&1 || true
   fi
 fi
 
