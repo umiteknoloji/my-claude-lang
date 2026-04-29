@@ -1,6 +1,5 @@
 # my-claude-lang (MCL)
 
-[![Sürüm](https://img.shields.io/badge/sürüm-8.14.0-blue.svg)](VERSION)
 [![Lisans](https://img.shields.io/badge/lisans-MIT-green.svg)](LICENSE)
 
 MCL, Claude Code'a iki kanat ekleyen bir plugin: bir **dil köprüsü** — geliştirici kendi dilinde düşünür, Claude senior seviye İngilizce mühendislik çıktısı üretir; ve bir **AI disiplini** katmanı — her değişikliği deterministik bir faz pipeline'ından (Phase 1 → 1.5 → 1.7 → 2 → 3 → 3.5 → 4 → 4.5 → 5 → 6) geçirir, güvenlik / DB tasarımı / UI erişilebilirliği / operasyonel hijyen için hook-enforced gate'ler uygular. Her şey projenin **dışında** çalışır — 8.5.0'dan itibaren projene sıfır dosya yazılır.
@@ -36,33 +35,33 @@ Veya bir oturumun içinde `/mcl-update` yaz.
 
 ---
 
-## Özellik kataloğu (8.14.0)
+## Özellik kataloğu
 
 ### Dil köprüsü
 İlk mesajdan geliştiricinin dilini tespit eder; her clarifying question, risk dialog, doğrulama raporu, section başlığı o dilde kalır. İç mühendislik çıktısı (spec, kod, teknik token) İngilizce. 14 dil desteği (TR / EN / AR / DE / ES / FR / HE / HI / ID / JA / KO / PT / RU / ZH); araç çıktıları için TR + EN tam lokalize, diğerleri scan rapor metinlerinde İngilizce fallback.
 
-### Per-project izolasyon (8.5.0+)
+### Per-project izolasyon
 MCL projene **sıfır dosya yazar**. State, hook, skill, agent, audit log, scan cache, dev-server log — her şey `~/.mcl/projects/<key>/` altında. Project key'ler `realpath($PWD)` SHA1; rename'de state kaybolur (kasıtlı, migration yok). Birden çok projede paralel çalışırken state çakışması olmaz.
 
-### Codebase scan (8.6.0) — `/codebase-scan`
+### Codebase scan — `/codebase-scan`
 Projeyi tek seferde 12 pattern extractor'la tarar (P1–P12: stack tespiti, mimari işaretler, naming convention, error handling stili, test pattern, API stili, state management, DB layer, logging, lint sıkılığı, build/deploy, README intent). Yüksek güvenlikli bulgular `project.md`'ye `<!-- mcl-auto -->` marker'ları arasına yazılır (Phase 5 bölümleri korunur); orta/düşük güven `project-scan-report.md`'ye.
 
-### Backend güvenlik — 3-katmanlı (8.7.0 / 8.7.1) — `/mcl-security-report`
+### Backend güvenlik — 3-katmanlı — `/mcl-security-report`
 13 generic core kural + 7 stack add-on (Django ALLOWED_HOSTS, FastAPI CORS, React unsafe HTML setter, Spring CSRF disabled, Rails strong params, Laravel debug, …) + Semgrep `p/default` entegrasyonu + SCA tool dispatch (npm/pip/cargo/go/bundle audit). OWASP Top 10 + ASVS L1 alt kümesi. Severity-tiered: HIGH=`decision:deny` block, MEDIUM=Phase 4.5 sequential dialog, LOW=audit log.
 - **L1 Phase 1.7** — 5 design-time dimension (auth model, authz unit, CSRF stance, secret management, deserialization input)
 - **L2 Phase 4 per-Edit** — Edit/Write/MultiEdit'te incremental scan; HIGH ise `decision:deny`
 - **L3 Phase 4.5 START gate** — full scan; HIGH varsa state `pending`'de kalır, fix edilene kadar Phase 4.5 dialog başlamaz
 
-### DB tasarım disiplini (8.8.0) — `/mcl-db-report`, `/mcl-db-explain`
+### DB tasarım disiplini — `/mcl-db-report`, `/mcl-db-explain`
 10 generic core kural (eksik PK, SELECT *, eksik FK index, WHERE'siz UPDATE/DELETE, validation'sız JSONB, timezone'suz TIMESTAMP, text-id-not-UUID, enum-as-text, kullanıcı verisinde cascade-delete, statik N+1) + 8 ORM add-on × 3 anchor (Prisma, SQLAlchemy, Django ORM, ActiveRecord, Sequelize, TypeORM, GORM, Eloquent) = 34 kural. External delegate'ler: `squawk` (Postgres migration linter) + `alembic check`. Opsiyonel `MCL_DB_URL` env, `/mcl-db-explain` ile canlı `EXPLAIN` plan analizi sunar (default `ANALYZE` yok — production güvenliği).
 
-### UI enforcement (8.9.0) — `/mcl-ui-report`, `/mcl-ui-axe`
+### UI enforcement — `/mcl-ui-report`, `/mcl-ui-axe`
 10 generic core HTML/a11y kuralı (img-no-alt, button-no-name, link-no-href, input-no-label, div-onClick-no-keyboard, heading-skip, hardcoded color/spacing/font-size, magic breakpoint) + 12 framework add-on React / Vue / Svelte / HTML-static = 22 kural. **Severity UI iteration tempo'suna göre tunelendi:** sadece a11y-critical bulgular (9 kural — örn. img-no-alt, controlled-input-without-onChange, html-no-lang) HIGH `decision:deny` tetikler; design tokens / reuse / responsive / naming = MEDIUM dialog; advisory = LOW audit. Design tokens C3 hibrit detect: project'in `tailwind.config` / CSS vars / `theme.ts` / `design-tokens.json`'u; yoksa MCL default 8px grid + Tailwind-ish scale fallback. Opsiyonel `MCL_UI_URL` env ile `/mcl-ui-axe` Playwright üzerinden runtime `axe-core` taramasını etkinleştirir.
 
-### Pause-on-error (8.10.0) — `/mcl-resume`
-Scan helper crash, validator malformed JSON, audit log write fail, hook script crash veya external delegate non-graceful failure durumlarında MCL **explicit pause** yapar — silent fail-open yerine: state.paused_on_error.active=true, sonraki her tool `decision:deny` döner, error context + suggested fix + last-known phase'le. `/mcl-resume <çözümün>` (free-form doğal dil argüman) ya da skill-driven doğal dil ack ile resume edilir. Session boundary'ları arasında sticky — paused state Claude Code restart'ından sağ çıkar. Dev server (8.12.0) build hataları aynı kanaldan beslenir.
+### Pause-on-error — `/mcl-resume`
+Scan helper crash, validator malformed JSON, audit log write fail, hook script crash veya external delegate non-graceful failure durumlarında MCL **explicit pause** yapar — silent fail-open yerine: state.paused_on_error.active=true, sonraki her tool `decision:deny` döner, error context + suggested fix + last-known phase'le. `/mcl-resume <çözümün>` (free-form doğal dil argüman) ya da skill-driven doğal dil ack ile resume edilir. Session boundary'ları arasında sticky — paused state Claude Code restart'ından sağ çıkar. Dev server build hataları aynı kanaldan beslenir.
 
-### Phase 6 Double-check (8.11.0) — `/mcl-phase6-report`
+### Phase 6 Double-check — `/mcl-phase6-report`
 Phase 5 verification sonrası, üç ortogonal check session kapanmadan önce çalışır:
 - **(a) Audit trail tamlığı** — gerekli STEP audit event'leri emit edildi mi? (Sessizce atlanan fazları yakalar.)
 - **(b) Final scan kümülasyonu** — security + DB + UI taramaları tekrar koşar; Phase 4.5 START baseline'ından sonra yeni HIGH bulgu = regression block.
@@ -70,10 +69,10 @@ Phase 5 verification sonrası, üç ortogonal check session kapanmadan önce ça
 
 Skip imkânsız: state field `phase6_double_check_done` `decision:block` ile enforce edilir.
 
-### Interactive design loop (8.12.0) — `/mcl-design-approve`, `/mcl-dev-server-start`, `/mcl-dev-server-stop`
+### Interactive design loop — `/mcl-design-approve`, `/mcl-dev-server-start`, `/mcl-dev-server-stop`
 Phase 4a UI build sonrası MCL arka planda dev server başlatır (10 stack detect: vite, next, cra, vue-cli, sveltekit, rails, django, flask, expo, static), port atar (default + 4 fallback), PID'yi `$MCL_STATE_DIR/dev-server.pid`'de takip eder, URL'yi state üzerinden surface eder. `dev-server.log`'tan tespit edilen build hataları (stack-spesifik regex haritası) pause-on-error tetikler. Headless ortamlar (`MCL_HEADLESS`, `CI`, Linux SSH no-DISPLAY) auto-start atlar, manuel talimat verir. Loop `/mcl-design-approve` ile kapanır (`ui_reviewed=true` set, Phase 4c BACKEND'e geçer).
 
-### Operasyonel disiplin (8.13.0) — `/mcl-ops-report`
+### Operasyonel disiplin — `/mcl-ops-report`
 4 rule pack × 20 kural — deployment / monitoring / test coverage / documentation:
 - **Deployment** (8): no-CI, workflow YAML hatası, Dockerfile root user, `:latest` tag, `HEALTHCHECK` yok, `.env.example` eksik, env drift, secret docs yok
 - **Monitoring** (4): structured logger yok (winston/pino/loguru/structlog), `/metrics` endpoint yok, error tracker yok (Sentry/Bugsnag/Rollbar), level'sız logger
@@ -82,13 +81,13 @@ Phase 4a UI build sonrası MCL arka planda dev server başlatır (10 stack detec
 
 Coverage delegate'i vitest / jest / pytest / go-test / cargo-tarpaulin (binary yoksa graceful skip). Konfigürasyon `$MCL_STATE_DIR/ops-config.json` üzerinden.
 
-### Performans bütçesi (8.14.0) — `/mcl-perf-report`, `/mcl-perf-lighthouse`
+### Performans bütçesi — `/mcl-perf-report`, `/mcl-perf-lighthouse`
 3 rule pack × 11 kural — **bundle / Core Web Vitals / image** — FE-only trigger:
 - **Bundle** (4): over-budget critical (>2× HIGH), over-budget (100-200% MEDIUM), build çıktısı yok (LOW advisory), large chunk (LOW). `dist/`, `build/`, `.next/static/chunks/`, `out/` taranır; gzipped JS toplamı. Build **invoke edilmez** — `npm run build` çalıştırılmış varsayılır.
 - **Core Web Vitals** (4): LCP poor (>4s HIGH), LCP needs improvement (2.5-4s MEDIUM), CLS poor (>0.25 MEDIUM), TBT poor (>600ms MEDIUM). Lighthouse delegate (`npx lighthouse --output=json --only-categories=performance`); yalnızca `/mcl-perf-lighthouse` veya `/mcl-perf-report` ile tetiklenir (L3 stop-hook gate'inde çalışmaz — 60s overhead).
 - **Image** (3): image huge (>500KB HIGH), image large (100-500KB MEDIUM), WebP/AVIF fallback'siz PNG (LOW). `public/`, `static/`, `assets/`, `src/assets/`, `app/static/` taranır.
 
-`/mcl-perf-lighthouse` `/mcl-ui-axe` (8.9.0) ile aynı **`MCL_UI_URL`** env var'ını kullanır — kullanıcı tek URL set eder, iki runtime tool da çalışır. Audit log'ta `tool=axe|lighthouse` ayrımı. Konfigürasyon `$MCL_STATE_DIR/perf-config.json` üzerinden.
+`/mcl-perf-lighthouse` `/mcl-ui-axe` ile aynı **`MCL_UI_URL`** env var'ını kullanır — kullanıcı tek URL set eder, iki runtime tool da çalışır. Audit log'ta `tool=axe|lighthouse` ayrımı. Konfigürasyon `$MCL_STATE_DIR/perf-config.json` üzerinden.
 
 ---
 

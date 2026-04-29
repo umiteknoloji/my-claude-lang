@@ -1,6 +1,5 @@
 # my-claude-lang (MCL)
 
-[![Version](https://img.shields.io/badge/version-8.14.0-blue.svg)](VERSION)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 MCL is a Claude Code plugin that grafts two wings onto every conversation: a **language bridge** that lets developers think in their own language while Claude produces senior-level English engineering output, and an **AI discipline** layer that drags every change through a deterministic phase pipeline (Phase 1 → 1.5 → 1.7 → 2 → 3 → 3.5 → 4 → 4.5 → 5 → 6) with hook-enforced gates for security, DB design, UI accessibility, and operational hygiene. It runs entirely outside your project — zero files written into your repo since 8.5.0.
@@ -36,33 +35,33 @@ Or type `/mcl-update` inside a session.
 
 ---
 
-## Feature catalog (8.14.0)
+## Feature catalog
 
 ### Language bridge
 Detects the developer's language from the first message, keeps every clarifying question, risk dialog, verification report, and section header in that language. Internal engineering output (specs, code, technical tokens) stays English. 14 languages supported (TR / EN / AR / DE / ES / FR / HE / HI / ID / JA / KO / PT / RU / ZH); TR + EN fully localized for tooling output, others fall back to English for tool reports.
 
-### Per-project isolation (8.5.0+)
+### Per-project isolation
 MCL writes **zero files into your project**. State, hooks, skills, agents, audit logs, scan caches, dev-server logs — everything lives in `~/.mcl/projects/<key>/`. Per-project keys are SHA1 of `realpath($PWD)`, so renames lose state (intentional, no migration). Multiple projects work in parallel without state collision.
 
-### Codebase scan (8.6.0) — `/codebase-scan`
+### Codebase scan — `/codebase-scan`
 Scans the project once with 12 pattern extractors (P1–P12: stack detection, architecture markers, naming convention, error handling style, test pattern, API style, state management, DB layer, logging, lint strictness, build/deploy, README intent). Writes high-confidence findings to `project.md` between `<!-- mcl-auto -->` markers (Phase 5 sections preserved); medium/low to `project-scan-report.md`.
 
-### Backend security — 3-tier (8.7.0 / 8.7.1) — `/mcl-security-report`
+### Backend security — 3-tier — `/mcl-security-report`
 13 generic core rules + 7 stack add-ons (Django ALLOWED_HOSTS, FastAPI CORS, React unsafe HTML setter, Spring CSRF disabled, Rails strong params, Laravel debug, …) + Semgrep `p/default` integration + SCA tool dispatch (npm/pip/cargo/go/bundle audit). OWASP Top 10 + ASVS L1 subset. Severity-tiered: HIGH=`decision:deny` block, MEDIUM=Phase 4.5 sequential dialog, LOW=audit log.
 - **L1 Phase 1.7** — 5 design-time dimensions (auth model, authz unit, CSRF stance, secret management, deserialization input)
 - **L2 Phase 4 per-Edit** — incremental scan on Edit/Write/MultiEdit; `decision:deny` if HIGH
 - **L3 Phase 4.5 START gate** — full scan; HIGH keeps state in `pending`, blocks Phase 4.5 dialog until fixed
 
-### DB design discipline (8.8.0) — `/mcl-db-report`, `/mcl-db-explain`
+### DB design discipline — `/mcl-db-report`, `/mcl-db-explain`
 10 generic core rules (missing PK, SELECT *, missing FK index, UPDATE/DELETE without WHERE, JSONB without validation, TIMESTAMP without timezone, text-id-not-UUID, enum-as-text, cascade-delete on user data, N+1 static heuristic) + 8 ORM add-ons × 3 anchor rules (Prisma, SQLAlchemy, Django ORM, ActiveRecord, Sequelize, TypeORM, GORM, Eloquent) = 34 rules. External delegates: `squawk` (Postgres migration linter) + `alembic check`. Optional `MCL_DB_URL` env enables `/mcl-db-explain` for live `EXPLAIN` plan analysis (no `ANALYZE` by default — production safety).
 
-### UI enforcement (8.9.0) — `/mcl-ui-report`, `/mcl-ui-axe`
+### UI enforcement — `/mcl-ui-report`, `/mcl-ui-axe`
 10 generic core HTML/a11y rules (img-no-alt, button-no-name, link-no-href, input-no-label, div-onClick-no-keyboard, heading-skip, hardcoded color/spacing/font-size, magic breakpoint) + 12 framework add-ons across React / Vue / Svelte / HTML-static = 22 rules. **Severity tuned for UI iteration tempo:** only a11y-critical findings (9 rules, e.g. img-no-alt, controlled-input-without-onChange, html-no-lang) trigger HIGH `decision:deny`; design tokens / reuse / responsive / naming = MEDIUM dialog; advisory = LOW audit. Design tokens detected hybrid: project's `tailwind.config` / CSS vars / `theme.ts` / `design-tokens.json`, falling back to MCL default 8px grid + Tailwind-ish scale. Optional `MCL_UI_URL` enables `/mcl-ui-axe` for live `axe-core` runtime scan via Playwright.
 
-### Pause-on-error (8.10.0) — `/mcl-resume`
-When a scan helper crashes, validator returns malformed JSON, audit log fails to write, hook script crashes, or external delegate fails non-gracefully, MCL **explicitly pauses** instead of silent fail-open: state.paused_on_error.active=true, every subsequent tool returns `decision:deny` with the error context, suggested fix, and last-known phase. Resume with `/mcl-resume <your resolution>` (free-form natural-language argument), or via skill-driven natural-language acknowledgment. Sticky across session boundaries — paused state survives Claude Code restarts. Build errors from the dev server (8.12.0) feed into the same channel.
+### Pause-on-error — `/mcl-resume`
+When a scan helper crashes, validator returns malformed JSON, audit log fails to write, hook script crashes, or external delegate fails non-gracefully, MCL **explicitly pauses** instead of silent fail-open: state.paused_on_error.active=true, every subsequent tool returns `decision:deny` with the error context, suggested fix, and last-known phase. Resume with `/mcl-resume <your resolution>` (free-form natural-language argument), or via skill-driven natural-language acknowledgment. Sticky across session boundaries — paused state survives Claude Code restarts. Build errors from the dev server feed into the same channel.
 
-### Phase 6 Double-check (8.11.0) — `/mcl-phase6-report`
+### Phase 6 Double-check — `/mcl-phase6-report`
 After Phase 5 verification, three orthogonal checks run before the session can close:
 - **(a) Audit trail completeness** — were all required STEP audit events emitted? (Catches silently skipped phases.)
 - **(b) Final scan aggregation** — re-runs security + DB + UI scans; new HIGH findings since the Phase 4.5 START baseline = regression block.
@@ -70,10 +69,10 @@ After Phase 5 verification, three orthogonal checks run before the session can c
 
 Skip impossible: state field `phase6_double_check_done` enforced via `decision:block`.
 
-### Interactive design loop (8.12.0) — `/mcl-design-approve`, `/mcl-dev-server-start`, `/mcl-dev-server-stop`
+### Interactive design loop — `/mcl-design-approve`, `/mcl-dev-server-start`, `/mcl-dev-server-stop`
 After Phase 4a UI build, MCL auto-starts a dev server (10 stack detection: vite, next, cra, vue-cli, sveltekit, rails, django, flask, expo, static) in the background, allocates a port (default + 4 fallbacks), tracks PID in `$MCL_STATE_DIR/dev-server.pid`, and surfaces the URL via state. Build errors detected from `dev-server.log` (stack-specific regex map) trigger pause-on-error. Headless environments (`MCL_HEADLESS`, `CI`, Linux SSH no-DISPLAY) skip auto-start with manual instructions. Loop closes with `/mcl-design-approve` (sets `ui_reviewed=true`, advances to Phase 4c BACKEND).
 
-### Operational discipline (8.13.0) — `/mcl-ops-report`
+### Operational discipline — `/mcl-ops-report`
 4 rule packs × 20 rules across deployment / monitoring / test coverage / documentation:
 - **Deployment** (8): no-CI, workflow YAML errors, Dockerfile root user, `:latest` tag, no `HEALTHCHECK`, missing `.env.example`, env drift, undocumented secrets
 - **Monitoring** (4): no structured logger (winston/pino/loguru/structlog), no `/metrics` endpoint, no error tracker (Sentry/Bugsnag/Rollbar), logger without level
@@ -82,13 +81,13 @@ After Phase 4a UI build, MCL auto-starts a dev server (10 stack detection: vite,
 
 Coverage delegated to vitest / jest / pytest / go-test / cargo-tarpaulin (binary missing → graceful skip). Configurable via `$MCL_STATE_DIR/ops-config.json`.
 
-### Performance budget (8.14.0) — `/mcl-perf-report`, `/mcl-perf-lighthouse`
+### Performance budget — `/mcl-perf-report`, `/mcl-perf-lighthouse`
 3 rule packs × 11 rules across **bundle / Core Web Vitals / image** — FE-only trigger:
 - **Bundle** (4): over-budget critical (>2× HIGH), over-budget (100-200% MEDIUM), no build output (LOW advisory), large chunk (LOW). Walks `dist/`, `build/`, `.next/static/chunks/`, `out/`; gzipped JS aggregation. Build is **not** invoked — assumes `npm run build` already ran.
 - **Core Web Vitals** (4): LCP poor (>4s HIGH), LCP needs improvement (2.5-4s MEDIUM), CLS poor (>0.25 MEDIUM), TBT poor (>600ms MEDIUM). Lighthouse delegate (`npx lighthouse --output=json --only-categories=performance`); runs only when explicitly invoked via `/mcl-perf-lighthouse` or `/mcl-perf-report` (not in the L3 stop-hook gate — 60s overhead).
 - **Image** (3): image huge (>500KB HIGH), image large (100-500KB MEDIUM), PNG without WebP/AVIF fallback (LOW). Walks `public/`, `static/`, `assets/`, `src/assets/`, `app/static/`.
 
-`/mcl-perf-lighthouse` reuses the **`MCL_UI_URL`** env var that `/mcl-ui-axe` (8.9.0) uses — set one URL once, both runtime tools work against it. Audit logs distinguish via `tool=axe|lighthouse`. Configurable via `$MCL_STATE_DIR/perf-config.json`.
+`/mcl-perf-lighthouse` reuses the **`MCL_UI_URL`** env var that `/mcl-ui-axe` uses — set one URL once, both runtime tools work against it. Audit logs distinguish via `tool=axe|lighthouse`. Configurable via `$MCL_STATE_DIR/perf-config.json`.
 
 ---
 
