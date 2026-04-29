@@ -96,7 +96,7 @@ review from the start, not isolated checkpoints bolted on at the end:
 | **(a) Code Review** | Correctness, logic errors, error handling, dead code, missing validations |
 | **(b) Simplify** | Unnecessary complexity, premature abstraction, over-engineering, duplicate logic |
 | **(c) Performance** | N+1 queries, unbounded loops, blocking synchronous calls, memory leaks, large allocations |
-| **(d) Security** | Injection (SQL, command, XSS), auth bypass, CSRF, sensitive data exposure, insecure defaults |
+| **(d) Security** | OWASP Top 10 + ASVS L1 subset — Phase 4.5 START runs `mcl-security-scan.py --mode=full` (see "Lens (d) expanded — 8.7.0+" section below) |
 | **(e) Brief-Phase-1 Scope Drift** (since 8.4.0) | Implementation elements that lack traceability to a Phase 1 confirmed parameter AND lack a `[default: X, changeable]` marker — likely Phase 1.5 upgrade-translator hallucination |
 
 Security and performance are **not separate gate steps** — they are
@@ -304,6 +304,28 @@ entirely (empty-section-omission rule).
 Skip STEP-454 when:
 - Phase 4.5 was entirely omitted (no risks found).
 - All four applicable categories are already covered by existing tests.
+
+## Lens (d) expanded — 8.7.0+ (Backend Security)
+
+Phase 4.5 START runs the security orchestrator BEFORE any other lens. Mechanism:
+
+**Step 0 — Security scan (8.7.0+, mandatory at Phase 4.5 START):**
+1. Run via Bash tool, in ONE call:
+   ```
+   python3 ${MCL_LIB:-$HOME/.mcl/lib}/hooks/lib/mcl-security-scan.py \
+     --mode=full --state-dir "$MCL_STATE_DIR" \
+     --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" --lang <user_lang>
+   ```
+2. Parse the JSON output. Severity routing:
+   - **HIGH bulgu varsa → Phase 4.5 START gate.** Phase 4.5 dialog'u BAŞLATMA. Önce HIGH bulguları sırayla fix et: her HIGH için Edit/Write yap, fix sonrası bir sonraki bulguya geç. Tüm HIGH'lar fix edilene kadar Phase 4.5 sequential dialog (Lens a-e) BAŞLAMAZ. Bare skip yasak — kullanıcının açık `--skip-security <rule_id>` onayı olmadan HIGH bulgu atlanmaz.
+   - **MEDIUM bulgu varsa → Phase 4.5 sequential dialog'a item olarak girer.** Lens (d) etiketiyle `[Security]` her MEDIUM tek tek tartışılır (mevcut sequential dialog mekaniği).
+   - **LOW bulgu → audit-only**, dialog'a girmez. `security-findings.jsonl`'e kayıt düşer; geliştirici `/mcl-security-report` ile görebilir.
+3. Auto-fix policy: Semgrep `autofix` field'ı dolu olan **safe categories** (formatting, deprecated rename, import order) için silent apply. **auth / crypto / secret / authz** kategorilerinde silent apply YOK — her zaman dialog'a surface, geliştirici onayı gerek.
+4. Coverage: A01-A03, A05-A08, A10 OWASP Top 10 + ASVS L1 V2/V3/V4/V5/V6/V7/V8 subset. A04 (Insecure Design) ve A09 (Logging) Phase 1.7 design-time'da ele alınır — Phase 4.5'te runtime detection yok.
+
+**Audit signal:** `security-scan-full | mcl-stop | high=N med=N low=N duration_ms=N sources=...`
+
+Eğer `mcl-security-scan.py` mevcut değilse (8.7.0 öncesi install) bu adım sessizce atlanır; Lens (d) eski model-behavioral checklist davranışına düşer (heuristic injection/auth/CSRF tarama).
 
 ## Handoff to Phase 4.6
 

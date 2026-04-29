@@ -7,6 +7,83 @@
 
 ## [Unreleased]
 
+## [8.7.0] - 2026-04-29
+
+### Eklendi — Backend Security (3-tier OWASP+ASVS L1)
+
+Sistematik backend güvenlik kapsama: Phase 1.7 design-time + Phase 4.5 post-hoc taxonomic + manuel `/mcl-security-report` keyword. Mevcut Semgrep + secret-scan üstüne kurulan severity-tiered enforcement ile HIGH bulgular Phase 4.5 dialog'unu bloke eder, MEDIUM sequential dialog item olur, LOW audit-only.
+
+#### Yeni dosyalar
+- **`hooks/lib/mcl-security-rules.py`** — generic core (G01-G13: SQLi-concat, command-exec-user-input, eval-from-string, hardcoded HIGH-entropy secret, DEBUG flag, CORS wildcard, weak hash, AES-ECB, hardcoded JWT secret, SSRF, path-traversal, insecure-deserialization, weak-TLS) + 7 stack add-on (S-PY-django-allowed-hosts, S-PY-fastapi-cors, S-RX-unsafe-html-setter, S-RX-target-blank-no-rel, S-JV-spring-csrf-disabled, S-RB-rails-strong-params, S-PHP-laravel-debug). Decorator-based registry; her bulgu severity + OWASP + ASVS + category field'ı taşır. **20 rule total.**
+- **`hooks/lib/mcl-security-scan.py`** — orchestrator: enumerate, file-SHA1+rules-version composite cache, Semgrep `p/default` çağrı, SCA çağrı, severity routing, lokalize markdown render. Modes: `incremental` (tek dosya, HIGH-only + Semgrep ERROR-only), `full` (tüm proje + Semgrep packs + SCA), `report` (cache bypass).
+- **`hooks/lib/mcl-sca.sh`** — SCA wrapper: stack tag'e göre `npm audit --json`, `pip-audit --format json`, `cargo audit --json`, `govulncheck`, `bundle-audit` çağrı; binary yoksa graceful skip + tek-seferlik warning. Tüm finding'ler ortak şemaya normalize edilir.
+
+#### Hook entegrasyonu (8.7.0 MVP)
+- **`hooks/mcl-activate.sh`** — `/mcl-security-report` keyword detection bloğu (mevcut `/codebase-scan` mirror'ı). Kullanıcı yazınca pipeline atlanır, Bash tool ile `mcl-security-scan.py --mode=report` çağrılır, lokalize markdown rapor sunulur.
+
+#### Phase 1.7 design-time L1 (5 yeni dimension)
+- **8. Auth Model** (OWASP A07): kim çağırabilir, kimlik doğrulama nasıl?
+- **9. Authz Unit / Resource-Owner Check** (OWASP A01): BOLA/IDOR — owner check explicit mi? SAST kapsamayan en kritik kategori.
+- **10. CSRF Stance** (A01/A05): cookie-session vs bearer-token vs custom flow.
+- **11. Secret Management Strategy** (A02): repo (yasak) / env-var / secret manager.
+- **12. Deserialization Input Source** (A08): JSON+schema vs YAML/binary-serialization.
+
+Hepsi mevcut SILENT-ASSUME / SKIP-MARK / GATE üçlüsünü kullanır.
+
+#### Phase 4.5 lens (d) genişletme (8.7.0+)
+
+Phase 4.5 START'ta zorunlu güvenlik scan: orchestrator çalışır, severity routing uygulanır:
+- **HIGH** → Phase 4.5 START gate, dialog başlamaz; HIGH'lar fix edilene kadar bekle. Bare skip yasak.
+- **MEDIUM** → sequential dialog item, `[Security]` etiketiyle.
+- **LOW** → audit-only, `security-findings.jsonl`.
+
+Auto-fix: Semgrep safe-category (formatting/rename/import) silent apply. auth/crypto/secret/authz **asla silent**.
+
+#### Coverage matrix
+
+| OWASP | Source | Yer |
+|---|---|---|
+| A01 Broken Access Control | stack add-on + Phase 1.7 | L1+L3 |
+| A02 Cryptographic Failures | generic core | L3 |
+| A03 Injection | generic + Semgrep | L3 |
+| A04 Insecure Design | Phase 1.7 | L1 only |
+| A05 Security Misconfig | stack add-on | L3 |
+| A06 Vulnerable Components | SCA tools | L3 |
+| A07 Auth Failures | Semgrep + stack | L3 |
+| A08 Software/Data Integrity | generic | L1+L3 |
+| A09 Logging/Monitoring | Phase 1.7 audit-dim | L1 only |
+| A10 SSRF | generic | L3 |
+
+ASVS L1 subset (V2/V3/V4/V5/V6/V7/V8) finding schema'sındaki `asvs` field'ında belirtilir.
+
+### Test sonuçları
+- T1 `/mcl-security-report` keyword detection: STATIC_CONTEXT 1019 byte, `MCL_SECURITY_REPORT_MODE` + `--mode=report` mevcut PASS
+- T2 Synthetic Python (eval+SQLi+secret+DEBUG+ALLOWED_HOSTS+md5): 3 HIGH (G01+G04+Semgrep sqlalchemy) + 2 MEDIUM (G05+G07) tespit; OWASP/ASVS field'lar dolu PASS
+- T3 Lokalizasyon TR: "Yüksek şiddet" / "Orta şiddet" / "Tarama tamamlandı" başlıkları doğru PASS
+- T4 Audit log: `security-scan-full | mcl-stop | high=3 med=2 low=0 duration_ms=N sources=generic,stack,semgrep` doğru format PASS
+- T5 Mevcut suite: 19 pass / 0 fail / 2 skip — regresyonsuz PASS
+
+### Updated files
+- `hooks/lib/mcl-security-rules.py` (yeni, 20 rule)
+- `hooks/lib/mcl-security-scan.py` (yeni, orchestrator)
+- `hooks/lib/mcl-sca.sh` (yeni, 5 stack tool wrapper)
+- `hooks/mcl-activate.sh` (`/mcl-security-report` keyword bloğu)
+- `skills/my-claude-lang/phase1-7-precision-audit.md` (5 yeni dimension)
+- `skills/my-claude-lang/phase4-5-risk-review.md` (Lens (d) 8.7.0+ expanded section)
+- `VERSION` (8.6.0 → 8.7.0)
+- `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (kabul edilmiş — 8.7.1 patch'te ele alınacak)
+
+- **Phase 4 incremental L2 hook entegrasyonu MVP'de yok.** Pre-tool Edit/Write/MultiEdit branch'inde HIGH-only quick scan + `decision:deny` mekanizması 8.7.1'e ertelendi. Şu an: Phase 4'te yazılan kod Phase 4.5 START'ta yakalanır; per-Edit blocking yok.
+- **Phase 4.5 hard-enforcement hook MVP'de yok.** mcl-stop.sh'a HIGH-bulgu-varsa-`decision:block` mekanizması 8.7.1'e ertelendi. Şu an: HIGH bulgu davranışı **model-behavioral** — phase4-5 skill'i Lens (d) expanded section'da modele talimat verir, Bash + scan + parse + fix yap. Hook seviyesi enforcement yok; geliştirici güvenliği `/mcl-security-report` ile manuel doğrulayabilir.
+- **A04 Insecure Design ve A09 Logging/Monitoring** sadece L1 (Phase 1.7) — runtime detection yok (kategorik kapsam dışı).
+- **ASVS L1 subset** (V2/V3/V4/V5/V6/V7/V8); L2/L3 kapsam dışı.
+- **BOLA/IDOR semantik** — heuristic yalnızca "decorator yokluğu" yakalar; logic flaw'ları yakalayamaz (manuel review).
+- **SCA tool yokluğunda** (`pip-audit`, `cargo-audit`, `govulncheck`, `bundle-audit` install edilmemiş) ilgili stack için A06 skip; warning tek seferlik stderr'a düşer.
+- **14 dilden yalnızca TR + EN tam lokalize**; diğer 12 dil EN fallback (codebase-scan ile aynı pattern).
+- **100k+ mono-repo'da `--mode=full` dakikalarca sürebilir**; cache ilk run'da etkisiz; kullanıcı sorumluluğu.
+
 ## [8.6.0] - 2026-04-29
 
 ### Eklendi — `/codebase-scan` (Codebase Learning)

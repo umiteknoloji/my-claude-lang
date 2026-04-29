@@ -112,6 +112,41 @@ Operation invoked twice → same observable result?
 - **GATE triggers:** write operations, payment / external side-effect calls, message publishing, file system mutation.
 - **Sample question (TR):** "Bu write operasyonu retry edilirse iki kayıt mı oluşur — idempotency key kullanılacak mı?"
 
+## Security Dimensions (since 8.7.0, design-time)
+
+These five dimensions cover the design-time half of MCL's 3-tier backend security: decisions made BEFORE code is written. Each follows the SILENT-ASSUME / SKIP-MARK / GATE classification of the core seven. They surface what runtime SAST cannot: authorization model, secret strategy, threat-model stance.
+
+### 8. Auth Model (OWASP A07)
+Who can call this endpoint / module / write path? What identity is presented and how is it verified?
+- **SILENT-ASSUME default:** existing project auth applies (e.g. session middleware already wired). Mark `[assumed: existing auth middleware]`.
+- **GATE triggers:** new public endpoint surface, new identity provider integration, multi-tenant isolation, B2B/admin distinction, anonymous-vs-authenticated branch in business logic.
+- **Sample question (TR):** "Bu endpoint'i kim çağırabilir — anonim, oturum açık, admin? Mevcut auth middleware aynen mi uygulansın?"
+
+### 9. Authz Unit / Resource-Owner Check (OWASP A01)
+For each resource access: which actor owns / can access this specific record? BOLA/IDOR is the most common production breach and SAST cannot detect it semantically.
+- **SILENT-ASSUME default:** none — authorization SHOULD be explicit per-resource. Default is `[unspecified: authz unit]` and Phase 4.5 lens (d) re-checks.
+- **GATE triggers:** any resource fetched / mutated by ID. Always ask: "Does the actor have a relationship to this resource ID?"
+- **Sample question (TR):** "GET /users/:id — bu ID herhangi biri olabilir. Owner check uygulansın mı (sadece kendi kaydı), admin bypass var mı?"
+
+### 10. CSRF Stance (OWASP A01 / A05)
+For state-changing endpoints with cookie-based session: is CSRF protection on, off, or stateless (token / SameSite=strict)?
+- **SILENT-ASSUME default:** REST APIs with bearer tokens have no CSRF surface; stateless token auth → `[assumed: no CSRF surface, bearer-only]`. Cookie-session apps assume framework default (Django CSRF middleware, Rails authenticity_token).
+- **GATE triggers:** mixed cookie + token auth, custom CSRF flow, framework default disabled, public form-post endpoints.
+- **Sample question (TR):** "State-changing endpoint cookie auth kullanıyor — CSRF token (framework default) mu, SameSite=strict mi, exempt mi?"
+
+### 11. Secret Management Strategy (OWASP A02)
+Where do credentials live? Repo (forbidden), env var (acceptable), secret manager (best)?
+- **SILENT-ASSUME default:** environment variables loaded via `.env` (not committed) or runtime config. `[assumed: env-var, .env in .gitignore]`.
+- **GATE triggers:** dev needs to write/read a credential at runtime, rotation policy required, multi-environment promotion (dev/staging/prod), 3rd-party SDK with API key.
+- **Sample question (TR):** "API key nereden gelecek? `.env` (gitignore'da) yeterli mi, yoksa runtime secret manager (Vault, AWS Secrets, GCP Secret Manager) gerek mi?"
+
+### 12. Deserialization Input Source (OWASP A08)
+Will the code parse externally-controlled serialized data? Untrusted deserialization is RCE-equivalent.
+- **SILENT-ASSUME default:** JSON-only ingress with schema validation (Pydantic, Zod, Joi) → `[assumed: JSON + schema]`. No SILENT for binary formats.
+- **GATE triggers:** YAML / Python-pickle-format / Marshal / Java serialization of any external input; webhooks ingesting opaque payload; file upload that may contain serialized object.
+- **SKIP-MARK alternative:** if the input source is genuinely undecided, mark `[unspecified: deser-source]` and Phase 4.5 lens (d) blocks until explicit source confirmed.
+- **Sample question (TR):** "Bu endpoint dış kaynaktan ne format alıyor — JSON+schema mı, YAML/binary-serialization mı? İkincisi attack surface."
+
 ## Stack Add-ons (delta dimensions, applied via `mcl-stack-detect.sh` tags)
 
 Stack tag returned by `mcl-stack-detect.sh detect "$(pwd)"`. Multi-stack

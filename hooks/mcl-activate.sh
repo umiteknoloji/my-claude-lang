@@ -150,6 +150,24 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /mcl-security-report keyword (since 8.7.0) --------
+if [ "$PROMPT_NORM" = "/mcl-security-report" ]; then
+  SEC_HELPER="$(dirname "$0")/lib/mcl-security-scan.py"
+  SEC_HELPER_ESC="$(printf '%s' "$SEC_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  STATE_DIR_SEC_ESC="$(printf '%s' "${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}/.mcl}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_SEC_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_SEC="${MCL_USER_LANG:-tr}"
+  cat <<SEC_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_SECURITY_REPORT_MODE — the developer typed the literal keyword ${_BT}/mcl-security-report${_BT}. SKIP the entire MCL pipeline. Do NOT run Phase 1/spec/3/4/4.5/4.6/5. Do NOT ask clarifying questions.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — security-report${_BT}.\n2. Run via the Bash tool, in ONE call: ${_BT}python3 \"${SEC_HELPER_ESC}\" --mode=report --state-dir \"${STATE_DIR_SEC_ESC}\" --project-dir \"${PROJECT_DIR_SEC_ESC}\" --lang ${USER_LANG_FOR_SEC} --markdown${_BT}.\n3. Present the full stdout of that command to the developer as-is (already markdown, already in the developer's language).\n4. After the report, in one localized sentence remind the developer that detailed findings are appended to ${_BT}\$MCL_STATE_DIR/security-findings.jsonl${_BT}.\n5. STOP. ${_BT}/mcl-security-report${_BT} is unambiguous — run the scan and present the result.\n</mcl_core>"
+  }
+}
+SEC_OUTPUT
+  exit 0
+fi
+
 # -------- Branch: /codebase-scan keyword (since 8.6.0) --------
 if [ "$PROMPT_NORM" = "/codebase-scan" ]; then
   SCAN_HELPER="$(dirname "$0")/lib/mcl-codebase-scan.py"
