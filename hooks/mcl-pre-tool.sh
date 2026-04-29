@@ -280,9 +280,14 @@ print(json.dumps({
     exit 0
   fi
 fi
-# -------- Branch: plan critique done detection (Gap 3, since 8.2.10) --------
+# -------- Branch: plan critique substance gate (Gap 3 + 8.3.3) --------
 # Task with subagent_type containing "general-purpose" AND model containing
-# "sonnet" marks plan_critique_done=true so the next ExitPlanMode passes.
+# "sonnet" is the plan-critique shape. 8.2.10 set plan_critique_done=true on
+# this shape alone — bypassable via Task(prompt="say hi"). 8.3.3 adds an
+# intent-validation step: pre-tool scans the transcript for a recent
+# `Task(subagent_type=*mcl-intent-validator*)` call and reads its JSON
+# verdict. Recursion-safe — the validator subagent has its own subagent_type
+# so its own Task call passes through this gate without re-entry.
 if [ "$TOOL_NAME" = "Task" ] && command -v python3 >/dev/null 2>&1; then
   _PCD_TASK_INFO="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json, sys
@@ -299,9 +304,155 @@ except Exception:
   if [ -n "$_PCD_TASK_INFO" ]; then
     _PCD_SUB="${_PCD_TASK_INFO%%|*}"
     _PCD_MDL="${_PCD_TASK_INFO#*|}"
-    mcl_state_set plan_critique_done true >/dev/null 2>&1 || true
-    mcl_audit_log "plan-critique-done" "pre-tool" "subagent=${_PCD_SUB} model=${_PCD_MDL}"
-    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_done "${_PCD_MDL}"
+
+    # 8.3.3: scan transcript for the most recent mcl-intent-validator Task
+    # call + tool_result, parse the JSON verdict, branch accordingly.
+    _PCD_VALIDATION="missing|"
+    if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+      _PCD_VALIDATION="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
+import json, sys
+
+path = sys.argv[1]
+
+tool_uses, tool_results, order = {}, {}, []
+
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            msg = obj.get("message") or obj
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role")
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                t = item.get("type")
+                if role == "assistant" and t == "tool_use" and item.get("name") == "Task":
+                    inp = item.get("input") or {}
+                    sub = (inp.get("subagent_type") or "").lower()
+                    if "mcl-intent-validator" in sub:
+                        tid = item.get("id") or ""
+                        if tid:
+                            tool_uses[tid] = inp
+                            order.append(tid)
+                elif role == "user" and t == "tool_result":
+                    tid = item.get("tool_use_id") or ""
+                    if tid in tool_uses:
+                        raw = item.get("content")
+                        text_val = ""
+                        if isinstance(raw, str):
+                            text_val = raw
+                        elif isinstance(raw, list):
+                            parts = [b.get("text", "") for b in raw
+                                     if isinstance(b, dict) and b.get("type") == "text"]
+                            text_val = "\n".join(parts)
+                        tool_results[tid] = text_val
+except Exception:
+    pass
+
+# Walk in reverse to find LATEST validator with a result.
+for tid in reversed(order):
+    res = tool_results.get(tid)
+    if not res:
+        continue
+    # Try to extract the JSON object from the response. Validator is
+    # instructed to return a single-line JSON; tolerate leading/trailing
+    # whitespace and stray text — find the first {...} block.
+    s = res.strip()
+    parsed = None
+    try:
+        parsed = json.loads(s)
+    except Exception:
+        # Fallback: scan for a JSON object substring.
+        depth = 0
+        start = -1
+        for i, ch in enumerate(s):
+            if ch == "{":
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0 and start >= 0:
+                    try:
+                        parsed = json.loads(s[start:i + 1])
+                        break
+                    except Exception:
+                        pass
+                    start = -1
+    if not isinstance(parsed, dict):
+        print("parse-error|invalid-json")
+        sys.exit(0)
+    verdict = (parsed.get("verdict") or "").strip().lower()
+    reason = (parsed.get("reason") or "").strip()
+    if verdict in ("yes", "no"):
+        # Sanitize reason for audit log: strip pipes and newlines.
+        reason = reason.replace("|", "/").replace("\n", " ").replace("\r", " ")
+        if len(reason) > 120:
+            reason = reason[:120] + "…"
+        print(f"{verdict}|{reason}")
+        sys.exit(0)
+    print("parse-error|verdict-missing-or-invalid")
+    sys.exit(0)
+
+# No validator call found in transcript at all.
+print("missing|")
+PYEOF
+)"
+    fi
+    _PCD_VVERDICT="${_PCD_VALIDATION%%|*}"
+    _PCD_VREASON="${_PCD_VALIDATION#*|}"
+
+    case "$_PCD_VVERDICT" in
+      yes)
+        mcl_state_set plan_critique_done true >/dev/null 2>&1 || true
+        mcl_audit_log "plan-critique-done" "pre-tool" "subagent=${_PCD_SUB} model=${_PCD_MDL} intent_validated reason=${_PCD_VREASON}"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_done "${_PCD_MDL}"
+        ;;
+      no)
+        mcl_audit_log "plan-critique-substance-fail" "pre-tool" "intent=no reason=${_PCD_VREASON}"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_substance_fail "intent=no"
+        python3 -c '
+import json, sys
+reason_text = sys.argv[1]
+print(json.dumps({
+    "decision": "block",
+    "reason": "MCL PLAN CRITIQUE SUBSTANCE GATE — Intent validator rejected the prompt. Reason: " + reason_text + ". Refine the Task prompt so it clearly carries plan critique intent (concrete plan reference + analytical scope), or skip the critique step if not needed."
+}))
+' "$_PCD_VREASON" 2>/dev/null
+        exit 0
+        ;;
+      missing)
+        mcl_audit_log "plan-critique-substance-fail" "pre-tool" "validator=not-called"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_substance_fail "validator=not-called"
+        python3 -c '
+import json, sys
+print(json.dumps({
+    "decision": "block",
+    "reason": "MCL PLAN CRITIQUE SUBSTANCE GATE — Plan critique requires intent validation since 8.3.3. Before this Task(subagent_type=general-purpose, model=*sonnet*), dispatch Task(subagent_type=\"mcl-intent-validator\", prompt=<the same prompt>) FIRST. Wait for its JSON verdict; if {\"verdict\":\"yes\"} re-issue this Task; if {\"verdict\":\"no\"} refine the prompt or skip."
+}))
+' 2>/dev/null
+        exit 0
+        ;;
+      parse-error|*)
+        # Fail-open: validator runtime issue (malformed output, transient
+        # error). Don't lock the user out — proceed but record a warn so
+        # patterns are visible via audit / mcl check-up.
+        mcl_state_set plan_critique_done true >/dev/null 2>&1 || true
+        mcl_audit_log "intent-validator-parse-error" "pre-tool" "fail-open detail=${_PCD_VREASON}"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append intent_validator_parse_error
+        ;;
+    esac
   fi
 fi
 

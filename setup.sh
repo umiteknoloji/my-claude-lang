@@ -14,6 +14,7 @@ HOOK_PRETOOL_SRC="$HOOK_SRC_DIR/mcl-pre-tool.sh"
 HOOK_STOP_SRC="$HOOK_SRC_DIR/mcl-stop.sh"
 HOOK_POSTTOOL_SRC="$HOOK_SRC_DIR/mcl-post-tool.sh"
 HOOK_LIB_SRC="$HOOK_SRC_DIR/lib"
+AGENTS_SRC_DIR="$SCRIPT_DIR/agents"
 
 SKILL_DST="$HOME/.claude/skills/my-claude-lang"
 HOOK_DST_DIR="$HOME/.claude/hooks"
@@ -22,6 +23,7 @@ HOOK_PRETOOL_DST="$HOOK_DST_DIR/mcl-pre-tool.sh"
 HOOK_STOP_DST="$HOOK_DST_DIR/mcl-stop.sh"
 HOOK_POSTTOOL_DST="$HOOK_DST_DIR/mcl-post-tool.sh"
 HOOK_LIB_DST="$HOOK_DST_DIR/lib"
+AGENTS_DST_DIR="$HOME/.claude/agents"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 
 echo "my-claude-lang (MCL) Setup"
@@ -115,6 +117,18 @@ mkdir -p "$HOOK_LIB_DST"
 cp "$HOOK_LIB_SRC"/*.sh "$HOOK_LIB_DST/"
 cp "$HOOK_LIB_SRC"/*.py "$HOOK_LIB_DST/" 2>/dev/null || true
 echo "[OK] Hook scripts + lib installed to $HOOK_DST_DIR"
+
+# 2b. Install agent definitions (since 8.3.3)
+#     mcl-intent-validator.md — strict gate-keeper used by the plan-critique
+#     substance gate in mcl-pre-tool.sh. Copies the MCL-shipped agent files
+#     into ~/.claude/agents/ so Claude Code can dispatch them by name. We
+#     only copy MCL-prefixed agents (mcl-*.md) to avoid clobbering any user
+#     agents that happen to share names.
+if [ -d "$AGENTS_SRC_DIR" ] && compgen -G "$AGENTS_SRC_DIR/mcl-*.md" >/dev/null; then
+  mkdir -p "$AGENTS_DST_DIR"
+  cp "$AGENTS_SRC_DIR"/mcl-*.md "$AGENTS_DST_DIR/"
+  echo "[OK] Agent definitions installed to $AGENTS_DST_DIR (mcl-* only)"
+fi
 
 # 3. Configure hooks in settings.json
 #    Fresh install: write all three event registrations.
