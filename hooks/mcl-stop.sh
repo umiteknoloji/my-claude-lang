@@ -927,8 +927,24 @@ print("hit" if hit else "")
 PYEOF
 )"
         if [ "$_PA_HIT" != "hit" ]; then
+          # Backward-compat: 8.3.0 skip-detection signal still emitted.
           mcl_audit_log "precision-audit-skipped-warn" "mcl-stop.sh" "summary-confirmed-but-no-audit"
           command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_skipped_warn
+
+          # 8.3.2: hard block — Phase 4.5-tier enforcement. State stays
+          # at phase=1; the spec is treated as not-yet-final; Claude must
+          # complete Phase 1.7 in this same response before re-emitting
+          # the precision-enriched spec. English-language sessions emit
+          # `precision-audit | ... skipped=true` (handled in skill file)
+          # which counts as `hit` above and bypasses this block — the
+          # implicit safety valve for English source.
+          mcl_audit_log "precision-audit-block" "mcl-stop.sh" "summary-confirmed-but-no-audit; transition-rewind"
+          command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_block
+          printf '%s\n' "{
+  \"decision\": \"block\",
+  \"reason\": \"⚠️ MCL PHASE 1.7 PRECISION AUDIT ENFORCEMENT (mandatory, non-skippable)\n\nA Phase 2 spec block was emitted but Phase 1.7 Precision Audit has NOT been run. The Phase 1→2 transition is blocked. In this SAME response, before the turn closes:\n\n1. Read ~/.claude/skills/my-claude-lang/phase1-7-precision-audit.md for the dimension list and classification rules.\n2. Walk the 7 core dimensions (permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry) plus any matching stack add-ons returned by: bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect \\\"\$(pwd)\\\"\n3. Classify each dimension: SILENT-ASSUME (mark [assumed: X]), SKIP-MARK (mark [unspecified: X] — currently only Performance SLA), or GATE (architectural impact → ask one question via AskUserQuestion).\n4. Emit the audit entry via: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log precision-audit phase1-7 \\\"core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<tags> skipped=false\\\"' (substitute counts and tags).\n5. Re-emit the spec block with precision-enriched parameters. The prior spec is discarded — replaced, not duplicated.\n\nIf detected language is English, emit the audit with skipped=true (Phase 1 already in English; behavioral prior assumed sufficient) and the block clears immediately on the next turn.\n\nRecovery: if you believe this block fired in error (e.g., audit emit failed silently), type /mcl-restart to clear phase state.\"
+}"
+          exit 0
         fi
       fi
 

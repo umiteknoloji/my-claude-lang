@@ -211,4 +211,41 @@ A consistent run produces:
   appropriate spec marker for SILENT/SKIP and a confirmed answer for GATE
 - All matching stack-add-on dimensions classified
 
+## Enforcement (since 8.3.2 — hard tier)
+
+Phase 1.7 is enforced at the same tier as Phase 4.5: `mcl-stop.sh` returns
+`{"decision": "block", ...}` when a Phase 2 spec block (`📋 Spec:`) is
+detected in the turn AND no `precision-audit` audit entry was emitted earlier
+in the same session. State stays at `current_phase=1`; the Phase 1→2
+transition is rewound until the audit entry appears.
+
+The block reason instructs Claude to walk Phase 1.7 in the same response and
+re-emit the spec with precision-enriched parameters (the prior spec is
+discarded — replaced, not duplicated).
+
+Two events are written when the block fires:
+- `precision-audit-skipped-warn | mcl-stop.sh | summary-confirmed-but-no-audit` — backward-compat with 8.3.0 detection signal
+- `precision-audit-block | mcl-stop.sh | summary-confirmed-but-no-audit; transition-rewind` — the new enforcement event
+
+### English-language safety valve
+
+When the developer's detected language is English, Phase 1.7 is skipped. To
+clear the block, emit the audit entry with `skipped=true`:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log "precision-audit" "phase1-7" "core_gates=0 stack_gates=0 assumes=0 skipmarks=0 stack_tags= skipped=true"'
+```
+
+The next turn's `mcl-stop.sh` will see the audit entry and allow the
+transition. The block does NOT loop for English sessions when this audit is
+emitted.
+
+### Recovery
+
+If the block fires repeatedly and you believe it's in error (e.g., audit emit
+failed silently due to a filesystem race), the developer can type
+`/mcl-restart` to clear all phase state. Manual edits to `.mcl/state.json` are
+blocked by `mcl-pre-tool.sh` to prevent state-machine bypass; recovery must
+go through `/mcl-restart` or session restart.
+
 </mcl_phase>

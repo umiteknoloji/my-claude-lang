@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.3.1
+**Güncel sürüm:** 8.3.2
 
 ---
 
@@ -85,7 +85,7 @@ Phase 1 "completeness" sağlar; Phase 1.7 "precision" sağlar. Phase 1 onayı so
 
 **Stack add-on'lar:** typescript/javascript/react, python (FastAPI/Django), go/rust, cli, data-pipeline (spark/beam), mobile (swift/kotlin), ml-inference. Her add-on 2-5 delta boyut içerir. Vue/Svelte/Angular gelecek genişleme için TODO işaretlendi.
 
-İngilizce session'da skip — audit entry yine emit edilir (`skipped=true`) detection control olarak. `mcl-stop.sh` Phase 1→2 transition'ında audit'te `precision-audit` entry'si yoksa `precision-audit-skipped-warn` yazar (audit-only, non-blocking).
+İngilizce session'da skip — audit entry yine emit edilir (`skipped=true`) detection control olarak. **Hard enforcement (8.3.2):** `mcl-stop.sh` Phase 1→2 transition'ında audit'te `precision-audit` entry yoksa hem `precision-audit-skipped-warn` (8.3.0 detection signal, backward compat) hem `precision-audit-block` audit'leri yazar VE `decision:block` JSON döndürür — Phase 1→2 transition rewind edilir, Claude aynı response içinde Phase 1.7'i çalıştırıp spec'i yeniden emit etmek zorunda. Phase 4.5 ile aynı tier. İngilizce session safety valve: `skipped=true` audit emit edildiğinde block fire etmez.
 
 ### Phase 2 — Spec Üretimi
 
