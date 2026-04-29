@@ -331,8 +331,21 @@ done
 mcl_state_set phase1_intent "<one-line intent summary, English>" >/dev/null 2>&1
 mcl_state_set phase1_constraints "<one-line constraints CSV (stack, env, scale, etc.)>" >/dev/null 2>&1
 mcl_state_set phase1_stack_declared "<comma-separated stack tags inferred from Phase 1 context, e.g. react-frontend,python,db-postgres>" >/dev/null 2>&1
+_mcl_validate_stack_tags "<same comma-separated tags as above>" || true
+mcl_audit_log "phase1_state_populated" "phase1" "intent+constraints+stack" 2>/dev/null || true
 '
 ```
+
+The `_mcl_validate_stack_tags` call (since 8.16.0) checks each token
+against the canonical known-tag set in `mcl-state.sh`. Unknown tokens
+(typos like `react-frontnd`, non-canonical aliases like `db-postgresql`)
+emit a stderr WARN and an `stack-tag-unknown` audit entry. The set
+write itself is not blocked — the warning is advisory so Phase 1.7 can
+continue with whatever subset of tags did match.
+
+The `phase1_state_populated` audit event (since 8.16.0) is required by
+Phase 6 (a) audit-trail completeness check. If skill prose Bash is
+forgotten, Phase 6 (a) reports a LOW soft fail.
 
 `phase1_stack_declared` is the **greenfield fallback** for
 `mcl-stack-detect.sh` — when the project has no manifest yet but the

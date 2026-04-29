@@ -65,8 +65,46 @@ mandates a question (GATE).
 ### GATE
 Architectural impact, irreversible without rework, or developer's input
 contains explicit signal that the answer matters (e.g., they used the word
-"fast", "scale", "secure"). Ask exactly **one question** following the
-existing one-question-at-a-time rule, then mark the answer in spec parameters.
+"fast", "scale", "secure"). Ask the developer to confirm.
+
+## GATE Batching (since 8.16.0)
+
+When multiple GATE dimensions in the same **category** fire in a single
+Phase 1.7 evaluation, batch them into ONE `AskUserQuestion` call with
+`multiSelect: true` instead of asking each dimension in its own turn.
+This caps Phase 1.7 turn count at the number of categories (≤ 5)
+regardless of how many dimensions fire.
+
+### Categories
+
+| Category | Dimensions covered |
+|---|---|
+| Security | Permission/Access (1), AuthN/AuthZ (8), Authorization-per-Object (9), CSRF/Session (10), Secrets/Config (11), Untrusted Deserialization (12) |
+| Database | Storage Choice (13), Schema Ownership (14), Migration Policy (15), Index Strategy (16), Identifier Strategy (17), Tenant Isolation (18), Connection Pooling (19) |
+| UI | every UI stack add-on dimension (a11y, responsive, state mgmt, form validation, …) |
+| Operations | Deployment Strategy (20), Observability Tier (21), Test Policy (22), Documentation Level (23) |
+| Performance | Performance Budget (24) — single-dimension category, no batching needed |
+
+Single-dimension fires within a category still use the single-question
+form. Batching only applies when ≥ 2 dimensions in the same category
+fire in the same Phase 1.7 evaluation.
+
+### Batched question shape
+
+One `AskUserQuestion` per category with all firing dimensions as
+options, `multiSelect: true`. Each option label names the dimension
+plus its decision space ("Deployment: Docker / Procfile / serverless /
+skip"). Developer selects one option per dimension in a single turn.
+
+### Reverse path (model-behavioral, until 8.17.0)
+
+If the developer pushes back in the next turn ("ops için TST'yi yanlış
+seçtim, tekrar sor"), the model SHOULD discard the batched answer for
+the named dimension and re-ask it as a single question. There is no
+hook-level rollback — this is a model-behavioral workaround until
+8.17.0 introduces a structured batch-revise feature. Skill prose: when
+developer feedback explicitly names a batched dimension and contradicts
+the prior selection, treat it as a re-ask trigger.
 
 ## Core Dimensions (always apply, every project)
 
@@ -253,8 +291,14 @@ done
 mcl_state_set phase1_ops "{\"deployment_target\":\"<dep_choice>\",\"observability_tier\":\"<mon_choice>\",\"test_policy\":\"<tst_choice>\",\"doc_level\":\"<doc_choice>\"}" >/dev/null 2>&1
 # perf budget tier: strict | pragmatic | internal-only
 mcl_state_set phase1_perf "{\"budget_tier\":\"<perf_tier>\"}" >/dev/null 2>&1
+mcl_audit_log "phase1_ops_populated" "phase1-7" "deployment+observability+test+doc" 2>/dev/null || true
+mcl_audit_log "phase1_perf_populated" "phase1-7" "budget_tier=<perf_tier>" 2>/dev/null || true
 '
 ```
+
+The two audit events (since 8.16.0) are required by Phase 6 (a)
+audit-trail completeness check. If skill prose Bash is forgotten,
+Phase 6 (a) reports a LOW soft fail per missing event.
 
 These state objects feed Phase 4.5 ops gate (8.13.0) and Phase 4.5 perf
 gate (8.14.0), and inform threshold defaults (e.g. perf budget_tier

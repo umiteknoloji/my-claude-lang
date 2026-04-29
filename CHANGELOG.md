@@ -7,6 +7,37 @@
 
 ## [Unreleased]
 
+## [8.16.0] - 2026-04-30
+
+### Eklendi — GATE Batching + Hook State-Population Guard
+
+8.15.0 skill prose sprint state plumbing'i model davranışına bıraktı: 4 ayrı transition'da (Phase 1 handoff, Phase 1.7 audit, Phase 4a→4b, Phase 5→5.5) model `mcl_state_set` + `mcl_audit_log` Bash çağırmazsa state set edilmez ve hook seviyesinde detect yoktu. Ek olarak 8.15.0'ın ops (DEP/MON/TST/DOC) + perf (PERF) dimension'ları greenfield'da da fired olduğu için Phase 1.7 turn sayısı 12 → 14-16'ya çıkmıştı. 8.16.0 bu iki yan etkiyi kapatır + GATE patlamasını yarıya indirir.
+
+#### GATE Batching (Phase 1.7 turn sayısı yarıya iner)
+- **`skills/my-claude-lang/phase1-7-precision-audit.md`** — Aynı kategoride birden fazla GATE dimension fire ettiğinde tek `AskUserQuestion` (`multiSelect: true`) ile sorulur. Kategoriler: Security / Database / UI / Operations / Performance. Maksimum 5 turn (mevcut 14-16 turn yerine).
+  - Tek-dimension fire'lar yine tek-soru formuyla sorulur — batching sadece ≥ 2 dimension aynı kategoride fire ettiğinde uygulanır.
+  - **Reverse path (model-behavioral, 8.17.0'a kadar):** Geliştirici sonraki turn'de batched dimension'a explicit feedback verirse model batched answer'ı discard edip tek-soru formuyla yeniden sorar. Hook-level rollback yok; structured batch-revise feature 8.17.0'da.
+
+#### Hook State-Population Guard (skill prose Bash unutulursa LOW soft fail)
+- **`hooks/lib/mcl-phase6.py`** — Phase 6 (a) audit-trail check'e 4 yeni LOW soft fail event eklendi: `phase1_state_populated`, `phase1_ops_populated`, `phase1_perf_populated`, `ui_sub_phase_set`. HIGH değil — skill prose model behavior; hook execution'ı block etmez. Eksik event = developer'a görünür uyarı, downstream'in default state ile çalıştığını ortaya çıkarır.
+
+#### `mcl_state_set` String Auto-Coerce Dokümantasyonu
+- **`skills/my-claude-lang/phase4a-ui-build.md`** — `mcl_state_set` Python `json.loads` fallback davranışı explicit dokümante edildi: bare scalar (`UI_REVIEW`, `BACKEND`) string olarak auto-quote edilir; integer (`3`, `42`), JSON literal (`true`, `false`, `null`) ve JSON object/array parsed type olarak korunur. Mevcut state'teki integer field'lar (`current_phase`, `schema_version`, `last_update`, `phase4_5_high_baseline.*`) auto-coerce davranışından etkilenmez — JSON int olarak parse edilir, int kalır. 8.15.0'daki "outer-single + inner-double" quoting nüansı artık opsiyonel (kod değişmedi, sadece kullanım sadeleşti).
+
+#### Stack Tag Validation
+- **`hooks/lib/mcl-state.sh`** — `_mcl_validate_stack_tags` helper. `phase1_stack_declared` CSV'sindeki her token kanonik stack-tag set'ine karşı validate edilir. Bilinmeyen token (`react-frontnd` typo, `db-postgresql` non-canonical alias) stderr'e WARN üretir + `stack-tag-unknown` audit kaydı atılır. Set write block edilmez — uyarı advisory.
+- **`skills/my-claude-lang/phase1-rules.md`** — handoff Bash'i `_mcl_validate_stack_tags` çağrısı içerir.
+
+#### Audit emissions (skill prose, since 8.16.0)
+- `phase1-rules.md` — `mcl_audit_log "phase1_state_populated" ...` handoff sonrası
+- `phase1-7-precision-audit.md` — `mcl_audit_log "phase1_ops_populated" ...` + `phase1_perf_populated`
+- `phase4a-ui-build.md` — `mcl_audit_log "ui_sub_phase_set" ...` UI_REVIEW transition sonrası
+
+### Bilinen sınırlar
+- GATE batching reverse path 8.17.0'a kadar model-behavioral. Geliştirici batched seçimde hata yapıp sonraki turn'de düzeltme istemezse hata sessiz kalır.
+- State-population events LOW soft fail; HIGH'a yükseltme 8.18.0'da değerlendirilir (false-positive risk: hook geç başlayan project'lerde).
+- Known stack tag listesi `mcl-state.sh` içinde statik. Yeni stack eklendiğinde manual güncelleme.
+
 ## [8.15.0] - 2026-04-30
 
 ### Eklendi — Skill Prose Sprint (rule freshening)

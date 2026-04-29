@@ -312,6 +312,35 @@ mcl_audit_log() {
     >> "$dir/audit.log" 2>/dev/null || true
 }
 
+# Known stack tags — kept in sync with hooks/lib/mcl-stack-detect.sh.
+# Used by _mcl_validate_stack_tags to validate phase1_stack_declared.
+_MCL_KNOWN_STACK_TAGS="typescript javascript react-frontend vue-frontend svelte-frontend html-static python java csharp ruby php go rust db-postgres db-mysql db-sqlite db-mariadb db-mongo db-redis db-bigquery db-snowflake db-dynamodb orm-prisma orm-sqlalchemy orm-django orm-activerecord orm-sequelize orm-typeorm orm-gorm orm-eloquent cli data-pipeline ml-inference"
+
+_mcl_validate_stack_tags() {
+  # Validate a comma-separated stack-tag CSV against the known-tag set.
+  # Prints a WARN line per unknown tag to stderr. Returns 0 if all known,
+  # 1 if any unknown. Empty/whitespace tokens are ignored.
+  local csv="${1:-}"
+  [ -z "$csv" ] && return 0
+  local bad=() t
+  local IFS=','
+  for t in $csv; do
+    t="$(echo "$t" | tr -d '[:space:]')"
+    [ -z "$t" ] && continue
+    case " $_MCL_KNOWN_STACK_TAGS " in
+      *" $t "*) ;;
+      *) bad+=("$t") ;;
+    esac
+  done
+  if [ ${#bad[@]} -gt 0 ]; then
+    echo "[mcl] WARN: unknown stack tag(s): ${bad[*]}" >&2
+    echo "[mcl] known tags: $_MCL_KNOWN_STACK_TAGS" >&2
+    mcl_audit_log "stack-tag-unknown" "$(basename "${0:-unknown}")" "tags=${bad[*]}"
+    return 1
+  fi
+  return 0
+}
+
 mcl_get_active_phase() {
   # Returns a single effective phase string from the combination of
   # current_phase, spec_approved, phase_review_state, ui_sub_phase,

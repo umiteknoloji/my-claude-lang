@@ -92,6 +92,10 @@ Phase 1 "completeness" sağlar; Phase 1.7 "precision" sağlar. Phase 1 onayı so
 - **Domain-shape (içerik tabanlı, dil değil):** cli, data-pipeline (Airflow/dbt/Prefect/Dagster + Beam/Spark), ml-inference (model artifact / torch/tensorflow/scikit-learn/mlflow). 8.4.1'de `mcl-stack-detect.sh` heuristik tespit eder; daha önce TODO idi.
 - Her add-on 2-5 delta boyut içerir. Solid/Angular/Qwik ve kotlin-mobile vs kotlin-backend ayrımı gelecek genişleme için TODO.
 
+**GATE Batching:** Aynı kategoride (Security / Database / UI / Operations / Performance) birden fazla GATE dimension fire ettiğinde tek `AskUserQuestion` (`multiSelect: true`) ile sorulur — her kategori en fazla 1 turn. Tek-dimension fire'lar yine tek-soru formuyla. Reverse path: geliştirici sonraki turn'de batched dimension'a feedback verirse model batched answer'ı discard edip yeniden sorar (model-behavioral, structured rollback gelecek sürümde).
+
+**Stack tag validation:** Phase 1 handoff sırasında set edilen `phase1_stack_declared` CSV'si, `mcl-state.sh`'taki kanonik stack-tag set'ine karşı validate edilir. Bilinmeyen token (typo, non-canonical alias) stderr'e WARN üretir + `stack-tag-unknown` audit kaydı atılır; set yine yazılır (uyarı advisory). Phase 1.7 hangi token match etti onunla devam eder.
+
 İngilizce session'da skip — audit entry yine emit edilir (`skipped=true`) detection control olarak. **Hard enforcement (8.3.2):** `mcl-stop.sh` Phase 1→2 transition'ında audit'te `precision-audit` entry yoksa hem `precision-audit-skipped-warn` (8.3.0 detection signal, backward compat) hem `precision-audit-block` audit'leri yazar VE `decision:block` JSON döndürür — Phase 1→2 transition rewind edilir, Claude aynı response içinde Phase 1.7'i çalıştırıp spec'i yeniden emit etmek zorunda. Phase 4.5 ile aynı tier. İngilizce session safety valve: `skipped=true` audit emit edildiğinde block fire etmez.
 
 ### Phase 1.5 — Engineering Brief (Upgrade-Translator, 8.4.0+)

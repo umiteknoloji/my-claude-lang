@@ -186,15 +186,22 @@ for lib in "$MCL_HOME/lib/hooks/lib/mcl-state.sh" \
            "$HOME/.claude/hooks/lib/mcl-state.sh"; do
   [ -f "$lib" ] && source "$lib" && break
 done
-mcl_state_set ui_sub_phase "\"UI_REVIEW\"" >/dev/null 2>&1
+mcl_state_set ui_sub_phase UI_REVIEW >/dev/null 2>&1
+mcl_audit_log "ui_sub_phase_set" "phase4a" "UI_REVIEW" 2>/dev/null || true
 '
 ```
 
-**Quoting note:** the JSON value is a string, so the field value
-must be `"UI_REVIEW"` (with surrounding double-quotes). Inside Bash
-double-quotes, escape as `"\"UI_REVIEW\""`. Wrong quoting (e.g.
-`mcl_state_set ui_sub_phase UI_REVIEW`) produces an `mcl-state` validation
-rejection.
+**Quoting note (since 8.16.0):** `mcl_state_set` parses the value as JSON
+first; if parsing fails it falls back to a string. So bare scalars like
+`UI_REVIEW`, `BACKEND`, `BUILD_UI` are auto-quoted into JSON strings —
+no need for inner-double-quote escaping. Integer literals (`3`, `42`),
+JSON literals (`true`, `false`, `null`), and JSON objects/arrays
+(`'{"k":"v"}'`, `'[1,2]'`) are preserved as their parsed types. This
+applies to every `mcl_state_set` call, not just this transition.
+
+The `ui_sub_phase_set` audit event (since 8.16.0) is required by Phase
+6 (a) audit-trail completeness. If skill prose Bash is forgotten,
+Phase 6 (a) reports a LOW soft fail.
 
 This signal tells `mcl-stop.sh` (8.12.0 dev-server auto-start gate) to
 invoke `mcl_devserver_start` on the next Stop event, spawning the FE

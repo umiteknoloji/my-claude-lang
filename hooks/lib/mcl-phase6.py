@@ -38,6 +38,17 @@ SOFT_REQUIRED_EVENTS = {
     "spec-save": "Phase 2 spec save (alternative)",
 }
 
+# State-population audit events (since 8.16.0). Skill prose emits these
+# after `mcl_state_set` calls in Phase 1 handoff, Phase 1.7 audit
+# emission, and Phase 4a → 4b transition. Missing event = LOW soft fail
+# (skill prose model behavior; hook does not block).
+STATE_POPULATION_EVENTS = {
+    "phase1_state_populated": "Phase 1 → 1.7 handoff (intent/constraints/stack)",
+    "phase1_ops_populated":   "Phase 1.7 ops dimensions classified",
+    "phase1_perf_populated":  "Phase 1.7 perf budget classified",
+    "ui_sub_phase_set":       "Phase 4a → 4b UI_REVIEW transition",
+}
+
 STOPWORDS = {
     "the", "a", "an", "and", "or", "but", "if", "then", "else", "for",
     "with", "to", "from", "of", "in", "on", "at", "by", "as", "is", "are",
@@ -118,6 +129,17 @@ def check_audit_trail(state_dir: Path) -> tuple[list[dict], list[dict]]:
             "message": "phase5-verify audit event missing — 8.10.x and earlier projects do not emit this; soft-fail (advisory).",
             "category": "phase6-audit-trail",
         })
+    # State-population events (since 8.16.0): each missing event surfaces
+    # as a LOW soft fail. They detect the case where skill prose forgot
+    # to call the corresponding `mcl_state_set` + `mcl_audit_log` Bash.
+    for ev, label in STATE_POPULATION_EVENTS.items():
+        if ev not in seen:
+            low.append({
+                "severity": "LOW", "source": "phase6", "rule_id": f"P6-A-missing-{ev}",
+                "file": str(audit_log), "line": 0,
+                "message": f"State-population audit event '{ev}' ({label}) missing — skill prose Bash may not have run; downstream phases may have read default state.",
+                "category": "phase6-audit-trail",
+            })
     return high, low
 
 
