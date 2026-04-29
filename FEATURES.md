@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.2.13
+**Güncel sürüm:** 8.3.0
 
 ---
 
@@ -11,6 +11,7 @@ MCL her geliştirici mesajını sıralı fazlardan geçirir. Bir faz eksik param
 
 ```
 Phase 1   → Anlama (intent, constraints, success_criteria, context)
+Phase 1.7 → Precision Audit (7 core boyut + stack add-on; SILENT-ASSUME / SKIP-MARK / GATE)
 Phase 1.5 → Engineering Brief (kullanıcı dili → EN çevirisi, yorumsuz)
 Phase 2   → Spec üretimi
 Phase 3   → Spec doğrulama + geliştirici onayı
@@ -71,6 +72,20 @@ Kullanıcı bir GATE sorusunu yanıtladıktan sonra, cevabın teknik imlikasyonu
 - Mantıksal çelişkiler: "offline AND real-time data" → hangisi öncelikli?
 - Nested conditional requirements: karmaşık şart cümlelerini numaralı listeye böler
 - Hidden sub-tasks: tek istek gibi görünen ama birden fazla bağımsız görev içerenleri tespit eder
+
+### Phase 1.7 — Precision Audit (8.3.0)
+
+Phase 1 "completeness" sağlar; Phase 1.7 "precision" sağlar. Phase 1 onayı sonrası, Phase 1.5 brief'inden önce çalışır. 7 core boyut + `mcl-stack-detect.sh` tag'lerine göre stack add-on boyutları walk eder. Her boyut üç sınıftan birine düşer:
+
+- **SILENT-ASSUME** — industry default var, reversible. Spec'te `[assumed: X]` markla.
+- **SKIP-MARK** — güvenli default yok, varsayım yapma. Spec'te `[unspecified: X]` markla. Şu an yalnızca **Performance SLA**'da kullanılıyor.
+- **GATE** — mimari etki var, tek soru sor (one-question-at-a-time).
+
+**Core 7 boyut (her projede):** Permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry. UX state'leri (empty/loading/error UI) UI stack add-on'larında — core'da değil.
+
+**Stack add-on'lar:** typescript/javascript/react, python (FastAPI/Django), go/rust, cli, data-pipeline (spark/beam), mobile (swift/kotlin), ml-inference. Her add-on 2-5 delta boyut içerir. Vue/Svelte/Angular gelecek genişleme için TODO işaretlendi.
+
+İngilizce session'da skip — audit entry yine emit edilir (`skipped=true`) detection control olarak. `mcl-stop.sh` Phase 1→2 transition'ında audit'te `precision-audit` entry'si yoksa `precision-audit-skipped-warn` yazar (audit-only, non-blocking).
 
 ### Phase 2 — Spec Üretimi
 

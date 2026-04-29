@@ -7,6 +7,33 @@
 
 ## [Unreleased]
 
+## [8.3.0] - 2026-04-29
+
+### Eklendi
+- **Phase 1.7 — Precision Audit (yeni faz, ana misyon).** Phase 1'in "completeness" disiplinini "precision" ile tamamlar. Senior İngilizce geliştiricinin analitik düşünme davranışını sistemleştirir: confirmed Phase 1 parametreleri için 7 core boyut + stack-detect-driven add-on boyutları walk edilir.
+  - **Core 7 boyut:** Permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry. UX state'ler (empty/loading/error UI) **core'da DEĞİL** — UI stack add-on'larında.
+  - **3 sınıflandırma:** SILENT-ASSUME (`[assumed: X]`), **SKIP-MARK** (yeni 3. kategori — `[unspecified: X]`, şu an yalnızca Performance SLA için), GATE (tek soru sor, one-question-at-a-time rule).
+  - **Stack add-on'lar:** typescript/javascript/react, python, go/rust, cli, data-pipeline, mobile, ml-inference. Vue/Svelte/Angular ayrımı v1'de tek TS/JS/React başlığı altında — skill dosyasında TODO comment ile gelecek genişleme işaretli.
+  - **English session skip:** `skipped=true` audit ile no-op (behavioral prior yeterli kabul).
+  - **Detection control:** `mcl-stop.sh` Phase 1→2 transition'ında audit'te `precision-audit` yoksa `precision-audit-skipped-warn` yazar.
+- **Files:** `skills/my-claude-lang/phase1-7-precision-audit.md` (yeni skill, 7 core dim + 7 stack add-on + sample questions); `skills/my-claude-lang.md` (pointer satırı); `skills/my-claude-lang/all-mcl.md` (STEP-64); `hooks/mcl-activate.sh` STATIC_CONTEXT (Phase 1 → 1.7 → 1.5 → 2 sıralaması); `hooks/mcl-stop.sh` (skip-detection bloğu Phase 1→2 case branch'inde).
+
+### Test
+- Skill dosyası mevcut, 7 core dim + 7 stack section + SKIP-MARK + Vue/Svelte TODO PASS
+- Pointer line `skills/my-claude-lang.md`'de PASS
+- STEP-64 `all-mcl.md`'de PASS
+- Skip-detection: spec emit + audit boş → `precision-audit-skipped-warn` yazıldı PASS
+- Skip-detection: spec emit + `precision-audit` audit var → warn yazılmadı PASS
+- English session skip: `skipped=true` audit → warn yazılmadı PASS
+- Stack tag listesi (7 add-on) skill dosyasında doğrulandı PASS
+- Mevcut test suite: 19 pass, 0 fail, 2 skip — regresyonsuz
+
+### Out of scope (gelecek iterasyonlar)
+- `PRECISION_AUDIT_PENDING_NOTICE` activate hook injection — v1'de behavioral + audit detection yeterli kabul edildi. Gerekirse v2'de eklenir.
+- `precision_audit_done` state field — v1'de behavioral phase, audit-driven detection. Yeni state field eklenmedi.
+- Per-project dimension override (`.mcl/precision-config.json`) — v1: skill dosyası tek truth source.
+- Vue/Svelte/Angular framework-specific stack add-on'ları — TODO comment skill dosyasında.
+
 ## [8.2.13] - 2026-04-29
 
 ### Düzeltildi

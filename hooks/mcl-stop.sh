@@ -889,6 +889,49 @@ SPEC_APPROVED="$(mcl_state_get spec_approved)"
 if [ -n "$SPEC_HASH" ]; then
   case "$CURRENT_PHASE" in
     1)
+      # --- Phase 1.7 precision-audit skip detection (since 8.3.0) ---
+      # Phase 1 → 2 transition: Phase 1.7 should have emitted a precision-audit
+      # entry before the spec block was written. Scan audit.log for the entry,
+      # scoped to current session via last `session_start` in trace.log. If
+      # missing → write `precision-audit-skipped-warn`. Audit-only, non-blocking.
+      _PA_AUDIT_FILE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+      _PA_TRACE_FILE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+      if [ -f "$_PA_AUDIT_FILE" ] && command -v python3 >/dev/null 2>&1; then
+        _PA_HIT="$(python3 - "$_PA_AUDIT_FILE" "$_PA_TRACE_FILE" 2>/dev/null <<'PYEOF'
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        with open(trace_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if "| session_start |" in line:
+                    parts = line.split("|", 1)
+                    if parts:
+                        session_ts = parts[0].strip()
+except Exception:
+    pass
+hit = False
+try:
+    with open(audit_path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "| precision-audit |" not in line:
+                continue
+            ts = line.split("|", 1)[0].strip()
+            if not session_ts or ts >= session_ts:
+                hit = True
+                break
+except Exception:
+    pass
+print("hit" if hit else "")
+PYEOF
+)"
+        if [ "$_PA_HIT" != "hit" ]; then
+          mcl_audit_log "precision-audit-skipped-warn" "mcl-stop.sh" "summary-confirmed-but-no-audit"
+          command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_skipped_warn
+        fi
+      fi
+
       mcl_state_set current_phase 2
       mcl_state_set phase_name '"SPEC_REVIEW"'
       mcl_state_set spec_hash "\"$SPEC_HASH\""

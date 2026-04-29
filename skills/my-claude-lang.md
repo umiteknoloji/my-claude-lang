@@ -215,14 +215,26 @@ Do not write anything else. Do not call tools beyond the AskUserQuestion
 itself. The summary is NOT permission to start Phase 1.5 — only the
 developer's approve-family selection in the tool_result is.
 
+## Phase 1.7: Precision Audit (since 8.3.0)
+
+For full Phase 1.7 rules, read `my-claude-lang/phase1-7-precision-audit.md`
+
+Walks 7 core dimensions (permission, failure modes, out-of-scope, PII,
+audit/observability, performance SLA, idempotency) plus stack-detect-matched
+add-on dimensions. Each dimension is classified SILENT-ASSUME (industry
+default → `[assumed: X]`), SKIP-MARK (no safe default → `[unspecified: X]`,
+used by Performance SLA), or GATE (architectural impact → ask one question).
+Skipped silently when source language is English. Emits `precision-audit`
+audit entry in both run and skipped cases. After Phase 1.7 → Phase 1.5.
+
 ## Phase 1.5: Engineering Brief
 
 For full Phase 1.5 rules, read `my-claude-lang/phase1-5-engineering-brief.md`
 
 Produces an internal English Engineering Brief from the confirmed Phase 1
-parameters. Skipped silently when source language is English. Not shown
-to the developer. Emits `engineering-brief` audit entry in all cases.
-After Phase 1.5 → Phase 2 begins.
+parameters (precision-enriched by Phase 1.7 since 8.3.0). Skipped silently
+when source language is English. Not shown to the developer. Emits
+`engineering-brief` audit entry in all cases. After Phase 1.5 → Phase 2 begins.
 
 ## Phase 2: Generate English Spec — MANDATORY, NEVER SKIP
 
