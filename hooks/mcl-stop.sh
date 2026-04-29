@@ -516,6 +516,79 @@ if [ "$_PR_FINAL_STATE" = "running" ] && [ -z "$ASKQ_INTENT" ]; then
   command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase5_skipped_warn
 fi
 
+# --- Root Cause Chain keyword scan after ExitPlanMode (since 8.2.8 — Gap 2) ---
+# When the last assistant turn used ExitPlanMode, scan its text + tool inputs
+# for the 3-check chain keywords. Pairs (EN OR TR per pair, case-insensitive):
+#   removal test / kaldırma testi
+#   falsification / yanlışlama
+#   visible process / görünür süreç
+# If any pair has neither EN nor TR → audit `root-cause-chain-skipped-warn`.
+if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] && command -v python3 >/dev/null 2>&1; then
+  _RCC_RESULT="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
+import json, sys
+
+path = sys.argv[1]
+last_text = []
+last_tools = []
+last_inputs = []
+
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+            except Exception:
+                continue
+            msg = obj.get("message") or obj
+            if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                continue
+            content = msg.get("content")
+            text_parts, tool_inputs, tool_names = [], [], []
+            if isinstance(content, str):
+                text_parts.append(content)
+            elif isinstance(content, list):
+                for item in content:
+                    if not isinstance(item, dict):
+                        continue
+                    t = item.get("type")
+                    if t == "text":
+                        v = item.get("text", "")
+                        if isinstance(v, str):
+                            text_parts.append(v)
+                    elif t == "tool_use":
+                        tool_names.append(item.get("name", ""))
+                        inp = item.get("input", {})
+                        if isinstance(inp, dict):
+                            for v in inp.values():
+                                if isinstance(v, str):
+                                    tool_inputs.append(v)
+            last_text, last_tools, last_inputs = text_parts, tool_names, tool_inputs
+except Exception:
+    pass
+
+if "ExitPlanMode" not in last_tools:
+    print("")
+    sys.exit(0)
+
+haystack = "\n".join(last_text + last_inputs).lower()
+pairs = [
+    ("removal test",   "kaldırma testi"),
+    ("falsification",  "yanlışlama"),
+    ("visible process","görünür süreç"),
+]
+missing = [en for en, tr in pairs if (en not in haystack and tr not in haystack)]
+print(",".join(missing) if missing else "OK")
+PYEOF
+)"
+  if [ -n "$_RCC_RESULT" ] && [ "$_RCC_RESULT" != "OK" ]; then
+    mcl_audit_log "root-cause-chain-skipped-warn" "mcl-stop.sh" "missing=$_RCC_RESULT"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append root_cause_chain_skipped_warn "$_RCC_RESULT"
+  fi
+fi
+
 # --- Phase 3.5 pattern-scan clearance (runs before early exit) ---
 # Must run before the spec/askq gate below because the Phase 3.5 turn has
 # no spec block and no AskUQ — the early exit would skip this otherwise.

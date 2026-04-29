@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+## [8.2.8] - 2026-04-29
+
+### Eklendi
+- **Gap 2 — Root cause chain enforcement trinity (`mcl-activate.sh`, `mcl-stop.sh`, `all-mcl.md`):**
+  - **Hook (`mcl-activate.sh`):** `.claude/plans/*.md` dosyalarından biri current session içinde (son `session_start` event'inden sonra) modify edildiyse `ROOT_CAUSE_DISCIPLINE_NOTICE` `additionalContext`'e enjekte edilir. Notice metni Claude'a plan turn'unda 3 check'i (visible process / removal test / falsification) görünür şekilde yazmasını söyler.
+  - **Meta-control (`mcl-stop.sh`):** Son assistant turun'da `ExitPlanMode` tool_use varsa, turun text content'i + tool input'ları case-insensitive olarak üç keyword çifti için taranır (EN OR TR per pair): `removal test` / `kaldırma testi`, `falsification` / `yanlışlama`, `visible process` / `görünür süreç`. Bir çiftin ne EN ne TR formu bulunamazsa audit'e `root-cause-chain-skipped-warn | mcl-stop.sh | missing=<list>` yazılır.
+  - **Auto-display (`mcl-activate.sh`):** Audit log'da current session içinde `root-cause-chain-skipped-warn` entry'si varsa `ROOT_CAUSE_CHAIN_WARN_NOTICE` enjekte edilir — Claude'a planı yeniden 3 check'le birlikte emit etmesini söyler.
+  - **STEP-62:** `skills/my-claude-lang/all-mcl.md`'ye `root-cause-chain-discipline` adımı eklendi.
+
+### Test
+- Plan file mtime + activate hook → ROOT_CAUSE_DISCIPLINE_NOTICE PASS
+- ExitPlanMode + keyword yok → audit warn PASS
+- ExitPlanMode + EN keyword'lar → warn yok PASS
+- ExitPlanMode + TR keyword'lar → warn yok (TR pattern eşleşiyor) PASS
+- Activate JSON valid + WARN notice present (audit fired) PASS
+- Mevcut test suite (19 pass, 0 fail, 2 skip) regresyonsuz
+
 ## [8.2.7] - 2026-04-29
 
 ### Eklendi

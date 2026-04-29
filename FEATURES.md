@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.2.7
+**Güncel sürüm:** 8.2.8
 
 ---
 
@@ -203,6 +203,9 @@ Call-graph tabanlı "gerçekten otomatize edilemeyen" liste. Hiçbiri tetiklenme
 
 **Hook Health Check** (8.2.7)
 Dört MCL hook'u (stop / activate / pre_tool / post_tool) son başarılı çalışma timestamp'ini `.mcl/hook-health.json`'a yazar. `mcl check-up` (STEP-61) eksik veya 24 saatten eski bir alan bulursa WARN üretir — hook'un kayıt dışı kaldığını veya sessizce başarısız olduğunu yakalar.
+
+**Root Cause Chain Discipline** (8.2.8)
+Plan-mode tespiti: bu session içinde `.claude/plans/*.md` dosyalarından biri modify edildiyse `mcl-activate.sh`, `ROOT_CAUSE_DISCIPLINE_NOTICE` enjekte ederek 3-check zincirini zorunlu kılar (visible process / removal test / falsification). `mcl-stop.sh`, `ExitPlanMode` çağrısı yapılan son assistant turunda metin + tool input'ları üç keyword çifti için (EN/TR, case-insensitive) tarar: `removal test`/`kaldırma testi`, `falsification`/`yanlışlama`, `visible process`/`görünür süreç`. Bir çiftin ne EN ne de TR formu yoksa audit'e `root-cause-chain-skipped-warn` yazılır; bir sonraki turda `mcl-activate.sh` `ROOT_CAUSE_CHAIN_WARN_NOTICE` ile Claude'a planı yeniden emit etmesini söyler.
 
 ---
 

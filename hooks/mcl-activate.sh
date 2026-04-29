@@ -780,6 +780,99 @@ PYEOF
   fi
 fi
 
+# Root Cause Discipline notice (since 8.2.8 — Gap 2). Plan-mode detection:
+# any `.claude/plans/*.md` modified since the last `session_start` event in
+# trace.log. While active, inject the discipline notice every turn telling
+# Claude to show the 3-check root-cause chain in the plan text.
+ROOT_CAUSE_DISCIPLINE_NOTICE=""
+if command -v python3 >/dev/null 2>&1; then
+  _RCD_PLANS_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/plans"
+  _RCD_TRACE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ -d "$_RCD_PLANS_DIR" ]; then
+    _RCD_HIT="$(python3 - "$_RCD_PLANS_DIR" "$_RCD_TRACE" 2>/dev/null <<'PYEOF'
+import os, sys, glob, time
+plans_dir, trace_path = sys.argv[1], sys.argv[2]
+session_epoch = 0
+try:
+    if os.path.isfile(trace_path):
+        with open(trace_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if "| session_start |" in line:
+                    ts = line.split("|", 1)[0].strip()
+                    try:
+                        session_epoch = int(time.mktime(time.strptime(ts, "%Y-%m-%d %H:%M:%S")))
+                    except Exception:
+                        pass
+except Exception:
+    pass
+hit = False
+try:
+    for path in glob.glob(os.path.join(plans_dir, "*.md")):
+        try:
+            mt = int(os.path.getmtime(path))
+            if mt >= session_epoch:
+                hit = True
+                break
+        except Exception:
+            continue
+except Exception:
+    pass
+print("hit" if hit else "")
+PYEOF
+)"
+    if [ "$_RCD_HIT" = "hit" ]; then
+      ROOT_CAUSE_DISCIPLINE_NOTICE="<mcl_audit name=\\\"root-cause-discipline\\\">\\nDEVTIME ROOT CAUSE DISCIPLINE — MANDATORY for this plan turn:\\nBefore finalizing the plan, show visible chain:\\n  1. Visible process: write out the reasoning path\\n  2. Removal test: if this cause removed → parent problem resolves?\\n  3. Falsification: what observable X confirms this cause?\\nThese three MUST appear in the plan text or in your response.\\nOmitting them means the plan is incomplete.\\n</mcl_audit>\\n\\n"
+      mcl_audit_log "root-cause-discipline-notice" "mcl-activate.sh" "shown"
+    fi
+  fi
+fi
+
+# Root Cause Chain Skipped notice (since 8.2.8 — Gap 2 auto-display).
+# Fires when the previous plan turn's keyword scan in mcl-stop.sh found a
+# missing chain check (one of removal-test / falsification / visible-process)
+# and wrote a `root-cause-chain-skipped-warn` audit entry. Scoped to current
+# session via last `session_start` in trace.log.
+ROOT_CAUSE_CHAIN_WARN_NOTICE=""
+if command -v python3 >/dev/null 2>&1; then
+  _RCW_AUDIT="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  _RCW_TRACE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ -f "$_RCW_AUDIT" ]; then
+    _RCW_HIT="$(python3 - "$_RCW_AUDIT" "$_RCW_TRACE" 2>/dev/null <<'PYEOF'
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        with open(trace_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if "| session_start |" in line:
+                    parts = line.split("|", 1)
+                    if parts:
+                        session_ts = parts[0].strip()
+except Exception:
+    pass
+hit = False
+try:
+    with open(audit_path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "root-cause-chain-skipped-warn" not in line:
+                continue
+            ts = line.split("|", 1)[0].strip()
+            if not session_ts or ts >= session_ts:
+                hit = True
+                break
+except Exception:
+    pass
+print("hit" if hit else "")
+PYEOF
+)"
+    if [ "$_RCW_HIT" = "hit" ]; then
+      ROOT_CAUSE_CHAIN_WARN_NOTICE="<mcl_audit name=\\\"root-cause-chain-skipped\\\">\\nROOT CAUSE CHAIN SKIPPED — the previous plan turn finalized via ExitPlanMode but the assistant text was missing one or more required checks: visible process, removal test, falsification. The 3-check chain is mandatory for plan turns. Re-emit the plan with all three checks visible before any further plan-mode work.\\n</mcl_audit>\\n\\n"
+      mcl_audit_log "root-cause-chain-warn-notice" "mcl-activate.sh" "shown"
+    fi
+  fi
+fi
+
 # Plugin dispatch audit — fires when Phase 4.5 is running to check whether
 # required plugins (code-review sub-agent, semgrep) were actually dispatched.
 PLUGIN_MISS_NOTICE=""
@@ -825,7 +918,7 @@ print(json.dumps(sys.stdin.read().strip())[1:-1])
   fi
 fi
 
-FULL_CONTEXT="${UPDATE_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
+FULL_CONTEXT="${UPDATE_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
 
 # Log MCL injection size for cost accounting (mcl-doctor)
 if command -v python3 >/dev/null 2>&1; then
