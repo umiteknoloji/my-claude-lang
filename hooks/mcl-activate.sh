@@ -150,6 +150,41 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /mcl-db-report keyword (since 8.8.0) --------
+if [ "$PROMPT_NORM" = "/mcl-db-report" ]; then
+  DB_HELPER="$(dirname "$0")/lib/mcl-db-scan.py"
+  DB_HELPER_ESC="$(printf '%s' "$DB_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  STATE_DIR_DB_ESC="$(printf '%s' "${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}/.mcl}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_DB_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_DB="${MCL_USER_LANG:-tr}"
+  cat <<DB_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_DB_REPORT_MODE — the developer typed the literal keyword ${_BT}/mcl-db-report${_BT}. SKIP the entire MCL pipeline. Do NOT run Phase 1/spec/3/4/4.5/4.6/5. Do NOT ask clarifying questions.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — db-report${_BT}.\n2. Run via the Bash tool, in ONE call: ${_BT}python3 \"${DB_HELPER_ESC}\" --mode=report --state-dir \"${STATE_DIR_DB_ESC}\" --project-dir \"${PROJECT_DIR_DB_ESC}\" --lang ${USER_LANG_FOR_DB} --markdown${_BT}.\n3. Present the full stdout of that command to the developer as-is (already markdown, already in the developer's language).\n4. After the report, in one localized sentence remind the developer that detailed findings are appended to ${_BT}\$MCL_STATE_DIR/db-findings.jsonl${_BT}, and that ${_BT}/mcl-db-explain${_BT} (with MCL_DB_URL env set) runs EXPLAIN on saved query files.\n5. STOP. ${_BT}/mcl-db-report${_BT} is unambiguous — run the scan and present the result.\n</mcl_core>"
+  }
+}
+DB_OUTPUT
+  exit 0
+fi
+
+# -------- Branch: /mcl-db-explain keyword (since 8.8.0) --------
+if [ "$PROMPT_NORM" = "/mcl-db-explain" ]; then
+  DB_EXPLAIN_HELPER="$(dirname "$0")/lib/mcl-db-explain.sh"
+  DB_EXPLAIN_HELPER_ESC="$(printf '%s' "$DB_EXPLAIN_HELPER" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PROJECT_DIR_DBX_ESC="$(printf '%s' "${CLAUDE_PROJECT_DIR:-$PWD}" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  USER_LANG_FOR_DBX="${MCL_USER_LANG:-tr}"
+  cat <<DBX_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_DB_EXPLAIN_MODE — the developer typed the literal keyword ${_BT}/mcl-db-explain${_BT}. SKIP the entire MCL pipeline.\n\nExecute these steps and respond ONLY in the developer's detected language (default Turkish if unknown):\n\n1. Start the response with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — db-explain${_BT}.\n2. Run via the Bash tool: ${_BT}bash \"${DB_EXPLAIN_HELPER_ESC}\" \"${PROJECT_DIR_DBX_ESC}\" ${USER_LANG_FOR_DBX}${_BT}.\n3. Present the full stdout as-is. If MCL_DB_URL is unset, the helper prints a localized advisory — relay it verbatim, do not invent EXPLAIN output.\n4. STOP.\n</mcl_core>"
+  }
+}
+DBX_OUTPUT
+  exit 0
+fi
+
 # -------- Branch: /mcl-security-report keyword (since 8.7.0) --------
 if [ "$PROMPT_NORM" = "/mcl-security-report" ]; then
   SEC_HELPER="$(dirname "$0")/lib/mcl-security-scan.py"

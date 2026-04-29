@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.7.1
+**Güncel sürüm:** 8.8.0
 
 ---
 

@@ -7,6 +7,86 @@
 
 ## [Unreleased]
 
+## [8.8.0] - 2026-04-29
+
+### Eklendi — DB Tasarım Disiplini (3-tier, ORM-aware)
+
+8.7.0 backend security'nin DB layer kapsamı sadece SQL injection / hardcoded credential / mass-assignment ile sınırlıydı. Schema design, index stratejisi, N+1 detection, migration safety, query plan, connection pooling, multi-tenancy — boştu. Bu patch 8.7.x security pattern'ini birebir paralel hatla DB tasarım disiplinine uyarlıyor.
+
+#### Yeni dosyalar
+- **`hooks/lib/mcl-db-rules.py`** — generic core 10 + 8 ORM × 3 anchor = 24 add-on = **34 rule**. Decorator-registry, `category=db-*` zorunlu, dialect field.
+  - Generic core: DB-G01 missing-PK, DB-G02 SELECT-*, DB-G03 missing-FK-index, DB-G04 UPDATE/DELETE-no-WHERE, DB-G05 JSONB-no-validation, DB-G06 TIMESTAMP-no-tz, DB-G07 text-id-not-uuid, DB-G08 enum-as-text, DB-G09 cascade-delete-user-data, DB-G10 N+1-static.
+  - ORM add-on (her biri 3): Prisma, SQLAlchemy, Django ORM, ActiveRecord, Sequelize, TypeORM, GORM, Eloquent.
+- **`hooks/lib/mcl-db-scan.py`** — orchestrator (incremental/full/report/explain modes), `db-cache.json` (file SHA1 + rules-version composite key), generic + ORM dispatch, migration delegate çağrı, lokalize markdown render.
+- **`hooks/lib/mcl-db-migration.sh`** — external delegate: `squawk` (Postgres migration linter — lock impact, data-loss, type narrow) + `alembic check` (Python). Binary-missing graceful skip + tek-seferlik warning.
+- **`hooks/lib/mcl-db-explain.sh`** — `/mcl-db-explain` keyword backing. `MCL_DB_URL` env yoksa lokalize advisory; varsa dialect tespit + generic CLI EXPLAIN (`psql/mysql/sqlite3`). MVP: ANALYZE değil, sadece EXPLAIN (production safety).
+
+#### Stack-detect (`hooks/lib/mcl-stack-detect.sh`) — 17 yeni tag
+- **DB dialect** (6): `db-postgres`, `db-mysql`, `db-sqlite`, `db-mariadb`, `db-mongo`, `db-redis` — manifest dep + Docker compose image + `.env.example` connection string regex.
+- **Cloud DB** (3): `db-bigquery`, `db-snowflake`, `db-dynamodb` — manifest dep (8.8.x'te dialect-spesifik kural setleri).
+- **ORM** (8): `orm-prisma`, `orm-sqlalchemy`, `orm-django`, `orm-activerecord`, `orm-sequelize`, `orm-typeorm`, `orm-gorm`, `orm-eloquent` — schema dosya varlığı + manifest dep.
+
+#### Hook entegrasyonu (8.7.x mirror)
+- **`hooks/mcl-activate.sh`** — `/mcl-db-report` + `/mcl-db-explain` keyword blokları (`/mcl-security-report` mirror).
+- **`hooks/mcl-pre-tool.sh`** — 8.7.1 security incremental block'undan sonra Phase 4 DB incremental block. DB stack-tag check + Edit/Write/MultiEdit + source ext (+`.sql`+`.prisma`); HIGH bulguda `decision:deny` reason "MCL DB DESIGN — `<rule>` [`<category>`]...". Audit `db-scan-incremental`, `db-scan-block`.
+- **`hooks/mcl-stop.sh`** — 8.7.1 security START gate'inin yanına paralel Phase 4.5 START DB gate. `phase4_5_db_scan_done` state field. `no_db_stack=true` ise skip + done. HIGH ≥ 1 → state pending'de kalır + `decision:block` reason'a ilk 5 HIGH bulgu listesi (`category` field'ıyla); standart Phase 4.5 reminder bypass. HIGH = 0 → done=true; MEDIUM listesi standart block reason'a `[DB-Design]` etiketli inject. Sıra: security-gate → db-gate → standart reminder.
+- **`hooks/lib/mcl-state.sh`** — schema'ya `phase4_5_db_scan_done: false` field (8.7.1 security paralel; v2 schema bump'sız).
+
+#### Phase 1.7 — 7 yeni DB design dimension (DB-stack-tag triggered)
+1. **Persistence Model** (RDBMS / document / hybrid)
+2. **Schema Ownership** (single-service / shared)
+3. **Migration Policy** (zero-downtime / expand-contract / direct)
+4. **Index Strategy Upfront** (composite / partial / expression / covering)
+5. **ID Generation** (auto-increment / UUID v4 / v7 / ULID / snowflake)
+6. **Multi-Tenancy** (schema-per-tenant / row-level / none)
+7. **Connection Pooling** (size + saturation)
+
+Hepsi mevcut SILENT-ASSUME / SKIP-MARK / GATE pattern'i. Sadece `db-*` tag tespit edilince uygulanır (FE-only / lib / CLI projelerinde skip).
+
+#### Phase 4.5 lens (d) genişletme
+`mcl-db-scan.py --mode=full` Phase 4.5 START'ta security gate sonrası çalışır. Severity routing 8.7.0 ile aynı: HIGH → block; MEDIUM → `[DB-Design]` dialog item; LOW → audit. Auto-fix: schema/migration/index **asla silent**; naming/style silent OK.
+
+#### Trigger condition
+**Sadece DB stack-tag tespit edildiğinde.** Stack-tag yoksa: Phase 1.7 DB dimension'ları uygulanmaz, L2 ve L3 hook bloğları skip (audit `db-scan-skipped reason=no-db-stack-tag`). ORM tag yoksa ama DB tag varsa: generic core çalışır, ORM add-on'lar skip.
+
+#### 8.7.0 ile çakışmazlık
+SQL injection / hardcoded credentials / mass-assignment / insecure-deserialization 8.7.0 kapsamında kalır — DB scan tekrar etmez. `category=db-schema|db-index|db-query|db-migration|db-n-plus-one|db-pooling` field'ı ayrım. Audit event'leri ayrı namespace: `db-scan-*`, `migration-safety-*`, `db-explain-*`.
+
+### Test sonuçları
+- T1 `/mcl-db-report` keyword detection (`MCL_STATE_DIR=/tmp/proj` outside MCL repo): STATIC_CONTEXT 1125 byte, `MCL_DB_REPORT_MODE` mevcut PASS
+- T2 `/mcl-db-explain` keyword: STATIC_CONTEXT 632 byte, `MCL_DB_EXPLAIN_MODE` mevcut PASS
+- T3 Stack-detect: `package.json` `pg+sequelize` → `[javascript, db-postgres, orm-sequelize]`; `requirements.txt` `psycopg+sqlalchemy+django` → `[python, db-postgres, orm-sqlalchemy, orm-django]` PASS
+- T4 Full scan synthetic project (Postgres + Sequelize, schema.sql + api.js): HIGH=1 (DB-G01), MEDIUM=2 (DB-SQ-raw-no-replacements + DB-G02 SELECT-*) PASS
+- T5 L2 pre-tool DB block: phase=4, Write `CREATE TABLE foo (id INT, val TEXT);` → `decision:deny` reason "MCL DB DESIGN — DB-G01-missing-primary-key [db-schema]..."; audit `db-scan-incremental high=1` + `db-scan-block` PASS
+- T6 Mevcut suite: 19/0/2 — regresyonsuz PASS
+
+### Updated files
+- `hooks/lib/mcl-db-rules.py` (yeni, 34 rule)
+- `hooks/lib/mcl-db-scan.py` (yeni, orchestrator)
+- `hooks/lib/mcl-db-migration.sh` (yeni, squawk + alembic delegate)
+- `hooks/lib/mcl-db-explain.sh` (yeni, MCL_DB_URL stub)
+- `hooks/lib/mcl-stack-detect.sh` (17 yeni tag: 6 DB + 3 cloud + 8 ORM)
+- `hooks/lib/mcl-state.sh` (`phase4_5_db_scan_done` field)
+- `hooks/mcl-activate.sh` (`/mcl-db-report` + `/mcl-db-explain` keyword blokları)
+- `hooks/mcl-pre-tool.sh` (Phase 4 DB incremental block)
+- `hooks/mcl-stop.sh` (Phase 4.5 START DB gate)
+- `skills/my-claude-lang/phase1-7-precision-audit.md` (7 DB design dimension)
+- `skills/my-claude-lang/phase4-5-risk-review.md` (Lens (d) DB extension)
+- `VERSION` (8.7.1 → 8.8.0)
+- `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (kabul edilmiş, 8.8.x patch'lerine ertelendi)
+
+- **N+1 runtime profiling D3** MVP'de **model-behavioral**; test runner direct-integration (pytest-django plugin / RSpec helper / jest setup) 8.8.x patch'lerinde
+- **`/mcl-db-explain` F2** MVP'de **stub**: `MCL_DB_URL` set'liyse generic CLI EXPLAIN (`psql/mysql/sqlite3`); ORM-spesifik query introspection (auto-detected slow paths from query log) 8.8.x'te
+- **Cloud DB (BigQuery / Snowflake / DynamoDB)** stack-tag detection eklendi ama dialect-spesifik kural setleri 8.8.x patch'lerinde; tag varlığı şimdilik audit-only
+- **Migration tool yokluğu** (squawk / alembic-check binary install edilmemiş): ilgili dialect/ORM için skip + tek-seferlik warning
+- **8 ORM × 3 rule = 24 ORM-spesifik rule** MVP; her ORM için 10+ derin rule yazılabilir, 8.8.x patch'lerinde
+- **MongoDB / Redis / DynamoDB schema tasarımı** stack-tag tespit edilir ama dialect-spesifik kural seti MVP'de yok (RDBMS-first); 8.9 plan
+- **EXPLAIN ANALYZE production safety**: `MCL_DB_URL` prod DB'sini gösteriyorsa `EXPLAIN ANALYZE` mutating queries için tehlikeli — `mcl-db-explain.sh` yalnızca `EXPLAIN` çalıştırır default
+- **Trigger gating false-negative riski**: DB stack-tag tespit edilemeyen projelerde (örn. raw SQL string'lerde Postgres connection ama manifest'te dep yok) DB feature hiç çalışmaz
+- **14 dilden yalnızca TR + EN tam lokalize**; diğer 12 dil EN fallback (codebase-scan / security-report ile aynı pattern)
+
 ## [8.7.1] - 2026-04-29
 
 ### Eklendi — Hook entegrasyonu (8.7.0'da ertelenmişti)

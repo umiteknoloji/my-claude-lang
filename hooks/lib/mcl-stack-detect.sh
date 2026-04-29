@@ -197,6 +197,91 @@ mcl_stack_detect() {
   fi
   unset _mcl_is_ml
 
+  # ---- DB dialect tags (since 8.8.0) ----
+  # Detected from: manifest deps (npm/pip/cargo/go/Gemfile/composer), Docker
+  # compose service images, env example connection-string regex. False
+  # positives accepted (DB rules are general enough to misfire safely).
+
+  _mcl_has_dep() {
+    # _mcl_has_dep <pattern> — grep across common manifests
+    grep -qE "$1" "$dir/package.json" 2>/dev/null && return 0
+    grep -qE "$1" "$dir/package-lock.json" 2>/dev/null && return 0
+    grep -qE "$1" "$dir/pyproject.toml" 2>/dev/null && return 0
+    grep -qE "$1" "$dir"/requirements*.txt 2>/dev/null && return 0
+    grep -qE "$1" "$dir/Cargo.toml" 2>/dev/null && return 0
+    grep -qE "$1" "$dir/go.mod" 2>/dev/null && return 0
+    grep -qE "$1" "$dir/Gemfile" 2>/dev/null && return 0
+    grep -qE "$1" "$dir/composer.json" 2>/dev/null && return 0
+    return 1
+  }
+  _mcl_compose_image() {
+    # _mcl_compose_image <pattern> — Docker compose service image regex
+    grep -qE "image:\s*[\"']?$1" "$dir/docker-compose.yml" "$dir/docker-compose.yaml" "$dir/compose.yml" "$dir/compose.yaml" 2>/dev/null
+  }
+  _mcl_envexample_url() {
+    # _mcl_envexample_url <prefix> — connection string in .env.example
+    grep -qiE "(database_url|db_url|conn(ection)?_?str(ing)?)\s*=\s*$1" "$dir/.env.example" "$dir/.env.sample" 2>/dev/null
+  }
+
+  if _mcl_has_dep '"pg"|psycopg|asyncpg|sqlalchemy.*postgres|pq\b|jackc/pgx|github.com/lib/pq' || _mcl_compose_image 'postgres' || _mcl_envexample_url 'postgres'; then
+    _mcl_stack_add db-postgres
+  fi
+  if _mcl_has_dep '"mysql2?"|pymysql|mysqlclient|go-sql-driver/mysql|mariadb' || _mcl_compose_image 'mysql|mariadb' || _mcl_envexample_url 'mysql'; then
+    _mcl_stack_add db-mysql
+  fi
+  if _mcl_has_dep 'better-sqlite3|"sqlite3?"|sqlx.*sqlite|github.com/mattn/go-sqlite3' || [ -f "$dir"/*.db ] 2>/dev/null; then
+    _mcl_stack_add db-sqlite
+  fi
+  if _mcl_has_dep 'mariadb' || _mcl_compose_image 'mariadb'; then
+    _mcl_stack_add db-mariadb
+  fi
+  if _mcl_has_dep 'mongoose|mongodb|pymongo|motor|go.mongodb.org/mongo-driver' || _mcl_compose_image 'mongo'; then
+    _mcl_stack_add db-mongo
+  fi
+  if _mcl_has_dep '"redis"|ioredis|redis-py|github.com/redis/go-redis|predis' || _mcl_compose_image 'redis'; then
+    _mcl_stack_add db-redis
+  fi
+
+  # ---- Cloud DB tags (since 8.8.0; tag-only — rule packs in 8.8.x) ----
+  if _mcl_has_dep '@google-cloud/bigquery|google-cloud-bigquery|cloud.google.com/go/bigquery'; then
+    _mcl_stack_add db-bigquery
+  fi
+  if _mcl_has_dep 'snowflake-(connector|sdk)|snowflake/snowflake-connector|gosnowflake'; then
+    _mcl_stack_add db-snowflake
+  fi
+  if _mcl_has_dep '@aws-sdk/client-dynamodb|boto3|github.com/aws/aws-sdk-go.*dynamodb'; then
+    _mcl_stack_add db-dynamodb
+  fi
+
+  # ---- ORM tags (since 8.8.0) ----
+  # Detected from: manifest dep + schema/model file presence + import scan.
+  if [ -f "$dir/prisma/schema.prisma" ] || _mcl_has_dep '"@?prisma'; then
+    _mcl_stack_add orm-prisma
+  fi
+  if _mcl_has_dep '\bsqlalchemy\b|SQLAlchemy'; then
+    _mcl_stack_add orm-sqlalchemy
+  fi
+  if _mcl_has_dep '\bdjango\b|Django' || [ -f "$dir/manage.py" ]; then
+    _mcl_stack_add orm-django
+  fi
+  if _mcl_has_dep '"rails"|activerecord' || [ -f "$dir/config/application.rb" ]; then
+    _mcl_stack_add orm-activerecord
+  fi
+  if _mcl_has_dep '"sequelize"'; then
+    _mcl_stack_add orm-sequelize
+  fi
+  if _mcl_has_dep '"typeorm"'; then
+    _mcl_stack_add orm-typeorm
+  fi
+  if _mcl_has_dep 'gorm.io/gorm|jinzhu/gorm'; then
+    _mcl_stack_add orm-gorm
+  fi
+  if _mcl_has_dep 'illuminate/database|laravel/framework'; then
+    _mcl_stack_add orm-eloquent
+  fi
+
+  unset -f _mcl_has_dep _mcl_compose_image _mcl_envexample_url
+
   if [ "${#detected[@]}" -gt 0 ]; then
     printf '%s\n' "${detected[@]}"
   fi

@@ -147,6 +147,52 @@ Will the code parse externally-controlled serialized data? Untrusted deserializa
 - **SKIP-MARK alternative:** if the input source is genuinely undecided, mark `[unspecified: deser-source]` and Phase 4.5 lens (d) blocks until explicit source confirmed.
 - **Sample question (TR):** "Bu endpoint dış kaynaktan ne format alıyor — JSON+schema mı, YAML/binary-serialization mı? İkincisi attack surface."
 
+## DB Design Dimensions (since 8.8.0, design-time)
+
+These seven dimensions cover the design-time half of MCL's 3-tier DB design discipline. **Apply only when at least one `db-*` stack tag is detected by `mcl-stack-detect.sh`.** FE-only / lib / CLI projects skip this entire section. SILENT-ASSUME / SKIP-MARK / GATE classification.
+
+### 13. Persistence Model
+RDBMS / document store / hybrid?
+- **SILENT-ASSUME default:** existing project DB is the persistence model (Postgres/MySQL/SQLite/Mongo/Redis as detected). `[assumed: <detected dialect>]`.
+- **GATE triggers:** explicit "save" / "store" / "persist" verbi + mevcut stack çakışıyor (ör. RDBMS + key-value cache karışımı), yeni service ile schema önemli.
+- **Sample question (TR):** "Bu veriyi RDBMS'te mi saklayacağız (relational queries var), yoksa document store mu (nested objects yoğun)?"
+
+### 14. Schema Ownership
+This service tek sahip mi, shared schema mı (multi-service repo)?
+- **SILENT-ASSUME default:** single-service / monorepo'da explicit boundary. `[assumed: this service owns the schema]`.
+- **GATE triggers:** multi-service repo, migration commit conflict riski, `db-*` tag birden fazla service'te aktif.
+- **Sample question (TR):** "Bu şemaya başka bir service de yazıyor mu? Migration ownership netleştir."
+
+### 15. Migration Policy
+Zero-downtime / expand-contract / direct?
+- **SILENT-ASSUME default:** dev/staging için direct OK. `[assumed: direct migration, dev-only]`.
+- **GATE triggers:** prod data var; ALTER TABLE on >100k rows; sıfır kabul edilemez kesinti.
+- **Sample question (TR):** "Bu migration'ın prod'da downtime'ı kabul mü, yoksa expand-contract / online-DDL gerekli mi?"
+
+### 16. Index Strategy Upfront
+Composite / partial / expression / covering index ihtiyacı tasarımda düşünüldü mü?
+- **SILENT-ASSUME default:** PK + FK index'ler yeterli (read-light path). `[assumed: PK + FK indexes only]`.
+- **GATE triggers:** read-heavy query path; ORDER BY + LIMIT pattern; range query; full-text search; multi-column WHERE.
+- **Sample question (TR):** "Bu sorgu hangi sütunları filtreliyor — composite index gerekli mi (ve hangi sıra)?"
+
+### 17. ID Generation Strategy
+Auto-increment / UUID v4 / UUID v7 / ULID / snowflake?
+- **SILENT-ASSUME default:** existing project convention (`[assumed: <detected>]`); yoksa auto-increment INT.
+- **GATE triggers:** distributed insert (multi-region / sharded); sortable ID need; ID expose ediliyor (security: enumerable IDs).
+- **Sample question (TR):** "ID auto-increment INT mi, UUID v4 mi (random), UUID v7 / ULID mı (sortable)?"
+
+### 18. Multi-Tenancy
+Schema-per-tenant / row-level (tenant_id column) / none?
+- **SILENT-ASSUME default:** single-tenant. `[assumed: no multi-tenancy]`.
+- **GATE triggers:** tenant isolation gereği; "her müşteri kendi verisini görür"; B2B SaaS pattern.
+- **Sample question (TR):** "Multi-tenant mı? Hangisi: schema-per-tenant (operasyonel maliyet), row-level + tenant_id (default), database-per-tenant (en izole)?"
+
+### 19. Connection Pooling
+Pool size + saturation behavior?
+- **SILENT-ASSUME default:** ORM / framework default pool size (SQLAlchemy 5, Sequelize 5, Django CONN_MAX_AGE off). `[assumed: framework default]`.
+- **GATE triggers:** high-concurrency (req/s > 100); serverless cold start; custom load balancer; connection limit'e yakın observed.
+- **Sample question (TR):** "Concurrent request beklentin nedir? Pool size ne, saturation'da queue mu fail mı?"
+
 ## Stack Add-ons (delta dimensions, applied via `mcl-stack-detect.sh` tags)
 
 Stack tag returned by `mcl-stack-detect.sh detect "$(pwd)"`. Multi-stack

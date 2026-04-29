@@ -660,6 +660,109 @@ print(json.dumps({
 fi
 # -------- end of Phase 4 incremental security scan --------
 
+# -------- Branch: Phase 4 incremental DB scan (since 8.8.0) --------
+# Edit/Write/MultiEdit to schema/migration/model/source files trigger
+# HIGH-only DB scan. Cache-keyed via mcl-db-scan.py. Skipped if no
+# db-* stack tag detected.
+_DB_SCAN_LIB="$SCRIPT_DIR/lib/mcl-db-scan.py"
+if [ "$CURRENT_PHASE" = "4" ] \
+   && [ -f "$_DB_SCAN_LIB" ] \
+   && command -v python3 >/dev/null 2>&1 \
+   && [ -n "${MCL_STATE_DIR:-}" ]; then
+  case "$TOOL_NAME" in
+    Edit|Write|MultiEdit)
+      _DB_TARGET_PATH="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    print((obj.get("tool_input") or {}).get("file_path") or "")
+except Exception:
+    pass' 2>/dev/null)"
+      _DB_EXT="${_DB_TARGET_PATH##*.}"
+      case "$_DB_EXT" in
+        ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|java|kt|swift|cs|php|cpp|cc|c|h|hpp|lua|vue|svelte|scala|dart|sql|prisma)
+          _DB_TMP="$(mktemp -t mcl-db-pre.XXXXXX)" || _DB_TMP=""
+          if [ -n "$_DB_TMP" ]; then
+            _DB_TMP_EXT="${_DB_TMP}.${_DB_EXT}"
+            mv "$_DB_TMP" "$_DB_TMP_EXT" 2>/dev/null && _DB_TMP="$_DB_TMP_EXT"
+            printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+from pathlib import Path
+data = json.loads(sys.stdin.read())
+tool = data.get("tool_name", "")
+ti = data.get("tool_input", {}) or {}
+target_real = ti.get("file_path") or ""
+out = sys.argv[1]
+content = ""
+if tool == "Write":
+    content = ti.get("content") or ""
+else:
+    try:
+        content = Path(target_real).read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        content = ""
+    if tool == "Edit":
+        old, new = ti.get("old_string", ""), ti.get("new_string", "")
+        if old and old in content:
+            content = content.replace(old, new, 1)
+    elif tool == "MultiEdit":
+        for ed in (ti.get("edits") or []):
+            old, new = ed.get("old_string", ""), ed.get("new_string", "")
+            if old and old in content:
+                content = content.replace(old, new, 1)
+Path(out).write_text(content, encoding="utf-8")
+' "$_DB_TMP" 2>/dev/null
+            _DB_RESULT_JSON="$(python3 "$_DB_SCAN_LIB" \
+              --mode=incremental \
+              --state-dir "$MCL_STATE_DIR" \
+              --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
+              --target "$_DB_TMP" \
+              --lang "${MCL_USER_LANG:-tr}" 2>/dev/null || echo '{}')"
+            _DB_BLOCK="$(printf '%s' "$_DB_RESULT_JSON" | python3 -c '
+import json, sys
+try:
+    r = json.loads(sys.stdin.read() or "{}")
+except Exception:
+    sys.exit(0)
+if r.get("no_db_stack"):
+    sys.exit(0)
+high = [f for f in r.get("findings", []) if f.get("severity") == "HIGH"]
+if not high:
+    sys.exit(0)
+top = high[0]
+real = sys.argv[1] if len(sys.argv) > 1 else top.get("file", "")
+rule = top.get("rule_id", "?")
+cat = top.get("category", "")
+line = top.get("line", 0)
+msg = top.get("message", "")
+suffix = " [" + cat + "]" if cat else ""
+print(rule + suffix + " at " + real + ":" + str(line) + " — " + msg)
+' "$_DB_TARGET_PATH" 2>/dev/null)"
+            rm -f "$_DB_TMP" 2>/dev/null
+            if [ -n "$_DB_BLOCK" ]; then
+              _DB_RULE="$(printf '%s' "$_DB_BLOCK" | awk '{print $1}')"
+              mcl_audit_log "db-scan-block" "mcl-pre-tool" "rule=${_DB_RULE} tool=${TOOL_NAME} file=${_DB_TARGET_PATH} severity=HIGH"
+              python3 -c '
+import json, sys
+reason = sys.argv[1]
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL DB DESIGN — " + reason + ". Fix the design issue and retry."
+    }
+}))
+' "$_DB_BLOCK" 2>/dev/null
+              exit 0
+            fi
+          fi
+          ;;
+      esac
+      ;;
+  esac
+fi
+# -------- end of Phase 4 incremental DB scan --------
+
 # --- Just-in-time askq advance (since 6.5.6) ---
 # Stop hook only fires at end-of-turn. When the model chains
 # summary-askq → spec → approve-askq → Write in a single turn, Stop has

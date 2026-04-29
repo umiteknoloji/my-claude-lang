@@ -305,6 +305,31 @@ Skip STEP-454 when:
 - Phase 4.5 was entirely omitted (no risks found).
 - All four applicable categories are already covered by existing tests.
 
+## Lens (d) expanded — 8.8.0+ (DB Design)
+
+When a `db-*` stack tag is detected, Phase 4.5 START runs the DB orchestrator **after** the security gate (8.7.0+) has cleared. Mechanism:
+
+**Step 0b — DB design scan (8.8.0+, mandatory at Phase 4.5 START when DB stack-tag present):**
+1. Run via Bash tool, in ONE call:
+   ```
+   python3 ${MCL_LIB:-$HOME/.mcl/lib}/hooks/lib/mcl-db-scan.py \
+     --mode=full --state-dir "$MCL_STATE_DIR" \
+     --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" --lang <user_lang>
+   ```
+2. Parse the JSON output. If `no_db_stack=true`: skip; mark `phase4_5_db_scan_done=true` and continue.
+3. Severity routing:
+   - **HIGH bulgu varsa → Phase 4.5 START gate.** Phase 4.5 dialog'u BAŞLATMA. HIGH örnekleri: data-loss migration (DROP COLUMN, TRUNCATE), missing PRIMARY KEY, UPDATE/DELETE without WHERE, ON DELETE CASCADE on user-data without explicit confirmation. Her HIGH için Edit/Write yap, fix sonrası bir sonraki bulguya geç. Schema/migration/index fixes **NEVER silent** — her fix tek cümle açıklamayla geliştiriciye sunulur (data-loss riski).
+   - **MEDIUM bulgu varsa → Phase 4.5 sequential dialog'a item olarak girer.** `[DB-Design]` etiketiyle her MEDIUM tek tek tartışılır. MEDIUM örnekleri: SELECT *, missing FK index, missing eager-load (N+1 static heuristic), TIMESTAMP without timezone, missing migration `down`, ALTER TABLE non-CONCURRENTLY (Postgres lock).
+   - **LOW bulgu → audit-only**, dialog'a girmez. `db-findings.jsonl`'e kayıt; geliştirici `/mcl-db-report` ile görebilir.
+4. Auto-fix policy: naming/style fix (CONST_CASE rename, table alias) silent OK. **Schema / migration / index** kategorilerinde **asla silent** — geliştiriciye sor.
+5. Coverage: Schema design / Index strategy / N+1 detection / Migration safety (squawk + alembic-check delegate) / Connection pooling (Phase 1.7) / Multi-tenancy (Phase 1.7). EXPLAIN-tabanlı query plan analizi `/mcl-db-explain` opt-in (`MCL_DB_URL` env).
+
+**Audit signal:** `db-scan-full | mcl-stop | high=N med=N low=N duration_ms=N sources=...`
+
+**8.7.0 ile çakışmazlık:** SQL injection / hardcoded credential / mass-assignment 8.7.0 kapsamında kalır — DB scan tekrar etmez. `category=db-*` field'ı ayrım sağlar.
+
+Eğer `mcl-db-scan.py` mevcut değilse (8.8.0 öncesi install) bu adım sessizce atlanır.
+
 ## Lens (d) expanded — 8.7.0+ (Backend Security)
 
 Phase 4.5 START runs the security orchestrator BEFORE any other lens. Mechanism:
