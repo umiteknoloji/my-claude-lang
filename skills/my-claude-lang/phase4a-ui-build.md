@@ -172,4 +172,38 @@ Edit the frontend files in place, emit a fresh "run it" snippet,
 re-call the Phase 4b askq. The loop is unbounded — exit only on
 approve or cancel from Phase 4b.
 
+## Phase 4a → 4b Transition (since 8.15.0)
+
+When Phase 4a UI code is fully written (components / dummy data /
+Tailwind or other token config / `package.json` scripts) AND
+`npm install` (or pnpm/yarn equivalent) has succeeded, emit the
+transition state-set BEFORE letting the Stop hook fire on this turn:
+
+```bash
+bash -c '
+for lib in "$MCL_HOME/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.mcl/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.claude/hooks/lib/mcl-state.sh"; do
+  [ -f "$lib" ] && source "$lib" && break
+done
+mcl_state_set ui_sub_phase "\"UI_REVIEW\"" >/dev/null 2>&1
+'
+```
+
+**Quoting note:** the JSON value is a string, so the field value
+must be `"UI_REVIEW"` (with surrounding double-quotes). Inside Bash
+double-quotes, escape as `"\"UI_REVIEW\""`. Wrong quoting (e.g.
+`mcl_state_set ui_sub_phase UI_REVIEW`) produces an `mcl-state` validation
+rejection.
+
+This signal tells `mcl-stop.sh` (8.12.0 dev-server auto-start gate) to
+invoke `mcl_devserver_start` on the next Stop event, spawning the FE
+dev server in background, allocating a port (default + 4 fallback),
+and surfacing the URL via `dev_server.url` state field. Without this
+state-set, the dev server never auto-starts; the developer must manually
+run `npm run dev` and the design loop (8.12.0) does not engage.
+
+After the dev server is up (audit `dev-server-started`), Phase 4b
+(`phase4b-ui-review.md`) takes over and runs the visual feedback loop.
+
 </mcl_phase>

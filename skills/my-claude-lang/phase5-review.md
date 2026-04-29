@@ -250,6 +250,34 @@ Rules:
 - This section is subject to the empty-section-omission rule — if
   the file is missing or empty, Section 3 vanishes cleanly.
 
+## Phase 5 → 5.5 Audit Emission (since 8.15.0)
+
+After all three Verification Report sections are emitted (Spec
+Compliance, MUST TEST THESE, Process Trace) and BEFORE handing off to
+Phase 5.5 localized translation, emit the verify audit:
+
+```bash
+bash -c '
+for lib in "$MCL_HOME/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.mcl/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.claude/hooks/lib/mcl-state.sh"; do
+  [ -f "$lib" ] && source "$lib" && break
+done
+mcl_audit_log "phase5-verify" "phase5" "report-emitted" >/dev/null 2>&1
+'
+```
+
+This audit event is the **deterministic signal** for Phase 6 (a)
+audit-trail completeness check. Without it, Phase 6 falls back to
+transcript header string match — heuristic, lokalize 14 dile bağımlı,
+gerçek emit garantisi vermez. Explicit `mcl_audit_log "phase5-verify"`
+çağrısı Phase 6'ya report'un yazıldığını net olarak söyler.
+
+Skip this only when Phase 5 itself was skipped (no spec, no Phase 4
+code) — in which case Phase 6 (a) flags `phase-review-impact` and
+`spec-approve` absence first; `phase5-verify` absence becomes
+secondary signal.
+
 ## Presentation Rules
 
 - ALL sections are in the developer's language

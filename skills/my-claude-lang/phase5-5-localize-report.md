@@ -61,4 +61,34 @@ localize-report | phase5-5 | lang=<detected> skipped=<true|false>
 This is the detection control: the audit confirms Phase 5.5 was evaluated
 even when it is a no-op.
 
+## Localized Verification Report Headers (since 8.15.0)
+
+When emitting the Phase 5.5 localized translation, the section header
+MUST be one of these exact strings — Phase 6 trigger transcript
+fallback regex (`mcl-stop.sh:~1769`) depends on a literal match. Other
+phrasings risk Phase 6 missing the trigger and skipping the
+double-check.
+
+| Lang | Localized header (use verbatim) |
+|---|---|
+| EN | `Verification Report` |
+| TR | `Doğrulama Raporu` |
+| FR | `Rapport de Vérification` |
+| DE | `Verifizierungsbericht` |
+| ES | `Informe de Verificación` |
+| JA | `検証レポート` |
+| KO | `검증 보고서` |
+| ZH | `验证报告` |
+| AR | `تقرير التحقق` |
+| HE | `דוח אימות` |
+| HI | `सत्यापन रिपोर्ट` |
+| ID | `Laporan Verifikasi` |
+| PT | `Relatório de Verificação` |
+| RU | `Отчёт о проверке` |
+
+Pick the row matching the developer's detected language. If the language
+is not in this 14-set, fall back to English (`Verification Report`) — the
+audit `phase5-verify` event (Phase 5 skill prose, since 8.15.0) is the
+deterministic Phase 6 signal and does not depend on the header.
+
 </mcl_phase>

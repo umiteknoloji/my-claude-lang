@@ -78,8 +78,8 @@ a Pass condition, and a Skip condition.
 ---
 
 ### STEP-12: summary-confirmation
-**Phase:** 1 | **Description:** Claude presents the Phase 1 summary as plain text, then immediately calls AskUserQuestion with prefix `MCL X.Y.Z | ` and options Approve/Edit/Cancel. State transitions to Phase 2 on approval.
-**Signal:** trace.log contains `summary_confirmed | approved`. audit.log contains `summary-confirm-approve | stop`.
+**Phase:** 1 | **Description:** Claude presents the Phase 1 summary as plain text, then immediately calls AskUserQuestion with prefix `MCL X.Y.Z | ` and options Approve/Edit/Cancel. State transitions to Phase 2 on approval. **Since 8.15.0:** on approval, skill prose emits `mcl_state_set phase1_intent / phase1_constraints / phase1_stack_declared` to populate state for Phase 1.7 stack add-ons (greenfield fallback) and Phase 6 (c) promise-vs-delivery.
+**Signal:** trace.log contains `summary_confirmed | approved`. audit.log contains `summary-confirm-approve | stop`. State has non-null `phase1_intent`, `phase1_constraints`, `phase1_stack_declared`.
 **Pass:** trace.log has `summary_confirmed` event followed by `phase_transition | 1 | 2`.
 **Skip:** Never skipped — mandatory before Phase 2.
 
@@ -138,9 +138,9 @@ a Pass condition, and a Skip condition.
 ## PHASE 4 STEPS
 
 ### STEP-40a: ui-build-phase
-**Phase:** 4a | **Description:** When `ui_flow_active=true`, Claude writes frontend-only code with dummy data, no backend writes. Dev server is started and browser opened. Stops and waits for developer feedback before Phase 4b. UI phases run first so visual scaffolding is reviewed before backend logic is written.
-**Signal:** state.json `ui_sub_phase="BUILD_UI"`. audit.log `ui-flow-enter-build | stop`. trace.log `ui_flow_enabled`.
-**Pass:** trace.log contains `ui_flow_enabled`. state.json `ui_sub_phase` progressed past `BUILD_UI`.
+**Phase:** 4a | **Description:** When `ui_flow_active=true`, Claude writes frontend-only code with dummy data, no backend writes. Dev server is started and browser opened. Stops and waits for developer feedback before Phase 4b. UI phases run first so visual scaffolding is reviewed before backend logic is written. **Since 8.15.0:** after UI files written and `npm install` succeeded, skill prose emits `mcl_state_set ui_sub_phase '"UI_REVIEW"'` (JSON-quoted string) — this triggers `mcl-stop.sh` dev-server auto-start (8.12.0 gate), spawning the FE dev server in background and surfacing the URL.
+**Signal:** state.json `ui_sub_phase="BUILD_UI"` then `"UI_REVIEW"`. audit.log `ui-flow-enter-build | stop`, then `dev-server-started`. trace.log `ui_flow_enabled`, then `dev_server_started`.
+**Pass:** trace.log contains `ui_flow_enabled`. state.json `ui_sub_phase` progressed past `BUILD_UI`. `dev_server.active=true` after transition.
 **Skip:** When `ui_flow_active=false` (no UI stack detected). Standard Phase 4 runs instead. Correct and expected skip.
 
 ---
@@ -248,9 +248,9 @@ a Pass condition, and a Skip condition.
 ## PHASE 5 STEPS
 
 ### STEP-50: spec-coverage-section
-**Phase:** 5 | **Description:** Phase 5 emits Section 1 as a full traceability table `| Requirement | Test | Status |`. One row per MUST/SHOULD from the approved spec. ✅ rows show the test file:line and function name; ⚠️ rows show file:line with partial note; ❌ rows show "—" in the Test column. All rows are included — ✅ rows are NOT omitted.
-**Signal:** Session diary contains a localized "Spec Kapsama" / "Spec Coverage" table with all MUST/SHOULD rows; ✅ rows include test file:line references.
-**Pass:** All MUST/SHOULD rows present. ✅ rows have test:line in the Test column. ❌ rows have "—". Table uses `| Requirement | Test | Status |` columns.
+**Phase:** 5 | **Description:** Phase 5 emits Section 1 as a full traceability table `| Requirement | Test | Status |`. One row per MUST/SHOULD from the approved spec. ✅ rows show the test file:line and function name; ⚠️ rows show file:line with partial note; ❌ rows show "—" in the Test column. All rows are included — ✅ rows are NOT omitted. **Since 8.15.0:** after all three Phase 5 sections (Spec Compliance, MUST TEST THESE, Process Trace) emitted and BEFORE Phase 5.5 localized translation, skill prose emits `mcl_audit_log "phase5-verify" "phase5" "report-emitted"` — this is the deterministic signal Phase 6 (a) audit-trail check uses (transcript header fallback becomes secondary).
+**Signal:** Session diary contains a localized "Spec Kapsama" / "Spec Coverage" table with all MUST/SHOULD rows; ✅ rows include test file:line references. audit.log contains `phase5-verify | phase5 | report-emitted`.
+**Pass:** All MUST/SHOULD rows present. ✅ rows have test:line in the Test column. ❌ rows have "—". Table uses `| Requirement | Test | Status |` columns. `phase5-verify` audit emitted.
 **Skip:** When test_command was never configured this session (no TDD ran at all). Correct, expected omission — not a failure.
 
 ---
@@ -344,7 +344,7 @@ a Pass condition, and a Skip condition.
 ### STEP-64: precision-audit
 **Phase:** 1.7 (between Phase 1 summary approval and Phase 1.5 brief), since 8.3.0; hard-enforced since 8.3.2; stack add-on coverage expanded since 8.4.1 | **Description:** After Phase 1 `AskUserQuestion` returns approve-family, Claude runs a precision audit against confirmed parameters. The audit walks 7 core dimensions (permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry) plus any stack-specific add-on dimensions matched by `mcl-stack-detect.sh` tags. **Stack coverage (since 8.4.1):** TypeScript/JavaScript base + dedicated framework add-ons for React / Vue / Svelte / html-static; backend add-ons for Python / Java / C# / Ruby / PHP / Go-Rust; systems add-ons for C++ / Lua; mobile add-on for Swift / Kotlin; domain-shape add-ons for cli / data-pipeline / ml-inference (auto-triggered by detection patterns added in 8.4.1). Each dimension is classified SILENT-ASSUME (industry default exists, mark `[assumed: X]` in spec), SKIP-MARK (no safe default; mark `[unspecified: X]` — used by Performance SLA), or GATE (architectural impact, ask one question via the existing one-question-at-a-time rule). When all dimensions resolve, an audit entry is emitted, then Phase 1.5 brief and Phase 2 spec follow with precision-enriched parameters. Skipped silently when developer's detected language is English (audit emitted with `skipped=true` as the explicit safety valve). **Hard enforcement (8.3.2):** when `mcl-stop.sh` detects a Phase 2 spec block in the turn AND no `precision-audit` entry exists since `session_start`, it returns `decision:block`, refuses the Phase 1→2 transition, and instructs Claude to walk Phase 1.7 in-response and re-emit the spec — same enforcement tier as Phase 4.5.
 **Signal:** `audit.log` contains `precision-audit | phase1-7 | core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<comma> skipped=<true|false>` between the session's `session_start` and the Phase 1→2 transition. When the entry is absent at transition time, `mcl-stop.sh` writes both `precision-audit-skipped-warn | mcl-stop.sh | summary-confirmed-but-no-audit` (8.3.0 detection signal, kept for backward compat) AND `precision-audit-block | mcl-stop.sh | summary-confirmed-but-no-audit; transition-rewind` (8.3.2 enforcement event); the stop hook emits a `decision:block` JSON to stdout and exits.
-**Pass:** `precision-audit` entry exists for the current Phase 1→2 transition. For non-English sessions all 7 core dimensions are classified (gates + assumes + skipmarks ≥ 7). For English sessions, one entry with `skipped=true` is sufficient.
+**Pass:** `precision-audit` entry exists for the current Phase 1→2 transition. For non-English sessions all 7 core dimensions are classified (gates + assumes + skipmarks ≥ 7). For English sessions, one entry with `skipped=true` is sufficient. **Since 8.15.0:** after all dimensions classified, skill prose emits `mcl_state_set phase1_ops '{deployment_target,observability_tier,test_policy,doc_level}'` and `mcl_state_set phase1_perf '{budget_tier}'` — these state objects feed Phase 4.5 ops gate (8.13.0) and perf gate (8.14.0), and inform threshold defaults (e.g. `budget_tier="strict"` lowers `bundle_budget_kb` from 200 to 100).
 **Skip:** When detected language is English. The audit entry is still required (`skipped=true`) as both detection control and the explicit safety valve that bypasses the 8.3.2 hard block — without the entry, the block fires for English sessions too.
 
 ### STEP-65: plan-critique-substance-validation

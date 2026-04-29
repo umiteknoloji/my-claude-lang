@@ -1766,7 +1766,7 @@ if [ -f "$_PHASE6_LIB" ] && command -v python3 >/dev/null 2>&1 \
   if [ -f "$MCL_STATE_DIR/audit.log" ] && grep -q "phase5-verify" "$MCL_STATE_DIR/audit.log" 2>/dev/null; then
     _PHASE6_TRIGGER=1
   elif [ -n "${TRANSCRIPT_PATH:-}" ] && [ -f "$TRANSCRIPT_PATH" ] \
-       && grep -lE "(Verification Report|Doğrulama Raporu)" "$TRANSCRIPT_PATH" >/dev/null 2>&1; then
+       && grep -lE "(Verification Report|Doğrulama Raporu|Rapport de Vérification|Verifizierungsbericht|Informe de Verificación|検証レポート|검증 보고서|验证报告|تقرير التحقق|דוח אימות|सत्यापन रिपोर्ट|Laporan Verifikasi|Relatório de Verificação|Отчёт о проверке)" "$TRANSCRIPT_PATH" >/dev/null 2>&1; then
     _PHASE6_TRIGGER=1
   fi
   if [ "$_PHASE6_TRIGGER" = "1" ]; then

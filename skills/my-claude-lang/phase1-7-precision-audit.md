@@ -193,6 +193,73 @@ Pool size + saturation behavior?
 - **GATE triggers:** high-concurrency (req/s > 100); serverless cold start; custom load balancer; connection limit'e yakın observed.
 - **Sample question (TR):** "Concurrent request beklentin nedir? Pool size ne, saturation'da queue mu fail mı?"
 
+## Operations Dimensions (since 8.15.0, design-time)
+
+Four ops dimensions and one perf dimension, applied per their trigger
+conditions. They feed `phase1_ops` and `phase1_perf` state objects which
+are read by Phase 4.5 ops/perf gates and Phase 6 (a) audit-trail check.
+
+### 20. Deployment Strategy (DEP)
+How does this code reach production? CI/CD / manual approval / Docker / serverless / static-deploy?
+- **Trigger:** `Dockerfile` OR `.github/workflows/` OR `Procfile` OR `fly.toml` OR `vercel.json` OR `netlify.toml` OR `app.yaml` OR `Jenkinsfile` exists.
+- **SILENT-ASSUME default:** existing CI pipeline auto-detected. `[assumed: <detected>]`.
+- **GATE triggers:** new public-facing service; zero-downtime mandatory; multi-environment (dev/staging/prod) promotion.
+- **Sample question (TR):** "Deploy nasıl olacak — Docker container, serverless (Lambda/Cloud Run), VPS, yoksa managed PaaS (Heroku/Fly/Render)?"
+
+### 21. Observability Tier (MON)
+Logging + metrics + alerting requirements?
+- **Trigger:** backend stack-tag (`python|java|csharp|ruby|php|go|rust` or node-backend non-FE-only).
+- **SILENT-ASSUME default:** prototype/internal → "basic" (logger only); production-bound → "full" (structured logger + metrics + error tracker).
+- **GATE triggers:** SLA / uptime hedefi; multi-tenant; incident response zorunluluğu.
+- **Sample question (TR):** "Production gözlemlemesi: console-only mı yeterli, yoksa structured logger + metrics + Sentry mi gerek?"
+
+### 22. Test Policy (TST)
+TDD strict / pragmatic / prototype-no-tests?
+- **Trigger:** test framework manifest (vitest/jest/pytest/rspec/junit/go-test/cargo).
+- **SILENT-ASSUME default:** "pragmatic" (Phase 5 Spec Coverage zorunlu, threshold opsiyonel).
+- **GATE triggers:** "prototype" / "MVP" keyword in Phase 1; explicit confirmation needed.
+- **Sample question (TR):** "Test policy: TDD strict (>80% coverage), pragmatic (>50%), yoksa prototype (test optional)?"
+
+### 23. Documentation Level (DOC)
+README + API docs + examples expectation?
+- **Trigger:** always-on (every project).
+- **SILENT-ASSUME default:** open-source/public repo → "public"; private → "internal".
+- **GATE triggers:** library / SDK / public API; contributor onboarding intent.
+- **Sample question (TR):** "Doc level: minimal (kendin kullan), internal (takım), public (3rd-party kullanıcılar)?"
+
+## Performance Dimensions (since 8.15.0, design-time)
+
+### 24. Performance Budget (PERF)
+JS bundle size + Core Web Vitals + image budget tier?
+- **Trigger:** FE stack-tag (`react-frontend|vue-frontend|svelte-frontend|html-static`).
+- **SILENT-ASSUME default:** "pragmatic" (200KB JS gzip, LCP 2.5s, image <100KB). `[assumed: pragmatic budget]`.
+- **GATE triggers:** Phase 1 prompt has "fast" / "scale" / "low-latency" / "mobile" / "3G" / "performance"; e-commerce / publishing / public-facing context; SLA gerektiren feature.
+- **SKIP-MARK alternative:** internal admin tool / prototype / proof-of-concept → `[unspecified: perf-budget, no SLA]`.
+- **Sample question (TR):** "Performans hedefi: strict (100KB JS / LCP <2s / WebP zorunlu), pragmatic (200KB / 2.5s / WebP önerilen), yoksa internal-only (budget yok)?"
+
+## Phase 1.7 → 1.5 handoff state-set (since 8.15.0)
+
+After all dimensions (core 7 + security 5 + DB 7 + ops 4 + perf 1 + stack add-ons) are classified and the developer has answered all GATE
+questions, emit the following Bash before handing off to Phase 1.5:
+
+```bash
+bash -c '
+for lib in "$MCL_HOME/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.mcl/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.claude/hooks/lib/mcl-state.sh"; do
+  [ -f "$lib" ] && source "$lib" && break
+done
+# 4 ops sub-fields: each is one of (provided value | "skipped" | "default-assumed")
+mcl_state_set phase1_ops "{\"deployment_target\":\"<dep_choice>\",\"observability_tier\":\"<mon_choice>\",\"test_policy\":\"<tst_choice>\",\"doc_level\":\"<doc_choice>\"}" >/dev/null 2>&1
+# perf budget tier: strict | pragmatic | internal-only
+mcl_state_set phase1_perf "{\"budget_tier\":\"<perf_tier>\"}" >/dev/null 2>&1
+'
+```
+
+These state objects feed Phase 4.5 ops gate (8.13.0) and Phase 4.5 perf
+gate (8.14.0), and inform threshold defaults (e.g. perf budget_tier
+"strict" lowers `bundle_budget_kb` from 200 to 100).
+
 ## Stack Add-ons (delta dimensions, applied via `mcl-stack-detect.sh` tags)
 
 Stack tag returned by `mcl-stack-detect.sh detect "$(pwd)"`. Multi-stack

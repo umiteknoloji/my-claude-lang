@@ -311,4 +311,39 @@ If the developer requests multiple distinct tasks in one message:
 - Run Phase 1-3 separately for each task
 - Execute tasks in the agreed order
 
+## Phase 1 → 1.7 handoff (since 8.15.0)
+
+After Phase 1 summary is approved (AskUserQuestion confirmed, developer
+accepted the captured intent / constraints / success / context), emit
+the following Bash commands BEFORE handing off to Phase 1.5/1.7. These
+populate state fields that downstream phases (Phase 1.7 ops/perf
+add-ons, Phase 4.5 ops/perf gates, Phase 6 promise-vs-delivery) rely on:
+
+```bash
+bash -c '
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")")" 2>/dev/null || true
+# Try multiple state-lib paths (per-project install / wrapper install / dev clone).
+for lib in "$MCL_HOME/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.mcl/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.claude/hooks/lib/mcl-state.sh"; do
+  [ -f "$lib" ] && source "$lib" && break
+done
+mcl_state_set phase1_intent "<one-line intent summary, English>" >/dev/null 2>&1
+mcl_state_set phase1_constraints "<one-line constraints CSV (stack, env, scale, etc.)>" >/dev/null 2>&1
+mcl_state_set phase1_stack_declared "<comma-separated stack tags inferred from Phase 1 context, e.g. react-frontend,python,db-postgres>" >/dev/null 2>&1
+'
+```
+
+`phase1_stack_declared` is the **greenfield fallback** for
+`mcl-stack-detect.sh` — when the project has no manifest yet but the
+developer has stated the stack in Phase 1, downstream stack-add-on
+gates (Phase 1.7 DB / UI / ops / perf dimensions) read this field and
+apply the relevant rule subset. Without it, Phase 1.7 stack add-ons
+silently skip on greenfield projects.
+
+`phase1_intent` and `phase1_constraints` are required by Phase 6 (c)
+promise-vs-delivery — keyword extraction reads these fields and
+matches against modified source files. If unset, Phase 6 (c) skips
+with LOW advisory.
+
 </mcl_phase>

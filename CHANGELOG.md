@@ -7,6 +7,88 @@
 
 ## [Unreleased]
 
+## [8.15.0] - 2026-04-30
+
+### Eklendi — Skill Prose Sprint (rule freshening)
+
+8.10.0-8.14.0 sürümleri state plumbing'i ekledi (`phase4_5_*_scan_done`, `phase4_5_high_baseline.{security,db,ui,ops,perf}`, `phase1_ops`, `phase1_perf`, `phase1_intent`, `phase1_constraints`, `paused_on_error`, `dev_server`, `phase6_double_check_done`); hook ve orchestrator tarafı bu field'ları **okuyor** ama skill prose'lar **set etmiyordu**. Real-use simülasyonu sonucu (54 turn senaryo) tespit edilen 4 blocker'ın hepsi bu yüzdendi:
+- `phase1_*` state field'ları skill prose'unda set edilmiyor → Phase 6 (c) promise-vs-delivery hep LOW skip; Phase 1.7 ops/perf dimension'ları audit etmiyor.
+- `ui_sub_phase=UI_REVIEW` transition explicit değil → 8.12.0 dev server otomatik başlamıyor; design loop tetiklenmiyor.
+- `phase5-verify` audit event emit edilmiyor → Phase 6 (a) audit-trail transcript fallback'a düşüyor.
+- Greenfield'da `mcl-stack-detect.sh` boş döner → Phase 1.7 stack add-on'ları (DB/UI/ops/perf) hiç tetiklenmez.
+
+8.15.0 **rule freshening** sürümüdür. Yeni kod yok, yeni feature yok. Mevcut state plumbing'in pratikte çalışmasını garanti altına alan toplu skill prose update'i — 6 skill dosyası + 1 hook regex extension'ı.
+
+#### Skill prose updates (6 dosya)
+
+- **`skills/my-claude-lang/phase1-rules.md`** — Phase 1 → 1.7 handoff section eklendi. Phase 1 summary onayından sonra skill 3 `mcl_state_set` Bash çağrısı yapar:
+  - `mcl_state_set phase1_intent "<intent>"` — Phase 6 (c) için
+  - `mcl_state_set phase1_constraints "<constraints>"` — Phase 6 (c) için
+  - `mcl_state_set phase1_stack_declared "<csv>"` — `mcl-stack-detect.sh` greenfield fallback
+- **`skills/my-claude-lang/phase1-7-precision-audit.md`** — (a) "DB Design Dimensions" sonrası 5 yeni dimension eklendi: 20. Deployment Strategy (DEP), 21. Observability Tier (MON), 22. Test Policy (TST), 23. Documentation Level (DOC), 24. Performance Budget (PERF). Her birinin trigger condition'ı 8.13.0/8.14.0 ile uyumlu. (b) Phase 1.7 → 1.5 handoff Bash: `mcl_state_set phase1_ops '{deployment_target,observability_tier,test_policy,doc_level}'` + `mcl_state_set phase1_perf '{budget_tier}'`.
+- **`skills/my-claude-lang/phase4a-ui-build.md`** — Phase 4a → 4b transition section. UI dosyaları + `npm install` tamamlanınca `mcl_state_set ui_sub_phase '"UI_REVIEW"'` (JSON-quoted string). Bu olmadan `mcl-stop.sh` 8.12.0 dev_server auto-start tetiklenmez. Quoting nüansı CHANGELOG + skill prose'da explicit.
+- **`skills/my-claude-lang/phase5-review.md`** — Phase 5 → 5.5 audit emission. 3 section (Spec Compliance, MUST TEST, Process Trace) tamamlandıktan sonra `mcl_audit_log "phase5-verify" "phase5" "report-emitted"`. Phase 6 (a) için deterministik signal — transcript header fallback secondary'ye düştü.
+- **`skills/my-claude-lang/phase5-5-localize-report.md`** — 14 dilden lokalize Verification Report header tablosu eklendi. Model 14 dilden seçer; 14-set dışı ise EN fallback. Phase 6 transcript fallback regex'i ile birebir eşleşir.
+- **`skills/my-claude-lang/all-mcl.md`** — STEP-12 (Phase 1 summary), STEP-40a (Phase 4a UI build), STEP-50 (Phase 5 spec coverage), STEP-64 (Phase 1.7 precision audit) description satırlarına `(since 8.15.0)` referansları eklendi. Yeni STEP yok.
+
+#### Hook regex extension (1 dosya)
+- **`hooks/mcl-stop.sh:1769`** — Phase 6 trigger transcript fallback regex'i 2 dilden (TR + EN) 14 dile genişletildi:
+  - EN: Verification Report
+  - TR: Doğrulama Raporu
+  - FR: Rapport de Vérification
+  - DE: Verifizierungsbericht
+  - ES: Informe de Verificación
+  - JA: 検証レポート
+  - KO: 검증 보고서
+  - ZH: 验证报告
+  - AR: تقرير التحقق
+  - HE: דוח אימות
+  - HI: सत्यापन रिपोर्ट
+  - ID: Laporan Verifikasi
+  - PT: Relatório de Verificação
+  - RU: Отчёт о проверке
+
+  Çeviri kalitesi 12 fallback dil için heuristic; native speaker review 8.15.x'te. Birebir audit event (`phase5-verify`) skill prose'da emit edildiğinden bu fallback artık yalnızca eski projeler için.
+
+#### State plumbing (yeni state field yok)
+8.15.0 mevcut state field'larının pratikte çalışmasını sağlar. Yeni schema bump yok. Yeni keyword yok. Yeni env var yok.
+
+#### Karar matrisi (kabul edilen varsayılanlar)
+- Çeviri kalitesi 14 dil için heuristic; native speaker review 8.15.x
+- Skill prose vs hook enforcement: Bash talimatları model-behavioral; hook seviyesinde detect 8.16.0+
+- `phase1_stack_declared` parsing: comma-separated string; JSON array conversion 8.16.x
+- JSON quoting (`mcl_state_set ui_sub_phase '"UI_REVIEW"'`): outer single-quote shell escape, inner double-quote JSON string
+
+### Test sonuçları
+- T1 phase1-rules.md handoff section eklendi PASS
+- T2 phase1-7 5 yeni dimension + state-set Bash eklendi (3 occurrences of `8.15.0` in skill) PASS
+- T3 phase4a-ui-build.md UI_REVIEW transition section eklendi PASS
+- T4 phase5-review.md audit emission section eklendi PASS
+- T5 phase5-5-localize-report.md 14-dil header tablosu eklendi (2 occurrences) PASS
+- T6 all-mcl.md STEP-12/40a/50/64 description footnotes eklendi (4 occurrences) PASS
+- T7 mcl-stop.sh:1769 regex 14 dile genişletildi PASS
+- T8 Mevcut suite: 19/0/2 — regresyonsuz PASS
+
+### Updated files
+- `skills/my-claude-lang/phase1-rules.md` (Phase 1 → 1.7 handoff)
+- `skills/my-claude-lang/phase1-7-precision-audit.md` (5 yeni dimension + state-set)
+- `skills/my-claude-lang/phase4a-ui-build.md` (UI_REVIEW transition)
+- `skills/my-claude-lang/phase5-review.md` (phase5-verify audit)
+- `skills/my-claude-lang/phase5-5-localize-report.md` (14-dil header)
+- `skills/my-claude-lang/all-mcl.md` (STEP description footnotes)
+- `hooks/mcl-stop.sh` (Phase 6 trigger 14-dil regex)
+- `VERSION` (8.14.0 → 8.15.0)
+- `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (8.15.x patch'lerine ertelendi)
+
+- **README.md / README.tr.md güncellenmedi** — 8.15.0'da yeni feature / keyword / env var / state field yok; CLAUDE.md release rule'u "yeni özellik varsa README" diyor — bu sürümde hiçbiri yok. CHANGELOG yeterli.
+- **Çeviri kalitesi 14 dil**: 12 fallback dil için header çevirileri makine-translation kalitesinde; native speaker review 8.15.x.
+- **Skill prose model-behavioral**: Bash talimatları model'in çağırmasına bağlı. Model unutursa state set edilmez. Hook seviyesinde detect mekanizması yok (8.10.0 NL-ack ile aynı sınır). 8.16.0+ Phase 6 (a) "phase1_intent state'te yoksa block" eklenebilir.
+- **`phase1_stack_declared` parse format**: comma-separated string; orchestrator'lar `set(t for t in tags.split(','))` ile parse eder. JSON array conversion 8.16.x.
+- **JSON quoting nüansı**: `mcl_state_set ui_sub_phase '"UI_REVIEW"'` — outer single-quote shell escape, inner double-quote JSON string. Skill prose'da explicit example var; yanlış quoting `mcl-state` validation rejection üretir.
+- **Real-use turn sayısı azalmaz**: 8.15.0 UX değil, rule freshening — Phase 1.7 GATE patlaması (real-use rapor #1) hâlâ var. UX iyileştirmesi 8.16.0+.
+
 ## [8.14.0] - 2026-04-30
 
 ### Eklendi — Performance Budget (İŞ 5, son iş)
