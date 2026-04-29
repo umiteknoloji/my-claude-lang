@@ -150,6 +150,72 @@ FINISH_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /mcl-design-approve keyword (since 8.12.0) --------
+if [ "$PROMPT_NORM" = "/mcl-design-approve" ]; then
+  _MCL_STATE_LIB_DA="$(dirname "$0")/lib/mcl-state.sh"
+  _MCL_DEVSV_LIB_DA="$(dirname "$0")/lib/mcl-dev-server.sh"
+  if [ -f "$_MCL_STATE_LIB_DA" ] && [ -f "$_MCL_DEVSV_LIB_DA" ]; then
+    source "$_MCL_STATE_LIB_DA" 2>/dev/null
+    source "$_MCL_DEVSV_LIB_DA" 2>/dev/null
+    command -v mcl_devserver_stop >/dev/null 2>&1 && mcl_devserver_stop 2>/dev/null
+    mcl_state_set ui_reviewed true >/dev/null 2>&1 || true
+    mcl_state_set ui_sub_phase '"BACKEND"' >/dev/null 2>&1 || true
+    mcl_audit_log "design-loop-approved" "mcl-activate.sh" "source=keyword" 2>/dev/null
+  fi
+  cat <<DA_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_DESIGN_APPROVE_MODE — the developer typed ${_BT}/mcl-design-approve${_BT}.\n\nDev server stopped. UI design loop closed. ui_reviewed=true and ui_sub_phase=BACKEND set.\n\nProceed with Phase 4c (BACKEND): wire real API/data behind the approved UI. The dev server can be restarted manually with ${_BT}/mcl-dev-server-start${_BT} if needed.\n</mcl_core>"
+  }
+}
+DA_OUTPUT
+  exit 0
+fi
+
+# -------- Branch: /mcl-dev-server-start keyword (since 8.12.0) --------
+if [ "$PROMPT_NORM" = "/mcl-dev-server-start" ]; then
+  _MCL_STATE_LIB_DS="$(dirname "$0")/lib/mcl-state.sh"
+  _MCL_DEVSV_LIB_DS="$(dirname "$0")/lib/mcl-dev-server.sh"
+  if [ -f "$_MCL_STATE_LIB_DS" ] && [ -f "$_MCL_DEVSV_LIB_DS" ]; then
+    source "$_MCL_STATE_LIB_DS" 2>/dev/null
+    source "$_MCL_DEVSV_LIB_DS" 2>/dev/null
+    command -v mcl_devserver_start >/dev/null 2>&1 && \
+      mcl_devserver_start "${CLAUDE_PROJECT_DIR:-$PWD}" 2>/dev/null
+    mcl_audit_log "mcl-dev-server-start" "mcl-activate.sh" "invoked" 2>/dev/null
+  fi
+  cat <<DSS_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_DEV_SERVER_START_MODE — manual dev server start invoked. Check state.dev_server for status; if active, the URL was injected to the next turn's context. If detection failed (state.dev_server.active=false), tell the developer no FE dev stack was detected and ask for the manual start command.\n</mcl_core>"
+  }
+}
+DSS_OUTPUT
+  exit 0
+fi
+
+# -------- Branch: /mcl-dev-server-stop keyword (since 8.12.0) --------
+if [ "$PROMPT_NORM" = "/mcl-dev-server-stop" ]; then
+  _MCL_STATE_LIB_DX="$(dirname "$0")/lib/mcl-state.sh"
+  _MCL_DEVSV_LIB_DX="$(dirname "$0")/lib/mcl-dev-server.sh"
+  if [ -f "$_MCL_STATE_LIB_DX" ] && [ -f "$_MCL_DEVSV_LIB_DX" ]; then
+    source "$_MCL_STATE_LIB_DX" 2>/dev/null
+    source "$_MCL_DEVSV_LIB_DX" 2>/dev/null
+    command -v mcl_devserver_stop >/dev/null 2>&1 && mcl_devserver_stop 2>/dev/null
+    mcl_audit_log "mcl-dev-server-stop" "mcl-activate.sh" "invoked" 2>/dev/null
+  fi
+  cat <<DSX_OUTPUT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_DEV_SERVER_STOP_MODE — dev server stopped manually. State cleared. UI loop is NOT closed (ui_sub_phase unchanged); use ${_BT}/mcl-design-approve${_BT} to advance to BACKEND.\n</mcl_core>"
+  }
+}
+DSX_OUTPUT
+  exit 0
+fi
+
 # -------- Branch: /mcl-phase6-report keyword (since 8.11.0) --------
 if [ "$PROMPT_NORM" = "/mcl-phase6-report" ]; then
   P6_HELPER="$(dirname "$0")/lib/mcl-phase6.py"

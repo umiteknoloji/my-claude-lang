@@ -7,6 +7,82 @@
 
 ## [Unreleased]
 
+## [8.12.0] - 2026-04-30
+
+### Eklendi — Interactive Design Loop (İŞ 3)
+
+Phase 4a (BUILD_UI) sonrası UI_REVIEW dev server döngüsü şu an MCL dışında akıyor: kullanıcı manuel `npm run dev`, browser açma, feedback verme. 8.12.0 bu döngüyü MCL içine alır — Phase 4a kod yazımı tamamlanınca MCL dev server'ı (10 stack tespit) arka planda başlatır, URL'yi state'e koyar, build error pause'a bağlanır, `/mcl-design-approve` ile döngü kapanır.
+
+#### Yeni dosyalar
+- **`hooks/lib/mcl-dev-server-detect.py`** — 10 stack detection (vite/next/cra/vue-cli/sveltekit/rails/django/flask/expo/static). Manifest tabanlı (package.json scripts + Rails Gemfile + Django manage.py + Flask requirements + Expo app.json + static index.html fallback). Output JSON: `{stack, default_port, start_cmd, args}`.
+- **`hooks/lib/mcl-dev-server.sh`** — sourceable lifecycle helper:
+  - `mcl_devserver_is_headless` — heuristic (`MCL_HEADLESS` / `CI` / Linux SSH no-DISPLAY)
+  - `mcl_devserver_detect <project>` — JSON via .py
+  - `mcl_devserver_start <project>` — port allocation (default + 4 fallback retry), `nohup` spawn, PID `dev-server.pid`, log `dev-server.log` (her ikisi `MCL_STATE_DIR`'da, 8.5.0 isolation), state.dev_server set, audit `dev-server-started`
+  - `mcl_devserver_stop` — kill PID + state clear + audit
+  - `mcl_devserver_status` — "active"/"inactive"/"stale" (PID alive check)
+
+#### State şeması
+- `dev_server` object field default `{"active": false}`; aktifken `{active, stack, port, url, pid, started_at, log_path}` (v2 schema bump'sız).
+
+#### Hook entegrasyonu
+- **`hooks/mcl-stop.sh`** — Phase 6 gate'den ÖNCE: `ui_flow_active=true` AND `ui_sub_phase=="UI_REVIEW"` AND `dev_server.active=false` AND not headless ise `mcl_devserver_start` tetiklenir. Headless ise audit `dev-server-headless-skip`. Stale PID detect ise auto-clear.
+- **`hooks/mcl-post-tool.sh`** — Edit/Write/MultiEdit sonrası `dev-server.log` tail (50 satır); stack-spesifik error pattern (vite/next/cra/django/rails/flask/expo regex map; default generic) match ise `mcl_pause_on_error "build-error" ...` (8.10.0 entegrasyonu) — kullanıcı çözüp `/mcl-resume` ile devam.
+- **`hooks/mcl-activate.sh`** — 3 yeni keyword block:
+  - `/mcl-design-approve` — `mcl_devserver_stop` + `ui_reviewed=true` + `ui_sub_phase=BACKEND` set + audit `design-loop-approved` + STATIC_CONTEXT BACKEND advance notice
+  - `/mcl-dev-server-start` — manuel server başlatma fallback
+  - `/mcl-dev-server-stop` — manuel durdurma (UI loop kapanmaz)
+
+#### Karar matrisi (kabul edilen varsayılanlar)
+- ui_sub_phase trigger: **(a)** skill talimatı (model-behavioral set; 8.12.x'te skill prose'una explicit `mcl_state_set ui_sub_phase UI_REVIEW` eklenir)
+- Stale PID: **auto-clear + restart** (sor yerine sessiz temizlik; 8.12.x'te AskUserQuestion opsiyonu)
+- Build error pattern: **(b)** stack-spesifik regex map
+- Hot reload check: **MVP skip** (advisory model-behavioral); 8.12.x'te `curl` health check
+- Mobile QR: **8.12.x'e ertelendi** (Expo log capture + ASCII rendering MVP'de yok; URL veriliyor, manuel QR alma)
+- Phase 4c geçiş: **`ui_reviewed=true` + `ui_sub_phase=BACKEND` ikisi**
+- Log persistence: **kalır** (`MCL_STATE_DIR/dev-server.log`)
+
+#### Audit events
+- `dev-server-started | mcl-stop | stack=<s> port=<p> pid=<n> url=<u>`
+- `dev-server-port-fallback | mcl-stop | requested=<p1> assigned=<p2>`
+- `dev-server-port-exhausted | mcl-stop | tried=<p1>-<p5>`
+- `dev-server-spawn-failed | mcl-stop | stack=<s>`
+- `dev-server-spawn-skipped | mcl-stop | reason=detect-or-spawn-failed`
+- `dev-server-headless-skip | mcl-stop | reason=headless-env`
+- `dev-server-stale-pid | mcl-stop | cleared=true`
+- `dev-server-stopped | mcl-activate.sh | pid=<n>`
+- `design-loop-approved | mcl-activate.sh | source=keyword`
+- `mcl-dev-server-start|stop | mcl-activate.sh | invoked` (manual)
+- `pause-on-error | mcl-post-tool | source=build-error tool=<stack>` (8.10.0 entegrasyonu)
+
+### Test sonuçları
+- T1 `/mcl-design-approve` keyword → STATIC_CONTEXT 340 byte, `MCL_DESIGN_APPROVE_MODE` mevcut PASS
+- T2 `/mcl-dev-server-start` keyword → 317 byte, `MCL_DEV_SERVER_START_MODE` PASS
+- T3 `/mcl-dev-server-stop` keyword → 190 byte, `MCL_DEV_SERVER_STOP_MODE` PASS
+- T4 Detection: vite (port 5173 + npm run dev), next (3000), django (8000 + manage.py runserver), nothing (null with reason) PASS
+- T5 Headless heuristic: default false, `MCL_HEADLESS=1` true PASS
+- T6 Mevcut suite: 19/0/2 — regresyonsuz PASS
+
+### Updated files
+- `hooks/lib/mcl-dev-server-detect.py` (yeni, 10 stack detection)
+- `hooks/lib/mcl-dev-server.sh` (yeni, lifecycle helpers)
+- `hooks/lib/mcl-state.sh` (`dev_server` field default)
+- `hooks/mcl-stop.sh` (auto-start trigger before Phase 6 gate)
+- `hooks/mcl-post-tool.sh` (build-error log tail check + pause-on-error integration)
+- `hooks/mcl-activate.sh` (3 keyword blocks)
+- `VERSION`, `FEATURES.md`, `CHANGELOG.md`
+
+### Bilinen sınırlar (8.12.x patch'lerine ertelendi)
+
+- **URL injection STATIC_CONTEXT'e otomatik eklenmedi**: model `mcl_state_get dev_server` ile JSON'dan URL'i çekebilir (Bash). 8.12.x'te activate hook STATIC_CONTEXT'e `<mcl_dev_server>` block otomatik enjekte.
+- **ui_sub_phase transition trigger**: Phase 4 model-behavioral; skill prose henüz `mcl_state_set ui_sub_phase UI_REVIEW` talimatını içermiyor. 8.12.x'te skill update.
+- **Hot reload health check**: MVP advisory only; 8.12.x'te `curl -sSf $URL` healthcheck.
+- **Mobile Expo QR**: log capture + ASCII render MVP'de yok; URL veriliyor (`exp://localhost:19000`), kullanıcı QR'ı manuel alır.
+- **Multi-server projeler** (Next.js + ayrı API): MVP single FE server only; backend Phase 4c'de manuel.
+- **Session abandon**: PID arka planda yaşar; bir sonraki session'da stale check ile auto-clear (sormadan); kullanıcı kontrolü 8.12.x'te.
+- **Build error pattern coverage**: 7 stack regex var, custom dev tooling kaçabilir; generic fallback `error|ERROR|FAILED|panic` false-positive yüksek.
+- **Skill files dokunulmadı**: design loop talimatı (URL relay, NL ack, hot reload bekleme) model-behavioral; skill update 8.12.x'te.
+
 ## [8.11.0] - 2026-04-30
 
 ### Eklendi — Phase 6 Double-check (İŞ 2)

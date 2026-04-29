@@ -83,6 +83,7 @@ _mcl_state_default() {
   "phase1_intent": null,
   "phase1_constraints": null,
   "paused_on_error": {"active": false},
+  "dev_server": {"active": false},
   "last_update": ${now}
 }
 JSON

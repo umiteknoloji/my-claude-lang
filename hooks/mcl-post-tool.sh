@@ -127,6 +127,41 @@ if printf '%s' "$TOOL_NAME_POST" | grep -qE '^(Write|Edit|MultiEdit|NotebookEdit
     mcl_state_set last_write_ts "$_WT_NOW" >/dev/null 2>&1 || true
   fi
 fi
+
+# --- Dev server build-error detection (since 8.12.0) ---
+# After Edit/Write/MultiEdit on UI files, tail dev-server.log for build
+# errors; if pattern match → trigger pause-on-error (8.10.0).
+if printf '%s' "$TOOL_NAME_POST" | grep -qE '^(Write|Edit|MultiEdit)$' 2>/dev/null \
+   && [ -n "${MCL_STATE_DIR:-}" ] && [ -f "$MCL_STATE_DIR/dev-server.log" ]; then
+  _DS_PAUSE_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/mcl-pause.sh"
+  _DS_STATE_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/mcl-state.sh"
+  if [ -f "$_DS_PAUSE_LIB" ] && [ -f "$_DS_STATE_LIB" ]; then
+    source "$_DS_STATE_LIB" 2>/dev/null
+    source "$_DS_PAUSE_LIB" 2>/dev/null
+    _DS_STACK="$(mcl_state_get dev_server.stack 2>/dev/null)"
+    # Stack-specific patterns (default generic if no match).
+    case "$_DS_STACK" in
+      vite|sveltekit) _DS_PAT='✗ Build|failed to (compile|resolve)|\[plugin' ;;
+      next) _DS_PAT='Module not found|Failed to compile|SyntaxError|TypeError' ;;
+      cra|vue-cli) _DS_PAT='Failed to compile|Module build failed' ;;
+      django) _DS_PAT='Traceback \(most recent call last\)|SystemCheckError' ;;
+      rails) _DS_PAT='ActionView::Template::Error|RuntimeError' ;;
+      flask) _DS_PAT='Traceback \(most recent call last\)|SyntaxError' ;;
+      expo) _DS_PAT='Bundling failed|Unable to resolve' ;;
+      *) _DS_PAT='error|ERROR|FAILED|panic' ;;
+    esac
+    _DS_LOG_TAIL="$(tail -50 "$MCL_STATE_DIR/dev-server.log" 2>/dev/null)"
+    if [ -n "$_DS_LOG_TAIL" ] && printf '%s' "$_DS_LOG_TAIL" | grep -qE "$_DS_PAT"; then
+      _DS_PAUSED_NOW="$(mcl_pause_check 2>/dev/null)"
+      if [ "$_DS_PAUSED_NOW" != "true" ]; then
+        _DS_ERR_LINE="$(printf '%s' "$_DS_LOG_TAIL" | grep -E "$_DS_PAT" | head -3)"
+        mcl_pause_on_error "build-error" "${_DS_STACK:-unknown}" \
+          "$_DS_ERR_LINE" \
+          "Check dev-server.log; fix the source error and the next Edit will retry. dev_server.log path: $MCL_STATE_DIR/dev-server.log"
+      fi
+    fi
+  fi
+fi
 if [ "$TOOL_NAME_POST" = "Bash" ]; then
   TOOL_OUTPUT="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json,sys

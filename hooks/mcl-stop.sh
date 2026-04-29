@@ -1564,6 +1564,31 @@ PYPS
   command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_cleared
 fi
 
+# --- Dev server auto-start (since 8.12.0) ---
+# Trigger: ui_flow_active=true AND ui_sub_phase=UI_REVIEW AND dev_server.active=false
+# AND not headless. Spawns FE dev server in background; URL retained in state.
+_DEVSV_LIB="$_MCL_HOOK_DIR/lib/mcl-dev-server.sh"
+if [ -f "$_DEVSV_LIB" ] && command -v python3 >/dev/null 2>&1 \
+   && [ -n "${MCL_STATE_DIR:-}" ]; then
+  source "$_DEVSV_LIB"
+  _DS_UI_ACTIVE="$(mcl_state_get ui_flow_active 2>/dev/null)"
+  _DS_SUB_PHASE="$(mcl_state_get ui_sub_phase 2>/dev/null)"
+  _DS_STATUS="$(mcl_devserver_status 2>/dev/null)"
+  _DS_HEADLESS="$(mcl_devserver_is_headless 2>/dev/null)"
+  if [ "$_DS_UI_ACTIVE" = "true" ] && [ "$_DS_SUB_PHASE" = "UI_REVIEW" ] \
+     && [ "$_DS_STATUS" = "inactive" ] && [ "$_DS_HEADLESS" = "false" ]; then
+    mcl_devserver_start "${CLAUDE_PROJECT_DIR:-$PWD}" >/dev/null 2>&1 || \
+      mcl_audit_log "dev-server-spawn-skipped" "mcl-stop" "reason=detect-or-spawn-failed"
+  elif [ "$_DS_UI_ACTIVE" = "true" ] && [ "$_DS_SUB_PHASE" = "UI_REVIEW" ] \
+       && [ "$_DS_STATUS" = "inactive" ] && [ "$_DS_HEADLESS" = "true" ]; then
+    mcl_audit_log "dev-server-headless-skip" "mcl-stop" "reason=headless-env"
+  elif [ "$_DS_STATUS" = "stale" ]; then
+    mcl_audit_log "dev-server-stale-pid" "mcl-stop" "cleared=true"
+    mcl_devserver_stop >/dev/null 2>&1 || true
+  fi
+fi
+# --- end dev server auto-start ---
+
 # --- Phase 6 Double-check gate (since 8.11.0) ---
 # Triggers when phase 4.5 dialog has been running AND phase5-verify event
 # has been emitted by the model AND phase6_double_check_done != true.
