@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 8.2.10
+**Güncel sürüm:** 8.2.11
 
 ---
 
@@ -211,6 +211,9 @@ Dört MCL hook'u (stop / activate / pre_tool / post_tool) son başarılı çalı
 
 **Plan Critique Subagent Enforcement** (8.2.10)
 Plan onayı (`ExitPlanMode`) öncesinde plan critique subagent'ının (Sonnet 4.6) çağrılmasını zorunlu kılar. State alanı `plan_critique_done` (default: `false`); session boundary'de ve `.claude/plans/*.md` dosyasına Write/Edit yapıldığında otomatik resetlenir. Pre-tool hook akışı: (1) `Task` çağrısı `subagent_type=*general-purpose*` + `model=*sonnet*` ise `plan_critique_done=true` set edilir; (2) `ExitPlanMode` çağrısı ile `plan_critique_done=false` ise `decision:block` ile reddedilir; (3) `.claude/plans/*.md` dosyasına Write/Edit/MultiEdit yapıldığında `plan_critique_done=false` resetlenir. Activate hook her turda plan dosyası varsa ve critique yapılmadıysa `PLAN_CRITIQUE_PENDING_NOTICE` enjekte eder. Stop hook ExitPlanMode tool_use bu turda var ve state hâlâ `false` ise audit'e `plan-critique-skipped-warn` yazar.
+
+**Session Context Bridge** (8.2.11)
+Cross-session bilgi köprüsü: `mcl-stop.sh` her Stop'ta `.mcl/session-context.md` yazar (trap EXIT — early-exit'lerde de fire eder, atomic tmp+rename). Markdown formatında 4-6 satır: aktif faz + spec hash, son commit SHA + subject (60 char), sıradaki adım (state-driven kural tablosu), ve varsa yarım plan / Phase 4.5 başlatılmamış uyarısı. Yeni session başında `mcl-activate.sh` dosyayı okur ve `SESSION_CONTEXT_NOTICE` olarak `additionalContext`'e enjekte eder — Claude önceki session'ın bağlamıyla devam edebilir. Aynı session içinde re-inject yok (boundary-only). Empty section omission: bilgi yoksa satır yazılmaz.
 
 ---
 

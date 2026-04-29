@@ -270,6 +270,28 @@ except Exception:
   fi
 fi
 
+# Session-context bridge (since 8.2.11). At session boundary, read
+# `.mcl/session-context.md` (written by the previous session's mcl-stop.sh)
+# and inject as `SESSION_CONTEXT_NOTICE` so Claude resumes with the prior
+# session's active phase, last commit, next step, and half-finished work.
+# Only fires once per new session — within-session activations skip injection
+# because Claude already has the running context.
+SESSION_CONTEXT_NOTICE=""
+if [ -n "${_EARLY_SESSION_ID:-}" ] \
+   && [ "${_EARLY_SESSION_ID:-}" != "${_EARLY_LAST_SESSION:-}" ] \
+   && command -v python3 >/dev/null 2>&1; then
+  _SC_READ_FILE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/session-context.md"
+  if [ -f "$_SC_READ_FILE" ]; then
+    _SC_BODY="$(cat "$_SC_READ_FILE" 2>/dev/null)"
+    if [ -n "$_SC_BODY" ]; then
+      _SC_ESC="$(printf '%s' "$_SC_BODY" | python3 -c 'import json,sys
+print(json.dumps(sys.stdin.read())[1:-1])' 2>/dev/null)"
+      SESSION_CONTEXT_NOTICE="<mcl_audit name=\\\"session-context\\\">\\nÖNCEKİ SESSION KONTEKSTİ (otomatik üretildi, bilgi amaçlı):\\n${_SC_ESC}\\n</mcl_audit>\\n\\n"
+      mcl_audit_log "session-context-injected" "mcl-activate.sh" "shown"
+    fi
+  fi
+fi
+
 # Optional Semgrep SAST preflight notice. The helper script
 # ${_BT}lib/mcl-semgrep.sh${_BT} checks three things: binary presence, whether at
 # least one detected project stack is in Semgrep's supported list, and
@@ -993,7 +1015,7 @@ print(json.dumps(sys.stdin.read().strip())[1:-1])
   fi
 fi
 
-FULL_CONTEXT="${UPDATE_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
+FULL_CONTEXT="${UPDATE_NOTICE}${SESSION_CONTEXT_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
 
 # Log MCL injection size for cost accounting (mcl-doctor)
 if command -v python3 >/dev/null 2>&1; then

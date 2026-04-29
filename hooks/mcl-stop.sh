@@ -71,6 +71,87 @@ source "$_MCL_HOOK_DIR/lib/mcl-state.sh"
 # shellcheck source=lib/mcl-log-append.sh
 [ -f "$_MCL_HOOK_DIR/lib/mcl-log-append.sh" ] && source "$_MCL_HOOK_DIR/lib/mcl-log-append.sh"
 
+# Session-context bridge (since 8.2.11) — writes .mcl/session-context.md on
+# every exit (trap EXIT) so the next session's mcl-activate.sh can resume
+# with active phase, last commit, next step, and any half-finished work.
+# Trap-based so the file lands even when stop returns decision:block early.
+_mcl_session_context_write() {
+  command -v python3 >/dev/null 2>&1 || return 0
+  [ -f "${MCL_STATE_FILE:-}" ] || return 0
+  local sc_file proj_dir git_sha git_msg
+  sc_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/session-context.md"
+  proj_dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+  git_sha="$(cd "$proj_dir" 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || true)"
+  git_msg="$(cd "$proj_dir" 2>/dev/null && git log -1 --pretty=%s 2>/dev/null || true)"
+  python3 - "$sc_file" "$MCL_STATE_FILE" "$git_sha" "$git_msg" "$proj_dir" 2>/dev/null <<'PYEOF' || true
+import json, os, sys, glob
+sc_path, state_path, git_sha, git_msg, project_dir = sys.argv[1:6]
+try:
+    state = json.load(open(state_path, "r", encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+phase = state.get("current_phase") or 1
+phase_name = state.get("phase_name") or ""
+spec_hash = (state.get("spec_hash") or "")[:8]
+spec_approved = state.get("spec_approved") is True
+phase_review_state = state.get("phase_review_state") or ""
+pattern_scan_due = state.get("pattern_scan_due") is True
+plan_critique_done = state.get("plan_critique_done") is True
+plan_files = []
+try:
+    plan_files = sorted(glob.glob(os.path.join(project_dir, ".claude", "plans", "*.md")))
+except Exception:
+    pass
+if spec_hash:
+    active = f"Phase {phase} ({phase_name}) — spec {spec_hash}"
+else:
+    active = f"Phase {phase} ({phase_name})"
+def resolve_next():
+    if phase_review_state == "pending":
+        return "Phase 4.5 risk review başlat"
+    if phase_review_state == "running":
+        return "Phase 4.5/4.6 dialog'u devam ettir"
+    if pattern_scan_due:
+        return "Phase 3.5 pattern scan"
+    if plan_files and not plan_critique_done:
+        return "Plan critique subagent çalıştır (Sonnet 4.6)"
+    if phase == 1:
+        return "Phase 1 parametre toplama"
+    if phase in (2, 3) and not spec_approved:
+        return "Spec onayı bekleniyor"
+    if phase >= 4 and spec_approved:
+        return "Phase 4 execute (kod yazımı)"
+    return "Belirsiz — state'e bak"
+next_step = resolve_next()
+lines = [
+    "# MCL Session Context (auto-generated)",
+    "",
+    f"**Aktif iş:** {active}",
+]
+if git_sha:
+    msg = (git_msg or "").strip()
+    if len(msg) > 60:
+        msg = msg[:60] + "…"
+    lines.append(f"**Son commit:** {git_sha} — {msg}" if msg else f"**Son commit:** {git_sha}")
+lines.append(f"**Sıradaki adım:** {next_step}")
+if plan_files and not plan_critique_done:
+    lines.append(f"**Yarım plan:** {os.path.relpath(plan_files[0], project_dir)} — critique pending")
+elif phase_review_state == "pending":
+    lines.append("**Yarım iş:** Phase 4.5 başlatılmadı")
+body = "\n".join(lines) + "\n"
+tmp = sc_path + ".tmp"
+try:
+    os.makedirs(os.path.dirname(sc_path), exist_ok=True)
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(body)
+    os.replace(tmp, sc_path)
+except Exception:
+    try: os.unlink(tmp)
+    except Exception: pass
+PYEOF
+}
+trap _mcl_session_context_write EXIT
+
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
 TRANSCRIPT_PATH="$(printf '%s' "$RAW_INPUT" | python3 -c '
