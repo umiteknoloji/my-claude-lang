@@ -89,6 +89,29 @@ These defaults are ALWAYS marked as `changeable` so Phase 3 review can
 correct without friction. They are NOT silently embedded — the marker
 makes them visible.
 
+### Phase 1.7 GATE answers override implicit defaults
+
+When Phase 1.7 fired a GATE on a dimension that overlaps a verb's
+implicit default (e.g., `paginate` default is `[default: cursor
+pagination, changeable]`, but the react-frontend GATE asked
+"page-numbered or infinite scroll?" and the developer answered
+"page-numbered, 25 rows"), the GATE answer **wins**. Replace the
+`[default: ..., changeable]` marker with `[confirmed: ...]`. The
+`[confirmed]` marker tells Phase 3 the value came from explicit
+developer input, not from a verb default — Phase 3's Scope Changes
+Callout shows it as a confirmed parameter, not as a reviewable default.
+
+Examples:
+- Verb `paginate` + Phase 1.7 GATE answer "page-numbered 25 rows" →
+  `[confirmed: page-numbered pagination, 25 rows]` (NOT
+  `[default: cursor pagination, changeable]`).
+- Verb `render` + Phase 1.7 GATE answer "skip loading state, show only
+  empty + error" → `[confirmed: empty + error states only]` (NOT
+  `[default: empty/loading/error states, changeable]`).
+
+If Phase 1.7 did NOT GATE the dimension, keep the `[default: ...,
+changeable]` marker as before.
+
 ## Forbidden Additions
 
 The brief MUST NOT introduce content not derivable from the user's
@@ -130,6 +153,8 @@ Concrete cases showing the upgrade boundary:
 | "build login page" | "build login page" | "Implement password-based login with bcrypt + JWT" | NO — bcrypt + JWT invented |
 | "manage users" | "manage users" | "Expose CRUD operations on users [default: GET/POST/PUT/DELETE on /users, changeable]" | YES — manage→CRUD with HTTP default |
 | "manage users" | "manage users" | "Expose user CRUD with admin-only access" | NO — admin-only invented |
+| "kullanıcı listele" (Phase 1 context: existing React + FastAPI project) | "list users" | "Render a paginated user table backed by a paginated GET endpoint exposed by the existing FastAPI service" | YES — backend layer is already in Phase 1 confirmed context, brief may mention it |
+| "kullanıcı listele" (Phase 1 context: empty / no stack confirmed) | "list users" | "Render a paginated user table backed by a new REST API" | NO — no backend layer in Phase 1 context, brief MUST stay frontend-only or send back to Phase 1 |
 
 The boundary: **surgical verb implies STANDARD industry default;
 specific features and constraints require user mention.**

@@ -275,7 +275,7 @@ For each dimension in order — core 1→7 first, then matching stack add-ons:
 1. Read the confirmed Phase 1 parameters.
 2. Classify SILENT-ASSUME, SKIP-MARK, or GATE.
 3. If GATE → ask exactly one question (existing one-question-at-a-time rule applies, no introductory sentences, no list of multiple questions).
-4. Confirm the developer's answer, mark it in the parameter set.
+4. **Wait for the developer's answer before evaluating the next dimension.** When multiple dimensions classify as GATE in the same audit pass, queue them and ask sequentially across turns — never batch two GATE questions in the same response, even with bullet/numbered formatting. Each GATE answer is confirmed and marked in the parameter set before the next GATE is evaluated.
 5. Continue to the next dimension.
 
 When all dimensions resolve, emit the audit entry, advance to Phase 1.5.
