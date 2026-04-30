@@ -7,6 +7,71 @@
 
 ## [Unreleased]
 
+## [8.19.0] - 2026-04-30
+
+### Eklendi — Hook-level State Population Fallback + Severity-Aware Phase 4.5 + Test Layer Coverage
+
+Üç bağımsız iyileştirme tek sürümde. Üçü de gerçek-kullanım telemetrisinden (`/Users/umitduman/adm_pnl` 264-satır audit'i) ortaya çıkan bulgulara cevap.
+
+#### Hook-level state population fallback
+
+**Sorun:** 8.10.0-8.17.0 boyunca `phase1_intent / constraints / stack_declared / ops / perf / ui_sub_phase` skill prose Bash'e bağımlıydı. Real session telemetri'sinde `set | skill-prose=0`, `deny-write | bash=0` (skill prose Bash sıfır deneme — model davranışı). 8.16.0 LOW soft fail guard durumu görünür kıldı ama state hâlâ null → Phase 6 (c) keyword extract silently skip.
+
+**Çözüm:** `hooks/lib/mcl-phase-detect.py` (yeni) — Engineering Brief parse (English-canonical, structured `Task: / Requirements: / Context:` field'ları) + `<mcl_state_emit kind="...">PAYLOAD</mcl_state_emit>` marker scanner. mcl-stop.sh her Stop turn'ünde idempotent çalıştırır:
+- Brief'ten `phase1_intent`, `phase1_constraints` extract; Context body'sinden stack tag inference (16 keyword pattern → `react-frontend / python / db-postgres / orm-prisma / ...`).
+- Marker'dan `phase1_ops`, `phase1_perf` (JSON object), `ui_sub_phase=UI_REVIEW`.
+- Idempotent: state.json'da zaten dolu olan field overwrite edilmez (skill prose Bash veya önceki turn'ün fallback'i tarafından yazılmış olabilir).
+- Audit: `phase1_state_populated | mcl-stop | source=brief-parse` veya `source=marker-emit` → fallback path explicit traceable.
+
+Skill prose Bash hâlâ desteklenir; marker-emit alternative section'ları `phase1-7-precision-audit.md` ve `phase4a-ui-build.md` içinde dokümante edilir. Dual path: Bash preferred (caller=skill-prose, immediate write), marker fallback (caller=mcl-stop, next-Stop write).
+
+#### Severity-aware Phase 4.5 skip enforcement + askuq-path gates fall-through
+
+**Sorun:** Phase 4.5 dialog mevcut 3 seçenek (apply / skip / make-rule) HIGH security finding'i bile skip etmeye izin veriyordu. Ayrıca real session'da `phase-review-pending` audit count=0 (greenfield), çünkü askuq=true path'i 5 START gate'i tamamen atlatıyordu (mcl-stop.sh:518-525 design intent — ama HIGH/MEDIUM finding senaryosunda yetersiz koruma).
+
+**Çözüm:**
+- `phase4-5-risk-review.md` severity-aware option matrix:
+  - **HIGH** (any): `apply-fix / override` — skip kaldırıldı.
+  - **MEDIUM Security/DB**: `apply-fix / override`.
+  - **MEDIUM other categories** (UI/Perf/Ops/Code-Review/Simplify/Test): mevcut 3 seçenek.
+  - **LOW**: mevcut 3 seçenek.
+- Override path: ikinci AskUserQuestion ile reason zorunlu. Marker `<mcl_state_emit kind="phase4-5-override">{...}</mcl_state_emit>` (preferred) veya Bash `mcl_audit_log phase4_5_override`. Reason Phase 5 raporuna ve audit'e akar.
+- `mcl-stop.sh:625-1136` refactor: askuq=true ve code_written/pending iki path da artık 5 START gate'i çağırır (idempotent via `phase4_5_*_scan_done` flags). Standart Phase 4.5 reminder block'u SADECE askuq=false path'inde fire eder (askuq=true zaten dialog içinde — hostile UX değil).
+- `hooks/lib/mcl-phase6.py` Phase 6 (a) `check_severity_skip_violations`: dialog'da `action=skip` + HIGH veya MEDIUM-sec/db finding + matching `phase4_5_override` event yoksa LOW soft fail (`P6-A-severity-skip-without-override`).
+
+#### Test layer coverage + TST-T04 load-test rule
+
+**Sorun:** Phase 1.7 TST dim test policy soruyor ama actual coverage gap (unit configured, integration/E2E/load eksik) Phase 4.5 dialog'da finding olarak inmiyor. Production-bound backend'lerde load testi yokluğu hiç yakalanmıyor.
+
+**Çözüm:** `hooks/lib/mcl-test-coverage.py` (yeni) — 8 manifest'e bakar (`package.json / requirements.txt / Gemfile / composer.json / pom.xml / go.mod / Cargo.toml / build.gradle`) + 4 framework kategorisi:
+- **TST-T01 HIGH**: source code mevcut + unit framework yok → tüm test eksik.
+- **TST-T02 MEDIUM**: integration framework yok (supertest/testcontainers/pytest-asyncio).
+- **TST-T03 MEDIUM**: `ui_flow_active=true` + e2e yok (playwright/cypress).
+- **TST-T04 MEDIUM (yeni)**: backend stack tag (`python/java/go/...`) + `phase1_ops.deployment_target ∈ {prod, public, multi-tenant, scale, cloud}` + load tool yok (k6/locust/artillery/jmeter).
+
+mcl-stop.sh Phase 4.5 lens orchestration'a entegre: 5 mevcut gate (security/db/ui/ops/perf) yanına 6. lens olarak test-coverage. Findings sequential dialog'a `[Test]` etiketli `MEDIUM` finding olarak inject edilir; severity-aware option matrix kategoriye göre uygulanır (TST-T0X → "MEDIUM other category" → apply/skip/make-rule).
+
+#### Trace.log expansion (kısmi)
+
+8.10-8.17 dersi: trace.log gerçek session'da çok dar. `mcl_trace_append spec_emit / ui_build_done / backend_start` eklendi. Phase 5 Process Trace section'ı genişler.
+
+### Yeni dosyalar
+- `hooks/lib/mcl-phase-detect.py` — brief + marker parser
+- `hooks/lib/mcl-test-coverage.py` — manifest scan + finding rules
+- `tests/cases/test-phase-detect.sh` — 21 unit assertion
+- `tests/cases/test-test-coverage.sh` — 11 unit assertion
+- `tests/cases/e2e-full-pipeline.sh` Phase 5 + 5b — gerçek end-to-end state-pop + idempotency
+
+### Bilinen sınırlar
+- **Brief stack inference heuristic** — keyword scan; brief'te stack açıkça geçmezse miss. Fallback olarak `mcl-stack-detect.sh` çalıştırılır. İkisi de boş → 8.16.0 LOW soft fail tetiklenir.
+- **`<mcl_state_emit>` model davranışına bağlı** — Bash'ten daha az fragile (tool invocation değil, text emission), ama yine atlanabilir. Brief-parse `phase1_intent/constraints` için neredeyse-deterministik (brief mandatory); marker `phase1_ops/perf/ui_sub_phase` için yarı-fragile.
+- **Severity enforcement skill-prose-only** — Phase 6 (a) audit assertion ile detect (LOW soft fail), real-time block YOK. Override reason yazmadan skip edilirse audit'e yansır ama dialog tamamlanmış olur. Hard hook-enforce 8.20+.
+- **askuq=true L3 gates** — security gate ~11s. Greenfield her Stop'ta tekrar çalışır mı? Hayır — `phase4_5_security_scan_done=true` flag idempotent; ilk fire'dan sonra skip. Sadece ilk askuq=true turn'ünde 11s overhead.
+- **TST-T04 deployment_target conditional** — `phase1_ops.deployment_target` null'sa rule fire etmez (false-negative). 8.19.0 hook-fallback ile çoğunlukla dolu olacak ama her senaryoda değil.
+- **`mcl-test-coverage.py` heuristic** — manifest var ama framework yoksa miss eder. AST-level test file scan 8.20+.
+
+Tests: 59/0/2 unit (önce 27 → +32: phase-detect 21, test-coverage 11). E2E 65/0/0 (önce 54 → +11: Phase 5 + 5b).
+
 ## [8.18.1] - 2026-04-30
 
 ### Düzeltildi — Phase 4a path redirect (UI-BUILD LOCK preempt)

@@ -479,6 +479,113 @@ _mcl_is_vision_request_option() {
 mcl_state_init
 CURRENT_PHASE="$(mcl_state_get current_phase)"
 
+# --- 8.19.0: hook-level state population fallback ---
+# Audit telemetry from 8.10.0-8.17.0 sessions showed skill prose Bash
+# (the documented mechanism for writing phase1_intent / constraints /
+# stack_declared / ops / perf / ui_sub_phase) was effectively never
+# invoked by the model. mcl_audit_log calls bypass auth-check so audit
+# events recorded SUCCESS while the underlying mcl_state_set writes
+# were either rejected or never attempted. Phase 6 (c) keyword extract
+# silently skipped because phase1_intent stayed null.
+#
+# Fallback: parse the Engineering Brief (always-English, structured)
+# from the transcript and emit `<mcl_state_emit>` markers from skill
+# prose. This hook context auth-passes, so every write here lands.
+# Idempotent — fields already populated by skill prose Bash this turn
+# (caller=skill-prose) are left untouched.
+_PD_HELPER="$_MCL_HOOK_DIR/lib/mcl-phase-detect.py"
+if [ -f "$_PD_HELPER" ] && command -v python3 >/dev/null 2>&1 \
+   && [ -n "${TRANSCRIPT_PATH:-}" ] && [ -f "${TRANSCRIPT_PATH:-}" ]; then
+  _PD_JSON="$(python3 "$_PD_HELPER" "$TRANSCRIPT_PATH" 2>/dev/null || echo '{}')"
+
+  # Helper: read field <X> from $_PD_JSON. Empty string when null/absent.
+  _pd_read() {
+    printf '%s' "$_PD_JSON" | python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read() or '{}')
+except Exception:
+    print(''); sys.exit(0)
+v = d.get(sys.argv[1])
+if v is None:
+    print('')
+elif isinstance(v, str):
+    print(v)
+else:
+    print(json.dumps(v))
+" "$1" 2>/dev/null
+  }
+
+  # Idempotent set: only writes if state field is currently null/empty.
+  # Audit caller=mcl-stop tags the write as a fallback population event,
+  # distinct from caller=skill-prose (token-path direct write).
+  _pd_set_if_empty() {
+    local fld="$1" val="$2"
+    [ -n "$val" ] || return 0
+    local cur
+    cur="$(mcl_state_get "$fld" 2>/dev/null)"
+    [ "$cur" = "null" ] || [ -z "$cur" ] || [ "$cur" = '""' ] || return 0
+    if mcl_state_set "$fld" "$val" >/dev/null 2>&1; then
+      mcl_audit_log "phase1_state_populated" "mcl-stop" \
+        "source=brief-parse field=${fld}"
+    fi
+  }
+
+  _pd_set_if_empty phase1_intent          "$(_pd_read phase1_intent)"
+  _pd_set_if_empty phase1_constraints     "$(_pd_read phase1_constraints)"
+  _pd_set_if_empty phase1_stack_declared  "$(_pd_read phase1_stack_declared)"
+
+  # phase1_ops / phase1_perf — JSON object writes; idempotent on the
+  # whole object (any prior population by skill prose Bash is kept).
+  _PD_OPS="$(_pd_read phase1_ops)"
+  if [ -n "$_PD_OPS" ]; then
+    _CUR_OPS_DT="$(mcl_state_get phase1_ops 2>/dev/null \
+      | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "null")
+    print(d.get("deployment_target") or "" if isinstance(d, dict) else "")
+except Exception:
+    print("")' 2>/dev/null)"
+    if [ -z "$_CUR_OPS_DT" ] || [ "$_CUR_OPS_DT" = "null" ]; then
+      mcl_state_set phase1_ops "$_PD_OPS" >/dev/null 2>&1 \
+        && mcl_audit_log "phase1_ops_populated" "mcl-stop" "source=marker-emit"
+    fi
+  fi
+
+  _PD_PERF="$(_pd_read phase1_perf)"
+  if [ -n "$_PD_PERF" ]; then
+    _CUR_PERF_BT="$(mcl_state_get phase1_perf 2>/dev/null \
+      | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "null")
+    print(d.get("budget_tier") or "" if isinstance(d, dict) else "")
+except Exception:
+    print("")' 2>/dev/null)"
+    if [ -z "$_CUR_PERF_BT" ] || [ "$_CUR_PERF_BT" = "null" ]; then
+      mcl_state_set phase1_perf "$_PD_PERF" >/dev/null 2>&1 \
+        && mcl_audit_log "phase1_perf_populated" "mcl-stop" "source=marker-emit"
+    fi
+  fi
+
+  # ui_sub_phase: only set when current value is null OR "BUILD_UI" and
+  # the marker says UI_REVIEW (forward transition only — never regress).
+  _PD_UI="$(_pd_read ui_sub_phase_signal)"
+  if [ "$_PD_UI" = "UI_REVIEW" ]; then
+    _CUR_UI="$(mcl_state_get ui_sub_phase 2>/dev/null | tr -d '"')"
+    if [ -z "$_CUR_UI" ] || [ "$_CUR_UI" = "null" ] || [ "$_CUR_UI" = "BUILD_UI" ]; then
+      if mcl_state_set ui_sub_phase '"UI_REVIEW"' >/dev/null 2>&1; then
+        mcl_audit_log "ui_sub_phase_set" "mcl-stop" "source=marker-emit"
+        command -v mcl_trace_append >/dev/null 2>&1 \
+          && mcl_trace_append ui_build_done "source=marker-emit"
+      fi
+    fi
+  fi
+
+  unset _PD_JSON _PD_OPS _PD_PERF _PD_UI _CUR_OPS_DT _CUR_PERF_BT _CUR_UI
+  unset -f _pd_read _pd_set_if_empty 2>/dev/null || true
+fi
+# --- end 8.19.0 state population fallback ---
+
 # --- Phase 4.5 / 4.6 / 5 review enforcement (since 7.1.3) ---
 #
 # Core invariant: after Phase 4 code is written, Claude MUST run Phase 4.5
@@ -515,7 +622,15 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
     _PR_ASKUQ="$(printf '%s' "$_PR_JSON" | python3 -c \
       'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("askuq_present") else "false")' 2>/dev/null)"
 
-    if [ "$_PR_ASKUQ" = "true" ]; then
+    # 8.19.0 refactor: gates run on EITHER state-set path (askuq=true OR
+    # code_written/pending). Real-session telemetry (8.10-8.17) showed
+    # askuq=true skipped Phase 4.5 START gates entirely because the
+    # branch returned without entering the gate code. Greenfield clean
+    # codebases hid this; with HIGH/MEDIUM findings this would let
+    # critical issues bypass the gate. Gates are idempotent via
+    # phase4_5_*_scan_done flags — second invocation is a no-op.
+    if [ "$_PR_CODE" = "true" ] || [ "$_PR_ASKUQ" = "true" ] || [ "$_PR_REVIEW_STATE" = "pending" ]; then
+     if [ "$_PR_ASKUQ" = "true" ]; then
       # Phase 4.5/4.6 dialog is running this turn — transition to "running"
       # regardless of whether code was also written (risk-fix + next-risk turn).
       if [ "$_PR_REVIEW_STATE" != "running" ]; then
@@ -524,7 +639,7 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
         command -v mcl_trace_append >/dev/null 2>&1 && \
           mcl_trace_append phase_review_running "${_PR_REVIEW_STATE:-null}"
       fi
-    elif [ "$_PR_CODE" = "true" ] || [ "$_PR_REVIEW_STATE" = "pending" ]; then
+     else
       # Code written this turn, OR pending state persists from a prior turn
       # (sticky enforcement — Bash-only/text-only turns cannot escape the gate).
       mcl_state_set phase_review_state '"pending"' >/dev/null 2>&1 || true
@@ -589,6 +704,11 @@ PYEOF
           [ -n "$_RG_OUTPUT" ] && mcl_audit_log "regression-guard-green" "stop" ""
         fi
       fi
+     fi  # end inner if/else (askuq=true vs code_written) — 8.19.0
+
+      # 8.19.0: Phase 4.5 START gates run for BOTH paths (askuq=true and
+      # code_written). Each gate is idempotent via its phase4_5_*_scan_done
+      # flag, so re-entry on subsequent turns short-circuits.
 
       # ---- Phase 4.5 START security gate (since 8.7.1) ----
       # Run full security scan on first pending entry; HIGH bulgu varsa
@@ -1018,12 +1138,65 @@ print("\\n".join(lines))
       fi
       # ---- end Perf gate ----
 
+      # ---- Phase 4.5 START test-coverage lens (since 8.19.0) ----
+      # Surfaces missing test categories (unit/integration/e2e/load) as
+      # MEDIUM findings the model must thread into the sequential
+      # dialog. Unlike security/db/ui/ops/perf gates, test coverage
+      # lacks a HIGH-severity blocking path — even TST-T01 (zero unit
+      # tests) is advisory-MEDIUM here; the developer answers via the
+      # severity-aware option matrix in phase4-5-risk-review.md.
+      _TC_HELPER="$_MCL_HOOK_DIR/lib/mcl-test-coverage.py"
+      _TEST_MEDIUM_PROSE=""
+      if [ -f "$_TC_HELPER" ] && command -v python3 >/dev/null 2>&1 \
+         && [ -n "${MCL_STATE_DIR:-}" ]; then
+        _TC_STACK="$(mcl_state_get phase1_stack_declared 2>/dev/null | tr -d '"')"
+        _TC_UI_FLOW="$(mcl_state_get ui_flow_active 2>/dev/null)"
+        _TC_DEPLOY="$(mcl_state_get phase1_ops 2>/dev/null \
+          | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "null")
+    print(d.get("deployment_target") or "" if isinstance(d, dict) else "")
+except Exception:
+    print("")' 2>/dev/null)"
+        _TC_JSON="$(python3 "$_TC_HELPER" \
+          --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
+          --stack-tags "${_TC_STACK:-}" \
+          --ui-flow-active "${_TC_UI_FLOW:-false}" \
+          --deployment-target "${_TC_DEPLOY:-}" 2>/dev/null || echo '{}')"
+        _TEST_MEDIUM_PROSE="$(printf '%s' "$_TC_JSON" | python3 -c '
+import json, sys
+try:
+    r = json.loads(sys.stdin.read() or "{}")
+except Exception:
+    sys.exit(0)
+findings = r.get("findings", []) or []
+if not findings:
+    sys.exit(0)
+lines = ["", "Test-coverage lens surfaced " + str(len(findings)) + " finding(s) — thread each into the sequential dialog as a [Test] item:"]
+for f in findings[:8]:
+    rid = f.get("rule_id", "?")
+    sev = f.get("severity", "MEDIUM")
+    msg = (f.get("message", "") or "")[:160]
+    lines.append("  - " + rid + " [" + sev + "] [Test] — " + msg)
+print("\\n".join(lines))
+' 2>/dev/null)"
+      fi
+      # ---- end test-coverage lens ----
+
+      # 8.19.0: emit the standard Phase 4.5 reminder ONLY when the model
+      # has not yet entered the dialog (askuq=false). When askuq=true,
+      # the model is already presenting a risk via AskUserQuestion;
+      # forcing a reminder block over its own dialog turn is hostile UX.
+      # Gates above already fired (idempotent); HIGH findings emitted
+      # their own decision:block + exit 0 if they fired.
+      if [ "$_PR_ASKUQ" != "true" ]; then
       # Return decision:block so Claude is forced to continue.
       printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written but Phase 4.5 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4.5 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4.5 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4.5 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Phase 4.5 risks are resolved → run Phase 4.6 Impact Review.\n    4. After Phase 4.6 → run Phase 5 Verification Report.\n\nPhase 4.5 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.${_SEC_MEDIUM_PROSE}${_DB_MEDIUM_PROSE}${_UI_MEDIUM_PROSE}${_OPS_MEDIUM_PROSE}${_PERF_MEDIUM_PROSE}\"
+  \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written but Phase 4.5 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4.5 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4.5 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4.5 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Phase 4.5 risks are resolved → run Phase 4.6 Impact Review.\n    4. After Phase 4.6 → run Phase 5 Verification Report.\n\nPhase 4.5 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.${_SEC_MEDIUM_PROSE}${_DB_MEDIUM_PROSE}${_UI_MEDIUM_PROSE}${_OPS_MEDIUM_PROSE}${_PERF_MEDIUM_PROSE}${_TEST_MEDIUM_PROSE}\"
 }"
       exit 0
+      fi  # 8.19.0: end askuq-aware reminder gate
     fi
   fi
 fi
@@ -1394,6 +1567,7 @@ PYEOF
       mcl_state_set spec_hash "\"$SPEC_HASH\""
       mcl_debug_log "stop" "transition-1-to-2" "hash=${SPEC_HASH:0:12}"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 1 2
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_emit "hash=${SPEC_HASH:0:12}"
       command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Faz 1 → 2 geçişi (spec algılandı)."
       ;;
     2|3)
@@ -1648,7 +1822,10 @@ if [ "$ASKQ_INTENT" = "ui-review" ]; then
     mcl_state_set ui_sub_phase '"BACKEND"'
     mcl_audit_log "approve-ui-review-via-askuserquestion" "stop" "sub=${UI_SUB_NOW}->BACKEND"
     mcl_debug_log "stop" "ui-review-approve" "sub=${UI_SUB_NOW}->BACKEND"
-    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_review_approved
+    command -v mcl_trace_append >/dev/null 2>&1 && {
+      mcl_trace_append ui_review_approved
+      mcl_trace_append backend_start "sub=${UI_SUB_NOW}->BACKEND"
+    }
   elif _mcl_is_vision_request_option "$ASKQ_SELECTED"; then
     mcl_audit_log "ui-review-vision-request" "stop" "selected=${ASKQ_SELECTED}"
     mcl_debug_log "stop" "ui-review-vision-request" "selected=${ASKQ_SELECTED}"

@@ -303,6 +303,27 @@ The two audit events (since 8.16.0) are required by Phase 6 (a)
 audit-trail completeness check. If skill prose Bash is forgotten,
 Phase 6 (a) reports a LOW soft fail per missing event.
 
+### Alternative: Marker Emission (since 8.19.0)
+
+Audit telemetry from 8.10.0-8.17.0 production sessions showed skill
+prose Bash above is rarely invoked in practice (auth-check / env
+inheritance / model behavior — multiple causes). If for ANY reason
+the Bash above is not executed, emit these structured text blocks at
+the END of your response — `mcl-stop.sh` reads them on the next Stop
+turn and writes the state from authorized hook context (idempotent —
+will not overwrite values the Bash already wrote):
+
+```
+<mcl_state_emit kind="phase1-7-ops">{"deployment_target":"<chosen>","observability_tier":"<chosen>","test_policy":"<chosen>","doc_level":"<chosen>"}</mcl_state_emit>
+<mcl_state_emit kind="phase1-7-perf">{"budget_tier":"<strict|pragmatic|internal-only>"}</mcl_state_emit>
+```
+
+The Bash path remains the **preferred** path (writes immediately,
+audit `caller=skill-prose`, no transcript dependency). The marker is
+the **safety net** — text emission only, no tool invocation, no auth
+required. If neither path runs, Phase 6 (a) reports the LOW soft
+fail and downstream phases proceed with default state.
+
 These state objects feed Phase 4.5 ops gate (8.13.0) and Phase 4.5 perf
 gate (8.14.0), and inform threshold defaults (e.g. perf budget_tier
 "strict" lowers `bundle_budget_kb` from 200 to 100).

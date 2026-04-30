@@ -94,6 +94,16 @@ Phase 1 "completeness" sağlar; Phase 1.7 "precision" sağlar. Phase 1 onayı so
 
 **GATE Batching:** Aynı kategoride (Security / Database / UI / Operations / Performance) birden fazla GATE dimension fire ettiğinde tek `AskUserQuestion` (`multiSelect: true`) ile sorulur — her kategori en fazla 1 turn. Tek-dimension fire'lar yine tek-soru formuyla. Reverse path: geliştirici sonraki turn'de batched dimension'a feedback verirse model batched answer'ı discard edip yeniden sorar (model-behavioral, structured rollback gelecek sürümde).
 
+**Hook-level state population fallback (8.19.0):** Skill prose Bash invocation'larının (8.10.0-8.17.0 boyunca real-session telemetri'sinde sıfır deneme tespit edildi) yedeği. `hooks/lib/mcl-phase-detect.py` Engineering Brief'i (her Phase 1 sonunda canonical English structured block) parse eder + `<mcl_state_emit kind="...">PAYLOAD</mcl_state_emit>` text marker'larını tarar. mcl-stop.sh idempotent çalıştırır → `phase1_intent / constraints / stack_declared / ops / perf / ui_sub_phase` skill prose Bash çağrılmadığında bile populate olur. Audit `caller=mcl-stop, source=brief-parse|marker-emit` ile fallback path traceable. Skill prose Bash hâlâ preferred (immediate, caller=skill-prose); marker-emit alternative section'ları skill files'da dokümante.
+
+**Severity-aware Phase 4.5 (8.19.0):** Risk dialog options severity + category matrix'ine göre seçilir. HIGH (her kategori) ve MEDIUM-Security/DB findings için `apply-fix / override` (skip kaldırıldı). Override reason zorunlu — `<mcl_state_emit kind="phase4-5-override">{rule_id, severity, category, reason}</mcl_state_emit>` marker'ı ile audit + Phase 5 raporu'na akar. Phase 6 (a) `check_severity_skip_violations` cross-reference: HIGH skip + override yoksa LOW soft fail. askuq=true path artık 5 START gate'i atlatmaz (idempotent re-entry); standart Phase 4.5 reminder block'u sadece askuq=false path'inde fire eder.
+
+**Test layer coverage lens (8.19.0):** Phase 4.5 6. lens olarak `hooks/lib/mcl-test-coverage.py`. 8 manifest format scan'ler; 4 kategori (unit/integration/e2e/load) eksikse finding oluştur:
+- TST-T01 HIGH: source code var, unit framework yok.
+- TST-T02 MEDIUM: integration framework yok.
+- TST-T03 MEDIUM: ui_flow_active + e2e yok.
+- TST-T04 MEDIUM: backend stack + production deployment + load tool yok (k6/locust/artillery/jmeter).
+
 **Skill prose auth (8.17.0):** Skill prose Bash invocation'ları (`bash -c '...mcl_state_set...'`) `MCL_SKILL_TOKEN` env + project-scoped token dosyası ile authenticate olur. Token her UserPromptSubmit'te `mcl-activate.sh` tarafından rotate edilir (32-hex, mode 0600); replay window tek turn. Auth pass eden write'lar audit'te `caller=skill-prose` ile etiketlenir; CLI bypass yolu açılmaz (token dosyası proje state dizininde 0600).
 
 **Stack tag validation:** Phase 1 handoff sırasında set edilen `phase1_stack_declared` CSV'si, `mcl-state.sh`'taki kanonik stack-tag set'ine karşı validate edilir. Bilinmeyen token (typo, non-canonical alias) stderr'e WARN üretir + `stack-tag-unknown` audit kaydı atılır; set yine yazılır (uyarı advisory). Phase 1.7 hangi token match etti onunla devam eder.

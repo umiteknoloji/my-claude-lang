@@ -88,19 +88,61 @@ conversation**. For each risk MCL surfaces:
 1. MCL presents **one** risk as plain text with a short explanation of
    why it matters (security / data integrity / performance / regression
    / UX / etc.)
-2. MCL immediately calls (since 6.0.0):
+2. MCL immediately calls `AskUserQuestion`. The OPTIONS depend on the
+   risk's severity AND category (since 8.19.0 — severity-aware skip
+   enforcement; the previous uniform 3-option form let critical
+   security findings be skipped silently).
+
+   ### Risk Decision Options (severity-aware, since 8.19.0)
+
+   | Severity | Category | Options |
+   |---|---|---|
+   | **HIGH** | any | apply-fix / **override** (reason mandatory; logged) |
+   | **MEDIUM** | Security / DB | apply-fix / **override** (reason mandatory) |
+   | **MEDIUM** | UI / Perf / Ops / Code-Review / Simplify / Test | apply-fix / skip / make-rule |
+   | **LOW** | any | apply-fix / skip / make-rule |
+
    ```
    AskUserQuestion({
      question: "MCL {{MCL_VERSION}} | <localized risk decision prompt>",
      options: [
-       "<apply-fix-in-language>",     # MCL implements the fix
-       "<skip-in-language>",          # accept the risk as-is
-       "<make-rule-in-language>"      # triggers Rule Capture
+       "<apply-fix-in-language>",
+       // For HIGH or MEDIUM-sec/db: replace skip+make-rule with:
+       "<override-in-language>",
+       // For other rows: keep:
+       "<skip-in-language>",
+       "<make-rule-in-language>"
      ]
    })
    ```
+
+   ### Override Path (HIGH + MEDIUM-security/db only)
+
+   When `override` is selected, IMMEDIATELY call a second
+   `AskUserQuestion` with question prefix `MCL {{MCL_VERSION}} |` and
+   the localized prompt "Override reason (one sentence, will be
+   logged):" — `multiSelect: false`, options `["devam", "iptal"]` plus
+   a free-text answer requested via the question body. Capture the
+   reason and emit BOTH:
+
+   - **Marker emission (preferred, since 8.19.0):**
+     ```
+     <mcl_state_emit kind="phase4-5-override">{"rule_id":"<RULE_ID>","severity":"<HIGH|MEDIUM>","category":"<sec|db|...>","reason":"<one-sentence reason>"}</mcl_state_emit>
+     ```
+   - **Bash alternative (fallback, audit caller=skill-prose):**
+     ```bash
+     mcl_audit_log "phase4_5_override" "phase4-5" "rule=<RULE_ID> severity=<HIGH|MEDIUM> category=<sec|db|...> reason=<text>"
+     ```
+
+   The override reason flows into the Phase 5 Verification Report
+   (rendered as `[Override: <reason>]` next to the requirement) and
+   the audit log. Phase 6 (a) cross-references skipped HIGH/MEDIUM-
+   sec/db findings against `phase4_5_override` events; mismatches
+   surface as LOW soft fail.
+
 3. MCL STOPS and waits for the tool_result **in the next message**.
-4. On tool_result: execute the chosen action, then present the next risk.
+4. On tool_result: execute the chosen action (apply-fix / override-
+   with-reason / skip / make-rule), then present the next risk.
 5. Repeat until all risks are resolved.
 
 ⛔ STOP RULE: After presenting a risk and calling `AskUserQuestion`,

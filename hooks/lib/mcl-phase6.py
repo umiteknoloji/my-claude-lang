@@ -140,7 +140,98 @@ def check_audit_trail(state_dir: Path) -> tuple[list[dict], list[dict]]:
                 "message": f"State-population audit event '{ev}' ({label}) missing — skill prose Bash may not have run; downstream phases may have read default state.",
                 "category": "phase6-audit-trail",
             })
+    # Severity-skip violation check (since 8.19.0): for each HIGH or
+    # MEDIUM-sec/db finding that the dialog SKIPPED (rather than fixing
+    # or overriding), require a matching `phase4_5_override` audit event
+    # naming the same rule_id. Mismatch → LOW soft fail.
+    low.extend(check_severity_skip_violations(audit_log))
     return high, low
+
+
+def check_severity_skip_violations(audit_log: Path) -> list[dict]:
+    """Cross-reference Phase 4.5 dialog skip events against override events.
+
+    Audit format expected (skill prose / hook records, all best-effort):
+      `phase4_5_dialog | phase4-5 | rule=<RULE_ID> severity=<HIGH|MED|LOW> category=<sec|db|...> action=<apply|skip|override|make-rule>`
+      `phase4_5_override | phase4-5 | rule=<RULE_ID> severity=<HIGH|MEDIUM> category=<sec|db|...> reason=<text>`
+
+    The `8.19.0` skill prose emits the override event whenever the
+    severity-aware dialog forces an override. If a HIGH or MEDIUM-sec/db
+    finding shows action=skip without a corresponding override event,
+    the developer bypassed the gate prematurely — surface advisory.
+    """
+    findings: list[dict] = []
+    if not audit_log.exists():
+        return findings
+    skipped_strict: list[tuple[str, str]] = []  # (rule_id, severity)
+    overridden: set[str] = set()
+    try:
+        for ln in audit_log.read_text(encoding="utf-8", errors="replace").splitlines():
+            parts = ln.split(" | ")
+            if len(parts) < 4:
+                continue
+            event, _, detail = parts[1].strip(), parts[2].strip(), parts[3].strip()
+            if event == "phase4_5_dialog":
+                d = _parse_kv(detail)
+                rule = d.get("rule") or ""
+                sev = (d.get("severity") or "").upper()
+                cat = (d.get("category") or "").lower()
+                action = (d.get("action") or "").lower()
+                if action != "skip" or not rule:
+                    continue
+                strict = sev == "HIGH" or (sev in ("MED", "MEDIUM") and cat in ("sec", "security", "db", "database"))
+                if strict:
+                    skipped_strict.append((rule, sev))
+            elif event == "phase4_5_override":
+                d = _parse_kv(detail)
+                rule = d.get("rule") or ""
+                if rule:
+                    overridden.add(rule)
+    except OSError:
+        return findings
+    for rule, sev in skipped_strict:
+        if rule in overridden:
+            continue
+        findings.append({
+            "severity": "LOW", "source": "phase6",
+            "rule_id": "P6-A-severity-skip-without-override",
+            "file": str(audit_log), "line": 0,
+            "message": (
+                f"Phase 4.5 dialog skipped {sev} finding '{rule}' without a "
+                f"matching `phase4_5_override` audit event — severity-aware "
+                f"enforcement (8.19.0) requires override-with-reason for HIGH "
+                f"and MEDIUM-sec/db findings."
+            ),
+            "category": "phase6-audit-trail",
+        })
+    return findings
+
+
+def _parse_kv(detail: str) -> dict:
+    """Parse `key=value key=value ...` audit detail into a dict.
+
+    Tolerant of values containing spaces only when followed by another
+    `key=` token; long free-text reasons survive as the trailing run.
+    """
+    out: dict = {}
+    if not detail:
+        return out
+    # Greedy: split on whitespace, accumulate "key=value" pairs.
+    tokens = detail.split()
+    current_key = None
+    current_val: list[str] = []
+    for tok in tokens:
+        if "=" in tok:
+            if current_key is not None:
+                out[current_key] = " ".join(current_val).strip()
+            k, v = tok.split("=", 1)
+            current_key = k.strip()
+            current_val = [v]
+        else:
+            current_val.append(tok)
+    if current_key is not None:
+        out[current_key] = " ".join(current_val).strip()
+    return out
 
 
 def run_scan(orch_path: Path, state_dir: Path, project_dir: Path, lang: str) -> dict:

@@ -215,6 +215,22 @@ mcl_audit_log "ui_sub_phase_set" "phase4a" "UI_REVIEW" 2>/dev/null || true
 '
 ```
 
+### Alternative: Marker Emission (since 8.19.0)
+
+If the Bash above is not executed, emit this structured text block at
+the END of your response — `mcl-stop.sh` reads it and advances
+`ui_sub_phase` from authorized hook context on the next turn (the
+forward transition only — already-BACKEND state is not regressed):
+
+```
+<mcl_state_emit kind="ui-sub-phase">UI_REVIEW</mcl_state_emit>
+```
+
+The Bash path is preferred (immediate state write, dev-server
+auto-start tetiklenir aynı turn'de). The marker is the safety net —
+state set on next Stop, dev-server start one turn later. If neither
+fires, the developer must run `npm run dev` manually.
+
 **Quoting note (since 8.16.0):** `mcl_state_set` parses the value as JSON
 first; if parsing fails it falls back to a string. So bare scalars like
 `UI_REVIEW`, `BACKEND`, `BUILD_UI` are auto-quoted into JSON strings —
