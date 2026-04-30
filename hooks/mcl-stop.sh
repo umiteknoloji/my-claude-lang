@@ -471,18 +471,39 @@ fi
 if [ "$ASKQ_INTENT" = "other" ] && [ -n "$ASKQ_SELECTED" ]; then
   _SCFB_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
   _SCFB_HASH="$(mcl_state_get spec_hash 2>/dev/null)"
-  if { [ "$_SCFB_PHASE" = "2" ] || [ "$_SCFB_PHASE" = "3" ]; } \
-     && [ -n "$_SCFB_HASH" ] && [ "$_SCFB_HASH" != "null" ]; then
+  # 9.1.4: defense for the partial-spec-blocked-transition case.
+  # When mcl-stop.sh:partial-spec branch fired earlier and emitted
+  # decision:block, the Phase 1→2 transition never ran and
+  # state.spec_hash stayed null. The local SPEC_HASH var, computed
+  # from the TRANSCRIPT (any spec-bearing assistant turn), is still
+  # populated — use it as the second-chance source.
+  _SCFB_TRANSCRIPT_HASH="${SPEC_HASH:-}"
+  _SCFB_HASH_SOURCE="state"
+  if { [ -z "$_SCFB_HASH" ] || [ "$_SCFB_HASH" = "null" ]; } \
+     && [ -n "$_SCFB_TRANSCRIPT_HASH" ]; then
+    _SCFB_HASH="\"$_SCFB_TRANSCRIPT_HASH\""
+    _SCFB_HASH_SOURCE="transcript"
+  fi
+  # Diagnostic audit: surface why the reclassify path entered or
+  # skipped. Each gate emits one audit line with a `gate=<name>`
+  # detail so a real-session forensic walk can pinpoint failure.
+  if ! { [ "$_SCFB_PHASE" = "2" ] || [ "$_SCFB_PHASE" = "3" ]; }; then
+    mcl_audit_log "askq-reclassify-skipped" "mcl-stop" \
+      "gate=phase phase=${_SCFB_PHASE} selected=${ASKQ_SELECTED}"
+  elif [ -z "$_SCFB_HASH" ] || [ "$_SCFB_HASH" = "null" ]; then
+    mcl_audit_log "askq-reclassify-skipped" "mcl-stop" \
+      "gate=spec-hash phase=${_SCFB_PHASE} hash_source=${_SCFB_HASH_SOURCE}"
+  else
     # Inline approve-family check: _mcl_is_approve_option helper is
     # defined ~50 lines below this point, so we cannot call it here.
-    # Logic is identical (with one small extension: `başla` and
-    # `continue` covered for "Onayla, başla" / "Continue" labels MCL
-    # itself produces).
+    # Logic is identical (with one small extension: `başla` /
+    # `continue` / `oluştur` covered for "Evet, oluştur" /
+    # "Onayla, başla" / "Continue" labels MCL itself produces).
     _SCFB_NORM="$(printf '%s' "$ASKQ_SELECTED" | tr '[:upper:]' '[:lower:]')"
     _SCFB_HIT=0
     case "$_SCFB_NORM" in
-      *onayla*|*onaylıyorum*|*evet*|*kabul*|*tamam*|*başla*) _SCFB_HIT=1 ;;
-      *approve*|*yes*|*confirm*|*ok*|*proceed*|*accept*|*continue*) _SCFB_HIT=1 ;;
+      *onayla*|*onaylıyorum*|*evet*|*kabul*|*tamam*|*başla*|*oluştur*) _SCFB_HIT=1 ;;
+      *approve*|*yes*|*confirm*|*ok*|*proceed*|*accept*|*continue*|*create*) _SCFB_HIT=1 ;;
       *aprobar*|*sí*|*si*|*confirmar*) _SCFB_HIT=1 ;;
       *approuver*|*oui*|*confirmer*) _SCFB_HIT=1 ;;
       *genehmigen*|*bestätigen*|*ja*) _SCFB_HIT=1 ;;
@@ -499,9 +520,12 @@ if [ "$ASKQ_INTENT" = "other" ] && [ -n "$ASKQ_SELECTED" ]; then
     if [ "$_SCFB_HIT" = "1" ]; then
       ASKQ_INTENT="spec-approve"
       mcl_audit_log "askq-reclassified-spec-approve" "mcl-stop" \
-        "phase=${_SCFB_PHASE} selected=${ASKQ_SELECTED} source=state-context-fallback"
+        "phase=${_SCFB_PHASE} selected=${ASKQ_SELECTED} hash_source=${_SCFB_HASH_SOURCE} source=state-context-fallback"
       command -v mcl_trace_append >/dev/null 2>&1 && \
-        mcl_trace_append askq_reclassified_spec_approve "selected=${ASKQ_SELECTED}"
+        mcl_trace_append askq_reclassified_spec_approve "selected=${ASKQ_SELECTED} hash_source=${_SCFB_HASH_SOURCE}"
+    else
+      mcl_audit_log "askq-reclassify-skipped" "mcl-stop" \
+        "gate=approve-family selected=${ASKQ_SELECTED}"
     fi
   fi
 fi

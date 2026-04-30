@@ -543,6 +543,62 @@ print(json.dumps({
   esac
 fi
 
+# -------- Branch: block AskUserQuestion when most-recent spec is incomplete (9.1.4) --------
+# Real-session bug: model emits a short `📋 Spec:` block (Project /
+# Pages / Stack notes — no canonical 7-section structure) AND an
+# AskUserQuestion in the same turn. Stop-hook partial-spec block fires
+# AFTER the askq tool_use was already processed, so the askq still
+# reaches the user. User clicks an approve-family option; subsequent
+# Write attempts hit the Phase 1 lock (transition was rewound by the
+# partial-spec block).
+#
+# Fix: deny the askq itself at PreToolUse time when the most-recent
+# assistant text (the same turn that is emitting this askq) carries
+# an incomplete spec. Forces the model to re-emit a complete 7-section
+# spec BEFORE asking for approval.
+#
+# Whitelist: Phase 4.5 / 4.6 risk-and-impact dialogs, Phase 4b UI
+# review, Phase 1 summary-confirm, ui-flow stack fallback prompts,
+# Rule A git-init consent — all use askq with question bodies that
+# do NOT mention "spec" approval. We detect the spec-approval
+# scenario by:
+#   - state.current_phase ∈ {1, 2, 3} (pre-Phase-4 window), AND
+#   - last assistant text contains a `📋 Spec:` block, AND
+#   - that spec block is missing 1+ required headers
+# Phase 4+ askq calls always pass through (different intent).
+if [ "$TOOL_NAME" = "AskUserQuestion" ] && command -v python3 >/dev/null 2>&1; then
+  _AQI_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+  case "$_AQI_PHASE" in
+    1|2|3)
+      _AQI_PARTIAL_LIB="$SCRIPT_DIR/lib/mcl-partial-spec.sh"
+      if [ -n "${TRANSCRIPT_PATH:-}" ] && [ -f "${TRANSCRIPT_PATH:-/dev/null}" ] \
+         && [ -f "$_AQI_PARTIAL_LIB" ]; then
+        _AQI_MISSING="$(bash "$_AQI_PARTIAL_LIB" check "$TRANSCRIPT_PATH" 2>/dev/null)"
+        _AQI_RC=$?
+        if [ "$_AQI_RC" = "0" ]; then
+          # Last assistant turn has an incomplete spec block. Deny
+          # this askq so the user does not approve a half-spec.
+          _AQI_MISSING_CSV="$(printf '%s' "$_AQI_MISSING" | tr '\n' ',' | sed 's/,$//')"
+          mcl_audit_log "block-askq-incomplete-spec" "pre-tool" \
+            "phase=${_AQI_PHASE} missing=${_AQI_MISSING_CSV}"
+          python3 -c '
+import json, sys
+missing = sys.argv[1]
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL ASKQ BLOCKED — the `📋 Spec:` block emitted in this turn is missing required sections: `" + missing + "`. Cannot ask for spec approval on a half-spec. Re-emit ONE COMPLETE `📋 Spec:` block FIRST with all seven canonical headers in order:\n\n  ## [Title]\n  ## Objective\n  ## MUST\n  ## SHOULD\n  ## Acceptance Criteria\n  ## Edge Cases\n  ## Technical Approach\n  ## Out of Scope\n\nGenuinely empty section → header + `- (none)`. Never omit a header. After the complete spec, call AskUserQuestion again with the spec-approval prompt."
+    }
+}))
+' "$_AQI_MISSING_CSV" 2>/dev/null
+          exit 0
+        fi
+      fi
+      ;;
+  esac
+fi
+
 # -------- Branch: block Task dispatch of Phase 4.5/4.6/5 as sub-agent --------
 # sub-agent-phase-discipline: Phase 4.5 (Risk Review), 4.6 (Impact Review),
 # and Phase 5 (Verification Report) MUST run in the main MCL session as

@@ -7,6 +7,56 @@
 
 ## [Unreleased]
 
+## [9.1.4] - 2026-04-30 — AskQ-Level Spec Enforcement + Reclassify Diagnostics
+
+Real-session bug raporu (9.1.3 sonrası): "spec_approved=true STILL not set after approval" — 9.1.1 reclassify-fallback fire etmedi. **Investigated root cause first.** Synthetic transcript ile reproduce ettim:
+
+### Root cause chain
+1. Model kısa spec emit ediyor (Project + Pages + Stack notları, no 7-section).
+2. Stop-hook partial-spec block fire ediyor (`decision:block` + `exit 0`).
+3. Phase 1→2 transition **hiç çalışmıyor** → `state.spec_hash=null`.
+4. Ama askq tool_use **aynı turn'de** zaten emit edilmiş (Stop hook'undan ÖNCE) → kullanıcıya ulaşıyor.
+5. Kullanıcı "Evet, oluştur" tıklıyor → tool_result.
+6. Sonraki Stop'ta 9.1.1 reclassify-fallback'ı: `_SCFB_HASH=null` (state hash yok) → guard fail → reclassify SKIP.
+7. Write attempt → mcl-pre-tool.sh `current_phase=1` lock.
+
+### Fix — Three layers
+
+**(A) Diagnostic audits at each reclassify gate.** 9.1.1 fallback yolunda her gate (`phase`, `spec-hash`, `approve-family`) skip edilirse explicit audit emit ediyor. Forensic analiz için:
+```
+askq-reclassify-skipped | mcl-stop | gate=phase phase=1 selected=Evet, oluştur
+askq-reclassify-skipped | mcl-stop | gate=spec-hash phase=2 hash_source=state
+askq-reclassify-skipped | mcl-stop | gate=approve-family selected=Düzenle
+```
+
+**(B) PreToolUse-level askq deny on incomplete spec.** Yeni branch `mcl-pre-tool.sh`'da: `current_phase ∈ {1,2,3}` AND last assistant text incomplete `📋 Spec:` block içeriyorsa AskUserQuestion **PreToolUse'da deny ediliyor**. askq tool_use bile gerçekleşmiyor; kullanıcı yarım-spec'i onaylamak zorunda kalmıyor. Phase 4+ askq pass-through (Phase 4.5 risk dialog vb. farklı intent). Block reason'da 7-header template + "complete spec FIRST, askq AFTER" talimatı.
+
+**(C) Reclassify-fallback uses local SPEC_HASH (transcript-derived) when state.spec_hash null.** mcl-stop.sh'ın local `SPEC_HASH` var'ı transcript taramasından populate olur (state'ten bağımsız). Fallback önce state'i sorar, null ise local'a düşer. Audit'te `hash_source=state` veya `hash_source=transcript` etiketleniyor.
+
+### Approve-family ek dilbilgisi
+9.1.1 listesi `*evet*`, `*onayla*`, `*başla*` içeriyordu. 9.1.4 ek: `*oluştur*` (TR — "Evet, oluştur"), `*create*` (EN — "Create it / Approve and create"). Real-session bulgular dilbilgisini genişletiyor.
+
+### Yeni audit events
+- `block-askq-incomplete-spec | pre-tool | phase=N missing=<csv>`
+- `askq-reclassify-skipped | mcl-stop | gate=<phase|spec-hash|approve-family> ...`
+- `askq-reclassified-spec-approve | mcl-stop | ... hash_source=<state|transcript>`
+
+### Yeni test
+`tests/cases/test-askq-incomplete-spec-block.sh` — 5 case:
+1. Phase 1 + short spec → askq deny + missing list + 7-header template.
+2. Phase 1 + complete 7-section spec → allow.
+3. Phase 4 + short spec → allow (gate phase-scoped).
+4. Phase 1 + no spec block → allow (Phase 1 summary-confirm path).
+5. Audit captures `block-askq-incomplete-spec`.
+
+### Bilinen sınırlar
+- (B) askq-deny `📋 Spec:` line'ı arıyor; model spec emit ediyor ama farklı marker (örn. yalnızca `# Spec`) kullanırsa miss eder. Mevcut MCL skill prose'u canonical marker'ı zorunlu kılıyor; model uymuyorsa diğer hooklar yine yakalar.
+- Diagnostic audit'leri Phase 6 (a) raporunda görünmez (sadece audit log forensic). 9.2'de `/mcl-doctor` raporuna bağlanabilir.
+
+### Tests
+- Unit: **161/0/2** (önce 154 → +7: askq-incomplete-spec-block 5-case + audit assertions)
+- E2E: **65/0/0** — regresyonsuz
+
 ## [9.1.3] - 2026-04-30 — Project Isolation Enforcement
 
 Real-session bug: kullanıcı `/Users/umitduman/ABCD` projesinde session başlattı, model `cd /Users/umitduman && npx create-next-app ...` çalıştırdı, ardından `/Users/umitduman/backoffice/` (kardeş proje) dosyalarını okudu. **Vaad #1 (proje izolasyonu) ihlal edildi.**
