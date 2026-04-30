@@ -281,9 +281,22 @@ if [ -z "$SPEC_HASH" ]; then
 fi
 
 # --- Partial spec detection (rate-limit interruption defense) ---
-# Unchanged from 5.x. Claude must re-emit a complete spec before the
-# AskUserQuestion approval call can advance state; while partial_spec
-# is true, any approval tool_result is ignored as defense-in-depth.
+# Defense for the rate-limit-truncated spec scenario: developer's
+# spec emit gets cut mid-section, mcl-stop sees an incomplete `📋
+# Spec:` block and forces re-emit before any approval can stick.
+#
+# 9.1.2 guard: only run during the pre-approval window. Once the
+# developer has approved a spec (spec_approved=true), retroactive
+# recovery is wrong — the spec was accepted, work has likely
+# advanced, and a recovery block at this point lands as a confusing
+# "MCL SPEC RECOVERY" error AFTER the build already passed. Same
+# transcript scan can match a quoted spec snippet from earlier
+# turns or a short ad-hoc spec the model emitted in Phase 4 prose
+# (project/pages/stack notes, etc.) and mistake it for truncation.
+_PS_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
+if [ "$_PS_APPROVED" = "true" ]; then
+  : # spec already approved — partial-spec detection retired
+else
 PARTIAL_MISSING="$(bash "$_MCL_HOOK_DIR/lib/mcl-partial-spec.sh" check "$TRANSCRIPT_PATH" 2>/dev/null)"
 PARTIAL_RC=$?
 PARTIAL_STATE="$(mcl_state_get partial_spec 2>/dev/null)"
@@ -322,6 +335,7 @@ case "$PARTIAL_RC" in
     :
     ;;
 esac
+fi  # 9.1.2: end of `if spec_approved != true` guard around partial-spec
 
 # --- AskUserQuestion approval scanner (shared lib since 6.5.6) ---
 # The scanner lives at hooks/lib/mcl-askq-scanner.py. Stop and PreToolUse

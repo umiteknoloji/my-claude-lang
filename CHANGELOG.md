@@ -7,6 +7,56 @@
 
 ## [Unreleased]
 
+## [9.1.2] - 2026-04-30 — Partial-Spec Post-Approval Guard
+
+Real-session bug: model emit kısa ad-hoc spec (Project + Pages + Stack notu) **Phase 4 prose'unda**, **AslolanSpec onaylanmıştı VE Phase 4 işi tamamlanmıştı**. mcl-stop.sh partial-spec detector bu kısa prose'u yakaladı, eksik 7 zorunlu section tespit etti, "MCL SPEC RECOVERY" decision:block emit etti → kullanıcı session sonunda hata bloğu gördü.
+
+### Root cause
+
+`hooks/mcl-stop.sh:283` partial-spec branch'ı `spec_approved` durumuna bakmadan her Stop turn'ünde fire ediyordu. Recovery path'i pre-approval window için tasarlanmıştı (rate-limit interruption defense), ama post-approval'da kısa spec-stili Phase 4 prose'larını yanlışlıkla "truncated spec" olarak yorumluyor.
+
+### Fix
+
+`mcl-stop.sh:283-310` partial-spec branch'ı `spec_approved=false` guard'ı ile sarıldı. Onay verildikten sonra retroactive recovery devre dışı; hangi prose görünürse görünsün, partial-spec detector susar.
+
+```bash
+_PS_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
+if [ "$_PS_APPROVED" = "true" ]; then
+  : # spec already approved — partial-spec detection retired
+else
+  ... existing detection ...
+fi
+```
+
+Pre-approval davranışı korundu: spec_approved=false iken detector yine fire eder; legitimate truncation defense intakt.
+
+### Skill prose strengthening
+
+`skills/my-claude-lang/phase2-spec.md` Rule 4 olarak yeni mandate eklendi: spec block 7 zorunlu section header'ı içermeli. Kısa / freeform / "Project + Pages + Stack" notları kabul edilmiyor — partial-spec hook eksik header'ları tespit edip transition'ı rewind ediyor. Headers (kanonik):
+```
+## Objective
+## MUST
+## SHOULD
+## Acceptance Criteria
+## Edge Cases
+## Technical Approach
+## Out of Scope
+```
+
+Genuinely empty section → header altında `- (none)`. Heading levels: `##` (h2) standart; partial-spec scanner h2/h3/inline-bold varyantlarını kabul eder ama `##` forward-compatibility için kanonik.
+
+### Yeni test
+
+`tests/cases/test-partial-spec-post-approval.sh` — 4 case:
+1. spec_approved=true + kısa spec prose → SPEC RECOVERY block emit edilmemeli.
+2. spec_approved=true → partial-spec audit count büyümemeli (detector skip).
+3. spec_approved durumu post-Stop'ta değişmemeli.
+4. spec_approved=false (regression guard) → detector hâlâ legitimate fire eder.
+
+### Tests
+- Unit: **126/0/2** (önce 122 → +4: post-approval guard 4-case regression)
+- E2E: **65/0/0** — regresyonsuz
+
 ## [9.1.1] - 2026-04-30 — Spec-Approve Reclassification Fix
 
 Real-session bug raporu: AskUserQuestion onayı tespit edilmedi → `spec_approved=false` kaldı → Phase 4 transition block'landı → mcl-pre-tool.sh Write tool'u deny etti → kullanıcı "MCL LOCK Phase 1" döngüsü gördü.
