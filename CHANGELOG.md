@@ -7,6 +7,37 @@
 
 ## [Unreleased]
 
+## [8.19.1] - 2026-04-30
+
+### Düzeltildi — Hook output UX: legacy `decision:block` → modern `permissionDecision:deny`
+
+Real session bulgusu: superpowers:brainstorming Skill çağrısı kullanıcıya **kırmızı `Error: blocking` bloğu** olarak render ediliyordu. MCL'in doğru kararı (suppression — Phase 1-3 zaten brainstorming rolünü oynuyor) hata gibi görünüyor → kullanıcı paniğe düşüyor.
+
+Kök sebep: `mcl-pre-tool.sh` 7 site'ta legacy `{"decision":"block","reason":"..."}` JSON şeması kullanıyordu; Claude Code bu eski formu "blocking error" olarak etiketleyip kırmızı render ediyor. Modern `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"..."}}` şeması permission-decision UI'ı kullanır — daha sakin.
+
+#### Doğrulama: Claude Code docs'a göre 3 alternatif değerlendirildi
+- **Pre-emptive disable** (SessionStart skill unregister): ❌ MÜMKÜN DEĞİL — Claude Code'da skill registration aşamasını bypass edebilen hook event yok.
+- **`permissionDecision:allow + updatedInput=null`**: ❌ Skill tool null input ile başka error path'e düşer.
+- **Modern output schema**: ✅ TEK GEÇERLİ YOL.
+
+#### Modernize edilen 6 site (`hooks/mcl-pre-tool.sh`)
+1. **Line 224**: `superpowers:brainstorming` Skill block (en sık tetiklenen — kullanıcı şikâyetinin kaynağı).
+2. **Line 252**: TodoWrite Phase 1-3 block (model brainstorming-style todo kullanırsa).
+3. **Line 295**: Task → Phase 4.5/4.6/5 sub-agent dispatch block.
+4. **Line 448**: Plan critique intent validator "no" verdict (devtime).
+5. **Line 460**: Plan critique intent validator missing (devtime).
+6. **Line 494**: ExitPlanMode without plan_critique_done (devtime).
+
+#### Kasıtlı dokunulmadı
+- **Line 530**: Direct `state.json` write block — security boundary; kırmızı alarmist render bilinçli (kullanıcı bunun arızi engelleme değil ciddi uyarı olduğunu görmeli).
+
+#### Korunan davranış
+- Tool yine block edilir (functional değişiklik yok).
+- Mesaj metni dokunulmadı (model davranış prior'ları korunur — rule capture, retry önleme).
+- Audit log entries (`block-skill`, `block-todowrite`, `block-task-phase-dispatch`, `plan-critique-block`) değişmedi.
+
+Tests: 59/0/2 unit, 65/0/0 e2e — regresyonsuz.
+
 ## [8.19.0] - 2026-04-30
 
 ### Eklendi — Hook-level State Population Fallback + Severity-Aware Phase 4.5 + Test Layer Coverage

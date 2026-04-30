@@ -218,11 +218,19 @@ except Exception:
   case "$_SKILL_NAME" in
     superpowers:brainstorming|superpowers:brainstorm)
       mcl_audit_log "block-skill" "pre-tool" "skill=${_SKILL_NAME} reason=mcl-active"
+      # 8.19.1: modern hookSpecificOutput.permissionDecision schema —
+      # Claude Code renders this as a calm permission decision, not the
+      # red "blocking error" produced by the legacy `decision:block` form.
+      # Functionally identical (tool blocked); UX scares the developer
+      # less when MCL is doing the right thing.
       python3 -c '
 import json, sys
 print(json.dumps({
-    "decision": "block",
-    "reason": "MCL ACTIVE — superpowers:brainstorming is suppressed. MCL Phase 1 (parameter gathering), Phase 2 (spec), and Phase 3 (verify) already fulfill the brainstorming role. Invoking superpowers:brainstorming would create a conflicting parallel workflow. Skip this skill call and proceed directly to MCL Phase 1."
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL ACTIVE — superpowers:brainstorming is suppressed. MCL Phase 1 (parameter gathering), Phase 2 (spec), and Phase 3 (verify) already fulfill the brainstorming role. Invoking superpowers:brainstorming would create a conflicting parallel workflow. Skip this skill call and proceed directly to MCL Phase 1."
+    }
 }))
 ' 2>/dev/null
       exit 0
@@ -246,11 +254,16 @@ if [ "$TOOL_NAME" = "TodoWrite" ] && command -v python3 >/dev/null 2>&1; then
   [ -n "$_TW_PHASE" ] && [ "$_TW_PHASE" -ge 4 ] 2>/dev/null && _TW_ALLOW=1
   if [ "$_TW_ALLOW" = "0" ]; then
     mcl_audit_log "block-todowrite" "pre-tool" "phase=${_TW_PHASE}"
+    # 8.19.1: modern permission-decision schema (see brainstorming branch
+    # above for rationale).
     python3 -c '
 import json, sys
 print(json.dumps({
-    "decision": "block",
-    "reason": "MCL ACTIVE (Phase 1-3) — TodoWrite is blocked. MCL manages phase state via state.json. Todo checklists during Phase 1-3 are a sign of superpowers:brainstorming interference — they duplicate and conflict with MCL phase logic. Proceed directly with MCL Phase 1 parameter gathering."
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — TodoWrite is blocked. MCL manages phase state via state.json. Todo checklists during Phase 1-3 are a sign of superpowers:brainstorming interference — they duplicate and conflict with MCL phase logic. Proceed directly with MCL Phase 1 parameter gathering."
+    }
 }))
 ' 2>/dev/null
     exit 0
@@ -289,11 +302,15 @@ print("")
   if printf '%s' "$_TASK_DESC" | grep -q "^block:"; then
     _MATCHED="${_TASK_DESC#block:}"
     mcl_audit_log "block-task-phase-dispatch" "pre-tool" "desc=${_MATCHED}"
+    # 8.19.1: modern permission-decision schema.
     python3 -c '
 import json, sys
 print(json.dumps({
-    "decision": "block",
-    "reason": "MCL SUB-AGENT DISCIPLINE — Phase 4.5 (Risk Review), Phase 4.6 (Impact Review), and Phase 5 (Verification Report) cannot be dispatched to sub-agents. These phases require the main MCL session to run the interactive AskUserQuestion dialog directly with the developer. Run them in this session after all code sub-agents complete."
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL SUB-AGENT DISCIPLINE — Phase 4.5 (Risk Review), Phase 4.6 (Impact Review), and Phase 5 (Verification Report) cannot be dispatched to sub-agents. These phases require the main MCL session to run the interactive AskUserQuestion dialog directly with the developer. Run them in this session after all code sub-agents complete."
+    }
 }))
 ' 2>/dev/null
     exit 0
@@ -441,12 +458,16 @@ PYEOF
       no)
         mcl_audit_log "plan-critique-substance-fail" "pre-tool" "intent=no reason=${_PCD_VREASON}"
         command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_substance_fail "intent=no"
+        # 8.19.1: modern permission-decision schema.
         python3 -c '
 import json, sys
 reason_text = sys.argv[1]
 print(json.dumps({
-    "decision": "block",
-    "reason": "MCL PLAN CRITIQUE SUBSTANCE GATE — Intent validator rejected the prompt. Reason: " + reason_text + ". Refine the Task prompt so it clearly carries plan critique intent (concrete plan reference + analytical scope), or skip the critique step if not needed."
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL PLAN CRITIQUE SUBSTANCE GATE — Intent validator rejected the prompt. Reason: " + reason_text + ". Refine the Task prompt so it clearly carries plan critique intent (concrete plan reference + analytical scope), or skip the critique step if not needed."
+    }
 }))
 ' "$_PCD_VREASON" 2>/dev/null
         exit 0
@@ -454,11 +475,15 @@ print(json.dumps({
       missing)
         mcl_audit_log "plan-critique-substance-fail" "pre-tool" "validator=not-called"
         command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_substance_fail "validator=not-called"
+        # 8.19.1: modern permission-decision schema.
         python3 -c '
 import json, sys
 print(json.dumps({
-    "decision": "block",
-    "reason": "MCL PLAN CRITIQUE SUBSTANCE GATE — Plan critique requires intent validation since 8.3.3. Before this Task(subagent_type=general-purpose, model=*sonnet*), dispatch Task(subagent_type=\"mcl-intent-validator\", prompt=<the same prompt>) FIRST. Wait for its JSON verdict; if {\"verdict\":\"yes\"} re-issue this Task; if {\"verdict\":\"no\"} refine the prompt or skip."
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL PLAN CRITIQUE SUBSTANCE GATE — Plan critique requires intent validation since 8.3.3. Before this Task(subagent_type=general-purpose, model=*sonnet*), dispatch Task(subagent_type=\"mcl-intent-validator\", prompt=<the same prompt>) FIRST. Wait for its JSON verdict; if {\"verdict\":\"yes\"} re-issue this Task; if {\"verdict\":\"no\"} refine the prompt or skip."
+    }
 }))
 ' 2>/dev/null
         exit 0
@@ -488,11 +513,15 @@ if [ "$TOOL_NAME" = "ExitPlanMode" ]; then
   if [ "$_PLAN_CRITIQUE_DONE" != "true" ]; then
     mcl_audit_log "plan-critique-block" "pre-tool" "tool=ExitPlanMode plan_critique_done=false"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plan_critique_block
+    # 8.19.1: modern permission-decision schema.
     python3 -c '
 import json, sys
 print(json.dumps({
-    "decision": "block",
-    "reason": "MCL PLAN CRITIQUE GATE — Plan critique subagent (Sonnet 4.6) must run before plan approval. Call Agent (Task) with subagent_type containing \"general-purpose\" AND model containing \"sonnet\" to critique the plan, then re-attempt ExitPlanMode."
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL PLAN CRITIQUE GATE — Plan critique subagent (Sonnet 4.6) must run before plan approval. Call Agent (Task) with subagent_type containing \"general-purpose\" AND model containing \"sonnet\" to critique the plan, then re-attempt ExitPlanMode."
+    }
 }))
 ' 2>/dev/null
     exit 0
