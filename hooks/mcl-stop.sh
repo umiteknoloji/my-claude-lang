@@ -434,6 +434,64 @@ PYEOF
   fi
 fi
 
+# State-aware AskUserQuestion approval reclassification (since 9.1.1).
+# Real-session bug: askq-scanner classifies intent by QUESTION BODY
+# tokens (mcl-askq-scanner.py:174-184). When the model phrases the
+# spec-approval question outside the recognized token set (e.g. "Bu
+# plan uygun mu?" or "Devam edelim mi?"), intent="other" → no
+# transition fires → spec_approved stays false → mcl-pre-tool.sh
+# locks Write tool → user sees "MCL LOCK Phase 1" loop.
+#
+# Fix: when intent="other" but state context says we're awaiting spec
+# approval (current_phase ∈ {2,3} + spec_hash set + selected matches
+# approve-family), reclassify the askq as spec-approve. This treats
+# the AskUserQuestion contract as the authoritative signal — if MCL
+# emitted the prefix `MCL X.Y.Z |` and the developer chose an approve-
+# family option, that IS the approval, regardless of question body.
+#
+# Risk surface: Phase 1 summary-confirm + Phase 1.7 GATE questions
+# also use the MCL prefix + approve-family options. Those run while
+# current_phase=1 (no spec_hash yet); the `current_phase ∈ {2,3}` +
+# `spec_hash present` guard scopes this fallback to the real spec-
+# approval window only.
+if [ "$ASKQ_INTENT" = "other" ] && [ -n "$ASKQ_SELECTED" ]; then
+  _SCFB_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+  _SCFB_HASH="$(mcl_state_get spec_hash 2>/dev/null)"
+  if { [ "$_SCFB_PHASE" = "2" ] || [ "$_SCFB_PHASE" = "3" ]; } \
+     && [ -n "$_SCFB_HASH" ] && [ "$_SCFB_HASH" != "null" ]; then
+    # Inline approve-family check: _mcl_is_approve_option helper is
+    # defined ~50 lines below this point, so we cannot call it here.
+    # Logic is identical (with one small extension: `başla` and
+    # `continue` covered for "Onayla, başla" / "Continue" labels MCL
+    # itself produces).
+    _SCFB_NORM="$(printf '%s' "$ASKQ_SELECTED" | tr '[:upper:]' '[:lower:]')"
+    _SCFB_HIT=0
+    case "$_SCFB_NORM" in
+      *onayla*|*onaylıyorum*|*evet*|*kabul*|*tamam*|*başla*) _SCFB_HIT=1 ;;
+      *approve*|*yes*|*confirm*|*ok*|*proceed*|*accept*|*continue*) _SCFB_HIT=1 ;;
+      *aprobar*|*sí*|*si*|*confirmar*) _SCFB_HIT=1 ;;
+      *approuver*|*oui*|*confirmer*) _SCFB_HIT=1 ;;
+      *genehmigen*|*bestätigen*|*ja*) _SCFB_HIT=1 ;;
+      *承認*|*はい*|*確認*|*了解*) _SCFB_HIT=1 ;;
+      *승인*|*네*|*확인*|*예*) _SCFB_HIT=1 ;;
+      *批准*|*是*|*确认*) _SCFB_HIT=1 ;;
+      *موافق*|*نعم*|*تأكيد*) _SCFB_HIT=1 ;;
+      *אשר*|*כן*|*אישור*) _SCFB_HIT=1 ;;
+      *स्वीकार*|*हाँ*|*हां*) _SCFB_HIT=1 ;;
+      *setujui*|*ya*|*konfirmasi*) _SCFB_HIT=1 ;;
+      *aprovar*|*sim*|*confirmar*) _SCFB_HIT=1 ;;
+      *одобрить*|*да*|*подтвердить*) _SCFB_HIT=1 ;;
+    esac
+    if [ "$_SCFB_HIT" = "1" ]; then
+      ASKQ_INTENT="spec-approve"
+      mcl_audit_log "askq-reclassified-spec-approve" "mcl-stop" \
+        "phase=${_SCFB_PHASE} selected=${ASKQ_SELECTED} source=state-context-fallback"
+      command -v mcl_trace_append >/dev/null 2>&1 && \
+        mcl_trace_append askq_reclassified_spec_approve "selected=${ASKQ_SELECTED}"
+    fi
+  fi
+fi
+
 # Helper: is $1 an "approve family" option string?
 # Lowercase substring match on a fixed 14-language whitelist.
 _mcl_is_approve_option() {

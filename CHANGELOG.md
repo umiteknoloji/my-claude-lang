@@ -7,6 +7,54 @@
 
 ## [Unreleased]
 
+## [9.1.1] - 2026-04-30 — Spec-Approve Reclassification Fix
+
+Real-session bug raporu: AskUserQuestion onayı tespit edilmedi → `spec_approved=false` kaldı → Phase 4 transition block'landı → mcl-pre-tool.sh Write tool'u deny etti → kullanıcı "MCL LOCK Phase 1" döngüsü gördü.
+
+### Root cause
+
+`hooks/lib/mcl-askq-scanner.py:174-184` AskUserQuestion intent'ini **question body token'ları** ile sınıflıyor. SPEC_APPROVE_TOKENS listesinde "spec'i onayla", "is this correct" gibi sabit fragmanlar var. Model, spec onay sorusunu listede olmayan farklı şekillerde sorduğunda (örn. "Bu plan uygun mu?", "Devam edelim mi?") body match etmiyor → `intent="other"` → `mcl-stop.sh:1690` `if [ "$ASKQ_INTENT" = "spec-approve" ]` gate'i geçilemiyor → spec_approved transition fire etmiyor.
+
+Token tabanlı sınıflandırma kırılgan. Doğru sinyal: state context.
+
+### Fix
+
+`hooks/mcl-stop.sh:436` (askq-scanner sonrasında) state-aware reclassification fallback eklendi. Mantık:
+- `intent == "other"` AND
+- `current_phase ∈ {2, 3}` AND
+- `spec_hash` set AND
+- `selected option` approve-family pattern'inden birine match (14 dil)
+
+→ intent yeniden `"spec-approve"` olarak set edilir; mevcut spec-approve transition path'i fire eder. Audit `askq-reclassified-spec-approve | mcl-stop | source=state-context-fallback`.
+
+### Tasarım gerekçesi
+
+**State context > question body tokens.** Token listesi sürdürülemez (model phrasing varyasyonları sonsuz). State, MCL'in pipeline pozisyonunu kesin olarak bilir. Phase 2/3 + spec_hash present = "spec emit edildi, onay bekliyor" demek. Bu pencerede MCL-prefixed AskUserQuestion + approve-family selected = onay anlamına gelir, soru gövdesinden bağımsız.
+
+### Phase 1 false-positive guard
+
+`current_phase ∈ {2, 3} + spec_hash` zorunluluğu kritik. Phase 1 summary-confirm + Phase 1.7 GATE soruları da MCL prefix + approve-family options kullanıyor. Bu rule olmadan, "Bu özet doğru mu?" sorusunda "Onayla, başla" seçimi Phase 1'i Phase 4'e fırlatırdı (spec yokken). `phase=1` durumunda `spec_hash=null` → reclassification fire etmez.
+
+### 9.1.0 hook fallbacks korundu
+
+User'ın istediği "drop unnecessary fallbacks" değerlendirildi: 9.1.0 hook fallbacks (precision-audit, phase1_ops/perf default-fill, ui_sub_phase auto-advance, phase5-verify auto-emit) farklı state field'larını ele alıyor — spec_approved bug'ı ile orthogonal. Kaldırılmaları 9.0.x bug'larını geri getirir. Dokunulmadı.
+
+### Yeni audit event
+
+- `askq-reclassified-spec-approve | mcl-stop | phase=N selected=X source=state-context-fallback`
+
+### Yeni test
+
+`tests/cases/test-spec-approve-reclassify.sh` — 4 case:
+1. Untokenized soru ("Bu plan uygun mu?") + "Onayla, başla" → reclassify + Phase 4 transition.
+2. Tokenized soru ("Spec'i onayla?") → original path; reclassify fire etmez.
+3. Untokenized soru + "Düzenle" (non-approve) → no transition; selected option authoritative.
+4. Phase=1 + approve-family → guard tutuyor; reclassify fire etmez (spec yok).
+
+### Tests
+- Unit: **122/0/2** (önce 113 → +9: spec-approve-reclassify 4 senaryo)
+- E2E: **65/0/0** — regresyonsuz
+
 ## [9.1.0] - 2026-04-30 — Hook-First Architecture
 
 Real-session bulgusu: model 4 kez precision-audit-block aldı. Asıl soru iyiydi: Phase 1.7 audit MCL'in iç bookkeeping'i; spec başarılı emit edilmiş + summary onaylanmışsa kullanıcının bu mesajları görmemesi gerek. 9.1.0 mimari değişiklik: tüm "model Bash zorunlu" path'leri "hook fallback" path'lerine taşır. Skill prose Bash opt-in optimization olarak kalır (caller=skill-prose audit provenance, synchronous-write); yokluğunda hook her şeyi sessizce halleder.
