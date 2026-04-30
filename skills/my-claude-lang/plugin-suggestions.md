@@ -128,10 +128,10 @@ message), before asking Phase 1 questions:
 - Auto-install the plugin or the binary.
 - Remember the decline across conversations. If the developer
   declined today, MCL may ask again in a future conversation.
-- Recommend orchestration-set plugins here (`superpowers`,
-  `feature-dev`, `code-review`, `pr-review-toolkit`). Those belong to
-  the curated required set in `plugin-orchestration.md` and surface
-  via the consolidated install-suggestion block, not this file.
+- Recommend orchestration-set plugins here (`feature-dev`,
+  `code-review`, `pr-review-toolkit`). Those belong to the curated
+  required set in `plugin-orchestration.md` and surface via the
+  consolidated install-suggestion block, not this file.
 - Refine `frontend-design` suggestion with framework-marker checks
   for Angular/Solid — `react-frontend`/`vue-frontend`/`svelte-frontend`/
   `html-static` are detected since 6.2.0; Angular/Solid detection is

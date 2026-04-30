@@ -2,8 +2,6 @@
 
 # Phase 4a: BUILD_UI — Runnable Frontend with Dummy Data
 
-**`superpowers` (tier-A, ambient):** active throughout this phase.
-
 ## Entry Condition
 
 Phase 4a starts automatically when ALL of these hold after spec approval:

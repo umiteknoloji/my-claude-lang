@@ -105,7 +105,6 @@ log_ok "claude CLI bulundu"
 
 log_step "1. Marketplace'ler"
 claude plugin marketplace add anthropics/claude-plugins-official || true
-claude plugin marketplace add obra/superpowers-marketplace || true
 
 log_step "2. Proje Başlangıcı & Kurulum"
 claude plugin install claude-code-setup@claude-plugins-official
@@ -130,9 +129,14 @@ claude plugin install commit-commands@claude-plugins-official
 claude plugin install pr-review-toolkit@claude-plugins-official
 claude plugin install code-review@claude-plugins-official
 
-log_step "7. İteratif İyileştirme + Superpowers"
+log_step "7. İteratif İyileştirme"
 claude plugin install ralph-loop@claude-plugins-official
-claude plugin install superpowers@superpowers-marketplace
+# 8.19.2: superpowers plugin removed from curated set. MCL has no
+# functional code-path dependency (the "tier-A ambient" claim was pure
+# documentation), and the plugin's `using-superpowers` SKILL.md auto-
+# injects an "ABSOLUTELY MUST invoke brainstorming" instruction that
+# repeatedly tries to fork into a parallel workflow MCL Phase 1-3
+# already covers. Removing the plugin cuts the source.
 
 # ============================================================================
 # BÖLÜM 2: LSP Plugin'lerini + Binary'lerini Kur

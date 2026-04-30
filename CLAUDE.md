@@ -28,7 +28,7 @@ skill files, captured-rules blocks), read
 
 ## Devtime Plan Critique (subagent)
 
-When producing a plan during an MCL development session (devtime — you + Ümit), automatically launch a `general-purpose` subagent (model: `claude-sonnet-4-6`, extended thinking enabled) with a plan-critique prompt to evaluate the plan before presenting it. Using a different model than the main session (Opus 4.7) provides genuine second-opinion bias diversity; Sonnet 4.6 with extended thinking is ideal for critique reasoning at ~5x lower cost. (`superpowers:code-reviewer` is scoped to code artifacts — wrong tool for plan text.) The subagent applies ten lenses:
+When producing a plan during an MCL development session (devtime — you + Ümit), automatically launch a `general-purpose` subagent (model: `claude-sonnet-4-6`, extended thinking enabled) with a plan-critique prompt to evaluate the plan before presenting it. Using a different model than the main session (Opus 4.7) provides genuine second-opinion bias diversity; Sonnet 4.6 with extended thinking is ideal for critique reasoning at ~5x lower cost. (`pr-review-toolkit:code-reviewer` is scoped to code artifacts — wrong tool for plan text.) The subagent applies ten lenses:
 
 1. **Root cause depth** — was the root cause genuinely found, or did the plan stay at the surface symptom?
 2. **Side-effect estimation** — were downstream effects estimated (Phase 4.6 logic: imports, shared state, contract breakage, schema effects)?

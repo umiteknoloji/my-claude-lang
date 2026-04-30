@@ -158,8 +158,8 @@ unchanged.
 
 For full plugin-gate rules, read `my-claude-lang/plugin-gate.md`
 
-Curated orchestration plugins (`superpowers`, `security-guidance`) and
-the stack-detected LSP plugins (`typescript-lsp`, `pyright-lsp`,
+Curated orchestration plugin (`security-guidance`) and the
+stack-detected LSP plugins (`typescript-lsp`, `pyright-lsp`,
 `gopls-lsp`, ...) are MANDATORY since 6.1.0. The `mcl-activate.sh`
 hook runs the check once per session on the first message. If any
 required plugin — or a plugin's wrapped binary — is missing, MCL
@@ -175,14 +175,11 @@ turn until resolved — the warn-once rule does NOT apply.
 For full plugin-orchestration rules, read `my-claude-lang/plugin-orchestration.md`
 
 MCL silently auto-dispatches a curated required plugin set
-(`superpowers`, `feature-dev`, `code-review`, `pr-review-toolkit`,
+(`feature-dev`, `code-review`, `pr-review-toolkit`,
 `security-guidance`) at natural alignment points of its phase
 pipeline — the developer never types `/feature-dev` or `/code-review`.
 Outputs are merged into MCL's own phase prose in the developer's
-language. `superpowers` is the always-on ambient methodology layer —
-active across every MCL phase (1, 2, 3, 4, 4.5, 4.6, 5) with no
-explicit dispatch point; its behavioral prior shapes every phase
-without a visible handoff. Three rules govern the dispatch: Rule A —
+language. Three rules govern the dispatch: Rule A —
 MCL guarantees git by asking once per project for consent to run
 `git init` locally (no remote, read-only bookkeeping); Rule B —
 overlapping plugins are multi-angle validation, not redundancy, so

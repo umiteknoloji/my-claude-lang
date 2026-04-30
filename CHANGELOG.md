@@ -7,6 +7,34 @@
 
 ## [Unreleased]
 
+## [8.19.2] - 2026-04-30
+
+### Kaldırıldı — `superpowers` plugin curated set'ten çıkarıldı
+
+8.19.1 modern permission-decision UI ile brainstorming engelinin "kırmızı Error" görünümünü kapattı; ama temel sorun devam ediyordu: `superpowers` plugin install'lı oldukça `using-superpowers` SKILL.md her session'da otomatik yüklenip "ABSOLUTELY MUST invoke brainstorming" instruction'ını modele enjekte ediyor → her session'ın ilk turn'ünde brainstorming çağrısı denenip block ediliyor → noise.
+
+Repo taraması: MCL'in superpowers'a **fonksiyonel kod-path bağımlılığı yok**. 11 skill dosyasındaki "tier-A ambient" satırı pure documentation; hiçbir kod akışı bu satıra göre branch yapmıyor. `superpowers:code-reviewer` Phase 4.5 code-review prefix listesinin 3 alternatifinden biriydi (`pr-review-toolkit`, `code-review` zaten mevcut). Plugin'i kaldırmak hiçbir MCL pipeline adımını kırmaz.
+
+#### Değişen dosyalar
+- **`install-claude-plugins.sh`** — `obra/superpowers-marketplace` ve `superpowers@superpowers-marketplace` install satırları kaldırıldı. Curated set artık 5 plugin: feature-dev, frontend-design, code-simplifier, hookify, security-guidance, commit-commands, pr-review-toolkit, code-review, ralph-loop + LSP'ler.
+- **`hooks/lib/mcl-plugin-gate.sh:90-93`** — `mcl_plugin_gate_required_plugins()` listesinden `superpowers` çıkarıldı. Artık tek tier-A required: `security-guidance`. Plugin gate notice eski "superpowers eksik" uyarısı vermez.
+- **`hooks/mcl-pre-tool.sh:204-242`** — superpowers:brainstorming hook block tamamen silindi (kaynak kesildi → using-superpowers SKILL.md hiç yüklenmiyor → brainstorming çağrısı modelden hiç gelmiyor → hook engellemeye gerek yok). TodoWrite block mesajındaki "superpowers:brainstorming interference" ifadesi nötr "parallel workflow" olarak yeniden yazıldı.
+- **`hooks/lib/mcl-dispatch-audit.sh:60`** — Phase 4.5 code-review prefix listesinden `superpowers:code-reviewer` çıkarıldı. Geçerli prefix'ler: `pr-review-toolkit`, `code-review`.
+- **11 phase skill dosyası** — Boilerplate satırı `**superpowers (tier-A, ambient):** active throughout this phase — no explicit dispatch point...` silindi. Etkilenen dosyalar: `phase1-rules.md`, `phase2-spec.md`, `phase3-verify.md`, `phase4-execute.md`, `phase4-tdd.md`, `phase4-5-risk-review.md`, `phase4-6-impact-review.md`, `phase4a-ui-build.md`, `phase4b-ui-review.md`, `phase4c-backend.md`, `phase5-review.md`. Bu satır pure documentation idi; hiçbir kod akışı bu satıra göre branch yapmıyordu.
+- **`skills/my-claude-lang/plugin-orchestration.md`** — "The curated set" tablosundan `superpowers` row'u silindi. "Phase dispatch map" tablosundan `superpowers (tier-A)` ambient sütun değerleri temizlendi. "Phase 4.5 manifest" tablosundan `superpowers:code-reviewer` prefix kaldırıldı. Plugin install hint listesinden ve "ambient by design" kuralından çıkarıldı.
+- **`skills/my-claude-lang/plugin-suggestions.md` + `plugin-gate.md`** — Curated set listesinden `superpowers` çıkarıldı.
+- **`skills/my-claude-lang.md`** — "Curated orchestration plugins" + "MCL silently auto-dispatches" listelerinden `superpowers` çıkarıldı; "always-on ambient methodology layer" paragrafı silindi.
+- **`hooks/mcl-activate.sh` STATIC_CONTEXT** — `<mcl_constraint name="superpowers-scope">` → `name="hook-enforcement-scope"` olarak yeniden adlandırıldı; brainstorming block bahsi düşürüldü. "SUB-AGENT PHASE DISCIPLINE" paragrafı superpowers örneğini kaldırdı. Phase 4.5 dispatch audit "superpowers:code-reviewer" alternatifini düşürdü.
+- **`FEATURES.md`** — Hook Dominance tablo + bullet listesinden `Skill: superpowers:brainstorming` satırı silindi. Curated plugin listesi 4 plugin.
+- **`CLAUDE.md`** — Devtime Plan Critique parantezindeki `superpowers:code-reviewer` örneği `pr-review-toolkit:code-reviewer` ile değiştirildi.
+
+#### Korunan
+- 7. legacy `decision:block` site (state.json direct write) — security boundary, kasıtlı.
+- TodoWrite Phase 1-3 block — MCL phase state korunuyor (mesaj nötr hale getirildi).
+- Task → Phase 4.5/4.6/5 dispatch block — sub-agent discipline.
+
+Tests: 59/0/2 unit, 65/0/0 e2e — sıfır regresyon.
+
 ## [8.19.1] - 2026-04-30
 
 ### Düzeltildi — Hook output UX: legacy `decision:block` → modern `permissionDecision:deny`

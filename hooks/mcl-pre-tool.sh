@@ -201,49 +201,15 @@ print(json.dumps({
   fi
 fi
 
-# -------- Branch: block superpowers:brainstorming when MCL is active --------
-# superpowers:using-superpowers has a hard "ABSOLUTELY MUST" instruction to
-# invoke brainstorming before any response. This creates a parallel workflow
-# that conflicts with MCL Phase 1-3. Block at hook level — behavioral rules
-# in STATIC_CONTEXT are not strong enough to override it.
-if [ "$TOOL_NAME" = "Skill" ] && command -v python3 >/dev/null 2>&1; then
-  _SKILL_NAME="$(printf '%s' "$RAW_INPUT" | python3 -c '
-import json, sys
-try:
-    obj = json.loads(sys.stdin.read())
-    print((obj.get("tool_input") or {}).get("skill","") or "")
-except Exception:
-    pass
-' 2>/dev/null)"
-  case "$_SKILL_NAME" in
-    superpowers:brainstorming|superpowers:brainstorm)
-      mcl_audit_log "block-skill" "pre-tool" "skill=${_SKILL_NAME} reason=mcl-active"
-      # 8.19.1: modern hookSpecificOutput.permissionDecision schema —
-      # Claude Code renders this as a calm permission decision, not the
-      # red "blocking error" produced by the legacy `decision:block` form.
-      # Functionally identical (tool blocked); UX scares the developer
-      # less when MCL is doing the right thing.
-      python3 -c '
-import json, sys
-print(json.dumps({
-    "hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL ACTIVE — superpowers:brainstorming is suppressed. MCL Phase 1 (parameter gathering), Phase 2 (spec), and Phase 3 (verify) already fulfill the brainstorming role. Invoking superpowers:brainstorming would create a conflicting parallel workflow. Skip this skill call and proceed directly to MCL Phase 1."
-    }
-}))
-' 2>/dev/null
-      exit 0
-      ;;
-  esac
-fi
-# Non-brainstorming Skill calls pass through — allow.
-if [ "$TOOL_NAME" = "Skill" ]; then
-  exit 0
-fi
+# 8.19.2: superpowers:brainstorming hook block REMOVED.
+# Root-cause cut: install-claude-plugins.sh no longer installs the
+# superpowers plugin (8.19.2), so its `using-superpowers` SKILL.md
+# never auto-loads, and the "ABSOLUTELY MUST invoke brainstorming"
+# instruction that triggered the call site never reaches the model.
+# All Skill calls now pass through this hook.
 
 # -------- Branch: block TodoWrite in Phase 1-3 --------
-# TodoWrite in Phase 1-3 is always superpowers:brainstorming interference —
+# TodoWrite in Phase 1-3 duplicates / conflicts with MCL phase state.
 # MCL manages phase state via state.json, not todo checklists.
 # Phase 4+ TodoWrite is allowed (legitimate task tracking during code execution).
 if [ "$TOOL_NAME" = "TodoWrite" ] && command -v python3 >/dev/null 2>&1; then
@@ -262,7 +228,7 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — TodoWrite is blocked. MCL manages phase state via state.json. Todo checklists during Phase 1-3 are a sign of superpowers:brainstorming interference — they duplicate and conflict with MCL phase logic. Proceed directly with MCL Phase 1 parameter gathering."
+        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — TodoWrite is blocked. MCL manages phase state via state.json; Phase 1-3 todo checklists duplicate that and pull the model into a parallel workflow. Proceed directly with MCL Phase 1 parameter gathering."
     }
 }))
 ' 2>/dev/null

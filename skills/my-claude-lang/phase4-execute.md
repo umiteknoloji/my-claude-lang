@@ -2,8 +2,6 @@
 
 # Phase 4: Execution with Live Translation
 
-**`superpowers` (tier-A, ambient):** active throughout this phase — no explicit dispatch point; its methodology layer applies as a behavioral prior.
-
 Called automatically when Phase 3 is confirmed.
 
 ## Flow Split (since MCL 6.2.0)

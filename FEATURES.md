@@ -44,7 +44,6 @@ Behavioral kurallar yerine hook kararları (`decision:block`) tercih edilir — 
 
 | Blok | Koşul |
 |---|---|
-| `Skill: superpowers:brainstorming` | MCL aktifken her zaman |
 | `TodoWrite` | Phase 1-3'te (Phase 4+ serbest) |
 | `Task` → Phase 4.5/4.6/5 | description'da faz anahtar kelimeleri varsa |
 | `Bash` → `.mcl/state.json` yazımı | Her zaman (state yalnızca hook sistemine ait) |
@@ -381,7 +380,6 @@ Her Stop hook'unda tur özeti: `Bu tur tamamlandı. | Tur: X token | Bağlam: Y 
 
 **Hook Dominance** (8.0.x)
 `mcl-pre-tool.sh` şu araç çağrılarını bloke eder:
-- `superpowers:brainstorming` → MCL Phase 1-3 zaten bu rolü üstleniyor
 - `TodoWrite` Phase 1-3 → MCL state.json ile yönetiyor
 - `Task` → Phase 4.5/4.6/5 dispatch → bu fazlar sub-agent'a devredilemez
 - `Bash` → `.mcl/state.json` yazımı → state yalnızca hook sistemine ait
