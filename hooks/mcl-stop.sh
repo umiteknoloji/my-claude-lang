@@ -294,8 +294,8 @@ fi
 # turns or a short ad-hoc spec the model emitted in Phase 4 prose
 # (project/pages/stack notes, etc.) and mistake it for truncation.
 _PS_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
-if [ "$_PS_APPROVED" = "true" ]; then
-  : # spec already approved — partial-spec detection retired
+if [ "$_PS_APPROVED" = "true" ] || [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
+  : # spec already approved or minimal-core — partial-spec detection skipped
 else
 PARTIAL_MISSING="$(bash "$_MCL_HOOK_DIR/lib/mcl-partial-spec.sh" check "$TRANSCRIPT_PATH" 2>/dev/null)"
 PARTIAL_RC=$?
@@ -898,6 +898,9 @@ print("\\n".join(lines))
       # ---- end of Phase 4.5 START UI gate ----
 
       # ---- Phase 4.5 START Ops gate (since 8.13.0) ----
+      if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
+        mcl_state_set phase4_5_ops_scan_done true >/dev/null 2>&1 || true
+      else
       _OPS_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-ops-scan.py"
       _OPS_SCAN_DONE="$(mcl_state_get phase4_5_ops_scan_done 2>/dev/null)"
       _OPS_MEDIUM_PROSE=""
@@ -971,9 +974,13 @@ for f in med[:8]:
 print("\\n".join(lines))
 ' 2>/dev/null)"
       fi
+      fi # end Ops gate (MCL_MINIMAL_CORE guard)
       # ---- end Ops gate ----
 
       # ---- Phase 4.5 START Perf gate (since 8.14.0) ----
+      if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
+        mcl_state_set phase4_5_perf_scan_done true >/dev/null 2>&1 || true
+      else
       _PERF_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-perf-scan.py"
       _PERF_SCAN_DONE="$(mcl_state_get phase4_5_perf_scan_done 2>/dev/null)"
       _PERF_MEDIUM_PROSE=""
@@ -1057,9 +1064,11 @@ print("\\n".join(lines))
 ' 2>/dev/null)"
         fi
       fi
+      fi # end Perf gate (MCL_MINIMAL_CORE guard)
       # ---- end Perf gate ----
 
       # ---- Phase 4.5 START test-coverage lens (since 8.19.0) ----
+      if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
       # Surfaces missing test categories (unit/integration/e2e/load) as
       # MEDIUM findings the model must thread into the sequential
       # dialog. Unlike security/db/ui/ops/perf gates, test coverage
@@ -1102,6 +1111,7 @@ for f in findings[:8]:
 print("\\n".join(lines))
 ' 2>/dev/null)"
       fi
+      fi # end test-coverage lens (MCL_MINIMAL_CORE guard)
       # ---- end test-coverage lens ----
 
       # 8.19.0: emit the standard Phase 4.5 reminder ONLY when the model
@@ -1798,6 +1808,7 @@ _PHASE6_LIB="$_MCL_HOOK_DIR/lib/mcl-phase6.py"
 _PHASE6_DONE="$(mcl_state_get phase6_double_check_done 2>/dev/null)"
 _PHASE6_REVIEW_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
 if [ -f "$_PHASE6_LIB" ] && command -v python3 >/dev/null 2>&1 \
+   && [ "${MCL_MINIMAL_CORE:-0}" != "1" ] \
    && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_PHASE6_DONE" != "true" ] \
    && [ "$_PHASE6_REVIEW_STATE" = "running" ]; then
   # Trigger detection (hybrid): phase5-verify audit event present OR
