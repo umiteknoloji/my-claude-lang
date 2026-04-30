@@ -7,6 +7,74 @@
 
 ## [Unreleased]
 
+## [9.1.0] - 2026-04-30 — Hook-First Architecture
+
+Real-session bulgusu: model 4 kez precision-audit-block aldı. Asıl soru iyiydi: Phase 1.7 audit MCL'in iç bookkeeping'i; spec başarılı emit edilmiş + summary onaylanmışsa kullanıcının bu mesajları görmemesi gerek. 9.1.0 mimari değişiklik: tüm "model Bash zorunlu" path'leri "hook fallback" path'lerine taşır. Skill prose Bash opt-in optimization olarak kalır (caller=skill-prose audit provenance, synchronous-write); yokluğunda hook her şeyi sessizce halleder.
+
+### Mimari değişiklik
+
+**Önce (9.0.x):** Skill prose Bash MUST → Hook bekler → Yoksa block + reminder + escape.
+**Sonra (9.1.0):** Hook fallback PRIMARY → Skill prose Bash opt-in.
+
+5 path tek mimari pattern altında (4'ü 9.1.0'da yeni, biri 8.18.2'de yapılmıştı):
+
+| Path | 9.1.0 davranış |
+|---|---|
+| `phase1_intent / constraints / stack_declared` | Engineering Brief parse (8.18.2) — değişmedi |
+| **`precision-audit` audit** | Spec body'de `[assumed:]` + `[unspecified:]` count + stack-detect → hook auto-emit |
+| **`phase1_ops` / `phase1_perf`** | Hook industry-default'larla auto-fill (`docker-compose / basic / pragmatic / internal / pragmatic`) |
+| **`ui_sub_phase=UI_REVIEW`** | `dev-server-started` audit + last-assistant turn'de localhost URL + localized "browser opened" cue → hook auto-set |
+| **`phase5-verify` audit** | Last assistant turn'de localized "Verification Report" header (14 dil) + post-Phase-4 → hook auto-emit |
+
+Sonuç: kullanıcı sadece "Phase 1 sorusu → spec onayı → çalışan proje" akışını görür. "precision-audit", "skip-precision-audit", "block fired", "transition rewind" mesajları kullanıcı UX'inden çıkar; hook hepsini sessizce halleder.
+
+### Değişen dosyalar
+
+#### `hooks/lib/mcl-phase-detect.py` — 3 yeni mode
+- `--mode=spec-markers` → `[assumed:]` ve `[unspecified:]` count'larını döndürür (`{"assumed_count": N, "unspecified_count": M}`).
+- `--mode=ui-review-signal` → last assistant turn'de localhost URL **VE** localized "browser opened" cue eşzamanlı varsa `true`. Conservative — yalnızca URL veya yalnızca prose tek başına yetmez (false positive'i önler).
+- `--mode=phase5-verify-detected` → 14-dil Verification Report header'larından biri last assistant turn'de varsa `true` + matched header. mcl-stop.sh:1769 fallback regex'i ile aynı set.
+- Default mode (`--mode=full`) backward-compat — pre-9.1.0 davranış.
+
+#### `hooks/mcl-stop.sh` — 4 yeni fallback section
+1. **precision-audit auto-emit** — Phase 1→2 transition'da `_PA_HIT != "hit"` ise spec-markers helper çağrılır, audit `caller=mcl-stop, source=hook-fallback` ile emit edilir, `_PA_HIT="hit"` set edilir → block hiç fire etmez.
+2. **phase1_ops/perf default-fill** — Aynı turn'de idempotent (state field zaten doluysa skip). Industry-default JSON object'leri.
+3. **ui_sub_phase auto-advance** — Stop sonu, Phase 4a → 4b transition. Trigger: `ui_flow_active=true` + `ui_sub_phase ∈ {null, BUILD_UI}` + `dev-server-started` audit + ui-review-signal positive.
+4. **phase5-verify auto-emit** — Stop sonu, post-Phase-4. Trigger: phase5-verify audit eksik + `current_phase >= 4` + phase5-verify-detected positive.
+
+#### Audit-file existence check fix
+- `mcl-stop.sh:1527` — Phase 1.7 precision-audit gate önceden `[ -f audit.log ]` ile gated'di; missing file = whole gate skipped (yeni session'da fallback hiç fire etmiyordu). 9.1.0 file check kaldırıldı; Python scanner missing file'ı zaten graceful handle ediyor.
+
+#### Skill prose updates (3 dosya — opt-in optimization notes)
+- `skills/my-claude-lang/phase1-7-precision-audit.md` — "Hook-first audit emission" bölümü; skill prose Bash hâlâ valid + preferred (caller=skill-prose provenance), ama no longer required.
+- `skills/my-claude-lang/phase4a-ui-build.md` — "Hook-first auto-advance" bölümü; UI_REVIEW transition trigger conditions açıklaması.
+- `skills/my-claude-lang/phase5-review.md` — "Hook-first audit emission" bölümü; 14-dil header detection.
+
+### Yeni testler
+- `tests/cases/test-phase-detect.sh` — 7 yeni case (spec-markers count, ui-review-signal positive/negative, phase5-verify-detected TR/EN/no-header, spec-markers no-spec graceful).
+- `tests/cases/test-precision-audit-fallback.sh` — 8 case (transition smoothness, audit emit, count parsing, ops/perf defaults, idempotency).
+
+### Audit log değişiklikleri
+- `precision-audit | mcl-stop | source=hook-fallback ...` (yeni — fallback path'i izi)
+- `phase1_ops_populated | mcl-stop | source=hook-default` (yeni — default-fill izi)
+- `phase1_perf_populated | mcl-stop | source=hook-default` (yeni)
+- `ui_sub_phase_set | mcl-stop | source=hook-detection` (yeni)
+- `phase5-verify | mcl-stop | source=hook-detection header=...` (yeni)
+
+`source=skill-prose` ve `source=hook-*` etiketleri her zaman audit'te coexist. Phase 6 (a) check ikisini de "present" sayar; provenance forensic.
+
+### Bilinen sınırlar
+- `[assumed:]` / `[unspecified:]` count parsing skill prose'a güveniyor. Model spec'te marker'ları doğru yazmazsa count yanlış olur (worst case: 0/0). `phase1_ops` / `phase1_perf` field'ları count'tan değil, kendi default'larından okunur — downstream etkilenmez.
+- `phase1_ops` / `phase1_perf` default'ları sabit (`docker-compose / basic / pragmatic / internal / pragmatic`). Stack-aware default'lar 9.2'ye bırakıldı.
+- UI_REVIEW heuristic conservative — model dev-server'ı asla başlatmazsa miss; o senaryoda zaten UI build done değil. False-negative kabul edilebilir.
+- 14-dil Verification Report header set sabit (`mcl-phase-detect.py` + `mcl-stop.sh:1769` + `phase5-5-localize-report.md` üç yerde duplicate). Tek-yer constants module 9.2'ye bırakıldı.
+- Skill prose Bash kaldırılmadı — `caller=skill-prose` ile `caller=mcl-stop` audit'te coexist; forensic provenance kaybı yok.
+- Hook-fallback modeli kullanıcıya görünmez → debug hard. Audit log'daki `source=hook-fallback` / `source=hook-default` / `source=hook-detection` etiketleri `/mcl-self-q` veya `mcl-doctor` ile yüzeye çıkar; default UX'te görünmez.
+
+### Tests
+- Unit: **113/0/2** (önce 96 → +17: phase-detect 7 yeni mode case + precision-audit-fallback 8 yeni e2e case + 2 ek)
+- E2E: **65/0/0** — regresyonsuz
+
 ## [9.0.0] - 2026-04-30 — Standalone Maturation
 
 Real-session log (1+ saat Phase 1'de takılı, kullanıcı session'ı abort etti) 6 ayrı failure mode'u ortaya koydu. 9.0.0 tek konsolide release ile hepsini kapatır + 8.19.2 superpowers-removal'ın breaking-change boyutunu semver'e taşır.

@@ -1524,7 +1524,11 @@ if [ -n "$SPEC_HASH" ]; then
       # missing → write `precision-audit-skipped-warn`. Audit-only, non-blocking.
       _PA_AUDIT_FILE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
       _PA_TRACE_FILE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
-      if [ -f "$_PA_AUDIT_FILE" ] && command -v python3 >/dev/null 2>&1; then
+      # 9.1.0: drop the audit-file existence check. A missing audit log
+      # means no precision-audit hit either, which is exactly when the
+      # hook-fallback should fire. The Python scanner handles missing
+      # files gracefully (empty file → no hit).
+      if command -v python3 >/dev/null 2>&1; then
         _PA_HIT="$(python3 - "$_PA_AUDIT_FILE" "$_PA_TRACE_FILE" 2>/dev/null <<'PYEOF'
 import os, sys
 audit_path, trace_path = sys.argv[1], sys.argv[2]
@@ -1554,6 +1558,70 @@ except Exception:
 print("hit" if hit else "")
 PYEOF
 )"
+        if [ "$_PA_HIT" != "hit" ]; then
+          # 9.1.0: hook-first fallback. If skill prose Bash didn't emit
+          # the precision-audit, derive the count fields from the spec
+          # body's [assumed:] / [unspecified:] markers + project stack
+          # tags, and emit the audit ourselves. This makes Phase 1→2
+          # transition smooth without a user-visible block. Skill prose
+          # Bash remains valid (caller=skill-prose audit provenance);
+          # this fallback only fires when that path didn't.
+          _PA_FB_HELPER="$_MCL_HOOK_DIR/lib/mcl-phase-detect.py"
+          if [ -f "$_PA_FB_HELPER" ] && command -v python3 >/dev/null 2>&1 \
+             && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+            _PA_FB_JSON="$(python3 "$_PA_FB_HELPER" --mode=spec-markers "$TRANSCRIPT_PATH" 2>/dev/null || echo '{}')"
+            _PA_FB_ASSUMES="$(printf '%s' "$_PA_FB_JSON" | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "{}")
+    print(d.get("assumed_count", 0))
+except Exception:
+    print(0)' 2>/dev/null)"
+            _PA_FB_SKIPMARKS="$(printf '%s' "$_PA_FB_JSON" | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "{}")
+    print(d.get("unspecified_count", 0))
+except Exception:
+    print(0)' 2>/dev/null)"
+            _PA_FB_TAGS=""
+            _STACK_DETECT="$_MCL_HOOK_DIR/lib/mcl-stack-detect.sh"
+            if [ -f "$_STACK_DETECT" ]; then
+              _PA_FB_TAGS="$(bash "$_STACK_DETECT" detect "${CLAUDE_PROJECT_DIR:-$PWD}" 2>/dev/null \
+                | tr '\n' ',' | sed 's/,$//')"
+            fi
+            mcl_audit_log "precision-audit" "mcl-stop" \
+              "core_gates=0 stack_gates=0 assumes=${_PA_FB_ASSUMES:-0} skipmarks=${_PA_FB_SKIPMARKS:-0} stack_tags=${_PA_FB_TAGS} skipped=false source=hook-fallback"
+            command -v mcl_trace_append >/dev/null 2>&1 && \
+              mcl_trace_append precision_audit_fallback "assumes=${_PA_FB_ASSUMES:-0} skipmarks=${_PA_FB_SKIPMARKS:-0}"
+            _PA_HIT="hit"
+
+            # 9.1.0: opportunistic phase1_ops / phase1_perf default-fill
+            # in the same fallback turn. Industry-default values; Phase 3
+            # spec review is the developer's chance to revise. Idempotent
+            # — only writes when the field is currently null.
+            _OPS_CUR="$(mcl_state_get phase1_ops 2>/dev/null \
+              | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "null")
+    print(d.get("deployment_target") or "" if isinstance(d, dict) else "")
+except Exception:
+    print("")' 2>/dev/null)"
+            if [ -z "$_OPS_CUR" ] || [ "$_OPS_CUR" = "null" ]; then
+              mcl_state_set phase1_ops '{"deployment_target":"docker-compose","observability_tier":"basic","test_policy":"pragmatic","doc_level":"internal"}' >/dev/null 2>&1 \
+                && mcl_audit_log "phase1_ops_populated" "mcl-stop" "source=hook-default"
+            fi
+            _PERF_CUR="$(mcl_state_get phase1_perf 2>/dev/null \
+              | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "null")
+    print(d.get("budget_tier") or "" if isinstance(d, dict) else "")
+except Exception:
+    print("")' 2>/dev/null)"
+            if [ -z "$_PERF_CUR" ] || [ "$_PERF_CUR" = "null" ]; then
+              mcl_state_set phase1_perf '{"budget_tier":"pragmatic"}' >/dev/null 2>&1 \
+                && mcl_audit_log "phase1_perf_populated" "mcl-stop" "source=hook-default"
+            fi
+          fi
+        fi
         if [ "$_PA_HIT" != "hit" ]; then
           # Backward-compat: 8.3.0 skip-detection signal still emitted.
           mcl_audit_log "precision-audit-skipped-warn" "mcl-stop.sh" "summary-confirmed-but-no-audit"
@@ -2052,6 +2120,76 @@ if [ -f "$_STOP_LOG_LIB" ] && [ -f "$_STOP_TURN_SCRIPT" ] \
   TURN_MSG="$(python3 "$_STOP_TURN_SCRIPT" "$TRANSCRIPT_PATH" 2>/dev/null)"
   [ -n "$TURN_MSG" ] && mcl_log_append "$TURN_MSG"
 fi
+
+# --- 9.1.0 hook-first fallbacks (UI_REVIEW + phase5-verify) -----------
+# Both fire near the end of Stop so they observe the post-turn state
+# and the most-recent assistant message. Both idempotent — if skill
+# prose Bash already wrote the audit / advanced the state, these are
+# no-ops.
+
+_HF_HELPER="$_MCL_HOOK_DIR/lib/mcl-phase-detect.py"
+if [ -f "$_HF_HELPER" ] && command -v python3 >/dev/null 2>&1 \
+   && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+
+  # ---- UI_REVIEW auto-advance ----------------------------------------
+  # Trigger: ui_flow_active=true AND ui_sub_phase ∈ {null, BUILD_UI}
+  # AND `dev-server-started` audit present in current session AND
+  # last-assistant text passes the ui-review-signal heuristic.
+  _UI_FLOW_ACTIVE="$(mcl_state_get ui_flow_active 2>/dev/null)"
+  _UI_SUB_NOW="$(mcl_state_get ui_sub_phase 2>/dev/null | tr -d '"')"
+  if [ "$_UI_FLOW_ACTIVE" = "true" ] \
+     && { [ -z "$_UI_SUB_NOW" ] || [ "$_UI_SUB_NOW" = "null" ] || [ "$_UI_SUB_NOW" = "BUILD_UI" ]; }; then
+    # Need a `dev-server-started` audit in the current session window.
+    _UI_DSS_HIT="$(grep -c "| dev-server-started |" "${MCL_STATE_DIR:-$PWD/.mcl}/audit.log" 2>/dev/null || echo 0)"
+    if [ "$_UI_DSS_HIT" -gt 0 ] 2>/dev/null; then
+      _UI_SIG_JSON="$(python3 "$_HF_HELPER" --mode=ui-review-signal "$TRANSCRIPT_PATH" 2>/dev/null || echo '{}')"
+      _UI_SIG="$(printf '%s' "$_UI_SIG_JSON" | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "{}")
+    print("true" if d.get("ui_review_signal") else "false")
+except Exception:
+    print("false")' 2>/dev/null)"
+      if [ "$_UI_SIG" = "true" ]; then
+        mcl_state_set ui_sub_phase '"UI_REVIEW"' >/dev/null 2>&1 \
+          && mcl_audit_log "ui_sub_phase_set" "mcl-stop" "source=hook-detection" \
+          && command -v mcl_trace_append >/dev/null 2>&1 \
+          && mcl_trace_append ui_build_done "source=hook-detection"
+      fi
+    fi
+  fi
+
+  # ---- phase5-verify auto-emit ---------------------------------------
+  # Trigger: last-assistant text contains a localized Verification
+  # Report header (any of 14 supported locales) AND no phase5-verify
+  # audit in the current session yet AND state.current_phase >= 4
+  # (post-Phase-4-execute; the hook never auto-emits before code is
+  # written, even if the model accidentally produces a header).
+  _P5V_AUDIT_HIT="$(grep -c "| phase5-verify |" "${MCL_STATE_DIR:-$PWD/.mcl}/audit.log" 2>/dev/null || echo 0)"
+  _P5V_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+  if [ "$_P5V_AUDIT_HIT" -eq 0 ] 2>/dev/null \
+     && [ -n "$_P5V_PHASE" ] && [ "$_P5V_PHASE" -ge 4 ] 2>/dev/null; then
+    _P5V_JSON="$(python3 "$_HF_HELPER" --mode=phase5-verify-detected "$TRANSCRIPT_PATH" 2>/dev/null || echo '{}')"
+    _P5V_DETECTED="$(printf '%s' "$_P5V_JSON" | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "{}")
+    print("true" if d.get("phase5_verify_detected") else "false")
+except Exception:
+    print("false")' 2>/dev/null)"
+    if [ "$_P5V_DETECTED" = "true" ]; then
+      _P5V_HEADER="$(printf '%s' "$_P5V_JSON" | python3 -c 'import json,sys
+try:
+    d=json.loads(sys.stdin.read() or "{}")
+    print(d.get("header_match") or "")
+except Exception:
+    print("")' 2>/dev/null)"
+      mcl_audit_log "phase5-verify" "mcl-stop" \
+        "source=hook-detection header=${_P5V_HEADER}"
+      command -v mcl_trace_append >/dev/null 2>&1 && \
+        mcl_trace_append phase5_emit "source=hook-detection"
+    fi
+  fi
+fi
+# --- end 9.1.0 hook-first fallbacks ----------------------------------
 
 # 9.0.0: Phase 1 turn-count tracking. Increments once per Stop turn
 # while the project is still in Phase 1. mcl-activate.sh reads the

@@ -139,3 +139,94 @@ assert_contains "stack infers vue-frontend" "$_pd_stack6" "vue-frontend"
 assert_contains "stack infers typescript" "$_pd_stack6" "typescript"
 assert_contains "stack infers go" "$_pd_stack6" "go"
 assert_contains "stack infers db-mysql" "$_pd_stack6" "db-mysql"
+
+# ---- 9.1.0 modes -------------------------------------------------
+
+# Helper: drive a specific --mode against an inline body.
+_pd_run_mode() {
+  local mode="$1" body_text="$2"
+  local tr
+  tr="$(mktemp)"
+  python3 -c "
+import json, sys
+out = sys.argv[1]
+body = sys.argv[2]
+with open(out, 'w') as f:
+    f.write(json.dumps({'type':'user','message':{'role':'user','content':'q'}}) + '\n')
+    f.write(json.dumps({
+        'type':'assistant',
+        'message':{'role':'assistant','content':[{'type':'text','text': body}]}
+    }) + '\n')
+" "$tr" "$body_text"
+  python3 "$_pd_helper" --mode="$mode" "$tr"
+  rm -f "$tr"
+}
+
+# ---- Test 7: --mode=spec-markers counts [assumed:] / [unspecified:] ----
+
+_pd_spec_body='📋 Spec:
+## Objective
+Build admin panel.
+## MUST
+- Auth required [assumed: JWT cookie]
+- Audit log [assumed: append-only]
+## SHOULD
+- Pagination [assumed: 20/page]
+## Acceptance Criteria
+## Edge Cases
+[unspecified: no SLA stated]
+## Technical Approach
+## Out of Scope'
+
+_pd_out7="$(_pd_run_mode spec-markers "$_pd_spec_body")"
+assert_json_valid "spec-markers → valid JSON" "$_pd_out7"
+_pd_assumed="$(printf '%s' "$_pd_out7" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["assumed_count"])')"
+assert_equals "spec-markers counts 3 [assumed:]" "$_pd_assumed" "3"
+_pd_unspec="$(printf '%s' "$_pd_out7" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["unspecified_count"])')"
+assert_equals "spec-markers counts 1 [unspecified:]" "$_pd_unspec" "1"
+
+# ---- Test 8: --mode=ui-review-signal positive ----
+
+_pd_ui_pos='UI hazır ve tarayıcıda açıldı: http://localhost:5173/admin — incele.'
+_pd_out8="$(_pd_run_mode ui-review-signal "$_pd_ui_pos")"
+_pd_sig8="$(printf '%s' "$_pd_out8" | python3 -c 'import json,sys; print("true" if json.loads(sys.stdin.read())["ui_review_signal"] else "false")')"
+assert_equals "ui-review-signal positive (URL + prose)" "$_pd_sig8" "true"
+
+# ---- Test 9: --mode=ui-review-signal negative (URL only, no prose) ----
+
+_pd_ui_neg='Configured proxy at http://localhost:8080.'
+_pd_out9="$(_pd_run_mode ui-review-signal "$_pd_ui_neg")"
+_pd_sig9="$(printf '%s' "$_pd_out9" | python3 -c 'import json,sys; print("true" if json.loads(sys.stdin.read())["ui_review_signal"] else "false")')"
+assert_equals "ui-review-signal negative (URL but no prose)" "$_pd_sig9" "false"
+
+# ---- Test 10: --mode=phase5-verify-detected — TR header ----
+
+_pd_p5_tr='## Doğrulama Raporu
+
+### Spec Coverage
+| Requirement | Test |'
+_pd_out10="$(_pd_run_mode phase5-verify-detected "$_pd_p5_tr")"
+_pd_det10="$(printf '%s' "$_pd_out10" | python3 -c 'import json,sys; print("true" if json.loads(sys.stdin.read())["phase5_verify_detected"] else "false")')"
+assert_equals "phase5-verify TR header detected" "$_pd_det10" "true"
+
+# ---- Test 11: --mode=phase5-verify-detected — EN canonical ----
+
+_pd_p5_en='# Verification Report
+
+This is the final summary.'
+_pd_out11="$(_pd_run_mode phase5-verify-detected "$_pd_p5_en")"
+_pd_det11="$(printf '%s' "$_pd_out11" | python3 -c 'import json,sys; print("true" if json.loads(sys.stdin.read())["phase5_verify_detected"] else "false")')"
+assert_equals "phase5-verify EN canonical detected" "$_pd_det11" "true"
+
+# ---- Test 12: --mode=phase5-verify-detected — no header (negative) ----
+
+_pd_p5_no='Just code, no report header here.'
+_pd_out12="$(_pd_run_mode phase5-verify-detected "$_pd_p5_no")"
+_pd_det12="$(printf '%s' "$_pd_out12" | python3 -c 'import json,sys; print("true" if json.loads(sys.stdin.read())["phase5_verify_detected"] else "false")')"
+assert_equals "phase5-verify no header → false" "$_pd_det12" "false"
+
+# ---- Test 13: spec-markers when no spec block present (graceful) ----
+
+_pd_out13="$(_pd_run_mode spec-markers "Just brief text, no spec block.")"
+_pd_assumed_empty="$(printf '%s' "$_pd_out13" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["assumed_count"])')"
+assert_equals "spec-markers no spec → 0 assumed" "$_pd_assumed_empty" "0"

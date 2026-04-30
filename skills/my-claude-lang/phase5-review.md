@@ -248,6 +248,15 @@ Rules:
 - This section is subject to the empty-section-omission rule — if
   the file is missing or empty, Section 3 vanishes cleanly.
 
+## Hook-first audit emission (since 9.1.0)
+
+`mcl-stop.sh` auto-emits the `phase5-verify` audit when the last
+assistant text contains a Verification Report header in any of the 14
+supported MCL locales (`Verification Report` / `Doğrulama Raporu` / 12
+others) AND `current_phase >= 4`. The Bash below remains valid and
+preferred (caller=skill-prose audit provenance, synchronous-write) but
+is no longer required for Phase 6 audit-trail completeness.
+
 ## Phase 5 → 5.5 Audit Emission (since 8.15.0)
 
 After all three Verification Report sections are emitted (Spec

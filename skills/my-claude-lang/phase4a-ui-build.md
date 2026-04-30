@@ -213,6 +213,17 @@ mcl_audit_log "ui_sub_phase_set" "phase4a" "UI_REVIEW" 2>/dev/null || true
 '
 ```
 
+### Hook-first auto-advance (since 9.1.0)
+
+`mcl-stop.sh` auto-advances `ui_sub_phase` from `BUILD_UI` to
+`UI_REVIEW` when it detects all of the following at end of turn:
+(1) `ui_flow_active=true`, (2) a `dev-server-started` audit event in
+the current session, (3) the last assistant text contains a
+`localhost:` URL **and** a localized "browser opened / UI ready" cue.
+The Bash below is no longer required — it stays as the preferred
+synchronous-write path (sets state in the same turn rather than next
+Stop) but is opt-in.
+
 ### Alternative: Marker Emission (since 8.19.0)
 
 If the Bash above is not executed, emit this structured text block at

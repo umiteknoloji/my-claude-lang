@@ -275,6 +275,20 @@ JS bundle size + Core Web Vitals + image budget tier?
 - **SKIP-MARK alternative:** internal admin tool / prototype / proof-of-concept → `[unspecified: perf-budget, no SLA]`.
 - **Sample question (TR):** "Performans hedefi: strict (100KB JS / LCP <2s / WebP zorunlu), pragmatic (200KB / 2.5s / WebP önerilen), yoksa internal-only (budget yok)?"
 
+## Hook-first audit emission (since 9.1.0)
+
+The `precision-audit` audit entry is now **auto-emitted by `mcl-stop.sh`**
+when the skill prose Bash below is not invoked. The hook reads
+`[assumed: ...]` and `[unspecified: ...]` markers from the spec body
+plus stack tags from `mcl-stack-detect.sh`, and writes the audit with
+`source=hook-fallback`. Phase 1→2 transitions smoothly without a
+user-visible block.
+
+Skill prose Bash below remains **valid and preferred** — it adds
+`caller=skill-prose` audit provenance (forensically richer) and writes
+synchronously rather than waiting one Stop turn. But it is no longer
+**required** for pipeline progress. The hook fallback is the safety net.
+
 ## Phase 1.7 → 1.5 handoff state-set (since 8.15.0)
 
 After all dimensions (core 7 + security 5 + DB 7 + ops 4 + perf 1 + stack add-ons) are classified and the developer has answered all GATE

@@ -266,22 +266,177 @@ def detect(transcript_path: str) -> dict[str, Any]:
     return result
 
 
+# --- 9.1.0 hook-first additions ----------------------------------------
+# Three narrow detection helpers used by mcl-stop.sh fallback paths.
+# Each runs in its own --mode so callers don't pay for a full detect()
+# when only one fact is needed.
+
+# Phase 5 verification report headers across the 14 supported MCL
+# locales. Kept in sync with skills/.../phase5-5-localize-report.md and
+# the mcl-stop.sh:1769 trigger fallback regex. Single source-of-truth
+# would be a constants module — deferred to 9.2 (see CHANGELOG limits).
+_P5V_HEADERS = [
+    "Verification Report",
+    "Doğrulama Raporu",
+    "Rapport de Vérification",
+    "Verifizierungsbericht",
+    "Informe de Verificación",
+    "検証レポート",
+    "검증 보고서",
+    "验证报告",
+    "تقرير التحقق",
+    "דוח אימות",
+    "सत्यापन रिपोर्ट",
+    "Laporan Verifikasi",
+    "Relatório de Verificação",
+    "Отчёт о проверке",
+]
+_P5V_RE = re.compile(
+    r"^\s*(?:#+\s+|━+\s*\n\s*)?(?:" +
+    "|".join(re.escape(h) for h in _P5V_HEADERS) +
+    r")\b",
+    re.MULTILINE,
+)
+
+# `[assumed: ...]` and `[unspecified: ...]` markers. Phase 1.7 skill
+# prose mandates these inside the spec body for SILENT-ASSUME and
+# SKIP-MARK classifications respectively.
+_ASSUMED_RE = re.compile(r"\[assumed:[^\]]*\]")
+_UNSPEC_RE = re.compile(r"\[unspecified:[^\]]*\]")
+
+# Last-assistant-text patterns indicating a UI build is done and
+# review-ready. Conservative — needs BOTH a localhost URL AND at least
+# one localized "browser-opened" cue OR a Bash dev-server invocation.
+_UI_LOCALHOST_RE = re.compile(r"\bhttps?://(?:localhost|127\.0\.0\.1)(?::\d+)?", re.I)
+_UI_OPENED_PROSE_RE = re.compile(
+    r"(UI hazır|UI ready|UI açıld|UI launched|browser|tarayıcı|ブラウザ|"
+    r"navigate to|open .* in your browser|otevř|brauseri|abriendo)",
+    re.I,
+)
+
+
+def detect_spec_markers(transcript_path: str) -> dict[str, Any]:
+    """Count `[assumed: ...]` and `[unspecified: ...]` markers in the spec.
+
+    Returns {"assumed_count": int, "unspecified_count": int}. Counts the
+    LAST assistant text containing a `📋 Spec:` block — falls back to
+    full last-assistant text if no spec block is found (so a brief-only
+    or pre-spec turn yields 0/0 rather than crashing).
+    """
+    out = {"assumed_count": 0, "unspecified_count": 0}
+    if not transcript_path or not Path(transcript_path).exists():
+        return out
+    text = _last_assistant_text(transcript_path)
+    if not text:
+        return out
+    # Prefer the spec body if present (most accurate scope); fall back
+    # to the full last-assistant text.
+    spec_match = re.search(
+        r"📋\s*Spec:.*",
+        text,
+        re.DOTALL,
+    )
+    body = spec_match.group(0) if spec_match else text
+    out["assumed_count"] = len(_ASSUMED_RE.findall(body))
+    out["unspecified_count"] = len(_UNSPEC_RE.findall(body))
+    return out
+
+
+def detect_ui_review_signal(transcript_path: str) -> dict[str, Any]:
+    """Heuristic: is the most-recent assistant turn signaling that the
+    UI is built and ready for review?
+
+    Conservative — both signals required:
+      - localhost URL pattern in the assistant text, AND
+      - a "browser-opened" / "UI ready" prose cue in any of the
+        supported locales
+
+    Returns {"ui_review_signal": bool}.
+    """
+    out = {"ui_review_signal": False}
+    if not transcript_path or not Path(transcript_path).exists():
+        return out
+    text = _last_assistant_text(transcript_path)
+    if not text:
+        return out
+    if _UI_LOCALHOST_RE.search(text) and _UI_OPENED_PROSE_RE.search(text):
+        out["ui_review_signal"] = True
+    return out
+
+
+def detect_phase5_verify(transcript_path: str) -> dict[str, Any]:
+    """Detect a Phase 5 Verification Report header in the most-recent
+    assistant turn (any of 14 supported locales).
+
+    Returns {"phase5_verify_detected": bool, "header_match": str|None}.
+    Used by mcl-stop.sh to auto-emit the `phase5-verify` audit when the
+    skill prose Bash was not invoked.
+    """
+    out: dict[str, Any] = {"phase5_verify_detected": False, "header_match": None}
+    if not transcript_path or not Path(transcript_path).exists():
+        return out
+    text = _last_assistant_text(transcript_path)
+    if not text:
+        return out
+    m = _P5V_RE.search(text)
+    if m:
+        out["phase5_verify_detected"] = True
+        out["header_match"] = m.group(0).strip().lstrip("#").strip()
+    return out
+
+
 def main() -> int:
-    if len(sys.argv) < 2:
+    # 9.1.0: --mode flag selects a narrow detection. Default mode (no
+    # flag, or `--mode=full`) preserves the pre-9.1.0 behavior so
+    # existing callers (mcl-stop.sh state-population block) keep working.
+    args = sys.argv[1:]
+    mode = "full"
+    transcript_path = None
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--mode" and i + 1 < len(args):
+            mode = args[i + 1]
+            i += 2
+            continue
+        if a.startswith("--mode="):
+            mode = a.split("=", 1)[1]
+            i += 1
+            continue
+        if transcript_path is None:
+            transcript_path = a
+        i += 1
+
+    if not transcript_path:
         print("{}")
         return 0
-    transcript_path = sys.argv[1]
+
     try:
-        result = detect(transcript_path)
-        print(json.dumps(result))
+        if mode == "spec-markers":
+            print(json.dumps(detect_spec_markers(transcript_path)))
+        elif mode == "ui-review-signal":
+            print(json.dumps(detect_ui_review_signal(transcript_path)))
+        elif mode == "phase5-verify-detected":
+            print(json.dumps(detect_phase5_verify(transcript_path)))
+        else:
+            # full mode — pre-9.1.0 behavior
+            result = detect(transcript_path)
+            print(json.dumps(result))
     except Exception:
-        # Fail-open: emit a fully-null shell. Caller treats null fields
-        # as "skip" — never as a write trigger.
-        print(json.dumps({k: None for k in (
-            "phase1_intent", "phase1_constraints", "phase1_stack_declared",
-            "phase1_ops", "phase1_perf", "ui_sub_phase_signal",
-            "phase4_5_overrides",
-        )}))
+        # Fail-open: emit a mode-appropriate empty shell. Caller treats
+        # missing/null fields as "skip" — never as a write trigger.
+        if mode == "spec-markers":
+            print(json.dumps({"assumed_count": 0, "unspecified_count": 0}))
+        elif mode == "ui-review-signal":
+            print(json.dumps({"ui_review_signal": False}))
+        elif mode == "phase5-verify-detected":
+            print(json.dumps({"phase5_verify_detected": False, "header_match": None}))
+        else:
+            print(json.dumps({k: None for k in (
+                "phase1_intent", "phase1_constraints", "phase1_stack_declared",
+                "phase1_ops", "phase1_perf", "ui_sub_phase_signal",
+                "phase4_5_overrides",
+            )}))
     return 0
 
 
