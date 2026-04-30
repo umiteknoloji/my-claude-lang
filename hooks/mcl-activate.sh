@@ -624,16 +624,21 @@ if [ -f "$SEMGREP_HELPER" ]; then
   SEMGREP_RC=$?
   case "$SEMGREP_RC" in
     2)
-      # Binary missing — hard-block SAST, but soft-block at the
-      # pipeline level: session proceeds without Semgrep in Phase 4.5.
-      SEMGREP_HINT="${SEMGREP_STATUS#semgrep-missing|install=}"
-      SEMGREP_HINT_ESC="$(printf '%s' "$SEMGREP_HINT" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-      SEMGREP_NOTICE="<mcl_audit name=\\\"semgrep-missing\\\">\\nSEMGREP SAST BINARY MISSING — Phase 4.5 (Risk Review) uses Semgrep as its SAST engine but the ${_BT}semgrep${_BT} binary is not on PATH. On the FIRST developer-facing message of this session ONLY, include a LOCALIZED one-sentence notice stating that Semgrep-based SAST will be skipped until installed, and include the install command ${_BT}${SEMGREP_HINT_ESC}${_BT} verbatim (do NOT translate the shell command). Do NOT block or delay the session. Phase 4.5's non-SAST checks still run. Per the warn-once-then-execute rule, do NOT re-emit this notice on subsequent turns.\\n</mcl_audit>\\n\\n"
+      # Binary missing — silent skip for the developer (audit log already
+      # captures the preflight result via mcl_audit_log inside the helper,
+      # so forensic trace is preserved). The previous behavior emitted a
+      # localized one-sentence notice on the first turn, but in practice
+      # the developer either already knows Semgrep is missing or doesn't
+      # need the install hint mid-Phase-1. Phase 4.5 falls back to its
+      # non-SAST lenses transparently.
+      :
       ;;
     1)
-      # Stack not on the Semgrep-supported matrix — no SAST for this
-      # project, ever. Warn once, then silent.
-      SEMGREP_NOTICE="<mcl_audit name=\\\"semgrep-unsupported-stack\\\">\\nSEMGREP UNSUPPORTED STACK — No Semgrep-supported language tag (typescript/javascript/python/go/ruby/java/kotlin/php/cpp/csharp/rust) was detected in this project. On the FIRST developer-facing message of this session ONLY, include a LOCALIZED one-sentence notice stating that Semgrep-based SAST will be skipped for this project and Phase 4.5 will run its non-SAST checks only. Per the warn-once-then-execute rule, do NOT re-emit on subsequent turns.\\n</mcl_audit>\\n\\n"
+      # Stack not on the Semgrep-supported matrix — silent skip, audit
+      # only. Same rationale as rc=2: no developer-facing prose, the
+      # audit `semgrep-preflight | mcl-activate | unsupported-stack`
+      # entry is the deterministic signal for tooling.
+      :
       ;;
     3)
       # Empty project — no source files exist yet (bootstrap/scaffold session).
