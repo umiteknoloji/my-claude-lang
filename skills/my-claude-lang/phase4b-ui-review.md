@@ -63,7 +63,7 @@ single emoji, a question back at MCL, etc.), and only then, emit:
 
 ```
 AskUserQuestion({
-  question: "MCL 6.5.0 | <localized: UI reviewed? proceed to backend?>",
+  question: "MCL {{MCL_VERSION}} | <localized: UI reviewed? proceed to backend?>",
   options: [
     "<approve-family: approve, proceed to backend>",
     "<revise: rewrite the UI>",

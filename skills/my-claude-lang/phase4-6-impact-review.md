@@ -83,7 +83,7 @@ one-impact-per-turn conversation**. For each impact MCL surfaces:
 2. MCL immediately calls (since 6.0.0):
    ```
    AskUserQuestion({
-     question: "MCL 6.0.0 | <localized impact decision prompt>",
+     question: "MCL {{MCL_VERSION}} | <localized impact decision prompt>",
      options: [
        "<apply-fix-in-language>",    # MCL patches the consumer in-place (see below)
        "<skip-in-language>",         # accept the impact as-is

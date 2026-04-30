@@ -65,7 +65,7 @@ I understood the following:
 Then call:
 ```
 AskUserQuestion({
-  question: "MCL 7.1.6 | <localized 'Is this correct?'>",
+  question: "MCL {{MCL_VERSION}} | <localized 'Is this correct?'>",
   options: [
     "<approve-verb>",
     "<edit-verb>",

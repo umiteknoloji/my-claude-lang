@@ -92,7 +92,7 @@ an `<mcl_audit name="partial-spec-recovery">` block into
    every required section present.
 3. NOT emit the legacy `✅ MCL APPROVED` text (dead in 6.0.0).
 4. End with a Phase 3 `AskUserQuestion` call (prefix
-   `MCL 6.0.0 | `) asking for fresh spec approval, then STOP.
+   `MCL {{MCL_VERSION}} | `) asking for fresh spec approval, then STOP.
    Note: the Stop hook IGNORES the tool_result while
    `partial_spec=true` (emits `askq-ignored-partial-spec`). The
    flag clears on the same turn if and only if the re-emitted

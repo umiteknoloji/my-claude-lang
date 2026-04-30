@@ -19,7 +19,7 @@ a senior English-speaking engineer wrote the requirements themselves.
 2. Write the spec in a visible `📋 Spec:` block in the response — NOT internally
 3. The spec MUST be visible to the developer in the conversation output
 4. After the spec, explain in the developer's language what it says
-5. Call `AskUserQuestion({question: "MCL 6.0.0 | <localized spec-approval
+5. Call `AskUserQuestion({question: "MCL {{MCL_VERSION}} | <localized spec-approval
    prompt>", options: ["<approve-family>", "<edit>", "<cancel>"]})` —
    since 6.0.0 this REPLACES the text-based "yes / no" prompt. Do NOT
    emit the legacy `✅ MCL APPROVED` marker; it is dead.

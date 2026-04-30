@@ -7,12 +7,12 @@ REMOVED — Claude must never emit it; it carries no state effect.
 ## Question format contract
 
 Every MCL-initiated `AskUserQuestion` call MUST set `question` beginning
-with the literal prefix `MCL 6.0.0 | ` followed by the localized question
+with the literal prefix `MCL {{MCL_VERSION}} | ` followed by the localized question
 body in the developer's detected language. Version tracks the banner.
 
 ```
 AskUserQuestion({
-  question: "MCL 6.0.0 | <localized question body>",
+  question: "MCL {{MCL_VERSION}} | <localized question body>",
   options: ["<approve-family-in-language>", "<edit-option>", "<cancel-option>"]
 })
 ```

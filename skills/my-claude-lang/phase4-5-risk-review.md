@@ -36,7 +36,7 @@ ONE batch question BEFORE entering the per-risk sequential dialog:
 
 ```
 AskUserQuestion({
-  question: "MCL 8.17.0 | <localized prompt: N risk listelendi — toplu karar ver, yoksa tek tek bak>",
+  question: "MCL {{MCL_VERSION}} | <localized prompt: N risk listelendi — toplu karar ver, yoksa tek tek bak>",
   options: [
     "<accept-all-in-language>",   # all risks accepted (auto-fix where fixable, others noted)
     "<reject-all-in-language>",   # all risks dismissed (developer takes responsibility)
@@ -91,7 +91,7 @@ conversation**. For each risk MCL surfaces:
 2. MCL immediately calls (since 6.0.0):
    ```
    AskUserQuestion({
-     question: "MCL 6.0.0 | <localized risk decision prompt>",
+     question: "MCL {{MCL_VERSION}} | <localized risk decision prompt>",
      options: [
        "<apply-fix-in-language>",     # MCL implements the fix
        "<skip-in-language>",          # accept the risk as-is

@@ -27,6 +27,10 @@ mkdir -p "$BIN"
 
 if [ -d "$LIB/.git" ]; then
   echo "Updating MCL at $LIB ..."
+  # Discard any previous {{MCL_VERSION}} substitutions in skill files so
+  # `git pull --ff-only` doesn't trip on locally-modified tracked files.
+  # The substitutions are re-applied below after pull lands the new VERSION.
+  git -C "$LIB" checkout -- skills/ 2>/dev/null || true
   git -C "$LIB" pull --ff-only
 else
   if [ -e "$LIB" ]; then
@@ -41,6 +45,18 @@ chmod +x "$LIB/bin/mcl-claude"
 ln -sf "$LIB/bin/mcl-claude" "$BIN/mcl-claude"
 
 version="$(cat "$LIB/VERSION" 2>/dev/null || echo unknown)"
+
+# Substitute {{MCL_VERSION}} placeholder in skill files with the actual
+# release version. Skill markdown is loaded as-is by Claude Code, so the
+# version is baked in at install time. Source repo keeps the placeholder
+# so the tracked tree never goes stale across releases.
+if [ "$version" != "unknown" ] && [ -d "$LIB/skills" ]; then
+  # macOS sed needs `-i ''`; GNU sed accepts `-i`. Use a portable -i.bak
+  # then remove the .bak files.
+  find "$LIB/skills" -name '*.md' -print0 \
+    | xargs -0 sed -i.bak "s/{{MCL_VERSION}}/${version}/g"
+  find "$LIB/skills" -name '*.md.bak' -delete
+fi
 echo
 echo "✓ MCL $version installed → $BIN/mcl-claude"
 echo "✓ Library: $LIB"
