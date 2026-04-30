@@ -1389,10 +1389,8 @@ fi
 
 
 REASON=""
-if [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null; then
-  REASON="MCL LOCK — current_phase=${CURRENT_PHASE} (${PHASE_NAME}). Mutating tool \`${TOOL_NAME}\` is blocked until Phase 4 (EXECUTE). Emit the 📋 Spec: block, get the developer's explicit approval via AskUserQuestion, then proceed."
-elif [ "$SPEC_APPROVED" != "true" ]; then
-  REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked until the developer explicitly approves the 📋 Spec: block via AskUserQuestion."
+if [ "$SPEC_APPROVED" != "true" ]; then
+  REASON="MCL LOCK — spec_approved=false (phase=${CURRENT_PHASE}). Mutating tool \`${TOOL_NAME}\` is blocked until the developer explicitly approves the 📋 Spec: block via AskUserQuestion (MCL X.Y.Z | Spec'i onaylıyor musun?)."
 fi
 
 # -------- Branch: UI flow path-exception (Phase 4a BUILD_UI / 4b REVIEW) --------

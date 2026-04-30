@@ -9,6 +9,11 @@
 
 echo "--- test-hook-debug-readers ---"
 
+if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
+  printf '  SKIP: test-hook-debug-readers — hook-debug disabled (MCL_MINIMAL_CORE=1)\n'
+  return 0 2>/dev/null || true
+fi
+
 _hd_proj="$(setup_test_dir)"
 
 # Plant a Phase 2 state — Phase 1-3 is the deny window.

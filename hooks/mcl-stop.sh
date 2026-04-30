@@ -376,6 +376,8 @@ if [ -n "$ASKQ_RECORD" ]; then
   ASKQ_INTENT="${ASKQ_RECORD%%|*}"
   ASKQ_SELECTED="${ASKQ_RECORD#*|}"
 fi
+mcl_audit_log "askq-scanner-result" "mcl-stop" \
+  "intent=${ASKQ_INTENT} selected=${ASKQ_SELECTED} has_record=$([ -n "${ASKQ_RECORD}" ] && echo true || echo false)"
 
 # Plain-text approval fallback (since 7.9.8):
 # Developers sometimes type approval words in the chat input instead of
@@ -898,12 +900,12 @@ print("\\n".join(lines))
       # ---- end of Phase 4.5 START UI gate ----
 
       # ---- Phase 4.5 START Ops gate (since 8.13.0) ----
+      _OPS_MEDIUM_PROSE=""
       if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
         mcl_state_set phase4_5_ops_scan_done true >/dev/null 2>&1 || true
       else
       _OPS_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-ops-scan.py"
       _OPS_SCAN_DONE="$(mcl_state_get phase4_5_ops_scan_done 2>/dev/null)"
-      _OPS_MEDIUM_PROSE=""
       if [ -f "$_OPS_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_OPS_SCAN_DONE" != "true" ]; then
         _OPS_FULL_JSON="$(timeout 120 python3 "$_OPS_FULL_LIB" \
@@ -978,12 +980,12 @@ print("\\n".join(lines))
       # ---- end Ops gate ----
 
       # ---- Phase 4.5 START Perf gate (since 8.14.0) ----
+      _PERF_MEDIUM_PROSE=""
       if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
         mcl_state_set phase4_5_perf_scan_done true >/dev/null 2>&1 || true
       else
       _PERF_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-perf-scan.py"
       _PERF_SCAN_DONE="$(mcl_state_get phase4_5_perf_scan_done 2>/dev/null)"
-      _PERF_MEDIUM_PROSE=""
       if [ -f "$_PERF_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_PERF_SCAN_DONE" != "true" ]; then
         _PERF_FULL_JSON="$(timeout 90 python3 "$_PERF_FULL_LIB" \
@@ -1068,6 +1070,7 @@ print("\\n".join(lines))
       # ---- end Perf gate ----
 
       # ---- Phase 4.5 START test-coverage lens (since 8.19.0) ----
+      _TEST_MEDIUM_PROSE=""
       if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
       # Surfaces missing test categories (unit/integration/e2e/load) as
       # MEDIUM findings the model must thread into the sequential
@@ -1076,7 +1079,6 @@ print("\\n".join(lines))
       # tests) is advisory-MEDIUM here; the developer answers via the
       # severity-aware option matrix in phase4-5-risk-review.md.
       _TC_HELPER="$_MCL_HOOK_DIR/lib/mcl-test-coverage.py"
-      _TEST_MEDIUM_PROSE=""
       if [ -f "$_TC_HELPER" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ]; then
         _TC_STACK="$(mcl_state_get phase1_stack_declared 2>/dev/null | tr -d '"')"

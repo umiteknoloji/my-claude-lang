@@ -7,6 +7,50 @@
 
 ## [Unreleased]
 
+## [9.2.0] - 2026-04-30 — Minimal Core: fallback removal + canonical path fixes
+
+### Breaking: hook fallbacks permanently deleted
+
+All hook-level fallbacks that masked model behavior deviations are permanently removed from `mcl-stop.sh` (no flag, no recovery):
+- **9.1.1** spec-approve reclassify (intent=other → spec-approve via state context)
+- **8.19.0** brief-parse state population (phase1_intent/ops/perf/ui_sub_phase from transcript)
+- **9.1.0** precision-audit auto-emit + ops/perf default-fill
+- **9.1.0** ui_sub_phase auto-advance (hook-first fallback)
+- **9.1.0** phase5-verify auto-emit (hook-first fallback)
+
+Phase 1→2 transition is now a direct 5-line block with no guards.
+
+### Feature-flag-off: MCL_MINIMAL_CORE=1
+
+Non-essential enforcement systems skipped when `MCL_MINIMAL_CORE=1` (code kept):
+- Partial-spec recovery (mcl-stop.sh)
+- Phase 4.5 Ops + Perf gates (mcl-stop.sh)
+- Phase 4.5 test-coverage lens (mcl-stop.sh)
+- Phase 6 double-check (mcl-stop.sh)
+- Hook-debug Bash + Read/Grep/Glob blocks (mcl-pre-tool.sh)
+- Severity per-write enforcement — sec/db/ui scan blocks (mcl-pre-tool.sh)
+
+### Skill prose: pinned question body
+
+`phase3-verify.md`, `my-claude-lang.md`, `phase2-spec.md`: AskUserQuestion question body for spec approval pinned to exact scanner token. TR: `Spec'i onaylıyor musun?` / EN: `Approve this spec?`. Label table trimmed to TR + EN only. Any paraphrase → intent="other" → visible failure.
+
+### Bug fixes
+
+**(1) Write guard: spec_approved is now sole gate** (`mcl-pre-tool.sh`). Previously `CURRENT_PHASE -lt 4` was checked first — stale phase reads caused spurious "phase=1" denies even when state had phase=2. Now: `SPEC_APPROVED != "true"` is the only condition; phase value included in error message as diagnostic context only.
+
+**(2) Scanner visibility: unconditional audit per Stop turn** (`mcl-stop.sh`). `askq-scanner-result | mcl-stop | intent=... selected=... has_record=...` emitted after every scanner run. `has_record=false` → PREFIX_RE miss or no tool_result; `intent=other` → body not tokenized; `intent=spec-approve` but no transition → guard bug downstream.
+
+### Tests removed
+
+- `test-spec-approve-reclassify.sh` — covered deleted reclassify
+- `test-precision-audit-fallback.sh` — covered deleted auto-emit
+- `test-precision-audit-escape.sh` — covered deleted block counter
+- `test-phase-detect.sh` — covered deleted mcl-phase-detect.py fallback
+
+e2e: phase_5 / phase_5b state-population assertions removed.
+
+Result: unit 102/0/2, e2e 54/0/0.
+
 ## [9.1.4] - 2026-04-30 — AskQ-Level Spec Enforcement + Reclassify Diagnostics
 
 Real-session bug raporu (9.1.3 sonrası): "spec_approved=true STILL not set after approval" — 9.1.1 reclassify-fallback fire etmedi. **Investigated root cause first.** Synthetic transcript ile reproduce ettim:

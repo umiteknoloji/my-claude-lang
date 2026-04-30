@@ -107,9 +107,10 @@ assert_equals "spec_approved stays true after post-approval Stop" \
   "$_psp_appr_after" "True"
 
 # ---- Test 4: pre-approval branch still works (regression guard) ----
-# Same fixture, but spec_approved=false. Detector must fire and
-# emit the SPEC RECOVERY block. This proves the guard is scoped to
-# post-approval only — it doesn't kill the legitimate detection.
+# Skipped when MCL_MINIMAL_CORE=1 (partial-spec detection disabled).
+if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
+  printf '  SKIP: pre-approval partial-spec — disabled (MCL_MINIMAL_CORE=1)\n'
+else
 python3 - <<'PY'
 import json, os, time
 o = {
@@ -132,6 +133,7 @@ else
   printf '  FAIL: pre-approval branch broken (recovery should fire here)\n'
   printf '        output snippet: %s\n' "$(printf '%s' "$_psp_out_pre" | head -c 200)"
 fi
+fi # end MCL_MINIMAL_CORE skip for Test 4
 
 cleanup_test_dir "$_psp_proj"
 unset PSP_STATE
