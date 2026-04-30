@@ -51,6 +51,27 @@ While `ui_sub_phase = "BUILD_UI"`, the pre-tool hook:
   `src/services/**`, `src/lib/db/**`, `.env*`, `prisma/**`,
   `drizzle/**`, `vercel.json`, `netlify.toml`, `server.{js,ts,mjs}`.
 
+### Backend-Sounding Paths — Redirect Before Writing
+
+Backend-paterni hatırlatan bir dosya adı gelirse, Write çağrısından
+ÖNCE aşağıdaki tabloya bak ve sağ sütundaki yolu kullan. Sol sütun
+hook tarafından block edilir; sağ sütun allowlist'tedir ve Phase 4c
+entry'sinde otomatik silinir.
+
+| Yazmak isteyebileceğin yol            | Onun yerine yaz                                  |
+| ------------------------------------- | ------------------------------------------------ |
+| `src/api/<name>.ts` (mock client)     | `src/mocks/<name>.mock.ts`                       |
+| `src/services/<name>.ts`              | `src/components/__fixtures__/<name>.fixture.ts`  |
+| `src/lib/db/<name>.ts`                | `src/mocks/<name>.mock.ts`                       |
+| `pages/api/<name>.ts` / `app/api/`    | inline constant — component dosyasının başında   |
+| `prisma/schema.prisma` (mock)         | `src/types/<name>.ts` (sadece type, schema yok)  |
+| `migrations/*.sql` (sample)           | inline constant + `src/types/<name>.ts`          |
+| `server.ts` / `index.server.ts`       | YAZMA — backend Phase 4c'ye aittir               |
+
+Sezgi: dosya adı "gerçek veri kaynağı" çağrıştırıyorsa Phase 4c'ye
+aittir. Phase 4a yalnızca UI + frontend-görünür mock yazar; mock
+yeri her zaman `src/mocks/` veya `__fixtures__/`. İstisna yok.
+
 Build tool configs (`vite.config.*`, `next.config.*`, `nuxt.config.*`,
 `tailwind.config.*`, `tsconfig*`, `postcss.config.*`) are **explicitly
 allowed** — they are needed to run `npm run dev` in Phase 4a. Writing

@@ -10,8 +10,9 @@
   data. Path: `src/**/__fixtures__/<name>.fixture.ts`. Kebab-case
   filename, singular noun (`user-profile.fixture.ts`, not
   `user-profiles.fixtures.ts`).
-- NEVER put fixtures under `src/api/**`, `src/services/**`, or
-  `src/lib/db/**` — those paths are deny-listed in Phase 4a.
+- Backend-paterni yollar (`src/api/**`, `src/services/**`, `src/lib/db/**`,
+  `prisma/**`, vb.) deny-listed. Tam yol-yönlendirme tablosu için
+  ana skill'e bak: `phase4a-ui-build.md` → "Backend-Sounding Paths".
 
 ## What is FORBIDDEN in a Phase 4a fixture
 

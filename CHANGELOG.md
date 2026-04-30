@@ -7,6 +7,18 @@
 
 ## [Unreleased]
 
+## [8.18.1] - 2026-04-30
+
+### Düzeltildi — Phase 4a path redirect (UI-BUILD LOCK preempt)
+
+Phase 4a (BUILD_UI) sırasında model "API mock" mental model'iyle `src/api/mock.ts` gibi backend-paterni yollara yazmaya çalışıyordu. PreToolUse hook bu yolları reddediyor (`src/api/`, `src/services/`, `src/lib/db/`, vb.) ve developer turn kaybediyordu. Hook davranışı doğru — eksik olan, model'in ilk yazımda doğru yolu seçmesini sağlayacak proaktif yönlendirmeydi.
+
+- **`skills/my-claude-lang/phase4a-ui-build.md`** — "Path Discipline" altına 7-satır redirect tablosu eklendi (X→Y eşleştirme): `src/api/<name>.ts` → `src/mocks/<name>.mock.ts`, `src/services/<name>.ts` → `src/components/__fixtures__/<name>.fixture.ts`, `pages/api/...` → inline constant, vb. Model ana skill'i her Phase 4a turn'ünde okuyor; sub-skill'e (fixtures.md) inmesine gerek kalmıyor.
+- **`skills/my-claude-lang/phase4c-backend.md`** — "Remove Dev-Only Bits" Delete listesine `src/mocks/` cleanup bullet'ı eklendi. Grep-verified (3 alias varyantı: `src/mocks/`, `../mocks/`, `@/mocks/`); test/spec dosyalarındaki referanslar korunur. Boş ise `rm -rf src/mocks/` Phase 4 Execution Plan kuralı altında.
+- **`skills/my-claude-lang/phase4a-ui-build/fixtures.md`** — Trailing prohibition bullet'ı ana skill'deki tabloya pointer'a dönüştürüldü (drift önleme; tek hakikat kaynağı).
+
+Tests: 27/0/2 unit, 54/0/0 e2e — regresyonsuz.
+
 ## [8.17.0] - 2026-04-30
 
 ### Düzeltildi — Skill prose state plumbing nihayet gerçekten çalışıyor

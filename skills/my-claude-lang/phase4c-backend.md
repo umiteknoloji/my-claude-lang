@@ -78,6 +78,16 @@ Delete:
 - `<select>` dev toggles that expose mock-state switching
 - `__fixtures__/<name>.fixture.ts` files that have no remaining
   importers (grep before deleting)
+- Tüm `src/mocks/` dizini, içindeki her `*.mock.ts` dosyasının kalan
+  importer'ı yoksa. Doğrulama:
+  ```
+  grep -rEn "from ['\"][^'\"]*src/mocks/|from ['\"]\.\./mocks/|from ['\"]@/mocks/" src/ \
+    --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx'
+  ```
+  Grep çıktısında veya `*.test.*` / `*.spec.*` dosyalarında referans
+  bulunan herhangi bir `*.mock.ts` silinmez. Çıktı boşsa
+  `rm -rf src/mocks/` Phase 4 Execution Plan kuralı altında çalıştırılır
+  (destructive op → reconfirm).
 
 Keep:
 - Type definitions from `src/types/` — real code uses them
