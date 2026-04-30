@@ -247,6 +247,167 @@ phase_1_handoff_token_path_probe() {
 }
 
 # ---------------------------------------------------------------------
+# PHASE 14 — Phase 4.5 START sticky-pause + 5 sequential gates
+# ---------------------------------------------------------------------
+# Two sub-tests:
+#   14.A Sticky-pause short-circuits Phase 4.5 START (no gate runs)
+#   14.B Each gate's scan helper returns valid JSON with HIGH=0 on a
+#        clean project (the "would proceed" baseline for every gate)
+#
+# Driving the full sequential gate ordering through mcl-stop.sh requires
+# a transcript fixture that triggers `code_written=true` from
+# mcl-phase-review-guard.py — that's a separate phase. 14.A + 14.B prove
+# the two preconditions: pause guard fires before gates; gates' helpers
+# emit valid JSON when there is nothing to find.
+
+# Write state.json directly as a test fixture, bypassing mcl_state_set
+# auth-check. Justified: the test owns the project dir and is asserting
+# downstream HOOK behavior, not exercising the writer.
+_e2e_write_state() {
+  local state_file="$1" python_payload="$2"
+  python3 -c "
+import json, sys, time
+fp = sys.argv[1]
+patch = json.loads(sys.argv[2])
+try:
+    obj = json.loads(open(fp).read())
+except Exception:
+    obj = {}
+obj.update(patch)
+obj['last_update'] = int(time.time())
+open(fp, 'w').write(json.dumps(obj, indent=2))
+" "$state_file" "$python_payload"
+}
+
+phase_14_sticky_pause_blocks_gates() {
+  phase_header "14.A — Sticky-pause short-circuits Phase 4.5 START"
+
+  local proj
+  proj="$(setup_test_dir)"
+  local state_file="$proj/.mcl/state.json"
+  local audit_log="$proj/.mcl/audit.log"
+
+  # Initialize state via real wrapper.
+  run_activate_hook "$proj" "init" >/dev/null
+
+  # Force pause-on-error active. Real flow would go through mcl_pause_set
+  # from a hook context; here we patch state directly so we isolate the
+  # sticky-pause CHECK in mcl-stop.sh, not the setter.
+  _e2e_write_state "$state_file" '{
+    "current_phase": 4,
+    "phase_name": "EXECUTE",
+    "spec_approved": true,
+    "phase_review_state": "pending",
+    "paused_on_error": {
+      "active": true,
+      "reason": "synthetic e2e fixture",
+      "ts": 1000
+    }
+  }'
+
+  # Provide a minimal transcript file. mcl-stop.sh requires
+  # transcript_path to exist; even a trivial one-message transcript is
+  # enough — sticky-pause check fires before the transcript is read for
+  # phase-review purposes.
+  local transcript="$proj/transcript.jsonl"
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"go"},"timestamp":"2026-04-30T00:00:00Z"}' > "$transcript"
+
+  local pause_before
+  pause_before="$(audit_count "$audit_log" pause-sticky-block)"
+  local sec_block_before
+  sec_block_before="$(audit_count "$audit_log" security-scan-block)"
+
+  # Run mcl-stop.sh end-to-end with the prepared input.
+  local stop_input stop_out
+  stop_input="$(python3 -c 'import json,sys; print(json.dumps({"transcript_path": sys.argv[1], "session_id": "e2e", "cwd": sys.argv[2]}))' "$transcript" "$proj")"
+  stop_out="$(printf '%s' "$stop_input" \
+    | CLAUDE_PROJECT_DIR="$proj" \
+      MCL_STATE_DIR="$proj/.mcl" \
+      MCL_REPO_PATH="$REPO_ROOT" \
+      bash "$REPO_ROOT/hooks/mcl-stop.sh" 2>/dev/null)"
+
+  # ASSERT 1: output is valid JSON with decision=block
+  assert_json_valid "stop hook → valid JSON under sticky pause" "$stop_out"
+
+  local decision
+  decision="$(printf '%s' "$stop_out" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); print(d.get("decision",""))' 2>/dev/null)"
+  assert_equals "decision=block under sticky pause" "$decision" "block"
+
+  # ASSERT 2: pause-sticky-block audit incremented
+  local pause_after
+  pause_after="$(audit_count "$audit_log" pause-sticky-block)"
+  if [ "$pause_after" -gt "$pause_before" ]; then
+    PASS=$((PASS+1))
+    printf '  PASS: pause-sticky-block audit incremented (%d → %d)\n' "$pause_before" "$pause_after"
+  else
+    FAIL=$((FAIL+1))
+    printf '  FAIL: pause-sticky-block audit NOT incremented (%d → %d)\n' "$pause_before" "$pause_after"
+  fi
+
+  # ASSERT 3: NO security gate ran (sticky-pause must short-circuit BEFORE gates)
+  local sec_block_after
+  sec_block_after="$(audit_count "$audit_log" security-scan-block)"
+  assert_equals "no security-scan-block emitted under pause" "$sec_block_after" "$sec_block_before"
+
+  # ASSERT 4: scan_done flags untouched (gates did not execute)
+  local sec_done
+  sec_done="$(state_get_field "$state_file" phase4_5_security_scan_done 2>/dev/null)"
+  assert_equals "phase4_5_security_scan_done still false (gate did not run)" "$sec_done" "false"
+
+  cleanup_test_dir "$proj"
+}
+
+phase_14_gates_helpers_clean_baseline() {
+  phase_header "14.B — Five gate scan helpers return HIGH=0 on clean project"
+
+  local proj
+  proj="$(setup_test_dir)"
+
+  # Each helper uses --mode=full as mcl-stop.sh does. Empty project →
+  # no findings → HIGH=0 → gate would mark scan_done=true and proceed.
+  # Security scan invokes semgrep + SCA tooling which is the slow
+  # outlier (~10-15s); others are sub-second.
+  local g out high schema_ok
+  for g in security db ui ops perf; do
+    out="$(python3 "$REPO_ROOT/hooks/lib/mcl-${g}-scan.py" \
+      --mode=full \
+      --state-dir "$proj/.mcl" \
+      --project-dir "$proj" \
+      --lang tr 2>/dev/null)"
+
+    if printf '%s' "$out" | python3 -m json.tool >/dev/null 2>&1; then
+      PASS=$((PASS+1))
+      printf '  PASS: %s scan → valid JSON\n' "$g"
+    else
+      FAIL=$((FAIL+1))
+      printf '  FAIL: %s scan → invalid JSON\n' "$g"
+      printf '        first 200 chars: %s\n' "$(printf '%s' "$out" | head -c 200)"
+      continue
+    fi
+
+    high="$(printf '%s' "$out" | python3 -c '
+import json, sys
+d = json.loads(sys.stdin.read() or "{}")
+hc = d.get("high_count")
+if hc is None:
+    hc = sum(1 for f in d.get("findings", []) if f.get("severity") == "HIGH")
+print(hc)
+' 2>/dev/null)"
+    assert_equals "$g scan HIGH=0 on clean project (would set baseline=0)" "$high" "0"
+
+    # Sanity: helper output exposes the shape mcl-stop.sh consumes.
+    schema_ok="$(printf '%s' "$out" | python3 -c '
+import json, sys
+d = json.loads(sys.stdin.read() or "{}")
+print("ok" if "findings" in d and isinstance(d["findings"], list) else "bad")
+' 2>/dev/null)"
+    assert_equals "$g scan exposes findings[] list" "$schema_ok" "ok"
+  done
+
+  cleanup_test_dir "$proj"
+}
+
+# ---------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------
 
@@ -268,11 +429,14 @@ main() {
     cleanup_test_dir "$E2E_PROJECT_DIR"
   fi
 
+  phase_14_sticky_pause_blocks_gates
+  phase_14_gates_helpers_clean_baseline
+
   printf '\n=== E2E SUMMARY ===\n'
   printf 'Pass:  %d\n' "$PASS"
   printf 'Fail:  %d\n' "$FAIL"
   printf 'Skip:  %d\n' "$SKIP"
-  printf '\nPhase coverage so far: 1 of ~9 phases populated.\n'
+  printf '\nPhase coverage so far: 1, 14 (partial) of ~9 phases.\n'
   printf 'See tests/e2e/manual-checklist.md for model-dependent steps.\n'
 
   if [ "$FAIL" -gt 0 ]; then

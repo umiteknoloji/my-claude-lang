@@ -49,7 +49,9 @@ Legend: ✅ owned by bash test · 📋 manual checklist · 🚧 not yet covered
 | 11 | `/mcl-design-approve` keyword — dev_server stop | 🚧 |
 | 12 | Phase 4c BACKEND — Python/SQL writes | 📋 |
 | 13 | L2 incremental scans on each Edit | 🚧 |
-| 14 | Phase 4.5 START — sticky-pause check, 5 gates serial | 🚧 |
+| 14.A | Phase 4.5 START — sticky-pause short-circuits gates | ✅ |
+| 14.B | Five gate scan helpers — valid JSON, HIGH=0 on clean project | ✅ |
+| 14.C | Sequential gate ordering through real Stop hook (transcript fixture) | 🚧 |
 | 15 | `phase4_5_high_baseline.{security,db,ui,ops,perf}` set | 🚧 |
 | 16 | Phase 4.5 dialog batch-action (8.17.0) — accept_all path | 🚧 |
 | 17 | Phase 4.6 impact review audit | 🚧 |
