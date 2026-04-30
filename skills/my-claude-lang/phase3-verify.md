@@ -49,8 +49,7 @@ Claude Code understood it this way:
 6. Then call (since 6.0.0):
 ```
 AskUserQuestion({
-  question: "MCL {version} | <localized 'Approve this spec?' — e.g.
-    Turkish: Bu spec'i onaylıyor musun?; English: Approve this spec?>",
+  question: "MCL {version} | <EXACT body from table below — copy verbatim>",
   options: [
     { label: "<approve-verb-only>", description: "<free-form context>" },
     { label: "<edit-verb>",         description: "<free-form context>" },
@@ -59,33 +58,29 @@ AskUserQuestion({
 })
 ```
 
+   **⛔ QUESTION BODY — PINNED (9.2.0, MANDATORY).** The Stop hook scanner
+   (`mcl-askq-scanner.py`) classifies intent by exact substring match.
+   Copy the question body VERBATIM — no paraphrase, no suffix. Any
+   deviation produces intent="other" and the Stop hook cannot advance
+   the phase.
+
+   | Locale | Exact question body (copy verbatim) |
+   | ------ | ----------------------------------- |
+   | TR     | Spec'i onaylıyor musun?             |
+   | EN     | Approve this spec?                  |
+
    **Label Discipline (since 6.4.1 — MANDATORY).** The approve option's
    `label` is the BARE VERB in the developer's detected language — NO
-   descriptive suffix. Use the canonical 14-language set from
-   [askuserquestion-protocol.md:32](my-claude-lang/askuserquestion-protocol.md):
+   descriptive suffix:
 
    | Locale | Approve label |
    | ------ | ------------- |
    | TR     | Onayla        |
    | EN     | Approve       |
-   | ES     | Aprobar       |
-   | FR     | Approuver     |
-   | DE     | Genehmigen    |
-   | JA     | 承認           |
-   | KO     | 승인           |
-   | ZH     | 批准           |
-   | AR     | موافق          |
-   | HE     | אשר           |
-   | HI     | स्वीकार        |
-   | ID     | Setujui       |
-   | PT     | Aprovar       |
-   | RU     | Одобрить      |
 
-   FORBIDDEN approve labels (examples of drift): `Onayla, kodu yaz`,
-   `Approve and proceed`, `Approve, write code`, `Aprobar y continuar`,
-   `承認して実装へ`, `승인하고 코드 작성`, `Genehmigen und codieren`.
-   Any descriptive context belongs in the option's `description` field,
-   NOT in `label`.
+   FORBIDDEN approve labels: `Onayla, kodu yaz`, `Approve and proceed`,
+   `Approve, write code`. Any descriptive context belongs in the option's
+   `description` field, NOT in `label`.
 
    The `edit` and `cancel` labels stay free-form localized verbs
    (`Düzenle` / `İptal` / `Edit` / `Cancel` / etc.) — this rule

@@ -34,8 +34,9 @@ a senior English-speaking engineer wrote the requirements themselves.
    uniformly (h2, flat — partial-spec scanner accepts h2 / h3 / inline-
    bold variants but `##` is canonical for forward compatibility).
 5. After the spec, explain in the developer's language what it says
-6. Call `AskUserQuestion({question: "MCL {{MCL_VERSION}} | <localized spec-approval
-   prompt>", options: ["<approve-family>", "<edit>", "<cancel>"]})` —
+6. Call `AskUserQuestion({question: "MCL {{MCL_VERSION}} | <EXACT pinned body —
+   TR: 'Spec\'i onaylıyor musun?' / EN: 'Approve this spec?' — see phase3-verify.md>",
+   options: ["<approve-family>", "<edit>", "<cancel>"]})` —
    since 6.0.0 this REPLACES the text-based "yes / no" prompt. Do NOT
    emit the legacy `✅ MCL APPROVED` marker; it is dead.
 7. Do NOT proceed to Phase 4 until the tool_result returns an

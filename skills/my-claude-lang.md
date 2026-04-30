@@ -251,8 +251,9 @@ processes the request AS IF a native English engineer wrote it.
    Observability / Reversibility+Rollback / Data Contract.
    See `phase2-spec.md` for triggers and templates.
 5. After the spec, explain in developer's language what it says
-6. Call `AskUserQuestion({question: "MCL {{MCL_VERSION}} | <localized-spec-approval
-   e.g. Bu spec'i onaylıyor musun? / Approve this spec?>", options:
+6. Call `AskUserQuestion({question: "MCL {{MCL_VERSION}} | <EXACT pinned body —
+   TR: 'Spec\'i onaylıyor musun?' / EN: 'Approve this spec?' — copy verbatim,
+   see phase3-verify.md>", options:
    [{label: "<approve-verb-only>", description: "..."},
     {label: "<edit-verb>",         description: "..."},
     {label: "<cancel-verb>",       description: "..."}]})`.
