@@ -181,6 +181,9 @@ transition state-set BEFORE letting the Stop hook fire on this turn:
 
 ```bash
 bash -c '
+# 8.17.0 — load skill-prose auth token (rotated by mcl-activate.sh).
+[ -n "${MCL_STATE_DIR:-}" ] && [ -f "$MCL_STATE_DIR/skill-token" ] \
+  && export MCL_SKILL_TOKEN="$(cat "$MCL_STATE_DIR/skill-token")"
 for lib in "$MCL_HOME/lib/hooks/lib/mcl-state.sh" \
            "$HOME/.mcl/lib/hooks/lib/mcl-state.sh" \
            "$HOME/.claude/hooks/lib/mcl-state.sh"; do

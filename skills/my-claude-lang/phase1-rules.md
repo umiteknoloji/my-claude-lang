@@ -321,8 +321,11 @@ add-ons, Phase 4.5 ops/perf gates, Phase 6 promise-vs-delivery) rely on:
 
 ```bash
 bash -c '
-SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "$0")")" 2>/dev/null || true
-# Try multiple state-lib paths (per-project install / wrapper install / dev clone).
+# 8.17.0 — load the skill-prose auth token written by mcl-activate.sh
+# this turn. Without this export, mcl_state_set is rejected by
+# auth-check ($0=bash). MCL_STATE_DIR is set by the mcl-claude wrapper.
+[ -n "${MCL_STATE_DIR:-}" ] && [ -f "$MCL_STATE_DIR/skill-token" ] \
+  && export MCL_SKILL_TOKEN="$(cat "$MCL_STATE_DIR/skill-token")"
 for lib in "$MCL_HOME/lib/hooks/lib/mcl-state.sh" \
            "$HOME/.mcl/lib/hooks/lib/mcl-state.sh" \
            "$HOME/.claude/hooks/lib/mcl-state.sh"; do

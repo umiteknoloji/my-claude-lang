@@ -29,6 +29,57 @@ THEN does Phase 5 emit a report that reflects reality.
 Immediately after Phase 4 finishes writing code. Phase 4 does NOT end
 with "done" or a changes summary — it hands off to Phase 4.5.
 
+## Batch Decision (since 8.17.0)
+
+When the **total risk count for this Phase 4.5 turn ≥ 3**, MCL emits
+ONE batch question BEFORE entering the per-risk sequential dialog:
+
+```
+AskUserQuestion({
+  question: "MCL 8.17.0 | <localized prompt: N risk listelendi — toplu karar ver, yoksa tek tek bak>",
+  options: [
+    "<accept-all-in-language>",   # all risks accepted (auto-fix where fixable, others noted)
+    "<reject-all-in-language>",   # all risks dismissed (developer takes responsibility)
+    "<one-by-one-in-language>"    # fall through to existing sequential dialog
+  ]
+})
+```
+
+On `accept-all`: MCL records `phase4_5_batch_decision="accept_all"`,
+applies fix-where-fixable for every risk, emits ONE summary line per
+risk in the response, then closes Phase 4.5 dialog in this single turn.
+
+On `reject-all`: MCL records `phase4_5_batch_decision="reject_all"`,
+notes each risk as "developer-accepted" in the audit, closes dialog.
+Phase 6 (b) regression scan still re-runs and re-surfaces any HIGH that
+materialized after the dismiss — there is no escape value, just a UX
+ergonomy.
+
+On `one-by-one`: records `phase4_5_batch_decision="one_by_one"` and
+proceeds to the sequential dialog below.
+
+**Eşik:** 1 veya 2 risk → batch question'ı atla, doğrudan tek-tek sor
+(2-risk için batching overhead mantıksız — zaten 2 turn).
+
+State write (skill prose Bash, since 8.17.0):
+
+```bash
+bash -c '
+[ -n "${MCL_STATE_DIR:-}" ] && [ -f "$MCL_STATE_DIR/skill-token" ] \
+  && export MCL_SKILL_TOKEN="$(cat "$MCL_STATE_DIR/skill-token")"
+for lib in "$MCL_HOME/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.mcl/lib/hooks/lib/mcl-state.sh" \
+           "$HOME/.claude/hooks/lib/mcl-state.sh"; do
+  [ -f "$lib" ] && source "$lib" && break
+done
+mcl_state_set phase4_5_batch_decision "accept_all" >/dev/null 2>&1
+mcl_audit_log "phase4_5_batch_decision" "phase4-5" "accept_all (count=N)" 2>/dev/null || true
+'
+```
+
+(Replace `accept_all` with `reject_all` or `one_by_one` per developer
+choice; `count=N` is the total risk count surfaced this turn.)
+
 ## The Dialog Structure
 
 Phase 4.5 is NOT a one-shot list. It is a **sequential, one-risk-per-turn

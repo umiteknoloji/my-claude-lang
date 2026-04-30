@@ -724,6 +724,11 @@ if [ -f "$PLUGIN_GATE_HELPER" ] && [ -f "$STATE_LIB" ]; then
   source "$STATE_LIB"
   mcl_state_init 2>/dev/null || true
 
+  # 8.17.0 — rotate the skill-prose token so this turn's skill prose Bash
+  # invocations can authenticate via MCL_SKILL_TOKEN. Previous turn's
+  # token is overwritten; replay across turns is impossible.
+  mcl_state_skill_token_rotate >/dev/null 2>&1 || true
+
   SESSION_ID="$(printf '%s' "$RAW_INPUT" | python3 -c 'import json,sys
 try:
     print(json.loads(sys.stdin.read()).get("session_id",""))

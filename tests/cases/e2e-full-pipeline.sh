@@ -198,52 +198,106 @@ phase_1_handoff_authcheck_baseline() {
 }
 
 phase_1_handoff_token_path_probe() {
-  phase_header "1.C — MCL_SKILL_TOKEN path probe (PRE-8.17.0: must still reject)"
+  phase_header "1.C — MCL_SKILL_TOKEN path (8.17.0: token authorizes write)"
 
-  # Pre-8.17.0 the env var has no effect — auth-check ignores it. This
-  # probe records the current behavior so 8.17.0 implementation can flip
-  # the expectation in a single line and the diff is auditable.
-  #
-  # Post-8.17.0 expected: with a valid token written to skill-token file
-  # and matching env var, the write succeeds and audit shows
-  # caller=skill-prose. This probe will then INVERT.
+  # 8.17.0 inverted this test: skill prose Bash now succeeds when the
+  # MCL_SKILL_TOKEN env matches the token file written by mcl-activate.sh.
+  # Three sub-tests: (1) matching token allows write, (2) wrong token
+  # rejects, (3) rotation invalidates the previous token.
 
   local audit_log="$E2E_STATE_DIR/audit.log"
   local state_file="$E2E_STATE_DIR/state.json"
 
-  # Pre-create a fake token file (post-8.17.0 helper would do this; we
-  # do it manually to probe whether auth-check honors the env var today).
-  printf '%s' "deadbeefcafef00d1234567890abcdef" > "$E2E_STATE_DIR/skill-token"
-  chmod 600 "$E2E_STATE_DIR/skill-token" 2>/dev/null || true
+  # mcl-activate.sh has already rotated a token during 1.A. Read it.
+  if [ ! -f "$E2E_STATE_DIR/skill-token" ]; then
+    FAIL=$((FAIL+1))
+    printf '  FAIL: skill-token file missing after wrapper init — rotation not wired\n'
+    return
+  fi
+  PASS=$((PASS+1))
+  printf '  PASS: skill-token file written by mcl-activate.sh (8.17.0 rotation wired)\n'
 
-  local deny_before
-  deny_before="$(audit_count "$audit_log" deny-write)"
+  local correct_token
+  correct_token="$(cat "$E2E_STATE_DIR/skill-token")"
 
+  # (1) Matching token → write succeeds, audit caller=skill-prose
+  local set_skill_before
+  set_skill_before="$(awk -F ' \\| ' '$2=="set" && $3=="skill-prose"{n++} END{print n+0}' "$audit_log" 2>/dev/null)"
   MCL_STATE_DIR="$E2E_STATE_DIR" \
-  MCL_SKILL_TOKEN="deadbeefcafef00d1234567890abcdef" \
+  MCL_SKILL_TOKEN="$correct_token" \
     bash -c '
       source "'"$REPO_ROOT"'/hooks/lib/mcl-state.sh"
-      mcl_state_set phase1_intent "with-token-attempt" >/dev/null
+      mcl_state_set phase1_intent "via-correct-token" >/dev/null 2>&1
     ' 2>/dev/null
-
-  local deny_after
-  deny_after="$(audit_count "$audit_log" deny-write)"
-
-  # PRE-8.17.0 expectation: still rejected (token not honored)
-  if [ "$deny_after" -gt "$deny_before" ]; then
-    PASS=$((PASS+1))
-    printf '  PASS: pre-8.17.0 — token-bearing invocation still rejected (auth-check unchanged)\n'
-  else
-    FAIL=$((FAIL+1))
-    printf '  FAIL: token invocation accepted unexpectedly — auth-check already token-aware?\n'
-    printf '        before=%d after=%d\n' "$deny_before" "$deny_after"
-  fi
 
   local pi
   pi="$(state_get_field "$state_file" phase1_intent 2>/dev/null)"
-  assert_equals "phase1_intent still null (pre-8.17.0 token path inactive)" "$pi" "null"
+  assert_equals 'phase1_intent populated via skill-prose token' "$pi" '"via-correct-token"'
 
-  rm -f "$E2E_STATE_DIR/skill-token"
+  local set_skill_after
+  set_skill_after="$(awk -F ' \\| ' '$2=="set" && $3=="skill-prose"{n++} END{print n+0}' "$audit_log" 2>/dev/null)"
+  if [ "$set_skill_after" -gt "$set_skill_before" ]; then
+    PASS=$((PASS+1))
+    printf '  PASS: audit set caller=skill-prose (token path tagged correctly)\n'
+  else
+    FAIL=$((FAIL+1))
+    printf '  FAIL: no `set | skill-prose` audit line emitted (%d → %d)\n' \
+      "$set_skill_before" "$set_skill_after"
+  fi
+
+  # (2) Wrong token → reject
+  local deny_before
+  deny_before="$(audit_count "$audit_log" deny-write)"
+  MCL_STATE_DIR="$E2E_STATE_DIR" \
+  MCL_SKILL_TOKEN="not-the-real-token" \
+    bash -c '
+      source "'"$REPO_ROOT"'/hooks/lib/mcl-state.sh"
+      mcl_state_set phase1_constraints "should-not-stick" >/dev/null
+    ' 2>/dev/null
+  local deny_after
+  deny_after="$(audit_count "$audit_log" deny-write)"
+  if [ "$deny_after" -gt "$deny_before" ]; then
+    PASS=$((PASS+1))
+    printf '  PASS: wrong token → deny-write audit (token verified, not just presence-checked)\n'
+  else
+    FAIL=$((FAIL+1))
+    printf '  FAIL: wrong token did NOT trigger deny-write\n'
+  fi
+  local pc
+  pc="$(state_get_field "$state_file" phase1_constraints 2>/dev/null)"
+  assert_equals "phase1_constraints unchanged after wrong-token attempt" "$pc" "null"
+
+  # (3) Rotation: re-run activate; old token must now reject.
+  local old_token="$correct_token"
+  run_activate_hook "$E2E_PROJECT_DIR" "next turn" >/dev/null
+  local new_token
+  new_token="$(cat "$E2E_STATE_DIR/skill-token")"
+  if [ "$old_token" != "$new_token" ]; then
+    PASS=$((PASS+1))
+    printf '  PASS: token rotated on next UserPromptSubmit (%s… → %s…)\n' \
+      "${old_token:0:8}" "${new_token:0:8}"
+  else
+    FAIL=$((FAIL+1))
+    printf '  FAIL: token did not rotate — replay surface still open\n'
+  fi
+
+  local deny_before2
+  deny_before2="$(audit_count "$audit_log" deny-write)"
+  MCL_STATE_DIR="$E2E_STATE_DIR" \
+  MCL_SKILL_TOKEN="$old_token" \
+    bash -c '
+      source "'"$REPO_ROOT"'/hooks/lib/mcl-state.sh"
+      mcl_state_set phase1_constraints "via-stale-token" >/dev/null
+    ' 2>/dev/null
+  local deny_after2
+  deny_after2="$(audit_count "$audit_log" deny-write)"
+  if [ "$deny_after2" -gt "$deny_before2" ]; then
+    PASS=$((PASS+1))
+    printf '  PASS: stale (pre-rotation) token → reject (no replay window)\n'
+  else
+    FAIL=$((FAIL+1))
+    printf '  FAIL: stale token accepted — rotation does not invalidate previous turn\n'
+  fi
 }
 
 # ---------------------------------------------------------------------

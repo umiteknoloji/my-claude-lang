@@ -84,6 +84,7 @@ _mcl_state_default() {
   "phase1_ops": {"deployment_target": null, "observability_tier": null, "test_policy": null, "doc_level": null},
   "phase1_perf": {"budget_tier": null},
   "phase6_double_check_done": false,
+  "phase4_5_batch_decision": null,
   "phase1_intent": null,
   "phase1_constraints": null,
   "paused_on_error": {"active": false},
@@ -94,13 +95,15 @@ JSON
 }
 
 _mcl_state_auth_check() {
-  # Return 0 iff the ENTRY script (what the OS executed) is one of our
-  # own hook files under hooks/. `$0` in a sourced library reflects the
-  # parent script, so this catches:
-  #   - CLI invocations of mcl-state.sh itself → $0 = mcl-state.sh → deny
-  #   - `bash -c "source .../mcl-state.sh; mcl_state_set ..."` → $0 = bash → deny
-  #   - Hooks that source this lib → $0 = hook path → allow
-  # Does NOT rely on env tokens (children would inherit them, unsafe).
+  # Return 0 iff EITHER:
+  #   (a) the ENTRY script (`$0`) is one of our hook files under hooks/, OR
+  #   (b) [since 8.17.0] MCL_SKILL_TOKEN env var matches the contents of
+  #       `$MCL_STATE_DIR/skill-token` (project-scoped, rotated each
+  #       UserPromptSubmit by mcl-activate.sh). Path (b) authorizes skill
+  #       prose Bash invocations of the form
+  #         `bash -c 'export MCL_SKILL_TOKEN=$(cat .../skill-token); ...'`
+  #       without giving CLI bypass — the token file is mode 0600 inside
+  #       the project state dir and rotated every prompt.
   local entry_abs hooks_dir
   entry_abs="$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")"
   hooks_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
@@ -111,7 +114,35 @@ _mcl_state_auth_check() {
     "$hooks_dir"/mcl-post-tool.sh)   return 0 ;;
     "$hooks_dir"/mcl-user-prompt.sh) return 0 ;;
   esac
+  # (b) skill-token path — only valid when both env var and file present.
+  if [ -n "${MCL_SKILL_TOKEN:-}" ] && [ -f "$MCL_STATE_DIR/skill-token" ]; then
+    local stored
+    stored="$(cat "$MCL_STATE_DIR/skill-token" 2>/dev/null)"
+    if [ -n "$stored" ] && [ "$MCL_SKILL_TOKEN" = "$stored" ]; then
+      MCL_AUTH_CALLER="skill-prose"
+      return 0
+    fi
+  fi
   return 1
+}
+
+mcl_state_skill_token_rotate() {
+  # Generate a fresh 32-hex token, write to <state>/skill-token (0600).
+  # Called by mcl-activate.sh on each UserPromptSubmit so the previous
+  # turn's token cannot be replayed by an unrelated subprocess.
+  # Stdout: the new token (so the caller can also surface it via
+  # additionalContext if needed for diagnostics).
+  local dir="${MCL_STATE_DIR}"
+  mkdir -p "$dir" 2>/dev/null || true
+  local tok
+  tok="$(openssl rand -hex 16 2>/dev/null \
+    || head -c 16 /dev/urandom 2>/dev/null | od -An -vtx1 | tr -d ' \n')"
+  if [ -z "$tok" ]; then
+    return 1
+  fi
+  printf '%s' "$tok" > "$dir/skill-token"
+  chmod 600 "$dir/skill-token" 2>/dev/null || true
+  printf '%s\n' "$tok"
 }
 
 _mcl_state_valid() {
@@ -275,7 +306,11 @@ print(json.dumps(obj, indent=2))
     return 1
   fi
   if _mcl_state_write_raw "$updated"; then
-    mcl_audit_log "set" "$(basename "${0:-unknown}")" "field=${field} value=${value}"
+    # Caller field reflects the auth path: hook entry → basename of $0;
+    # skill-token path → "skill-prose" (set by _mcl_state_auth_check).
+    local _caller
+    _caller="${MCL_AUTH_CALLER:-$(basename "${0:-unknown}")}"
+    mcl_audit_log "set" "$_caller" "field=${field} value=${value}"
     return 0
   fi
   return 1

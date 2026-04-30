@@ -7,6 +7,45 @@
 
 ## [Unreleased]
 
+## [8.17.0] - 2026-04-30
+
+### Düzeltildi — Skill prose state plumbing nihayet gerçekten çalışıyor
+
+8.10.0'dan beri eklenen skill prose Bash plumbing'i (`phase1_intent`, `phase1_constraints`, `phase1_stack_declared`, `phase1_ops`, `phase1_perf`, `ui_sub_phase=UI_REVIEW` transition) **production'da hiç çalışmamış**. Sebep: `mcl_state_set` auth-check `$0`'a bakıyor; skill prose `bash -c '...'` invocation'ında `$0=bash` → whitelist match etmiyor → `deny-write` audit + write reject. `mcl_audit_log` auth-check'i bypass ettiği için audit event'leri başarılı görünüyordu (Phase 6 (a) yanıltıcı clean rapor verdi) ama `state.json` field'ları null kalıyordu. E2E test bu davranışı uçtan uca kanıtladı (`tests/cases/e2e-full-pipeline.sh:1.B`).
+
+#### MCL_SKILL_TOKEN auth path
+- **`hooks/lib/mcl-state.sh`** — `_mcl_state_auth_check` extension: hook entry whitelist (existing) + skill-token path (new). Hem `MCL_SKILL_TOKEN` env var hem `$MCL_STATE_DIR/skill-token` dosyası varsa ve içerikleri eşleşiyorsa write authorize edilir, audit'e `caller=skill-prose` yazılır. Yeni helper `mcl_state_skill_token_rotate` (32-hex token, `openssl rand` veya `/dev/urandom` fallback, mode 0600).
+- **`hooks/mcl-activate.sh`** — Her UserPromptSubmit'te `mcl_state_skill_token_rotate` çağrısı. Önceki turn'ün token'ı overwrite edilir; replay attack window tek turn ile sınırlı.
+- **`mcl_state_set` audit caller field** — `MCL_AUTH_CALLER` env var ile thread edilir. Hook entry path → `caller=mcl-stop.sh` vb.; skill-token path → `caller=skill-prose`. Audit log forensik analizi için provenance net.
+
+#### 4 skill prose dosyası token-aware Bash prefix
+Her skill prose Bash bloğunun başında:
+```bash
+[ -n "${MCL_STATE_DIR:-}" ] && [ -f "$MCL_STATE_DIR/skill-token" ] \
+  && export MCL_SKILL_TOKEN="$(cat "$MCL_STATE_DIR/skill-token")"
+```
+- `skills/my-claude-lang/phase1-rules.md` (Phase 1 → 1.7 handoff)
+- `skills/my-claude-lang/phase1-7-precision-audit.md` (Phase 1.7 → 1.5 audit emission)
+- `skills/my-claude-lang/phase4a-ui-build.md` (UI_REVIEW transition)
+- `skills/my-claude-lang/phase5-review.md` — değişmedi (yalnızca `mcl_audit_log` çağrısı, auth-check'siz path)
+
+#### Phase 4.5 Dialog Batch-Action
+- **`skills/my-claude-lang/phase4-5-risk-review.md`** — Risk count ≥ 3 ise sequential dialog ÖNCESİ tek `AskUserQuestion` (multiSelect false, 3 seçenek): "Hepsi kabul / Hepsi reddet / Tek tek bak". Accept-all path'inde tüm risk'ler tek turn'de auto-fix + summary; reject-all path'inde dismiss audit; one-by-one path'inde mevcut sequential dialog. Eşik 3 (1-2 risk için batching overhead mantıksız). State field: `phase4_5_batch_decision` (null|accept_all|reject_all|one_by_one).
+- **`hooks/lib/mcl-state.sh`** — Default schema'ya `phase4_5_batch_decision: null` eklendi.
+
+#### Side-effect bug fix (8.7.1'den beri açık)
+- **`hooks/mcl-stop.sh:532`** — `${_PR_PHASE}` undefined variable referansı `set -u` altında script'i öldürüyordu. Sonuç: Phase 4.5 START enforcement bloğunda `phase_review_state="pending"` atandıktan hemen sonra hata → 5 sequential gate (security/db/ui/ops/perf) **production'da hiç çalışmamış**. Tek karakter düzeltme: `_PR_PHASE` → `_PR_ACTIVE_PHASE`. E2E `tests/cases/e2e-full-pipeline.sh:14.C` ile yakalandı.
+
+#### E2E test infrastructure
+- **`tests/cases/e2e-full-pipeline.sh`** — Hibrit e2e: bash test + manual checklist. Mevcut coverage: Phase 1 (3 test, auth-check baseline + token path inversion + rotation), Phase 14 (3 test, sticky-pause + 5 gate baseline + sequential ordering), Phase 25 (1 test, pause-on-error trigger via stub helper). 54/0/0 pass.
+- **`tests/e2e/manual-checklist.md`** — 33 satırlık coverage tablosu, model-bağımlı adımlar (AskUserQuestion turn'leri, npm-driven dev server, gerçek Claude session) için.
+
+### Bilinen sınırlar
+- Skill-token mekanizması cryptographic değil — local plumbing trust boundary (accidental misuse engelleme amaçlı). Token dosyası mode 0600, session-scoped, her UserPromptSubmit rotate. Yeterli güvenlik MCL'in lokal yürütme modeli için.
+- Batch-action reverse path 8.18.0'a kadar model-behavioral. Geliştirici batched seçimde hata yapıp sonraki turn'de düzeltme istemezse hata sessiz kalır.
+- Phase 4.5 batch-action `mcl-stop.sh`'a hook-level shortcut entegre etmedi — skill prose state'i set ediyor ama hook tarafı şu an sequential path ile aynı yolu izliyor. Hook integration 8.18.0+.
+- E2E coverage manual-checklist'te 33 satırın 7'si ✅. Geri kalanı sonraki turn'lerde adım adım eklenecek.
+
 ## [8.16.0] - 2026-04-30
 
 ### Eklendi — GATE Batching + Hook State-Population Guard
