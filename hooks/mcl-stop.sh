@@ -293,8 +293,22 @@ case "$PARTIAL_RC" in
     if [ -n "$SPEC_HASH" ]; then
       mcl_state_set partial_spec_body_sha "\"${SPEC_HASH:0:16}\""
     fi
-    mcl_audit_log "partial-spec" "stop" "missing=$(printf '%s' "$PARTIAL_MISSING" | tr '\n' ',' | sed 's/,$//')"
+    _PS_MISSING_CSV="$(printf '%s' "$PARTIAL_MISSING" | tr '\n' ',' | sed 's/,$//')"
+    mcl_audit_log "partial-spec" "stop" "missing=${_PS_MISSING_CSV}"
     mcl_debug_log "stop" "partial-spec" "missing=$(printf '%s' "$PARTIAL_MISSING" | tr '\n' '|')"
+    # 9.0.0: emit decision:block with the concrete header template AND
+    # the specific missing-section list. Pre-9.0 path was audit-only; the
+    # PARTIAL_SPEC_NOTICE on the NEXT activate told the model what to do,
+    # but real-session telemetry showed the model often re-emitted the
+    # same incomplete spec because the previous turn's instruction was
+    # too generic. Forcing in-turn recovery via decision:block + a copy-
+    # paste-ready template + a "DO NOT debug hook files" line breaks the
+    # loop.
+    printf '%s\n' "{
+  \"decision\": \"block\",
+  \"reason\": \"⚠️ MCL SPEC RECOVERY (mandatory)\n\nThe previous \`📋 Spec:\` block is missing exactly these required sections: \`${_PS_MISSING_CSV}\`.\n\nIn THIS same response, emit ONE COMPLETE \`📋 Spec:\` block. The new block fully replaces the prior one — do NOT write a delta or a partial fix. Required headers (verbatim, in this order):\n\n  ## [Title]\n  ## Objective\n  ## MUST\n  ## SHOULD\n  ## Acceptance Criteria\n  ## Edge Cases\n  ## Technical Approach\n  ## Out of Scope\n\nIf a section is genuinely empty for this task, write the header followed by \`- (none)\`. Never omit a header.\n\nDo NOT debug hook files (cat / grep / find under \`~/.mcl/\` or \`~/.claude/hooks/\`). The pipeline is healthy; the only required action is re-emitting the spec in this same response. Do NOT call AskUserQuestion for spec approval in this recovery turn — the developer approves the re-emitted spec on the NEXT turn.\"
+}"
+    exit 0
     ;;
   1)
     if [ "$PARTIAL_STATE" = "true" ]; then
@@ -1552,11 +1566,28 @@ PYEOF
           # `precision-audit | ... skipped=true` (handled in skill file)
           # which counts as `hit` above and bypasses this block — the
           # implicit safety valve for English source.
-          mcl_audit_log "precision-audit-block" "mcl-stop.sh" "summary-confirmed-but-no-audit; transition-rewind"
-          command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_block
+          # 9.0.0: increment precision_audit_block_count on every fire.
+          # Activate hook reads this on the NEXT turn and surfaces an
+          # AskUserQuestion-driven escape (continue / skip / restart)
+          # once the count reaches 3 — breaks the precision-audit loop
+          # without auto-bypassing developer consent.
+          _PA_COUNT_PREV="$(mcl_state_get precision_audit_block_count 2>/dev/null)"
+          _PA_COUNT_PREV="${_PA_COUNT_PREV:-0}"
+          [ "$_PA_COUNT_PREV" -eq "$_PA_COUNT_PREV" ] 2>/dev/null || _PA_COUNT_PREV=0
+          _PA_COUNT_NEW=$(( _PA_COUNT_PREV + 1 ))
+          mcl_state_set precision_audit_block_count "$_PA_COUNT_NEW" >/dev/null 2>&1 || true
+          mcl_audit_log "precision-audit-block" "mcl-stop.sh" "fire=${_PA_COUNT_NEW}; summary-confirmed-but-no-audit"
+          command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_block "fire=${_PA_COUNT_NEW}"
+          # Reason includes a 3rd-retry hint so the model knows the next
+          # turn will offer an escape — reduces the "loop without
+          # awareness of how to exit" failure mode.
+          _PA_ESCAPE_HINT=""
+          if [ "$_PA_COUNT_NEW" -ge 3 ]; then
+            _PA_ESCAPE_HINT="\n\n[3rd retry] On your NEXT turn MCL will offer an AskUserQuestion with three options: (1) try Phase 1.7 once more, (2) /mcl-skip-precision-audit (bypass with [hook-default: industry] markers), (3) /mcl-restart. Until then, attempt the audit one more time below."
+          fi
           printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL PHASE 1.7 PRECISION AUDIT ENFORCEMENT (mandatory, non-skippable)\n\nA Phase 2 spec block was emitted but Phase 1.7 Precision Audit has NOT been run. The Phase 1→2 transition is blocked. In this SAME response, before the turn closes:\n\n1. Read ~/.claude/skills/my-claude-lang/phase1-7-precision-audit.md for the dimension list and classification rules.\n2. Walk the 7 core dimensions (permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry) plus any matching stack add-ons returned by: bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect \\\"\$(pwd)\\\"\n3. Classify each dimension: SILENT-ASSUME (mark [assumed: X]), SKIP-MARK (mark [unspecified: X] — currently only Performance SLA), or GATE (architectural impact → ask one question via AskUserQuestion).\n4. Emit the audit entry via: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log precision-audit phase1-7 \\\"core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<tags> skipped=false\\\"' (substitute counts and tags).\n5. Re-emit the spec block with precision-enriched parameters. The prior spec is discarded — replaced, not duplicated.\n\nIf detected language is English, emit the audit with skipped=true (Phase 1 already in English; behavioral prior assumed sufficient) and the block clears immediately on the next turn.\n\nRecovery: if you believe this block fired in error (e.g., audit emit failed silently), type /mcl-restart to clear phase state.\"
+  \"reason\": \"⚠️ MCL PHASE 1.7 PRECISION AUDIT (mandatory)\n\nA Phase 2 \`📋 Spec:\` block was emitted but the required Phase 1.7 audit entry is missing. In THIS same response, before the turn closes:\n\n1. Read ~/.claude/skills/my-claude-lang/phase1-7-precision-audit.md for the dimension list and rules. Do NOT cat / grep the hook libs (\`~/.mcl/lib/\`, \`~/.claude/hooks/\`); those are off-limits in Phase 1-3.\n2. Walk the 7 core dimensions (permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry) plus matching stack add-ons. Stack: \`bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect \\\"\$(pwd)\\\"\`.\n3. Classify each dimension: SILENT-ASSUME (mark [assumed: X]), SKIP-MARK (mark [unspecified: X]), or GATE (architectural impact → ask one question via AskUserQuestion).\n4. Emit the audit entry via skill-prose Bash (\`source ... mcl-state.sh; mcl_audit_log precision-audit phase1-7 ...\`).\n5. Re-emit the spec block with precision-enriched parameters. The prior spec is discarded.\n\nEnglish-detected sessions: emit \`precision-audit ... skipped=true\` and proceed.${_PA_ESCAPE_HINT}\"
 }"
           exit 0
         fi
@@ -1565,6 +1596,9 @@ PYEOF
       mcl_state_set current_phase 2
       mcl_state_set phase_name '"SPEC_REVIEW"'
       mcl_state_set spec_hash "\"$SPEC_HASH\""
+      # 9.0.0: reset Phase 1 counters on successful 1→2 transition.
+      mcl_state_set phase1_turn_count 0 >/dev/null 2>&1 || true
+      mcl_state_set precision_audit_block_count 0 >/dev/null 2>&1 || true
       mcl_debug_log "stop" "transition-1-to-2" "hash=${SPEC_HASH:0:12}"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 1 2
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_emit "hash=${SPEC_HASH:0:12}"
@@ -2017,6 +2051,20 @@ if [ -f "$_STOP_LOG_LIB" ] && [ -f "$_STOP_TURN_SCRIPT" ] \
   source "$_STOP_LOG_LIB"
   TURN_MSG="$(python3 "$_STOP_TURN_SCRIPT" "$TRANSCRIPT_PATH" 2>/dev/null)"
   [ -n "$TURN_MSG" ] && mcl_log_append "$TURN_MSG"
+fi
+
+# 9.0.0: Phase 1 turn-count tracking. Increments once per Stop turn
+# while the project is still in Phase 1. mcl-activate.sh reads the
+# value on the next UserPromptSubmit and surfaces an escape advisory
+# (10-turn) or a forced AskUserQuestion (20-turn). Counter resets on
+# Phase 1→2 transition (handled in the spec-emit branch above).
+_P1TC_PHASE_FINAL="$(mcl_state_get current_phase 2>/dev/null)"
+if [ "$_P1TC_PHASE_FINAL" = "1" ]; then
+  _P1TC_PREV="$(mcl_state_get phase1_turn_count 2>/dev/null)"
+  _P1TC_PREV="${_P1TC_PREV:-0}"
+  [ "$_P1TC_PREV" -eq "$_P1TC_PREV" ] 2>/dev/null || _P1TC_PREV=0
+  _P1TC_NEW=$(( _P1TC_PREV + 1 ))
+  mcl_state_set phase1_turn_count "$_P1TC_NEW" >/dev/null 2>&1 || true
 fi
 
 exit 0

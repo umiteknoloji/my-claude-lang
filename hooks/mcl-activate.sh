@@ -494,6 +494,58 @@ RESTART_OUTPUT
   exit 0
 fi
 
+# -------- Branch: /mcl-skip-precision-audit keyword (since 9.0.0) --------
+# Escape hatch when Phase 1.7 keeps looping. Only valid when the
+# precision-audit-block has fired at least 3 times in the current
+# session — otherwise the developer is asked to try Phase 1.7 properly
+# at least 3 times before bailing. Sets `precision_audit_skipped=true`,
+# resets the counter, and instructs the model to emit an audit entry
+# with [hook-default: industry] markers so the spec carries explicit
+# defaults the developer can revise in Phase 3 review.
+if [ "$PROMPT_NORM" = "/mcl-skip-precision-audit" ]; then
+  _SKIP_STATE_LIB="$(dirname "$0")/lib/mcl-state.sh"
+  _SKIP_RC=0
+  _SKIP_COUNT=0
+  if [ -f "$_SKIP_STATE_LIB" ]; then
+    # shellcheck source=hooks/lib/mcl-state.sh
+    . "$_SKIP_STATE_LIB"
+    mcl_state_init 2>/dev/null || true
+    _SKIP_COUNT="$(mcl_state_get precision_audit_block_count 2>/dev/null)"
+    _SKIP_COUNT="${_SKIP_COUNT:-0}"
+    [ "$_SKIP_COUNT" -eq "$_SKIP_COUNT" ] 2>/dev/null || _SKIP_COUNT=0
+    if [ "$_SKIP_COUNT" -lt 3 ]; then
+      _SKIP_RC=1
+      mcl_audit_log "precision-audit-skip-attempt-too-early" "mcl-activate.sh" \
+        "count=${_SKIP_COUNT} (needs >= 3)"
+    else
+      mcl_state_set precision_audit_skipped true >/dev/null 2>&1 || true
+      mcl_state_set precision_audit_block_count 0 >/dev/null 2>&1 || true
+      mcl_audit_log "precision-audit-skip-accepted" "mcl-activate.sh" \
+        "fires_before_skip=${_SKIP_COUNT}"
+    fi
+  fi
+  if [ "$_SKIP_RC" = "0" ]; then
+    cat <<SKIP_OK
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_SKIP_PRECISION_AUDIT — developer typed ${_BT}/mcl-skip-precision-audit${_BT} after the precision-audit block fired ${_SKIP_COUNT} times. Phase 1.7 is BYPASSED for this task.\n\nIn THIS response, in the developer's detected language (default Turkish if unknown):\n\n1. Start with the banner ${_BT}🌐 MCL ${INSTALLED_VERSION} — Phase 1.7 atlandı (3+ deneme)${_BT}.\n2. Emit ONE LINE acknowledging the skip. TR: ${_BT}Phase 1.7 atlandı; spec'te dimension'lar [hook-default: industry] ile işaretli, Phase 3'te düzeltebilirsin.${_BT}; EN: ${_BT}Phase 1.7 skipped; dimensions marked [hook-default: industry] in the spec — revise in Phase 3 review.${_BT}\n3. Emit the precision-audit entry via skill-prose Bash (source mcl-state.sh, then mcl_audit_log with three positional args: event=precision-audit, hook=phase1-7, detail=core_gates=0 stack_gates=0 assumes=7 skipmarks=0 stack_tags=<csv> skipped=true source=user-skip). Substitute stack tags from mcl-stack-detect.sh detect of the project dir.\n4. Continue with Phase 1.5 / Phase 2 normally. The spec block MUST mark every core dimension with ${_BT}[hook-default: industry]${_BT} so Phase 3 spec review surfaces them for developer revision.\n\nSTOP RULE: no clarifying questions about the skip itself.\n</mcl_core>"
+  }
+}
+SKIP_OK
+  else
+    cat <<SKIP_REJECT
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "<mcl_core>\nMCL_SKIP_PRECISION_AUDIT_TOO_EARLY — developer typed ${_BT}/mcl-skip-precision-audit${_BT} but Phase 1.7 has only fired the precision-audit block ${_SKIP_COUNT} time(s). Skip is allowed only after 3 attempts (the audit usually succeeds on the second try).\n\nRespond ONLY in the developer's detected language with one short line: ${_BT}Phase 1.7 atlama 3. denemeden önce kabul edilmiyor; bir kez daha dene veya /mcl-restart yaz.${_BT} (TR) / ${_BT}Skip not accepted before the 3rd retry; try Phase 1.7 once more or /mcl-restart.${_BT} (EN). Do NOT proceed to spec emission.\n</mcl_core>"
+  }
+}
+SKIP_REJECT
+  fi
+  exit 0
+fi
+
 # -------- Branch: /mcl-checkup keyword --------
 if [ "$PROMPT_NORM" = "/mcl-checkup" ]; then
   CHECK_UP_SKILL="$HOME/.claude/skills/my-claude-lang/check-up.md"
@@ -680,8 +732,72 @@ except Exception:
     print("false")
 ' "$STATE_FILE" 2>/dev/null)"
   if [ "$PARTIAL_FLAG" = "true" ]; then
-    PARTIAL_SPEC_NOTICE="<mcl_audit name=\\\"partial-spec-recovery\\\">\\nPARTIAL SPEC RECOVERY — the previous assistant turn emitted a ${_BT}📋 Spec:${_BT} block that is structurally incomplete (missing one or more of: Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope). The likely cause is a rate-limit interruption or a network drop mid-emission. Do the following in this turn, in the developer's detected language (default Turkish if unknown):\\n\\n1. Open with ONE short localized line acknowledging that the prior spec was cut off and you are re-emitting it. Examples — Turkish: ${_BT}Önceki spec yarıda kesildi, tam halini yeniden yayınlıyorum.${_BT}; English: ${_BT}The previous spec was truncated; re-emitting the full version.${_BT}; Japanese: ${_BT}前回のスペックは途中で切れました。完全版を再送します。${_BT}; Spanish: ${_BT}La spec anterior se truncó; emitiéndola completa.${_BT}; Arabic: ${_BT}تم قطع المواصفات السابقة؛ أعيد إصدار النسخة الكاملة.${_BT}; German: ${_BT}Der vorherige Spec wurde abgeschnitten; vollständige Version wird erneut gesendet.${_BT}; French: ${_BT}Le spec précédent a été tronqué; je le réémets en entier.${_BT}; Portuguese: ${_BT}O spec anterior foi truncado; reemitindo a versão completa.${_BT}; Italian-style adjustments apply analogously for Indonesian/Korean/Chinese/Russian/Hindi/Hebrew.\\n2. Re-emit the ENTIRE ${_BT}📋 Spec:${_BT} block using the developer's original Phase 1 intent from conversation context — include every required section (Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope).\\n3. Do NOT emit the token ${_BT}✅ MCL APPROVED${_BT} in this recovery turn. The developer must explicitly approve the re-emitted spec in a SEPARATE following turn. The Stop hook also mechanically ignores any approval marker while the partial-spec flag is raised — a marker here has no effect.\\n4. End with the standard localized approval prompt (${_BT}Bu mı istiyorsun?${_BT} / ${_BT}Is this what you want?${_BT} / etc.) and STOP. Do NOT proceed to Phase 4 execute in this turn.\\n\\nIf the developer's original intent is unrecoverable from context, ask ONE surgical clarifying question instead of re-emitting a fabricated spec — never guess. Phase 4.5/4.6/5 do NOT run on recovery turns; they run only after fresh approval and a clean execute.\\n</mcl_audit>\\n\\n"
+    # 8.19.3: extract the SPECIFIC missing-sections list from the most
+    # recent `partial-spec` audit entry. Real-session log analysis
+    # showed the model retried the exact same incomplete spec because
+    # the generic "missing one or more of: 7 sections" notice wasn't
+    # specific enough — model couldn't tell which section it had
+    # actually omitted.
+    _MCL_STATE_DIR_PSN="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}"
+    _PARTIAL_MISSING_LIST=""
+    if [ -f "$_MCL_STATE_DIR_PSN/audit.log" ]; then
+      _PARTIAL_MISSING_LIST="$(awk -F ' \\| ' \
+        '$2 == "partial-spec" {last=$0} END {if (last) print last}' \
+        "$_MCL_STATE_DIR_PSN/audit.log" 2>/dev/null \
+        | sed -n 's/.*missing=//p' | head -c 240)"
+    fi
+    if [ -n "$_PARTIAL_MISSING_LIST" ]; then
+      _PARTIAL_MISSING_FRAGMENT="The previous turn's spec is missing exactly these sections: ${_BT}${_PARTIAL_MISSING_LIST}${_BT}. Add the missing sections AND keep the existing ones — emit ONE complete ${_BT}📋 Spec:${_BT} block, not a delta or a partial fix."
+    else
+      _PARTIAL_MISSING_FRAGMENT="The previous turn's ${_BT}📋 Spec:${_BT} block is structurally incomplete (one or more required sections missing: Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope)."
+    fi
+    PARTIAL_SPEC_NOTICE="<mcl_audit name=\\\"partial-spec-recovery\\\">\\nPARTIAL SPEC RECOVERY — ${_PARTIAL_MISSING_FRAGMENT} The likely cause is a rate-limit interruption or a section the model accidentally dropped. Do the following in this turn, in the developer's detected language (default Turkish if unknown):\\n\\n1. Open with ONE short localized line: ${_BT}Spec eksikti, tam halini yeniden yazıyorum.${_BT} (TR) / ${_BT}The spec was incomplete; re-emitting it complete.${_BT} (EN) / equivalent in detected language.\\n2. Emit ONE COMPLETE ${_BT}📋 Spec:${_BT} block using the developer's original Phase 1 intent from conversation context. Include EVERY required section: Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope. Do NOT emit a delta — the new block fully replaces the prior one.\\n3. Do NOT debug — do NOT read hook files, do NOT cat ${_BT}~/.mcl/${_BT} or ${_BT}~/.claude/hooks/${_BT}, do NOT inspect state.json. The pipeline is healthy; the only required action is re-emitting the spec block in this same response.\\n4. Do NOT emit ${_BT}✅ MCL APPROVED${_BT} in this recovery turn. The developer approves the re-emitted spec in a SEPARATE following turn (Stop hook also ignores any approval marker while the partial-spec flag is raised).\\n5. End with the standard localized approval prompt (${_BT}Bu mı istiyorsun?${_BT} / ${_BT}Is this what you want?${_BT} / etc.) and STOP. Do NOT proceed to Phase 4 in this turn.\\n\\nIf the developer's original intent is genuinely unrecoverable from context, ask ONE surgical clarifying question instead of re-emitting a fabricated spec — never guess. Phase 4.5/4.6/5 do NOT run on recovery turns.\\n</mcl_audit>\\n\\n"
+    unset _MCL_STATE_DIR_PSN _PARTIAL_MISSING_LIST _PARTIAL_MISSING_FRAGMENT
   fi
+fi
+
+# Phase 1 escape mechanism (since 9.0.0). Real-session telemetry: model
+# stuck in Phase 1 for 1+ hours (clarifying questions loop, partial-spec
+# retries, precision-audit retries). The mcl-stop.sh end-of-Stop block
+# increments `phase1_turn_count` once per turn while current_phase=1.
+# At thresholds 10 and 20 this hook surfaces an advisory (10) or a
+# forced AskUserQuestion (20) so the developer + model both know an
+# escape exists.
+PHASE1_STUCK_NOTICE=""
+PRECISION_ESCAPE_NOTICE=""
+if [ -f "$STATE_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  _P1_DATA="$(python3 -c '
+import json, sys
+try:
+    o = json.loads(open(sys.argv[1]).read())
+    cp = o.get("current_phase")
+    tc = o.get("phase1_turn_count") or 0
+    pac = o.get("precision_audit_block_count") or 0
+    print(f"{cp}|{tc}|{pac}")
+except Exception:
+    print("?|0|0")
+' "$STATE_FILE" 2>/dev/null)"
+  _P1_CP="${_P1_DATA%%|*}"
+  _P1_REST="${_P1_DATA#*|}"
+  _P1_TC="${_P1_REST%%|*}"
+  _P1_PAC="${_P1_REST##*|}"
+  if [ "$_P1_CP" = "1" ]; then
+    if [ "$_P1_TC" -ge 20 ] 2>/dev/null; then
+      # 20-turn forced AskUserQuestion. Model is told to immediately
+      # surface a 3-option dialog. Developer chooses; nothing here
+      # forcibly restarts.
+      PHASE1_STUCK_NOTICE="<mcl_audit name=\\\"phase1-stuck-forced-askuq\\\">\\nPHASE 1 STUCK (${_P1_TC} turns). Phase 1 has not advanced to Phase 2 in 20+ turns — typically clarifying-question loop or repeated partial-spec retries. Before answering anything else THIS turn, call AskUserQuestion (prefix ${_BT}MCL ${INSTALLED_VERSION} | ${_BT}) with three options in the developer's detected language: (1) Continue (model tries one more time); (2) ${_BT}/mcl-restart${_BT} (clear all state); (3) ${_BT}/mcl-finish${_BT} (close the session and emit a project-level summary). Do NOT proceed without the developer's tool_result. The developer's most recent message remains queued — answer it AFTER the choice resolves.\\n</mcl_audit>\\n\\n"
+    elif [ "$_P1_TC" -ge 10 ] 2>/dev/null; then
+      PHASE1_STUCK_NOTICE="<mcl_audit name=\\\"phase1-stuck-advisory\\\">\\nPHASE 1 SLOW PROGRESS (${_P1_TC} turns). Phase 1 has been running for 10+ turns. If you are stuck in a clarifying-question or partial-spec loop, surface ONE short localized advisory line in your response: ${_BT}10+ turn'dür Phase 1'desin — emin değilsen /mcl-restart ile yeniden başlayabilirsin.${_BT} (TR) / ${_BT}You've been in Phase 1 for 10+ turns — if you're stuck, /mcl-restart resets state.${_BT} (EN). Then continue normally — do not stop the response on the advisory.\\n</mcl_audit>\\n\\n"
+    fi
+    if [ "$_P1_PAC" -ge 3 ] 2>/dev/null; then
+      # Precision-audit escape: model has been blocked 3+ times. Tell
+      # it (in addition to whatever PHASE1_STUCK_NOTICE says) to surface
+      # the AskUserQuestion with the /mcl-skip-precision-audit option.
+      PRECISION_ESCAPE_NOTICE="<mcl_audit name=\\\"precision-audit-escape\\\">\\nPHASE 1.7 LOOP (${_P1_PAC} precision-audit-block fires). Before any other action this turn, call AskUserQuestion (prefix ${_BT}MCL ${INSTALLED_VERSION} | ${_BT}) with three options in the developer's detected language: (1) Phase 1.7'yi bir kez daha dene; (2) ${_BT}/mcl-skip-precision-audit${_BT} (Phase 1.7'yi atla, dimension'lara ${_BT}[hook-default: industry]${_BT} marker'ı ile spec'i emit et); (3) ${_BT}/mcl-restart${_BT}. Do NOT proceed without the developer's tool_result.\\n</mcl_audit>\\n\\n"
+    fi
+  fi
+  unset _P1_DATA _P1_CP _P1_REST _P1_TC _P1_PAC
 fi
 
 # Phase review enforcement notice (since 7.1.8). When the Stop hook set
@@ -1340,7 +1456,7 @@ print(json.dumps(sys.stdin.read().strip())[1:-1])
   fi
 fi
 
-FULL_CONTEXT="${UPDATE_NOTICE}${SESSION_CONTEXT_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
+FULL_CONTEXT="${UPDATE_NOTICE}${SESSION_CONTEXT_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PHASE1_STUCK_NOTICE}${PRECISION_ESCAPE_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
 
 # Log MCL injection size for cost accounting (mcl-doctor)
 if command -v python3 >/dev/null 2>&1; then

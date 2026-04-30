@@ -240,6 +240,152 @@ if [ "$TOOL_NAME" = "TodoWrite" ]; then
   exit 0
 fi
 
+# -------- Branch: block hook/lib debugging Bash in Phase 1-3 (since 8.19.3) --------
+# Real-session telemetry: when a Phase 1.7 precision-audit block fires,
+# the model often interprets the technical reason (`transition-rewind`,
+# `partial_spec`, etc.) as a bug to investigate — and starts cat-ing /
+# greping `~/.mcl/lib/`, `~/.claude/hooks/`, `~/.mcl/projects/<key>/state/`.
+# 50+ Bash calls per session in the worst case, none of which advance
+# the pipeline. The skill's spec-approval-discipline section already
+# forbids this ("NO HOOK FILE DEBUGGING") but enforcement was missing.
+# Phase 4+ legitimate reasons exist (e.g., reading hook libs from
+# Phase 4 code), so the block scopes to Phase 1-3 only.
+if [ "$TOOL_NAME" = "Bash" ] && command -v python3 >/dev/null 2>&1; then
+  _HD_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+  # Only fire when phase is explicitly 1, 2, or 3. Default-block on
+  # unknown is too aggressive (early activation race with state init).
+  case "$_HD_PHASE" in
+    1|2|3)
+      _HD_HIT="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, re, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    cmd = (obj.get("tool_input") or {}).get("command", "") or ""
+except Exception:
+    cmd = ""
+# Patterns that indicate the model is reading MCL internals to debug.
+# All target known MCL paths; edits here are intentional, not generic.
+patterns = [
+    r"~/\.mcl(/|\b)",
+    r"\$HOME/\.mcl(/|\b)",
+    r"/\.mcl/lib/",
+    r"~/\.claude/hooks(/|\b)",
+    r"\$HOME/\.claude/hooks(/|\b)",
+    r"/\.claude/hooks/",
+    r"~/\.mcl/projects/[^ ]*/state(/|\b)",
+    r"/\.mcl/projects/[^/]+/(state|audit|trace)",
+    r"mcl-state\.sh\b",
+    r"mcl-stop\.sh\b",
+    r"mcl-pre-tool\.sh\b",
+    r"mcl-activate\.sh\b",
+    r"mcl-phase6\.py\b",
+    r"mcl-phase-detect\.py\b",
+]
+for p in patterns:
+    if re.search(p, cmd):
+        # Whitelist: skill-prose Bash invocations source mcl-state.sh
+        # legitimately (token-path writes). Detect via the shebang-style
+        # `source` + `mcl_state_set` / `mcl_audit_log` companion.
+        if re.search(r"\bsource\b.*mcl-state\.sh", cmd) and \
+           re.search(r"\b(mcl_state_set|mcl_audit_log|_mcl_validate_stack_tags)\b", cmd):
+            break
+        # Whitelist: stack detection invocation from Phase 1.7 prose.
+        if re.search(r"\bmcl-stack-detect\.sh\s+detect\b", cmd):
+            break
+        print("block:" + cmd[:120])
+        sys.exit(0)
+print("")
+' 2>/dev/null)"
+      if printf '%s' "$_HD_HIT" | grep -q "^block:"; then
+        _HD_CMD="${_HD_HIT#block:}"
+        mcl_audit_log "block-hook-debug" "pre-tool" "tool=Bash phase=${_HD_PHASE} cmd=${_HD_CMD}"
+        python3 -c '
+import json, sys
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — reading MCL hook/lib/state files is blocked. The pipeline is healthy and self-managing; if a block fired (precision-audit / partial-spec / etc.), the only required action is to follow the block reason in your CURRENT response — not to debug the hook system. Allowed legitimate Phase 1.7 helpers: `bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect $(pwd)`, and skill-prose `bash -c \"source ... mcl-state.sh; mcl_state_set ...\"`. Everything else under ~/.mcl/ or ~/.claude/hooks/ is off-limits until Phase 4. Trust the pipeline or type /mcl-restart."
+    }
+}))
+' 2>/dev/null
+        exit 0
+      fi
+      ;;
+  esac
+fi
+
+# -------- Branch: block hook/lib debugging via Read/Grep/Glob in Phase 1-3 (9.0.0) --------
+# Bash branch (above) catches `cat / grep / find` invocations. Real-session
+# telemetry shows the model also reaches for the dedicated Read/Grep/Glob
+# tools when looping. There is no legitimate Phase 1-3 reason to inspect
+# `~/.mcl/lib/`, `~/.claude/hooks/`, or `~/.mcl/projects/<key>/state/`
+# through these tools, so no whitelist is needed.
+if { [ "$TOOL_NAME" = "Read" ] || [ "$TOOL_NAME" = "Grep" ] || [ "$TOOL_NAME" = "Glob" ]; } \
+   && command -v python3 >/dev/null 2>&1; then
+  _HDR_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+  case "$_HDR_PHASE" in
+    1|2|3)
+      _HDR_HIT="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, re, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    tool = obj.get("tool_name", "")
+    ti = obj.get("tool_input") or {}
+except Exception:
+    print(""); sys.exit(0)
+
+# Concatenate every input field that could carry a path: Read.file_path,
+# Grep.path + .pattern, Glob.path + .pattern. Pattern is included because
+# `Glob "**/mcl-state.sh"` is just as much a hook-debug attempt as a
+# direct path.
+candidates = []
+for k in ("file_path", "path", "pattern"):
+    v = ti.get(k)
+    if isinstance(v, str):
+        candidates.append(v)
+blob = "\n".join(candidates)
+
+patterns = [
+    r"~/\.mcl(/|$|\b)",
+    r"\$HOME/\.mcl(/|$|\b)",
+    r"^/[^\n]*/\.mcl/(lib|projects)/",
+    r"~/\.claude/hooks(/|$|\b)",
+    r"\$HOME/\.claude/hooks(/|$|\b)",
+    r"/\.claude/hooks/",
+    r"\bmcl-state\.sh\b",
+    r"\bmcl-stop\.sh\b",
+    r"\bmcl-pre-tool\.sh\b",
+    r"\bmcl-activate\.sh\b",
+    r"\bmcl-phase6\.py\b",
+    r"\bmcl-phase-detect\.py\b",
+    r"\bmcl-test-coverage\.py\b",
+]
+for p in patterns:
+    if re.search(p, blob):
+        print("block:" + tool + ":" + blob[:120].replace("\n", " | "))
+        sys.exit(0)
+print("")
+' 2>/dev/null)"
+      if printf '%s' "$_HDR_HIT" | grep -q "^block:"; then
+        _HDR_DETAIL="${_HDR_HIT#block:}"
+        mcl_audit_log "block-hook-debug" "pre-tool" "tool=${TOOL_NAME} phase=${_HDR_PHASE} input=${_HDR_DETAIL}"
+        python3 -c '
+import json, sys
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — Read / Grep / Glob on MCL hook/lib/state paths is blocked. There is no legitimate Phase 1-3 reason to inspect `~/.mcl/lib/`, `~/.claude/hooks/`, or `~/.mcl/projects/<key>/state/`. If a block fired (precision-audit / partial-spec / etc.), follow the block reason in your CURRENT response. Trust the pipeline or type /mcl-restart."
+    }
+}))
+' 2>/dev/null
+        exit 0
+      fi
+      ;;
+  esac
+fi
+
 # -------- Branch: block Task dispatch of Phase 4.5/4.6/5 as sub-agent --------
 # sub-agent-phase-discipline: Phase 4.5 (Risk Review), 4.6 (Impact Review),
 # and Phase 5 (Verification Report) MUST run in the main MCL session as

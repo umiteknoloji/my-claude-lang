@@ -145,7 +145,56 @@ def check_audit_trail(state_dir: Path) -> tuple[list[dict], list[dict]]:
     # or overriding), require a matching `phase4_5_override` audit event
     # naming the same rule_id. Mismatch → LOW soft fail.
     low.extend(check_severity_skip_violations(audit_log))
+    # State-hack attempt check (since 9.0.0): any `deny-write | bash |
+    # unauthorized` events surface as HIGH soft fail. The auth-check
+    # rejected the writes, but the attempt itself is a misalignment
+    # signal worth surfacing prominently in the Phase 6 report.
+    high.extend(check_state_hack_attempts(audit_log))
     return high, low
+
+
+def check_state_hack_attempts(audit_log: Path) -> list[dict]:
+    """Count `deny-write | bash | unauthorized` events in current session.
+
+    Each occurrence means the model tried to write state.json from an
+    unauthorized caller (typically a `bash -c '... mcl_state_set ...'`
+    invocation that failed token-auth). The write was rejected, but the
+    attempt is forensically significant — it usually indicates the
+    model is trying to bypass MCL phase logic rather than follow it.
+    Surfaces as HIGH (single finding aggregating all occurrences) so
+    it's prominent in the Phase 6 report, not buried as advisory.
+    """
+    findings: list[dict] = []
+    if not audit_log.exists():
+        return findings
+    deny_count = 0
+    try:
+        for ln in audit_log.read_text(encoding="utf-8", errors="replace").splitlines():
+            # Audit format: `<ts> | deny-write | <caller> | unauthorized`
+            parts = [p.strip() for p in ln.split("|")]
+            if len(parts) < 4:
+                continue
+            if parts[1] == "deny-write" and "unauthorized" in parts[3]:
+                deny_count += 1
+    except OSError:
+        return findings
+    if deny_count == 0:
+        return findings
+    return [{
+        "severity": "HIGH",
+        "source": "phase6",
+        "rule_id": "P6-A-state-hack-attempt",
+        "file": str(audit_log),
+        "line": 0,
+        "message": (
+            f"Model attempted {deny_count} unauthorized state.json write(s) — "
+            "auth-check rejected each one but the attempt itself signals a "
+            "misaligned approach (e.g. trying to bypass MCL phase logic, "
+            "patch state directly to skip a gate). Review session prose / "
+            "skill prose drift; consider /mcl-restart on next stuck loop."
+        ),
+        "category": "phase6-audit-trail",
+    }]
 
 
 def check_severity_skip_violations(audit_log: Path) -> list[dict]:

@@ -7,6 +7,81 @@
 
 ## [Unreleased]
 
+## [9.0.0] - 2026-04-30 — Standalone Maturation
+
+Real-session log (1+ saat Phase 1'de takılı, kullanıcı session'ı abort etti) 6 ayrı failure mode'u ortaya koydu. 9.0.0 tek konsolide release ile hepsini kapatır + 8.19.2 superpowers-removal'ın breaking-change boyutunu semver'e taşır.
+
+### Breaking changes
+- **Phase 4.5 code-review dispatch** — `superpowers:code-reviewer` artık kabul edilen prefix listesinde değil (8.19.2). `pr-review-toolkit:code-reviewer` veya `code-review:*` zorunlu. `install-claude-plugins.sh` zaten her ikisini install eder; ek aksiyon gerekmiyor.
+- **Phase 1-3 dosya erişim kapsamı** — `~/.mcl/lib/`, `~/.claude/hooks/`, `~/.mcl/projects/<key>/state/` ve mcl-* skript dosyaları Phase 1-3'te `Bash`, `Read`, `Grep`, `Glob` tool'ları ile okunamaz (hook-debug block). Phase 4+ pass-through; whitelist: `bash mcl-stack-detect.sh detect`, skill-prose `source mcl-state.sh; mcl_state_set`.
+
+### Düzeltildi — 6 failure mode
+
+#### (A) Partial spec recovery (model loop fix)
+- **`hooks/mcl-stop.sh:283-310`** — Partial-spec detect'inde audit-only path artık `decision:block` JSON emit ediyor. Block reason'da: spesifik missing-section listesi + tam markdown header template (`## Objective\n## MUST\n## SHOULD\n## Acceptance Criteria\n## Edge Cases\n## Technical Approach\n## Out of Scope`) + "tek bütün spec block — delta yazma" + "hook file debugging yasak". Model aynı turn'de complete spec emit etmek zorunda.
+- **`skills/my-claude-lang/phase2-spec.md`** — Spec template explicit + flat (`## H2` headers, nested olmayan). Genuinely empty section → `- (none)` placeholder; header asla atlanmaz.
+- **`hooks/mcl-activate.sh`** — `PARTIAL_SPEC_NOTICE` (8.19.3'te yapıldı) audit log'tan en son `partial-spec | ... missing=...` listesini parse edip notice'a inject ediyor. Generic 7-section listesi yerine SPESİFİK eksik isimler.
+
+#### (B) Phase 1.7 escape
+- **`hooks/mcl-stop.sh:1539-1565`** — precision-audit-block her fire'da `precision_audit_block_count++`. Block reason'a `>= 3` olduğunda hint: "bir sonraki turn'de AskUserQuestion ile 3 seçenek".
+- **`hooks/mcl-activate.sh`** — `precision_audit_block_count >= 3` ise `PRECISION_ESCAPE_NOTICE` inject: model'e talimat AskUserQuestion 3-option (devam / `/mcl-skip-precision-audit` / `/mcl-restart`) sunması için.
+- **`hooks/mcl-activate.sh`** — Yeni `/mcl-skip-precision-audit` keyword branch:
+  - `count < 3` ise reject + audit `precision-audit-skip-attempt-too-early`.
+  - `count >= 3` ise accept + counter reset + `precision_audit_skipped=true` + skill talimatı (spec'teki dimension'lara `[hook-default: industry]` marker'ı, Phase 3'te developer revize eder).
+- **Counter reset** — Phase 1→2 transition'da otomatik sıfırlanır (`mcl-stop.sh` spec-emit branch'inde).
+
+#### (C) Hook debugging block — kapsam genişletme
+- **`hooks/mcl-pre-tool.sh:204-242`** (8.19.3'te yapıldı) — Bash tool'da MCL hook/lib/state path'leri Phase 1-3'te deny.
+- **9.0.0 ek** — `Read`, `Grep`, `Glob` tool'ları için aynı path-deny. Whitelist yok (Phase 1-3'te bu tool'larla hook path okumanın legitimate sebebi yok). Audit format: `block-hook-debug | pre-tool | tool=<Read|Grep|Glob|Bash> phase=<N> ...`.
+
+#### (D) State hack severity bump
+- **`hooks/lib/mcl-phase6.py`** — Yeni `check_state_hack_attempts(audit_log)`. `deny-write | <caller> | unauthorized` audit count > 0 → **HIGH** soft fail (`P6-A-state-hack-attempt`). Phase 6 (a) chain'e eklendi (`high.extend(...)`). Auth-check zaten reject ediyor; bu sadece forensic surface.
+
+#### (E) Phase 1 stuck escape
+- **`hooks/mcl-stop.sh`** end-of-Stop — `current_phase=1` ise `phase1_turn_count++`. Phase 1→2 transition'da reset.
+- **`hooks/mcl-activate.sh`** — Yeni `PHASE1_STUCK_NOTICE`:
+  - `count >= 10 && < 20`: advisory ("`/mcl-restart` ile yeniden başlayabilirsin").
+  - `count >= 20`: forced AskUserQuestion talimatı (continue / `/mcl-restart` / `/mcl-finish`).
+- **Counter reset** — spec-approve, summary-confirm, 1→2 transition.
+
+#### (F) Plugin uninstall otomasyonu
+- **`install.sh`** (8.19.3'te yapıldı) — Idempotent best-effort 3 syntax form ile superpowers uninstall:
+  ```
+  claude plugin uninstall superpowers || true
+  claude plugin uninstall superpowers@superpowers-marketplace || true
+  claude plugin marketplace remove obra/superpowers-marketplace || true
+  ```
+  Manual fallback: `claude plugin uninstall superpowers`.
+
+### Yeni state field'lar (`hooks/lib/mcl-state.sh` default schema)
+- `phase1_turn_count: 0` — Phase 1 turn counter (escape mechanism).
+- `precision_audit_block_count: 0` — Precision-audit block fire counter (escape).
+- `precision_audit_skipped: false` — `/mcl-skip-precision-audit` flag.
+
+### Yeni audit event'leri
+- `block-hook-debug` (genişletildi: tool=Read/Grep/Glob/Bash)
+- `precision-audit-skip-attempt-too-early`
+- `precision-audit-skip-accepted`
+- `phase1-stuck-advisory` (mcl_audit name içinde)
+- `phase1-stuck-forced-askuq` (mcl_audit name içinde)
+- `precision-audit-escape` (mcl_audit name içinde)
+
+### Yeni testler
+- `tests/cases/test-hook-debug-readers.sh` — Read/Grep/Glob block + Phase 4 pass-through.
+- `tests/cases/test-state-hack-soft-fail.sh` — `check_state_hack_attempts` 5 case (boş, 1 deny, 3 deny, irrelevant, missing-qualifier).
+- `tests/cases/test-precision-audit-escape.sh` — 4 case (count=0/2 reject, count=3/5 accept, audit forensic).
+- `tests/cases/test-phase1-stuck.sh` — 5 case (5/10/15/20 thresholds, phase=2 skip).
+
+### Bilinen sınırlar
+- 3-retry budget kullanıcı sabırına bağlı; sabırsız kullanıcı için yine takılma riski. 9.0.x'te `MCL_PRECISION_AUDIT_RETRY_BUDGET=N` env override eklenebilir.
+- AskUserQuestion-bağımlı escape — model AskUserQuestion'ı çağırmazsa stuck devam. Hook-level forced exit yok.
+- Plugin uninstall syntax versiyon-bağımlı (Claude Code 1.x vs 2.x). 3 form best-effort + manuel fallback.
+- E2E Phase 8 (1+ saat stuck simulation) deferred — unit tests stuck threshold'larını kapsıyor; e2e ileri sürümde.
+
+### Tests
+- Unit: **96/0/2** (önce 59 → +37: 4 yeni 9.0.0 test dosyası)
+- E2E: **65/0/0** — regresyonsuz
+
 ## [8.19.2] - 2026-04-30
 
 ### Kaldırıldı — `superpowers` plugin curated set'ten çıkarıldı

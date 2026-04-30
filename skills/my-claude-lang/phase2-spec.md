@@ -34,41 +34,44 @@ Write specs like a senior engineer with 15+ years of experience who:
 - Separates what the system MUST do vs SHOULD do vs MUST NOT do
 - Considers the existing codebase architecture and patterns
 
-## Spec Template
+## Spec Template (since 9.0.0 — explicit, partial-spec-safe)
+
+The spec block MUST contain SEVEN required section headers in this
+exact order. Each header must appear verbatim. Genuinely empty
+sections write `- (none)` rather than omitting the header — partial-
+spec detection treats any missing header as truncation and forces a
+re-emit.
 
 ```
 📋 Spec:
 
 ## [Feature/Change Title]
 
-### Objective
+## Objective
 [One precise sentence: what this change accomplishes and why it matters]
 
-### Requirements
-MUST:
-- [Non-negotiable requirements — the feature fails without these]
+## MUST
+- [Non-negotiable requirement — the feature fails without this]
+- [Add SHOULD NOT items here too as `- NOT: <anti-pattern>` if needed]
 
-SHOULD:
+## SHOULD
 - [Expected behavior — standard engineering practice]
 
-SHOULD NOT:
-- [Anti-patterns to avoid]
-
-### Acceptance Criteria
+## Acceptance Criteria
 - [ ] [Observable, testable criterion — not vague]
 - [ ] [Each criterion answers: "how do I verify this works?"]
 
-### Edge Cases & Error Handling
+## Edge Cases
 - [What happens when input is empty/null/invalid?]
 - [What happens at boundary conditions?]
 - [What happens when the operation fails?]
 
-### Technical Approach
+## Technical Approach
 - [Which files to modify and why]
 - [Architecture pattern to follow — match existing codebase]
 - [Dependencies or utilities to use]
 
-### Out of Scope
+## Out of Scope
 - [Explicitly state what this task does NOT include]
 - [Prevents scope creep during implementation]
 
