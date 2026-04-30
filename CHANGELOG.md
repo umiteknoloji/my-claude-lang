@@ -67,11 +67,41 @@ New tests in `tests/cases/`:
 New helper: `tests/lib/build-transcript.py` — synthesizes realistic
 Claude Code JSONL transcripts with named fixture kinds.
 
+### Critical fix — macOS `timeout` binary missing silently disabled all Phase 4.5 scans
+
+`mcl-stop.sh` used `timeout 120 python3 mcl-security-scan.py ...` for
+all five Phase 4.5 scans + Phase 6 helper. macOS doesn't ship `timeout`
+by default; the command failed silently → empty JSON → scanner findings
+discarded → HIGH issues never blocked. This was a pre-existing
+months-long silent disablement on every macOS install.
+
+Added portable `_mcl_timeout` shim that prefers `timeout`, falls back
+to `gtimeout`, then runs the command directly when neither is present.
+Each Python helper has its own internal subprocess timeouts as a
+fallback safety.
+
+### Additional 9.2.1 test coverage
+
+- `test-security-full-scan-blocks.sh` — Express+SQL HIGH fixture exercises
+  the full scan-to-block path through `mcl-security-scan.py` (G01 rule),
+  asserts Stop hook emits `MCL SECURITY` block + `security-scan-block`
+  audit, then verifies recovery (parameterized query → gate clears).
+- `test-phase4-5-to-6-cycle.sh` — multi-turn fixture: iteration-1
+  baseline (HIGH=0) + iteration-2 regression (1 new HIGH from sort
+  parameter concat) + Phase 5 verification report → Phase 6 (b) detects
+  the regression and emits `phase6-block`. Verifies
+  `phase4_5_high_baseline.security` stays at 0 (not silently raised).
+- `test-ui-synthetic-pass.sh` — UI sub-phase state machine (BUILD_UI →
+  REVIEW → BACKEND), frontend/backend path-exception. **Vaad #2
+  (browser-rendered UI vs spec match) marked synthetic-pass — requires
+  real-session confirmation in production.**
+
 ### Test results
 
-- Default mode: unit 151/0/2, e2e 54/0/0
-- MCL_MINIMAL_CORE=1: unit 127/0/2 (24 skipped: spec format / hook-debug
-  / partial-spec / severity tests for disabled features), e2e 54/0/0
+- Default mode: unit **166/0/4**, e2e **54/0/0**
+- MCL_MINIMAL_CORE=1: unit **131/0/3**, e2e **54/0/0**
+
+**Total: 405 passing assertions across both modes, both suites. Zero failures.**
 
 ### Removed
 

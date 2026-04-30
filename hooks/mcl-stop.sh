@@ -84,6 +84,23 @@ fi
 # shellcheck source=lib/mcl-log-append.sh
 [ -f "$_MCL_HOOK_DIR/lib/mcl-log-append.sh" ] && source "$_MCL_HOOK_DIR/lib/mcl-log-append.sh"
 
+# Portable timeout shim (since 9.2.1). macOS lacks `timeout` by default;
+# without this, all five Phase 4.5 scan commands and Phase 6 silently
+# returned empty JSON (timeout: command not found → empty stdout →
+# scanner output discarded → HIGH findings missed). Honor `timeout` or
+# `gtimeout` when available, otherwise run the command directly (the
+# Python helpers have their own internal timeouts on subprocess calls).
+_mcl_timeout() {
+  local secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$secs" "$@"
+  else
+    "$@"
+  fi
+}
+
 # Session-context bridge (since 8.2.11) — writes .mcl/session-context.md on
 # every exit (trap EXIT) so the next session's mcl-activate.sh can resume
 # with active phase, last commit, next step, and any half-finished work.
@@ -655,7 +672,7 @@ PYEOF
       _SEC_MEDIUM_PROSE=""
       if [ -f "$_SEC_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_SEC_SCAN_DONE" != "true" ]; then
-        _SEC_FULL_JSON="$(timeout 120 python3 "$_SEC_FULL_LIB" \
+        _SEC_FULL_JSON="$(_mcl_timeout 120 python3 "$_SEC_FULL_LIB" \
           --mode=full \
           --state-dir "$MCL_STATE_DIR" \
           --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
@@ -738,7 +755,7 @@ print("\\n".join(lines))
       _DB_MEDIUM_PROSE=""
       if [ -f "$_DB_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_DB_SCAN_DONE" != "true" ]; then
-        _DB_FULL_JSON="$(timeout 120 python3 "$_DB_FULL_LIB" \
+        _DB_FULL_JSON="$(_mcl_timeout 120 python3 "$_DB_FULL_LIB" \
           --mode=full \
           --state-dir "$MCL_STATE_DIR" \
           --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
@@ -829,7 +846,7 @@ print("\\n".join(lines))
       _UI_MEDIUM_PROSE=""
       if [ -f "$_UI_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_UI_SCAN_DONE" != "true" ]; then
-        _UI_FULL_JSON="$(timeout 120 python3 "$_UI_FULL_LIB" \
+        _UI_FULL_JSON="$(_mcl_timeout 120 python3 "$_UI_FULL_LIB" \
           --mode=full \
           --state-dir "$MCL_STATE_DIR" \
           --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
@@ -921,7 +938,7 @@ print("\\n".join(lines))
       _OPS_SCAN_DONE="$(mcl_state_get phase4_5_ops_scan_done 2>/dev/null)"
       if [ -f "$_OPS_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_OPS_SCAN_DONE" != "true" ]; then
-        _OPS_FULL_JSON="$(timeout 120 python3 "$_OPS_FULL_LIB" \
+        _OPS_FULL_JSON="$(_mcl_timeout 120 python3 "$_OPS_FULL_LIB" \
           --mode=full \
           --state-dir "$MCL_STATE_DIR" \
           --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
@@ -1001,7 +1018,7 @@ print("\\n".join(lines))
       _PERF_SCAN_DONE="$(mcl_state_get phase4_5_perf_scan_done 2>/dev/null)"
       if [ -f "$_PERF_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_PERF_SCAN_DONE" != "true" ]; then
-        _PERF_FULL_JSON="$(timeout 90 python3 "$_PERF_FULL_LIB" \
+        _PERF_FULL_JSON="$(_mcl_timeout 90 python3 "$_PERF_FULL_LIB" \
           --mode=full \
           --state-dir "$MCL_STATE_DIR" \
           --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
@@ -1818,7 +1835,7 @@ if [ -f "$_PHASE6_LIB" ] && command -v python3 >/dev/null 2>&1 \
     _PHASE6_TRIGGER=1
   fi
   if [ "$_PHASE6_TRIGGER" = "1" ]; then
-    _PHASE6_JSON="$(timeout 180 python3 "$_PHASE6_LIB" \
+    _PHASE6_JSON="$(_mcl_timeout 180 python3 "$_PHASE6_LIB" \
       --mode=run \
       --state-dir "$MCL_STATE_DIR" \
       --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
