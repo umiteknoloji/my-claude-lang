@@ -16,31 +16,49 @@ a senior English-speaking engineer wrote the requirements themselves.
 1. Announce: "All points are clear. Generating the specification..."
 2. Write the spec in a visible `📋 Spec:` block in the response — NOT internally
 3. The spec MUST be visible to the developer in the conversation output
-4. **The spec block MUST contain ALL SEVEN required sections (since 9.1.2).**
-   Short / freeform / "Project + Pages + Stack" notes are NOT acceptable —
-   the partial-spec hook detects missing headers and rewinds the
-   transition. Required headers, in this exact order:
+4. **⛔ SPEC BLOCK — PINNED VERBATIM (9.2.1, MANDATORY).** Copy the
+   template below EXACTLY. The Stop hook scanner matches the literal
+   `📋 Spec:` line-anchored prefix; ANY deviation produces
+   `decision:block` and forces re-emit:
+   - First non-blank line MUST be `📋 Spec:` (clipboard emoji + space +
+     `Spec` + colon). Plain `Spec:`, `## Spec`, `## Faz N — Spec` are
+     FORBIDDEN.
+   - The spec MUST be raw markdown — NEVER inside triple-backticks.
+     A code-block-wrapped spec is invisible to the hook scanner.
+   - Seven H2 headers verbatim, in this order:
+     `## [Title]` → `## Objective` → `## MUST` → `## SHOULD` →
+     `## Acceptance Criteria` → `## Edge Cases` → `## Technical Approach`
+     → `## Out of Scope`. Missing any → `decision:block`.
+   - Genuinely empty section: write header followed by `- (none)`.
+     Never omit a header.
+
+   ### ⛔ Forbidden formats (each → hook decision:block)
+
    ```
+   ## Faz 2 — Spec        ← H2 heading instead of 📋 prefix
+                            → block: missing 📋 Spec:
+
+   Spec:                  ← bare "Spec:" without 📋
+     Project: ...           → block: missing 📋 Spec:
+
+   ```                    ← spec wrapped in triple-backticks
+   📋 Spec:               → block: code-block hides the marker
    ## Objective
-   ## MUST
-   ## SHOULD
-   ## Acceptance Criteria
-   ## Edge Cases
-   ## Technical Approach
-   ## Out of Scope
+   ...
    ```
-   If a section is genuinely empty for this task, write the header
-   followed by `- (none)` — never omit a header. Heading levels: `##`
-   uniformly (h2, flat — partial-spec scanner accepts h2 / h3 / inline-
-   bold variants but `##` is canonical for forward compatibility).
-5. After the spec, explain in the developer's language what it says
-6. Call `AskUserQuestion({question: "MCL {{MCL_VERSION}} | <EXACT pinned body —
-   TR: 'Spec\'i onaylıyor musun?' / EN: 'Approve this spec?' — see phase3-verify.md>",
-   options: ["<approve-family>", "<edit>", "<cancel>"]})` —
-   since 6.0.0 this REPLACES the text-based "yes / no" prompt. Do NOT
-   emit the legacy `✅ MCL APPROVED` marker; it is dead.
-7. Do NOT proceed to Phase 4 until the tool_result returns an
-   approve-family option (Stop hook audit: `approve-via-askuserquestion`).
+   ```
+5. After the spec, explain in the developer's language what it says.
+6. **Auto-approve flow (9.2.1).** When the spec block passes the hook's
+   format gate (📋 prefix + 7 H2 sections, all present), the Stop hook
+   automatically transitions state to `current_phase=4`,
+   `spec_approved=true` in the SAME turn — NO AskUserQuestion call,
+   NO tool_result wait. Developer review happened in Phase 1 (intent
+   questions) and Phase 1.7 (precision-audit GATE questions); the spec
+   block is the materialized answer. Proceed directly to Phase 4
+   (code execution) on the next turn.
+7. Do NOT call `AskUserQuestion` for spec approval — that step was
+   removed in 9.2.1 because it duplicated Phase 1 / 1.7 control and
+   was the dominant source of pipeline-stall bugs.
 
 ## Spec Quality Standard
 
@@ -52,13 +70,11 @@ Write specs like a senior engineer with 15+ years of experience who:
 - Separates what the system MUST do vs SHOULD do vs MUST NOT do
 - Considers the existing codebase architecture and patterns
 
-## Spec Template (since 9.0.0 — explicit, partial-spec-safe)
+## Spec Template (PINNED — copy verbatim, do NOT paraphrase)
 
-The spec block MUST contain SEVEN required section headers in this
-exact order. Each header must appear verbatim. Genuinely empty
-sections write `- (none)` rather than omitting the header — partial-
-spec detection treats any missing header as truncation and forces a
-re-emit.
+**Copy the block below VERBATIM into the response.** Do not wrap in
+code blocks. Do not change `📋 Spec:` to `Spec:` or `## Spec`. Hook
+enforces this format — deviation = `decision:block` + forced re-emit.
 
 ```
 📋 Spec:

@@ -24,8 +24,9 @@ Claude Code understood it this way:
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
-5.5. **Technical Challenge Pass** — Before calling AskUserQuestion, silently
-   ask yourself: "Does this spec have a concrete, specific technical problem?"
+5.5. **Technical Challenge Pass** — Before the spec auto-approves,
+   silently ask yourself: "Does this spec have a concrete, specific
+   technical problem?"
 
    Qualifying problems (specific and actionable, not vague):
    - Algorithmic scale issue (e.g., O(n²) on a large dataset)
@@ -35,65 +36,25 @@ Claude Code understood it this way:
    - Unhandled cascading failure mode
    - Contradiction with loaded project memory (`.mcl/project.md` patterns)
 
-   **If a concrete problem is found:** add ONE localized line to the response
-   AFTER the translated summary and BEFORE the AskUserQuestion call:
-   - Turkish: `⚠️ Teknik not: [tek cümle spesifik sorun]. Devam edebilirsiniz — onaylamadan önce bu riski değerlendirin.`
-   - English: `⚠️ Technical note: [one sentence specific issue]. You can proceed — evaluate this risk before approving.`
-   Localize to the developer's detected language. One line, one problem, no list.
+   **If a concrete problem is found:** add ONE localized line to the
+   response AFTER the translated summary, BEFORE the spec block:
+   - Turkish: `⚠️ Teknik not: [tek cümle spesifik sorun]. Spec'i bu uyarıyla yazıyorum — kabul etmiyorsan /mcl-restart ile yeniden başla.`
+   - English: `⚠️ Technical note: [one sentence specific issue]. Writing the spec with this caveat — type /mcl-restart to start over if you disagree.`
+   This is NOT a gate. The spec auto-approves regardless; the note is
+   purely advisory.
 
-   **If no concrete problem or only a vague concern:** skip silently. Do NOT
-   add "potential risks" or hedge language — only concrete findings surface.
+6. **No AskUserQuestion call (since 9.2.1).** Spec approval was removed
+   because Phase 1 (intent questions) and Phase 1.7 (precision-audit
+   GATE questions) already gave the developer fine-grained control.
+   The spec block IS the materialized answer. When the Stop hook sees
+   a format-valid spec (📋 prefix + 7 H2 sections), it auto-transitions
+   to `current_phase=4`, `spec_approved=true` in the same turn.
 
-   This is NOT a gate. The developer can approve even with the note.
+   To reject a spec, the developer types `/mcl-restart`. To stop the
+   pipeline, `/mcl-finish`.
 
-6. Then call (since 6.0.0):
-```
-AskUserQuestion({
-  question: "MCL {version} | <EXACT body from table below — copy verbatim>",
-  options: [
-    { label: "<approve-verb-only>", description: "<free-form context>" },
-    { label: "<edit-verb>",         description: "<free-form context>" },
-    { label: "<cancel-verb>",       description: "<free-form context>" }
-  ]
-})
-```
-
-   **⛔ QUESTION BODY — PINNED (9.2.0, MANDATORY).** The Stop hook scanner
-   (`mcl-askq-scanner.py`) classifies intent by exact substring match.
-   Copy the question body VERBATIM — no paraphrase, no suffix. Any
-   deviation produces intent="other" and the Stop hook cannot advance
-   the phase.
-
-   | Locale | Exact question body (copy verbatim) |
-   | ------ | ----------------------------------- |
-   | TR     | Spec'i onaylıyor musun?             |
-   | EN     | Approve this spec?                  |
-
-   **Label Discipline (since 6.4.1 — MANDATORY).** The approve option's
-   `label` is the BARE VERB in the developer's detected language — NO
-   descriptive suffix:
-
-   | Locale | Approve label |
-   | ------ | ------------- |
-   | TR     | Onayla        |
-   | EN     | Approve       |
-
-   FORBIDDEN approve labels: `Onayla, kodu yaz`, `Approve and proceed`,
-   `Approve, write code`. Any descriptive context belongs in the option's
-   `description` field, NOT in `label`.
-
-   The `edit` and `cancel` labels stay free-form localized verbs
-   (`Düzenle` / `İptal` / `Edit` / `Cancel` / etc.) — this rule
-   restricts the approve label only.
-
-   Do NOT emit the legacy `✅ MCL APPROVED` marker — dead in 6.0.0.
-
-7. If developer picks a non-approve option → ask "What did I get
-   wrong?", fix the English spec, repeat Phase 3.
-8. Only when the tool_result returns an approve-family option → Stop
-   hook flips state to Phase 4 (`approve-via-askuserquestion` audit).
-9. After the tool_result returns an approve-family option — and BEFORE
-   Phase 4 code writing begins — resolve the test command (STEP-24).
+7. After auto-approval — and BEFORE Phase 4 code writing begins —
+   resolve the test command (STEP-24).
    Resolution priority (first non-empty result wins):
 
    a. Check config: `bash ~/.claude/hooks/lib/mcl-config.sh get test_command`.
@@ -150,8 +111,8 @@ correct anything that was added without their explicit ask.
 **Skip:** `upgraded=false` (no upgrades; no callout needed).
 
 **Format:** include a "Scope Changes" section in Phase 3 prose
-**before** the AskUserQuestion spec-approval call. Render in the
-developer's detected language. Each upgrade is one bullet:
+**before** the spec block. Render in the developer's detected
+language. Each upgrade is one bullet:
 
 ```
 **Spec'e eklenen mühendislik standartları:**
@@ -159,8 +120,8 @@ developer's detected language. Each upgrade is one bullet:
 - Empty/loading/error UI states [render verbinden çıkarıldı, UI bağlamında]
 - HTTP CRUD endpoints [yönet verbinden çıkarıldı, varsayılan: GET/POST/PUT/DELETE — değiştirilebilir]
 
-İstemediğin bir ekleme varsa "düzenle" seç ve hangi maddeyi
-kaldırmak istediğini belirt.
+İstemediğin bir ekleme varsa /mcl-restart ile yeniden başla ve
+sorulara farklı cevaplar ver.
 ```
 
 Localize per detected language (Turkish above; English / Spanish /

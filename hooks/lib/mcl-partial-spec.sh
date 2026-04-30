@@ -15,7 +15,9 @@
 #   0  — spec block present but one or more required headers missing
 #        (stdout: newline-separated list of missing header names)
 #   1  — spec block present and structurally complete
-#   2  — no `📋 Spec:` marker in last assistant turn (nothing to check)
+#   2  — no `📋 Spec:` marker AND no spec-attempt patterns (nothing to check)
+#   3  — spec-attempt detected without `📋 Spec:` prefix (since 9.2.1)
+#        (stdout: the offending pattern that matched, ≤80 chars)
 #
 # Diagnostics (e.g., unreadable transcript) go to stderr with exit 2.
 # The caller treats exit 2 as "not a spec turn" either way — this is a
@@ -84,6 +86,33 @@ except Exception:
     sys.exit(2)
 
 if not last_text:
+    # 9.2.1: spec-attempt without 📋 prefix detection.
+    # Re-scan ALL assistant text for spec-LIKE patterns. If found, rc=3.
+    spec_attempt_re = re.compile(
+        r"^(?:Spec:\s*$|## (?:Spec|Faz \d+\s*[—–\-]\s*Spec)\b)",
+        re.MULTILINE,
+    )
+    last_attempt_match = None
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                text = extract_text(obj)
+                if text:
+                    m = spec_attempt_re.search(text)
+                    if m:
+                        last_attempt_match = m.group().strip()
+    except Exception:
+        sys.exit(2)
+    if last_attempt_match:
+        sys.stdout.write(last_attempt_match[:80])
+        sys.exit(3)
     sys.exit(2)
 
 lines = last_text.splitlines()

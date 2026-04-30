@@ -1287,101 +1287,53 @@ _mcl_pre_is_approve_option() {
   return 1
 }
 
+# 9.2.1: JIT auto-advance on spec emit. Same-turn rescue — when the
+# model emits a complete `📋 Spec:` in the same turn it tries to Write,
+# Stop hook hasn't fired yet so state is still phase=1. Pre-tool runs
+# the partial-spec checker on the transcript: rc=1 (complete) → advance
+# state to phase=4 + spec_approved=true here so the Write can proceed.
+# rc=0/3 → keep phase=1, the Write still gets denied (correct).
+JIT_PARTIAL_LIB="$SCRIPT_DIR/lib/mcl-partial-spec.sh"
 JIT_SCANNER="$SCRIPT_DIR/lib/mcl-askq-scanner.py"
-if { [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null || [ "$SPEC_APPROVED" != "true" ]; } \
+if [ "$SPEC_APPROVED" != "true" ] \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] \
-   && [ -f "$JIT_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
-  # Pass restart_turn_ts (since 8.2.13) so the scanner drops pre-restart
-  # askq's. Without this filter, /mcl-restart would be defeated by JIT
-  # re-promoting on an old approve askq still in the session transcript.
-  JIT_RESTART_TS="$(mcl_state_get restart_turn_ts 2>/dev/null)"
-  JIT_JSON="$(python3 "$JIT_SCANNER" "$TRANSCRIPT_PATH" "$JIT_RESTART_TS" 2>/dev/null)"
-  if [ -n "$JIT_JSON" ]; then
-    JIT_INTENT="$(printf '%s' "$JIT_JSON" | python3 -c '
-import json, sys
-try:
-    obj = json.loads(sys.stdin.read())
-    print(obj.get("intent","") or "")
-except Exception:
-    pass
-' 2>/dev/null)"
-    JIT_SELECTED="$(printf '%s' "$JIT_JSON" | python3 -c '
-import json, sys
-try:
-    obj = json.loads(sys.stdin.read())
-    print(obj.get("selected","") or "")
-except Exception:
-    pass
-' 2>/dev/null)"
-    JIT_SPEC_HASH="$(printf '%s' "$JIT_JSON" | python3 -c '
-import json, sys
-try:
-    obj = json.loads(sys.stdin.read())
-    print(obj.get("spec_hash","") or "")
-except Exception:
-    pass
-' 2>/dev/null)"
-    PARTIAL_NOW="$(mcl_state_get partial_spec 2>/dev/null)"
-    STATE_SPEC_HASH="$(mcl_state_get spec_hash 2>/dev/null)"
-    if [ "$JIT_INTENT" = "spec-approve" ] \
-       && [ -n "$JIT_SPEC_HASH" ] \
-       && [ "$PARTIAL_NOW" != "true" ] \
-       && _mcl_pre_is_approve_option "$JIT_SELECTED"; then
-      # Idempotency: if state already matches this approval, skip.
-      if [ "$SPEC_APPROVED" = "true" ] && [ "$CURRENT_PHASE" -ge 4 ] 2>/dev/null \
-         && [ "$STATE_SPEC_HASH" = "$JIT_SPEC_HASH" ]; then
-        mcl_debug_log "pre-tool" "askq-jit-idempotent" "hash=${JIT_SPEC_HASH:0:12}"
-      else
-        mcl_state_set spec_hash "\"$JIT_SPEC_HASH\""
-        mcl_state_set spec_approved true
-        mcl_state_set current_phase 4
-        mcl_state_set phase_name '"EXECUTE"'
-        # UI intent scan mirrors stop.sh: bootstrap projects whose
-        # file-system UI signals fired `false` at session start still
-        # enter BUILD_UI if the approved spec has UI-framework markers.
-        UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
-        UI_INTENT_SCANNER="$SCRIPT_DIR/lib/mcl-spec-ui-intent.py"
-        if [ "$UI_FLOW_ON" != "true" ] && [ -f "$UI_INTENT_SCANNER" ]; then
-          UI_INTENT_VERDICT="$(python3 "$UI_INTENT_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
-          if [ "$UI_INTENT_VERDICT" = "true" ]; then
-            mcl_state_set ui_flow_active true
-            UI_FLOW_ON="true"
-            mcl_audit_log "ui-flow-spec-intent" "pre-tool" "hash=${JIT_SPEC_HASH:0:12}"
-            command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_flow_spec_intent "${JIT_SPEC_HASH:0:12}"
-          fi
+   && [ -f "$JIT_PARTIAL_LIB" ] && [ -f "$JIT_SCANNER" ] \
+   && command -v python3 >/dev/null 2>&1; then
+  set +e
+  bash "$JIT_PARTIAL_LIB" check "$TRANSCRIPT_PATH" >/dev/null 2>&1
+  _JIT_PARTIAL_RC=$?
+  set -e
+  if [ "$_JIT_PARTIAL_RC" = "1" ]; then
+    # Complete spec present in transcript. Compute its hash.
+    JIT_SPEC_HASH="$(python3 "$JIT_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null \
+      | python3 -c 'import json,sys; print((json.loads(sys.stdin.read() or "{}").get("spec_hash") or ""))' 2>/dev/null)"
+    if [ -n "$JIT_SPEC_HASH" ]; then
+      mcl_state_set spec_hash "\"$JIT_SPEC_HASH\""
+      mcl_state_set spec_approved true
+      mcl_state_set current_phase 4
+      mcl_state_set phase_name '"EXECUTE"'
+      UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
+      UI_INTENT_SCANNER="$SCRIPT_DIR/lib/mcl-spec-ui-intent.py"
+      if [ "$UI_FLOW_ON" != "true" ] && [ -f "$UI_INTENT_SCANNER" ]; then
+        UI_INTENT_VERDICT="$(python3 "$UI_INTENT_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
+        if [ "$UI_INTENT_VERDICT" = "true" ]; then
+          mcl_state_set ui_flow_active true
+          UI_FLOW_ON="true"
+          mcl_audit_log "ui-flow-spec-intent" "pre-tool" "hash=${JIT_SPEC_HASH:0:12}"
         fi
-        if [ "$UI_FLOW_ON" = "true" ]; then
-          mcl_state_set ui_sub_phase '"BUILD_UI"'
-          mcl_audit_log "ui-flow-enter-build" "pre-tool" "hash=${JIT_SPEC_HASH:0:12}"
-        fi
-        mcl_audit_log "askq-advance-jit" "pre-tool" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->4 ui_flow=${UI_FLOW_ON}"
-        mcl_debug_log "pre-tool" "askq-advance-jit" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->4"
-        command -v mcl_trace_append >/dev/null 2>&1 && {
-          mcl_trace_append spec_approved "${JIT_SPEC_HASH:0:12}"
-          mcl_trace_append phase_transition "$CURRENT_PHASE" 4
-          [ "$UI_FLOW_ON" = "true" ] && mcl_trace_append ui_flow_enabled
-          mcl_trace_append askq_advance_jit "${JIT_SPEC_HASH:0:12}"
-        }
-        bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$JIT_SPEC_HASH" 2>/dev/null || true
-        # Re-read state for downstream gate evaluation.
-        CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-        SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
-        PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
       fi
-    elif [ "$JIT_INTENT" = "summary-confirm" ] \
-         && _mcl_pre_is_approve_option "$JIT_SELECTED" \
-         && [ "$CURRENT_PHASE" = "1" ]; then
-      # Phase-1 → Phase-2 advance. Does NOT unlock mutating tools
-      # (still phase<4) but keeps audit/trace parity with Stop.
-      mcl_state_set current_phase 2
-      mcl_state_set phase_name '"SPEC_REVIEW"'
-      mcl_audit_log "askq-advance-jit" "pre-tool" "summary-confirm phase=1->2"
-      mcl_debug_log "pre-tool" "askq-advance-jit" "summary-confirm phase=1->2"
+      if [ "$UI_FLOW_ON" = "true" ]; then
+        mcl_state_set ui_sub_phase '"BUILD_UI"'
+      fi
+      mcl_audit_log "auto-approve-spec-jit" "pre-tool" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->4"
       command -v mcl_trace_append >/dev/null 2>&1 && {
-        mcl_trace_append summary_confirmed approved
-        mcl_trace_append phase_transition 1 2
+        mcl_trace_append spec_approved "${JIT_SPEC_HASH:0:12}"
+        mcl_trace_append phase_transition "$CURRENT_PHASE" 4
       }
+      bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$JIT_SPEC_HASH" 2>/dev/null || true
+      # Re-read state for downstream gate evaluation.
       CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+      SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
       PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
     fi
   fi
@@ -1390,7 +1342,7 @@ fi
 
 REASON=""
 if [ "$SPEC_APPROVED" != "true" ]; then
-  REASON="MCL LOCK — spec_approved=false (phase=${CURRENT_PHASE}). Mutating tool \`${TOOL_NAME}\` is blocked until the developer explicitly approves the 📋 Spec: block via AskUserQuestion (MCL X.Y.Z | Spec'i onaylıyor musun?)."
+  REASON="MCL LOCK — spec_approved=false (phase=${CURRENT_PHASE}). Mutating tool \`${TOOL_NAME}\` is blocked until you emit a format-valid \`📋 Spec:\` block (📋 prefix + 7 H2 sections: Title, Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope). The Stop hook auto-approves on next turn."
 fi
 
 # -------- Branch: UI flow path-exception (Phase 4a BUILD_UI / 4b REVIEW) --------

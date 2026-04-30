@@ -7,6 +7,81 @@
 
 ## [Unreleased]
 
+## [9.2.1] - 2026-05-01 — Spec auto-approve, AskUserQuestion approval removed
+
+### Breaking: AskUserQuestion-based spec approval is GONE
+
+Phase 1 (clarifying questions) and Phase 1.7 (precision-audit GATE
+questions) already give the developer fine-grained control over spec
+content. The AskUserQuestion approval step duplicated that control,
+introduced a model-deviation failure mode (paraphrased question bodies
+silently failed), and was the dominant source of pipeline-stall bugs.
+
+**New flow:**
+1. Phase 1: clarifying questions (existing).
+2. Phase 2: model emits `📋 Spec:` block with 7 H2 sections.
+3. Stop hook validates spec format → auto-transitions to
+   `current_phase=4`, `spec_approved=true` in the same turn. Audit:
+   `auto-approve-spec`.
+4. Phase 4: Write/Edit unlocked. To reject a spec, developer types
+   `/mcl-restart`.
+
+Pre-tool hook also runs the same auto-approve in JIT mode for
+same-turn spec + Write sequences. Audit: `auto-approve-spec-jit`.
+
+### Hard-pinned spec format enforcement
+
+Skill prose (`phase2-spec.md`, `phase3-verify.md`, `my-claude-lang.md`)
+now mandates the literal `📋 Spec:` line-anchored prefix and 7 H2
+sections in exact order:
+- `## [Title]` → `## Objective` → `## MUST` → `## SHOULD` →
+  `## Acceptance Criteria` → `## Edge Cases` → `## Technical Approach`
+  → `## Out of Scope`
+
+Hook-level enforcement: `mcl-partial-spec.sh` returns rc=3 when the
+model emits spec-LIKE text without the `📋` prefix (bare `Spec:`,
+`## Spec`, `## Faz N — Spec`). Stop hook handles rc=3 with
+`spec-no-emoji-block` audit and a `decision:block` carrying the exact
+canonical template — model retries with the verbatim format.
+
+### Pre-tool Write guard simplified
+
+Single condition: `spec_approved != true` → block. Phase value moved
+to error-message context only. Eliminates stale-phase-read deny bugs
+(e.g., "phase=1" when state actually shows phase=2).
+
+### Comprehensive synthetic test coverage (16 failure modes)
+
+New tests in `tests/cases/`:
+- `test-spec-format-enforcement.sh` — bare `Spec:`, `## Spec`,
+  `## Faz N — Spec`, missing H2 sections, canonical complete
+- `test-canonical-flow.sh` — full happy path: spec emit → auto Phase 4
+  → Write allowed; same-turn JIT advance
+- `test-multi-spec-latest-wins.sh` — re-emit recovery, latest spec wins
+- `test-phase4-5-gates.sh` — Phase 4.5 START fires sec/db/ui/ops/perf
+- `test-state-path-isolation.sh` — state lives at MCL_STATE_DIR, never
+  in CLAUDE_PROJECT_DIR/.mcl
+- `test-severity-blocks-write.sh` — HIGH-severity per-write block
+- `test-minimal-core-skips.sh` — MCL_MINIMAL_CORE=1 skip semantics
+
+New helper: `tests/lib/build-transcript.py` — synthesizes realistic
+Claude Code JSONL transcripts with named fixture kinds.
+
+### Test results
+
+- Default mode: unit 151/0/2, e2e 54/0/0
+- MCL_MINIMAL_CORE=1: unit 127/0/2 (24 skipped: spec format / hook-debug
+  / partial-spec / severity tests for disabled features), e2e 54/0/0
+
+### Removed
+
+- `mcl-stop.sh`: askq-driven spec-approve transition branch (~200 lines)
+- `mcl-pre-tool.sh`: askq-spec-approve JIT advance + summary-confirm
+  JIT advance (replaced with spec-format JIT advance)
+- Skill prose: AskUserQuestion call instructions in phase2-spec.md,
+  phase3-verify.md, my-claude-lang.md
+- `tests/cases/test-askq-non-pinned-body.sh`: test of removed feature
+
 ## [9.2.0] - 2026-04-30 — Minimal Core: fallback removal + canonical path fixes
 
 ### Breaking: hook fallbacks permanently deleted

@@ -250,24 +250,17 @@ processes the request AS IF a native English engineer wrote it.
    Non-functional Requirements / Failure Modes & Degradation /
    Observability / Reversibility+Rollback / Data Contract.
    See `phase2-spec.md` for triggers and templates.
-5. After the spec, explain in developer's language what it says
-6. Call `AskUserQuestion({question: "MCL {{MCL_VERSION}} | <EXACT pinned body —
-   TR: 'Spec\'i onaylıyor musun?' / EN: 'Approve this spec?' — copy verbatim,
-   see phase3-verify.md>", options:
-   [{label: "<approve-verb-only>", description: "..."},
-    {label: "<edit-verb>",         description: "..."},
-    {label: "<cancel-verb>",       description: "..."}]})`.
-   The approve `label` is the BARE VERB in the developer's language —
-   `Onayla` / `Approve` / `Aprobar` / `承認` / `승인` / `批准` / etc.
-   NO descriptive suffix (e.g. `Onayla, kodu yaz`, `Approve and proceed`
-   are forbidden). Free-form context goes in `description`, not `label`.
-   See `my-claude-lang/phase3-verify.md` for the full 14-language table.
-7. Do NOT proceed until the tool_result returns an approve-family option.
-   Do NOT emit the legacy `✅ MCL APPROVED` marker — it is dead in 6.0.0.
+5. After the spec, explain in developer's language what it says.
+6. **Auto-approve flow (since 9.2.1).** No AskUserQuestion call. When
+   the spec block passes the hook's format gate (📋 prefix + 7 H2
+   sections), the Stop hook automatically transitions state to
+   `current_phase=4`, `spec_approved=true` in the SAME turn. Developer
+   review happened in Phase 1 / 1.7. To reject a spec, the developer
+   types `/mcl-restart`. To stop, `/mcl-finish`.
 
-**⛔ STOP RULE:** After calling `AskUserQuestion` for spec approval, your
-response ENDS. Do not write code. Do not call further tools. STOP and wait
-for the tool_result.
+**⛔ STOP RULE:** After emitting the `📋 Spec:` block, your response
+ENDS. Do NOT call AskUserQuestion. Do NOT write code in the same turn.
+The next turn (after Stop hook auto-approves) begins Phase 4.
 
 Spec = SINGLE SOURCE OF TRUTH. All code must satisfy the spec.
 
