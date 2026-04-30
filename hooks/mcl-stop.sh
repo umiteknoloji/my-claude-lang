@@ -529,7 +529,7 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
       # (sticky enforcement — Bash-only/text-only turns cannot escape the gate).
       mcl_state_set phase_review_state '"pending"' >/dev/null 2>&1 || true
       mcl_audit_log "phase-review-pending" "stop" \
-        "prev=${_PR_REVIEW_STATE} phase=${_PR_PHASE} code=${_PR_CODE}"
+        "prev=${_PR_REVIEW_STATE} phase=${_PR_ACTIVE_PHASE} code=${_PR_CODE}"
       command -v mcl_trace_append >/dev/null 2>&1 && \
         mcl_trace_append phase_review_pending "${_PR_REVIEW_STATE:-null}"
 
