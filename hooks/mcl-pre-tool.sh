@@ -201,6 +201,126 @@ print(json.dumps({
   fi
 fi
 
+# -------- Project isolation pattern definition (since 9.1.3) --------
+# The actual isolation BRANCH lives further down in this file, after
+# the Phase 1-3 hook-debug branches (Bash + Read/Grep/Glob). Order
+# matters: hook-debug fires first to deny `~/.mcl/lib/...` reads in
+# Phase 1-3 with the "trust the pipeline" reason; isolation fires
+# after with the broader "outside CLAUDE_PROJECT_DIR" reason. If
+# isolation went first, its `~/.mcl` whitelist would mask hook-debug.
+# Defining the helper here keeps the long Python heredoc out of the
+# branch site below.
+_iso_check_python='
+import json, os, re, sys
+
+_proj = sys.argv[1].rstrip("/")
+_tool = sys.argv[2]
+
+try:
+    obj = json.loads(sys.stdin.read())
+    ti = obj.get("tool_input") or {}
+except Exception:
+    print(""); sys.exit(0)
+
+home = os.path.expanduser("~")
+
+# Whitelist: prefixes any project may legitimately reach.
+ALLOW = [
+    _proj,
+    "/tmp", "/private/tmp", "/var/tmp", "/var/folders",
+    home + "/.npm", home + "/.cache",
+    home + "/.yarn", home + "/.pnpm-store",
+    home + "/.cargo", home + "/.rustup",
+    home + "/.gradle", home + "/.m2",
+    home + "/.bun",
+    home + "/.claude/skills/my-claude-lang",
+    home + "/.claude/skills/my-claude-lang.md",
+    home + "/.claude/hooks/lib/mcl-stack-detect.sh",
+    home + "/.mcl",
+    "/usr",
+]
+def _norm(p):
+    p = os.path.expanduser(p)
+    if not os.path.isabs(p):
+        # Relative paths interpret against project (CWD == project for
+        # MCL hook subprocess); reject obvious lexical escape.
+        if p.startswith("../") or p == ".." or "/../" in p or p.endswith("/.."):
+            return None
+        return os.path.normpath(os.path.join(_proj, p))
+    return os.path.normpath(p)
+
+def _allowed(abs_p):
+    if abs_p is None:
+        return False
+    for a in ALLOW:
+        a_norm = os.path.normpath(os.path.expanduser(a))
+        if abs_p == a_norm or abs_p.startswith(a_norm + "/"):
+            return True
+    return False
+
+if _tool == "Bash":
+    cmd = ti.get("command", "") or ""
+    # Pattern 1: dangerous cd/pushd targets — lexical escape.
+    # Pattern 1b: any `../` argv token in any command (cat ../x,
+    # node ../bin/cli.js, mv ../a ./b, etc.). Anchored with a
+    # whitespace / shell-separator left context so `1..10` brace
+    # expansion does not false-positive.
+    escapes = [
+        r"(?:^|[;&|\s])cd\s+\.\.(?:[/\s;&|]|$)",
+        r"(?:^|[;&|\s])pushd\s+\.\.(?:[/\s;&|]|$)",
+        r"(?:^|[;&|\s])cd\s+~(?:/[^;&|\s]*)?(?:[;&|\s]|$)",
+        r"(?:^|[;&|\s])cd\s+\$HOME(?:/[^;&|\s]*)?(?:[;&|\s]|$)",
+        r"(?:^|[;&|=\s])\.\./",
+    ]
+    for p in escapes:
+        if re.search(p, cmd):
+            print("block:cd-escape:" + cmd[:80].replace("\n"," "))
+            sys.exit(0)
+    # Pattern 2: absolute / tilde-prefixed path tokens that escape the
+    # project + whitelist. Token-scan; reject the first non-allowed.
+    # Negative lookbehind includes `.` so relative paths like `./bin`
+    # or `../sibling` will not get their `/foo/bar` suffix captured
+    # as a standalone absolute path. Lexical-escape (`../`) is still
+    # caught by the cd/pushd patterns above; relative `./x` is
+    # project-local.
+    abs_re = re.compile(
+        r"(?<![\w/=:.])(/[A-Za-z0-9._\-/]+|~/[A-Za-z0-9._\-/]+)"
+    )
+    for m in abs_re.finditer(cmd):
+        tok = m.group(0)
+        # Pure root "/" tokens etc. — skip; only longer paths are signal.
+        if len(tok) < 2:
+            continue
+        # Drop trailing punctuation that may have been captured.
+        tok = tok.rstrip(".,;:)\"’”")
+        norm = _norm(tok)
+        if norm and not _allowed(norm):
+            print("block:abs:" + tok[:80])
+            sys.exit(0)
+elif _tool in ("Read", "Write", "Edit", "MultiEdit", "Glob", "Grep", "NotebookEdit"):
+    # Collect every input field that carries a path-like value.
+    candidates = []
+    for k in ("file_path", "path", "notebook_path"):
+        v = ti.get(k)
+        if isinstance(v, str) and v:
+            candidates.append(v)
+    pat = ti.get("pattern")
+    if isinstance(pat, str) and pat:
+        # Only treat pattern as a path if it looks absolute/tilde or
+        # has an escape segment — pure globs like "src/**/*.ts" are
+        # project-relative and fine.
+        if pat.startswith("/") or pat.startswith("~/") or \
+           pat.startswith("../") or "/../" in pat:
+            candidates.append(pat)
+    for c in candidates:
+        norm = _norm(c)
+        if norm is None:
+            print("block:relpath-escape:" + c[:80]); sys.exit(0)
+        if not _allowed(norm):
+            print("block:abs:" + c[:80]); sys.exit(0)
+print("")
+'
+
 # 8.19.2: superpowers:brainstorming hook block REMOVED.
 # Root-cause cut: install-claude-plugins.sh no longer installs the
 # superpowers plugin (8.19.2), so its `using-superpowers` SKILL.md
@@ -377,6 +497,43 @@ print(json.dumps({
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
         "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — Read / Grep / Glob on MCL hook/lib/state paths is blocked. There is no legitimate Phase 1-3 reason to inspect `~/.mcl/lib/`, `~/.claude/hooks/`, or `~/.mcl/projects/<key>/state/`. If a block fired (precision-audit / partial-spec / etc.), follow the block reason in your CURRENT response. Trust the pipeline or type /mcl-restart."
+    }
+}))
+' 2>/dev/null
+        exit 0
+      fi
+      ;;
+  esac
+fi
+
+# -------- Branch: project isolation (since 9.1.3, all phases) --------
+# Vaad #1: per-project state + per-project hook scope = "this MCL only
+# knows this project". Real-session bug: model ran `cd /Users/umit &&
+# npx create-next-app …` then Read /Users/umit/sibling-project/file.
+# That violated the isolation contract.
+#
+# Order note: this branch fires AFTER the Phase 1-3 hook-debug
+# branches above. Hook-debug denies `~/.mcl/lib/...` etc. with the
+# narrow "trust the pipeline" reason; isolation here covers any
+# cross-project boundary in any phase. The `~/.mcl` whitelist below
+# would otherwise mask the hook-debug deny if isolation came first.
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && command -v python3 >/dev/null 2>&1 \
+   && [ -n "${TOOL_NAME:-}" ]; then
+  case "$TOOL_NAME" in
+    Bash|Read|Write|Edit|MultiEdit|Glob|Grep|NotebookEdit)
+      _ISO_PROJ_REAL="$(cd "$CLAUDE_PROJECT_DIR" 2>/dev/null && pwd -P || printf '%s' "$CLAUDE_PROJECT_DIR")"
+      _ISO_HIT="$(printf '%s' "$RAW_INPUT" \
+        | python3 -c "$_iso_check_python" "$_ISO_PROJ_REAL" "$TOOL_NAME" 2>/dev/null)"
+      if printf '%s' "$_ISO_HIT" | grep -q "^block:"; then
+        _ISO_DETAIL="${_ISO_HIT#block:}"
+        mcl_audit_log "block-isolation" "pre-tool" "tool=${TOOL_NAME} detail=${_ISO_DETAIL}"
+        python3 -c '
+import json, sys
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "MCL ISOLATION — operations outside project directory ($CLAUDE_PROJECT_DIR) are blocked. Stay in the current project. Allowed system paths: build scratch (/tmp, /var/folders), package caches (~/.npm, ~/.cache, ~/.yarn, ~/.pnpm-store, ~/.cargo, ~/.gradle, ~/.m2, ~/.bun), MCL skill files (~/.claude/skills/my-claude-lang), Phase 1.7 stack-detect (~/.claude/hooks/lib/mcl-stack-detect.sh), MCL state (~/.mcl), system bins (/usr). For sibling project access, exit and re-enter MCL inside that project."
     }
 }))
 ' 2>/dev/null

@@ -7,6 +7,81 @@
 
 ## [Unreleased]
 
+## [9.1.3] - 2026-04-30 — Project Isolation Enforcement
+
+Real-session bug: kullanıcı `/Users/umitduman/ABCD` projesinde session başlattı, model `cd /Users/umitduman && npx create-next-app ...` çalıştırdı, ardından `/Users/umitduman/backoffice/` (kardeş proje) dosyalarını okudu. **Vaad #1 (proje izolasyonu) ihlal edildi.**
+
+MCL'in temel taahhüdü: per-project state dizini + per-project hook scope = "bu MCL sadece bu projeyi tanır". `MCL_STATE_DIR` envelope'u doğru kullanılıyordu ama **tool çağrılarının file system kapsamı enforce edilmiyordu** — model `CLAUDE_PROJECT_DIR` dışına çıkabiliyordu.
+
+### Fix
+
+`hooks/mcl-pre-tool.sh` yeni isolation branch — tüm phase'lerde fire eder:
+
+**Bash:**
+- `cd ..`, `cd ../foo`, `pushd ..` → deny (lexical escape)
+- `cd ~`, `cd ~/x`, `cd $HOME` → deny
+- `cd /Users/other`, `cat /Users/other/file` → deny (absolute outside whitelist)
+- `cat ../sibling/file.ts` → deny (`../` argv token in any command)
+- `node ./bin/cli.js`, `cd src && ls`, `npm install`, `git status` → allow
+- `cd /tmp/build` → allow (whitelist)
+
+**Read / Write / Edit / MultiEdit / Glob / Grep / NotebookEdit:**
+- `file_path` / `path` / `notebook_path` absolute resolve → outside project + whitelist → deny
+- `pattern` if absolute / tilde / contains `../` → resolve + check
+- Project-relative globs (`src/**/*.ts`) → allow
+
+### Whitelist (read/exec from any phase)
+
+| Path | Reason |
+|---|---|
+| `$CLAUDE_PROJECT_DIR` | Project root |
+| `/tmp`, `/private/tmp`, `/var/tmp`, `/var/folders` | Build scratch (npm/vite cache) |
+| `~/.npm`, `~/.cache`, `~/.yarn`, `~/.pnpm-store` | Package manager caches |
+| `~/.cargo`, `~/.rustup`, `~/.gradle`, `~/.m2`, `~/.bun` | Stack-specific caches |
+| `~/.claude/skills/my-claude-lang*` | MCL skill files (legitimate Phase 1-3 read) |
+| `~/.claude/hooks/lib/mcl-stack-detect.sh` | Phase 1.7 stack detection helper |
+| `~/.mcl` | MCL state dir |
+| `/usr` | System binaries (`/usr/bin/git`, `/usr/local/bin/node`) |
+
+### Order with existing hook-debug branches
+
+İzolasyon **AFTER** Phase 1-3 hook-debug branches (Bash + Read/Grep/Glob, 8.19.3 / 9.0.0). Hook-debug `~/.mcl/lib/...` ve `~/.claude/hooks/...` reads'lerini Phase 1-3'te narrow "trust the pipeline" reason'ıyla denies; isolation broader cross-project boundary kontrolü ekler. Order kritik: isolation önce gitse `~/.mcl` whitelist hook-debug'ı maskelerdi.
+
+### Block reason
+
+```
+MCL ISOLATION — operations outside project directory ($CLAUDE_PROJECT_DIR)
+are blocked. Stay in the current project. Allowed system paths: build
+scratch (/tmp, /var/folders), package caches (~/.npm, ~/.cache, ~/.yarn,
+~/.pnpm-store, ~/.cargo, ~/.gradle, ~/.m2, ~/.bun), MCL skill files
+(~/.claude/skills/my-claude-lang), Phase 1.7 stack-detect
+(~/.claude/hooks/lib/mcl-stack-detect.sh), MCL state (~/.mcl), system
+bins (/usr). For sibling project access, exit and re-enter MCL inside
+that project.
+```
+
+### Yeni audit event
+- `block-isolation | pre-tool | tool=<X> detail=<reason>:<token>`
+
+### Yeni test
+`tests/cases/test-project-isolation.sh` — 28 case:
+- Bash escape patterns (cd .., cd ../foo, cd ~, cd $HOME, pushd ..)
+- Bash absolute outside (cd /Users/other, cat /etc/passwd, cat ../escape)
+- Bash in-project + whitelist (cd /tmp/build, npm install, git status, node ./bin)
+- Read/Write/Edit cross-boundary deny + whitelist allow
+- Glob/Grep pattern handling (project-relative allow, ../ deny, absolute outside deny)
+- Phase-agnostic check (Phase 1 + cd .. → deny aynı şekilde)
+- Audit log captures block-isolation events
+
+### Bilinen sınırlar
+- Pattern-based (syntactic), realpath resolution değil. `eval $(echo cd ..)` gibi obfuscated escape'leri kaçar; legitimate model davranışı obfuscation kullanmaz.
+- Whitelist sabit: yeni package manager (`~/.deno`, vb.) için update gerek.
+- Symlink resolve: Python `os.path.normpath` kullanılır; `os.path.realpath` değil. Aynı project'e symlink ile ulaşan yollar normalize edilmeyebilir. 9.2'de değerlendir.
+
+### Tests
+- Unit: **154/0/2** (önce 126 → +28: project-isolation 28-case regression)
+- E2E: **65/0/0** — regresyonsuz
+
 ## [9.1.2] - 2026-04-30 — Partial-Spec Post-Approval Guard
 
 Real-session bug: model emit kısa ad-hoc spec (Project + Pages + Stack notu) **Phase 4 prose'unda**, **AslolanSpec onaylanmıştı VE Phase 4 işi tamamlanmıştı**. mcl-stop.sh partial-spec detector bu kısa prose'u yakaladı, eksik 7 zorunlu section tespit etti, "MCL SPEC RECOVERY" decision:block emit etti → kullanıcı session sonunda hata bloğu gördü.
