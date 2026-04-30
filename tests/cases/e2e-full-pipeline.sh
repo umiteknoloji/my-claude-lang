@@ -536,6 +536,195 @@ print(','.join(str(hb.get(k, 'missing')) for k in ['security','db','ui','ops','p
 }
 
 # ---------------------------------------------------------------------
+# PHASE 25 — Pause-on-error trigger (mock helper returns broken JSON)
+# ---------------------------------------------------------------------
+# Drives `mcl-pre-tool.sh` end-to-end with an Edit tool input on a
+# Python file (triggers the security-scan incremental path). The trick:
+# we run mcl-pre-tool.sh from a MIRROR hooks/ directory in /tmp where
+# every lib file is symlinked back to the real repo EXCEPT
+# `mcl-security-scan.py`, which is replaced by a stub that emits
+# `{"error":"simulated helper failure"}`.
+#
+# Why mirror not PATH override: mcl-pre-tool.sh resolves the helper
+# path from `SCRIPT_DIR` (its own dirname) — it does not consult PATH.
+# Mirroring the hooks dir is the lowest-impact way to swap the helper
+# while keeping auth-check valid (the auth check whitelists hook entry
+# scripts by absolute path; both real and mirror dirs match the pattern
+# because BASH_SOURCE of mcl-state.sh resolves to the mirror dir).
+
+_e2e_build_mirror_hooks() {
+  # $1 = mirror_dir (will hold mcl-*.sh + lib/)
+  # $2 = security_scan_stub_payload (raw stdout the stub will print)
+  local mirror="$1" stub_payload="$2"
+  mkdir -p "$mirror/lib"
+
+  # Symlink top-level hook entry scripts so $0 resolves into the mirror
+  # (auth-check whitelist matches by exact absolute path).
+  local f
+  for f in "$REPO_ROOT"/hooks/*.sh; do
+    ln -s "$f" "$mirror/$(basename "$f")"
+  done
+
+  # Symlink every lib file EXCEPT mcl-security-scan.py.
+  for f in "$REPO_ROOT"/hooks/lib/*; do
+    local bn
+    bn="$(basename "$f")"
+    if [ "$bn" = "mcl-security-scan.py" ]; then
+      continue
+    fi
+    ln -s "$f" "$mirror/lib/$bn"
+  done
+
+  # Drop the stub helper — it must accept the same flags
+  # (--mode=incremental --state-dir --project-dir --target --lang) and
+  # print the supplied payload.
+  # Pass payload as a JSON literal embedded via Python json.dumps so it
+  # survives any quoting issues in shell (bash 3.2 has no @Q operator).
+  python3 -c '
+import json, sys, os
+out_path, payload = sys.argv[1], sys.argv[2]
+script = (
+    "#!/usr/bin/env python3\n"
+    "import sys\n"
+    "sys.stdout.write(" + json.dumps(payload) + ")\n"
+    "sys.stdout.flush()\n"
+)
+open(out_path, "w").write(script)
+os.chmod(out_path, 0o755)
+' "$mirror/lib/mcl-security-scan.py" "$stub_payload"
+}
+
+phase_25_pause_on_scan_helper_error() {
+  phase_header "25 — Pause-on-error: scan helper returns {\"error\": ...}"
+
+  local proj
+  proj="$(setup_test_dir)"
+  local state_file="$proj/.mcl/state.json"
+  local audit_log="$proj/.mcl/audit.log"
+
+  # Real wrapper init.
+  run_activate_hook "$proj" "init" >/dev/null
+
+  # Patch state into Phase 4 so the security incremental scan path is
+  # active (mcl-pre-tool.sh gates the scan on phase >= 4).
+  _e2e_write_state "$state_file" '{
+    "current_phase": 4,
+    "phase_name": "EXECUTE",
+    "spec_approved": true,
+    "spec_hash": "deadbeef"
+  }'
+
+  # Build mirror hooks dir with stub security-scan.py.
+  local mirror="$proj/_mirror_hooks"
+  _e2e_build_mirror_hooks "$mirror" '{"error": "simulated helper failure"}'
+
+  # Create the file the Edit tool will target — incremental scan path
+  # only fires on existing source files.
+  local target_py="$proj/main.py"
+  printf '%s\n' "x = 1" > "$target_py"
+
+  # PreToolUse input shape: tool_name + tool_input for an Edit on .py.
+  local pre_input
+  pre_input="$(python3 -c '
+import json, sys
+print(json.dumps({
+    "tool_name": "Edit",
+    "tool_input": {
+        "file_path": sys.argv[1],
+        "old_string": "x = 1",
+        "new_string": "x = 2"
+    },
+    "session_id": "e2e-25",
+    "cwd": sys.argv[2]
+}))
+' "$target_py" "$proj")"
+
+  local pause_audit_before
+  pause_audit_before="$(audit_count "$audit_log" pause-on-error)"
+  local pause_active_before
+  pause_active_before="$(python3 -c "
+import json
+d = json.load(open('$state_file'))
+p = d.get('paused_on_error') or {}
+print('true' if p.get('active') else 'false')
+" 2>/dev/null)"
+
+  # Run mirror's mcl-pre-tool.sh — auth check sees entry_abs=$mirror/mcl-pre-tool.sh,
+  # hooks_dir=$mirror (BASH_SOURCE of mcl-state.sh symlink resolved to
+  # mirror). Match → write allowed → pause set → state.paused_on_error.active=true.
+  local pre_out
+  pre_out="$(printf '%s' "$pre_input" \
+    | CLAUDE_PROJECT_DIR="$proj" \
+      MCL_STATE_DIR="$proj/.mcl" \
+      MCL_REPO_PATH="$REPO_ROOT" \
+      bash "$mirror/mcl-pre-tool.sh" 2>/dev/null)"
+
+  # ASSERT 1: pre-tool emitted valid JSON
+  assert_json_valid "pre-tool → valid JSON under helper error" "$pre_out"
+
+  # ASSERT 2: permissionDecision = deny (mcl_pause_on_scan_error path)
+  local decision
+  decision="$(printf '%s' "$pre_out" | python3 -c '
+import json, sys
+d = json.loads(sys.stdin.read() or "{}")
+hso = d.get("hookSpecificOutput", {}) or {}
+print(hso.get("permissionDecision", ""))
+' 2>/dev/null)"
+  assert_equals "permissionDecision=deny on helper error" "$decision" "deny"
+
+  # ASSERT 3: pause-on-error audit incremented
+  local pause_audit_after
+  pause_audit_after="$(audit_count "$audit_log" pause-on-error)"
+  if [ "$pause_audit_after" -gt "$pause_audit_before" ]; then
+    PASS=$((PASS+1))
+    printf '  PASS: pause-on-error audit incremented (%d → %d)\n' \
+      "$pause_audit_before" "$pause_audit_after"
+  else
+    FAIL=$((FAIL+1))
+    printf '  FAIL: pause-on-error audit NOT incremented (%d → %d)\n' \
+      "$pause_audit_before" "$pause_audit_after"
+  fi
+
+  # ASSERT 4: state.paused_on_error.active = true (real persistence path)
+  local pause_active_after
+  pause_active_after="$(python3 -c "
+import json
+d = json.load(open('$state_file'))
+p = d.get('paused_on_error') or {}
+print('true' if p.get('active') else 'false')
+" 2>/dev/null)"
+  assert_equals "paused_on_error.active=true after helper error" "$pause_active_after" "true"
+
+  # ASSERT 5: paused_on_error carries the error_msg from the stub
+  local err_msg
+  err_msg="$(python3 -c "
+import json
+d = json.load(open('$state_file'))
+p = d.get('paused_on_error') or {}
+print(p.get('error_msg', ''))
+" 2>/dev/null)"
+  if printf '%s' "$err_msg" | grep -qF "simulated helper failure"; then
+    PASS=$((PASS+1))
+    printf '  PASS: paused_on_error.error_msg propagates stub payload\n'
+  else
+    FAIL=$((FAIL+1))
+    printf '  FAIL: paused_on_error.error_msg missing stub payload (got: %s)\n' "$err_msg"
+  fi
+
+  # ASSERT 6: source = "scan-helper" (correct provenance for resume UI)
+  local src
+  src="$(python3 -c "
+import json
+d = json.load(open('$state_file'))
+p = d.get('paused_on_error') or {}
+print(p.get('source', ''))
+" 2>/dev/null)"
+  assert_equals "paused_on_error.source = scan-helper" "$src" "scan-helper"
+
+  cleanup_test_dir "$proj"
+}
+
+# ---------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------
 
@@ -560,6 +749,7 @@ main() {
   phase_14_sticky_pause_blocks_gates
   phase_14_gates_helpers_clean_baseline
   phase_14_sequential_gate_ordering
+  phase_25_pause_on_scan_helper_error
 
   printf '\n=== E2E SUMMARY ===\n'
   printf 'Pass:  %d\n' "$PASS"

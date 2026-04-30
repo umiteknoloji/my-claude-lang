@@ -62,7 +62,7 @@ Legend: ✅ owned by bash test · 📋 manual checklist · 🚧 not yet covered
 | 22 | Phase 6 (b) regression scan — HIGH=0 | 🚧 |
 | 23 | Phase 6 (c) promise-vs-delivery — `phase1_intent` read (no LOW skip) | 🚧 |
 | 24 | `phase6_double_check_done=true` in state | 🚧 |
-| 25 | Pause-on-error trigger (mock broken scan) | 🚧 |
+| 25 | Pause-on-error trigger (mock broken scan) | ✅ |
 | 26 | `/mcl-resume` keyword — pause cleared | 🚧 |
 | 27 | `/codebase-scan` keyword — `project.md` `mcl-auto` block | 🚧 |
 | 28 | `/mcl-security-report` keyword + helper | 🚧 |
