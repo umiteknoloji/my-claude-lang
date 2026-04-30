@@ -90,8 +90,53 @@ export MCL_HOME
 export MCL_STATE_DIR="$state_dir"
 export MCL_PROJECT_KEY="$key"
 
-# ---- Exec claude with isolated config ----
-exec claude \
+# ---- Single-session-per-project lock (since 8.18.0) ----
+# A second mcl-claude invocation against the same project would share
+# state.json, audit.log, and the rotating skill-token — concurrent
+# writes are not coordinated and the token rotation race-condition
+# would invalidate the active session's token mid-turn. Lock prevents
+# that footgun. Cleared on normal exit, on Ctrl-C, and on stale-PID
+# detection if a previous wrapper crashed without cleaning up.
+LOCK_FILE="$state_dir/session.lock"
+
+if [ -f "$LOCK_FILE" ]; then
+  existing_pid="$(cat "$LOCK_FILE" 2>/dev/null | tr -d '[:space:]')"
+  if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+    echo "mcl-claude: MCL session already active for this project (PID $existing_pid)." >&2
+    echo "  Project: $real_pwd" >&2
+    echo "  Lock:    $LOCK_FILE" >&2
+    echo "  Exit the other terminal first, or:" >&2
+    echo "    kill $existing_pid && rm $LOCK_FILE" >&2
+    exit 1
+  fi
+  # Stale lock — owning process is gone. Reclaim silently.
+  rm -f "$LOCK_FILE" 2>/dev/null || true
+fi
+
+# Acquire the lock with our own PID. mode 0600 (umask 077) — only the
+# owning user reads/writes; subprocess inheritance does not change this.
+(umask 077 && printf '%s' "$$" > "$LOCK_FILE")
+
+# Cleanup runs on normal exit AND on signals (HUP/INT/TERM). We only
+# remove the lock if it still names OUR pid — defensive against the
+# stale-recovery path racing a second wrapper that already took over.
+_mcl_unlock() {
+  if [ -f "$LOCK_FILE" ]; then
+    local owner
+    owner="$(cat "$LOCK_FILE" 2>/dev/null | tr -d '[:space:]')"
+    [ "$owner" = "$$" ] && rm -f "$LOCK_FILE" 2>/dev/null || true
+  fi
+}
+trap _mcl_unlock EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+
+# ---- Run claude with isolated config ----
+# Cannot `exec` because that replaces the wrapper process and skips the
+# EXIT trap. Spawn claude as a child, wait, then propagate the exit
+# code. The lock is released by _mcl_unlock once we fall off the end.
+claude \
   --settings "$settings_file" \
   --plugin-dir "$MCL_LIB" \
   "$@"
+exit $?
