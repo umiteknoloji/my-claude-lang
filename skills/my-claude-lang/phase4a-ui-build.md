@@ -164,11 +164,30 @@ promotion details.
    | RU     | UI запущен и открыт в браузере: `<url>` — посмотри, потом вернись и расскажи впечатление.   |
    | ZH     | UI 已启动并在浏览器中打开：`<url>` — 先看看，然后回来告诉我你的想法。                       |
 
-6. **STOP.** Do not call `AskUserQuestion` now. The developer needs
-   room to inspect the UI in their browser without a modal dialog
-   blocking the terminal. Phase 4b takes over on the developer's
-   NEXT turn, after they return with free-form feedback (see
-   `my-claude-lang/phase4b-ui-review.md`).
+6. **MANDATORY: Call AskUserQuestion (since 9.2.3).** After emitting
+   the URL prose, immediately call:
+
+   ```
+   AskUserQuestion({
+     question: "MCL {{MCL_VERSION}} | Tasarımı onaylıyor musun?",
+     options: [
+       { label: "Onayla", description: "Tasarım uygun, backend'e geç" },
+       { label: "Değiştir", description: "Şu değişikliği yap: [açıkla]" },
+       { label: "İptal",   description: "UI flow'unu durdur" }
+     ]
+   })
+   ```
+
+   For English sessions, swap labels: `Approve` / `Revise` / `Cancel`.
+   The Stop hook ENFORCES this — without the askq call, Stop emits
+   `decision:block` ("MCL: UI hazır. Phase 4b zorunlu — askq ile onay
+   iste."). The model cannot proceed past Phase 4a without explicit
+   developer approval.
+
+   Why mandatory askq instead of free-form prose detection: real
+   sessions showed the model would say "uygulamayı kullanabilirsin" and
+   silently end the turn, bypassing the review gate. Hook now hard-
+   blocks; askq is the canonical Phase 4b entry, free-form is gone.
 
 ## What Does NOT Happen in Phase 4a
 

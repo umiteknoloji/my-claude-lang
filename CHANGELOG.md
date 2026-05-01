@@ -7,6 +7,94 @@
 
 ## [Unreleased]
 
+## [9.2.3] - 2026-05-01 — UI_REVIEW gate restored as core enforcement
+
+Real-session 9.2.2 ship worked end-to-end (spec auto-approve + Phase 4
+build) but vaad #2 broke: model finished without UI review gate. Said
+"Onay beklemiyorum, uygulamayı kullanabilirsin" and ended the turn,
+silently bypassing Phase 4b entirely.
+
+### Two interlocked root causes
+
+1. **Phase 4.5 enforcement fired on Phase 4a code-write turns.** The
+   Phase 4.5 START gate's active-phase regex `^(4|4a|4b|4c|3\.5)$`
+   matched `4a` (BUILD_UI sub-phase). Result: the model wrote one UI
+   file, the Phase 4.5 reminder block fired with `decision:block`,
+   the model interpreted "Phase 4.5 Risk Review IMMEDIATELY" as the
+   primary mandate, skipped Phase 4b/4c entirely, and went straight
+   to risk dialog. UI never reviewed.
+
+2. **No hard enforcement of Phase 4a → 4b transition.** 9.2.0 deleted
+   the silent auto-advance fallback. The replacement was supposed to
+   be skill prose mandating `mcl_state_set ui_sub_phase UI_REVIEW`,
+   but the model didn't execute that Bash. Without state advancement,
+   the dev-server auto-start never fired (it gates on
+   `ui_sub_phase=UI_REVIEW`), and the AskUserQuestion was never
+   issued.
+
+### Fix (9.2.3)
+
+**(a) Phase 4.5 START scope tightened** (`hooks/mcl-stop.sh:571`).
+Active-phase regex changed `^(4|4a|4b|4c|3\.5)$` → `^(4|4c|3\.5)$`.
+Phase 4.5 risk review now fires AFTER UI review approval (Phase 4c
+backend) — not during 4a/4b. UI flow has its own gate; risk review
+runs once on the final integrated codebase.
+
+**(b) New UI_REVIEW gate** (`hooks/mcl-stop.sh:1797`, ~95 lines).
+Hard enforcement, not silent fallback:
+
+- When `ui_flow_active=true` AND `ui_reviewed != true` AND
+  `ui_sub_phase ∈ {BUILD_UI, UI_REVIEW}` AND the transcript shows
+  Write/Edit/MultiEdit calls to frontend paths
+  (`src/components`, `src/pages`, `src/styles`, `*.tsx`, `*.vue`,
+  `*.svelte`, `package.json`, `vite.config*`, etc.):
+  1. Auto-advance `ui_sub_phase: BUILD_UI → UI_REVIEW` so dev-server
+     auto-start fires (audit: `ui-sub-phase-auto-advance`).
+  2. Scan transcript for any AskUserQuestion with a UI-review prompt
+     (regex matches `tasarım.*onayl`, `approve.*(design|ui)`,
+     `(onayla|approve).*backend`, etc.).
+  3. If askq is missing → emit `decision:block` with reason:
+     `MCL: UI hazır. Phase 4b zorunlu — dev server URL'sini paylaş ve AskUserQuestion ile onay iste. Soru body: 'Tasarımı onaylıyor musun?'. Options: Onayla / Değiştir / İptal. Detay: phase4b-ui-review.md.`
+     Audit: `ui-review-gate-block`.
+
+   Gate skips entirely when `MCL_MINIMAL_CORE=1` (consistent with
+   Phase 4.5 etc).
+
+**(c) Skill prose mandates askq** (`phase4a-ui-build.md`,
+`phase4b-ui-review.md`). Removed the "STOP. Do not call
+AskUserQuestion" instruction from Phase 4a step 6. Replaced with
+"MANDATORY: Call AskUserQuestion (since 9.2.3)" + verbatim template:
+
+```
+AskUserQuestion({
+  question: "MCL X.Y.Z | Tasarımı onaylıyor musun?",
+  options: [
+    { label: "Onayla",   description: "Tasarım uygun, backend'e geç" },
+    { label: "Değiştir", description: "Şu değişikliği yap: [açıkla]" },
+    { label: "İptal",    description: "UI flow'unu durdur" }
+  ]
+})
+```
+
+Phase 4b's free-form prose detection demoted from "primary path" to
+fallback; askq is canonical.
+
+### New synthetic test
+
+`tests/cases/test-ui-review-gate.sh`:
+1. BUILD_UI + frontend file write + no askq → `decision:block` +
+   `ui_sub_phase` auto-advances to UI_REVIEW + both audits captured.
+2. UI_REVIEW + askq present → no block (gate satisfied).
+3. `ui_flow_active=false` → gate skipped (non-UI project).
+4. `ui_reviewed=true` → gate skipped (Phase 4c open, gate done).
+
+### Test results
+
+- Default mode: unit **176/0/4**, e2e **54/0/0**
+- MCL_MINIMAL_CORE=1: unit **131/0/3**, e2e **54/0/0**
+
+**Total: 415 passing assertions across both modes, both suites. Zero failures.**
+
 ## [9.2.2] - 2026-05-01 — UX hardening: prose cleanup + minimal hook messages
 
 Real-session UX feedback after 9.2.1 ship surfaced three issues:

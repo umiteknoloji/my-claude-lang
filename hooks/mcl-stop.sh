@@ -567,8 +567,12 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
   _PR_ACTIVE_PHASE="$(mcl_get_active_phase 2>/dev/null)"
   _PR_REVIEW_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
 
-  # Phase 4+ means approved and executing (4, 4a, 4b, 4c, 4.5, 3.5 all qualify)
-  if echo "$_PR_ACTIVE_PHASE" | grep -qE '^(4|4a|4b|4c|3\.5)$'; then
+  # 9.2.3: Phase 4.5 fires only AFTER UI review is complete. While in
+  # BUILD_UI / UI_REVIEW sub-phases, the UI gate (line ~1820) handles
+  # enforcement — Phase 4.5 risk review runs after BACKEND code lands.
+  # Without this guard, Phase 4.5 reminder fires on every UI file write,
+  # blocking Phase 4a/4b entirely (vaad #2 regression).
+  if echo "$_PR_ACTIVE_PHASE" | grep -qE '^(4|4c|3\.5)$'; then
     _PR_JSON="$(python3 "$_PR_GUARD" "$TRANSCRIPT_PATH" 2>/dev/null)"
     _PR_CODE="$(printf '%s' "$_PR_JSON" | python3 -c \
       'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("code_written") else "false")' 2>/dev/null)"
@@ -1789,6 +1793,106 @@ PYPS
   mcl_audit_log "pattern-scan-cleared" "stop" ""
   command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_cleared
 fi
+
+# --- Phase 4a → 4b auto-advance + UI_REVIEW gate enforcement (since 9.2.3) ---
+# Vaad #2 enforcement: when UI flow is active and the model has written
+# frontend files in the BUILD_UI sub-phase, auto-advance to UI_REVIEW
+# and block Stop until the model calls AskUserQuestion for visual
+# approval. Replaces the deleted 9.1.0 silent auto-advance fallback —
+# this version is hard-enforcement, not a quiet bypass.
+#
+# Two assertions:
+#   (1) BUILD_UI + frontend files written this session → advance to UI_REVIEW
+#       (so dev server auto-start below can fire)
+#   (2) UI_REVIEW + no ui-review askq in transcript → decision:block
+#       mandating the askq call
+if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
+  _UI_GATE_FLOW="$(mcl_state_get ui_flow_active 2>/dev/null)"
+  _UI_GATE_SUB="$(mcl_state_get ui_sub_phase 2>/dev/null | tr -d '"')"
+  _UI_GATE_REVIEWED="$(mcl_state_get ui_reviewed 2>/dev/null)"
+  if [ "$_UI_GATE_FLOW" = "true" ] && [ "$_UI_GATE_REVIEWED" != "true" ] \
+     && { [ "$_UI_GATE_SUB" = "BUILD_UI" ] || [ "$_UI_GATE_SUB" = "UI_REVIEW" ]; } \
+     && [ -n "${TRANSCRIPT_PATH:-}" ] && [ -f "$TRANSCRIPT_PATH" ] \
+     && command -v python3 >/dev/null 2>&1; then
+    _UI_GATE_INFO="$(python3 - "$TRANSCRIPT_PATH" <<'PYEOF'
+import json, re, sys
+path = sys.argv[1]
+fe_path_re = re.compile(
+    r"(?:^|/)src/(?:components|pages|app|styles|features|views|routes)(?:/|$)"
+    r"|(?:^|/)public/"
+    r"|\.(?:tsx|jsx|vue|svelte|css|scss)$"
+    r"|(?:^|/)(?:package\.json|vite\.config|next\.config|nuxt\.config|tsconfig|tailwind\.config|postcss\.config)"
+)
+ask_re = re.compile(
+    r"(?i)(?:tasarım|design|ui).*onayl"
+    r"|approve.*(?:design|ui|tasarım)"
+    r"|(?:onayla|approve).*backend"
+    r"|tasarım[ıi]?\s*(?:onayl|kontrol)"
+)
+files_written = 0
+ui_askq = False
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            try:
+                obj = json.loads(line.strip())
+            except Exception:
+                continue
+            msg = obj.get("message", {})
+            if not isinstance(msg, dict):
+                continue
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                t = item.get("type")
+                name = item.get("name", "")
+                if t == "tool_use" and name in ("Write", "Edit", "MultiEdit"):
+                    inp = item.get("input", {}) or {}
+                    fp = inp.get("file_path") or inp.get("notebook_path") or ""
+                    if fp and fe_path_re.search(fp):
+                        files_written += 1
+                elif t == "tool_use" and name == "AskUserQuestion":
+                    inp = item.get("input", {}) or {}
+                    qs = inp.get("questions") or []
+                    q = ""
+                    if isinstance(qs, list) and qs and isinstance(qs[0], dict):
+                        q = qs[0].get("question") or ""
+                    if q and ask_re.search(q):
+                        ui_askq = True
+except Exception:
+    pass
+print(f"files={files_written}|askq={'yes' if ui_askq else 'no'}")
+PYEOF
+)"
+    _UI_GATE_FILES="${_UI_GATE_INFO%%|*}"; _UI_GATE_FILES="${_UI_GATE_FILES#files=}"
+    _UI_GATE_ASKQ="${_UI_GATE_INFO##*askq=}"
+    if [ "${_UI_GATE_FILES:-0}" -ge 1 ] 2>/dev/null; then
+      # (1) Auto-advance BUILD_UI → UI_REVIEW so dev-server auto-start fires.
+      if [ "$_UI_GATE_SUB" = "BUILD_UI" ]; then
+        mcl_state_set ui_sub_phase '"UI_REVIEW"' >/dev/null 2>&1 || true
+        mcl_audit_log "ui-sub-phase-auto-advance" "mcl-stop" \
+          "BUILD_UI->UI_REVIEW reason=fe-files-written count=${_UI_GATE_FILES}"
+        command -v mcl_trace_append >/dev/null 2>&1 && \
+          mcl_trace_append ui_sub_phase_advance "UI_REVIEW"
+        _UI_GATE_SUB="UI_REVIEW"
+      fi
+      # (2) UI_REVIEW + no ui-review askq → block until the model asks.
+      if [ "$_UI_GATE_SUB" = "UI_REVIEW" ] && [ "$_UI_GATE_ASKQ" = "no" ]; then
+        mcl_audit_log "ui-review-gate-block" "mcl-stop" \
+          "files=${_UI_GATE_FILES} askq=missing"
+        printf '%s\n' "{
+  \"decision\": \"block\",
+  \"reason\": \"MCL: UI hazır. Phase 4b zorunlu — dev server URL'sini paylaş ve AskUserQuestion ile onay iste. Soru body: 'Tasarımı onaylıyor musun?'. Options: Onayla / Değiştir / İptal. Detay: phase4b-ui-review.md.\"
+}"
+        exit 0
+      fi
+    fi
+  fi
+fi
+# --- end UI_REVIEW gate ---
 
 # --- Dev server auto-start (since 8.12.0) ---
 # Trigger: ui_flow_active=true AND ui_sub_phase=UI_REVIEW AND dev_server.active=false

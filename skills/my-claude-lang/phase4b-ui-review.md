@@ -54,10 +54,15 @@ Full 14-language token sets live in `hooks/mcl-stop.sh` under
 - Ambiguous one-word reply in a non-cue form → fall back to the
   explicit `AskUserQuestion` below.
 
-## Confirmation AskUserQuestion (fallback only)
+## Mandatory AskUserQuestion (since 9.2.3)
 
-If intent classification is genuinely ambiguous (empty reply, a
-single emoji, a question back at MCL, etc.), and only then, emit:
+Phase 4b is **askq-driven, not free-form**. Real sessions showed the
+model bypassing free-form prose detection ("uygulamayı kullanabilirsin"
+→ no review gate, no transition to Phase 4c). The Stop hook now
+hard-enforces an `ui-review` askq presence in the transcript before
+Phase 4 can complete; missing askq → `decision:block`.
+
+Always emit:
 
 ```
 AskUserQuestion({
