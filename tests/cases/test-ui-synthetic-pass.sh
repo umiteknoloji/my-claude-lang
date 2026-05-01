@@ -1,14 +1,16 @@
 #!/bin/bash
-# Test: UI flow + browser-display verification — SYNTHETIC PASS only.
+# Test: 10.0.0 UI flow Phase 2 → Phase 3 — SYNTHETIC PASS only.
 #
-# UI sub-phases (4a BUILD_UI, 4b REVIEW, 4c BACKEND) involve a live
-# browser (mcl-claude-in-chrome / playwright / dev-server). These cannot
-# be exercised end-to-end in CI without a display + browser binary.
+# In 10.0.0 the old 4a/4b/4c sub-phases collapse into:
+#   - Phase 2 DESIGN_REVIEW: UI skeleton writes allowed, backend blocked
+#   - Phase 3 IMPLEMENTATION: all writes unlocked (UI + backend)
+# design_approved=true is the single transition trigger.
 #
 # This test exercises the STATE machinery only:
-#   - ui_flow_active=true + ui_sub_phase transitions (BUILD_UI → REVIEW
-#     → BACKEND) work via state writes
-#   - mcl-pre-tool.sh path-exception blocks backend paths in BUILD_UI
+#   - Phase 2 + is_ui_project=true: pre-tool denies backend writes,
+#     allows frontend writes
+#   - After design_approved=true + transition to Phase 3: backend writes
+#     succeed
 #
 # **Vaad #2 (browser-rendered UI matches the spec) is SYNTHETIC-PASS;
 # real-session confirmation required in production.**
@@ -17,24 +19,21 @@ echo "--- test-ui-synthetic-pass ---"
 
 _us_proj="$(setup_test_dir)"
 
-_us_init_4a() {
+_us_init_phase2() {
   python3 - "$_us_proj/.mcl/state.json" <<'PY'
 import json, sys, time
-o = {"schema_version": 2, "current_phase": 4, "phase_name": "EXECUTE",
-     "spec_approved": True, "spec_hash": "deadbeefcafef00d",
-     "ui_flow_active": True, "ui_sub_phase": "BUILD_UI",
-     "phase4_5_security_scan_done": True, "phase4_5_db_scan_done": True,
-     "phase4_5_ui_scan_done": True, "phase4_5_ops_scan_done": True,
-     "phase4_5_perf_scan_done": True,
+o = {"schema_version": 3, "current_phase": 2, "phase_name": "DESIGN_REVIEW",
+     "is_ui_project": True, "design_approved": False,
+     "spec_hash": "deadbeefcafef00d",
      "last_update": int(time.time())}
 open(sys.argv[1], "w").write(json.dumps(o))
 PY
 }
 
-_us_init_4a
+_us_init_phase2
 
-# Build a Write attempt against a BACKEND path in BUILD_UI sub-phase.
-# Pre-tool path-exception should DENY backend writes in BUILD_UI.
+# Build a Write attempt against a BACKEND path in Phase 2 DESIGN_REVIEW.
+# Pre-tool path-exception should DENY backend writes in Phase 2.
 _us_t="$_us_proj/t.jsonl"
 python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_us_t" user-only "build"
 
@@ -53,10 +52,10 @@ _us_out_backend="$(printf '%s' "$_us_payload" \
     MCL_REPO_PATH="$REPO_ROOT" \
     bash "$REPO_ROOT/hooks/mcl-pre-tool.sh" 2>/dev/null)"
 
-assert_contains "[4a BUILD_UI] backend Write → permissionDecision deny" "$_us_out_backend" '"permissionDecision": "deny"'
-assert_contains "[4a BUILD_UI] reason mentions UI-BUILD LOCK" "$_us_out_backend" "UI-BUILD LOCK"
+assert_contains "[Phase 2] backend Write → permissionDecision deny" "$_us_out_backend" '"permissionDecision": "deny"'
+assert_contains "[Phase 2] reason mentions DESIGN_REVIEW" "$_us_out_backend" "DESIGN_REVIEW"
 
-# Frontend Write in BUILD_UI → ALLOWED.
+# Frontend Write in Phase 2 DESIGN_REVIEW → ALLOWED.
 _us_payload_fe="$(python3 -c "
 import json,sys
 print(json.dumps({
@@ -74,25 +73,26 @@ _us_out_frontend="$(printf '%s' "$_us_payload_fe" \
 
 if [ -z "$_us_out_frontend" ] || ! printf '%s' "$_us_out_frontend" | grep -q '"permissionDecision": "deny"'; then
   PASS=$((PASS+1))
-  printf '  PASS: [4a BUILD_UI] frontend Write → allowed\n'
+  printf '  PASS: [Phase 2] frontend Write → allowed\n'
 else
   FAIL=$((FAIL+1))
-  printf '  FAIL: [4a BUILD_UI] frontend Write blocked unexpectedly\n'
+  printf '  FAIL: [Phase 2] frontend Write blocked unexpectedly\n'
   printf '        output: %s\n' "$(printf '%s' "$_us_out_frontend" | head -c 200)"
 fi
 
-# Transition BUILD_UI → BACKEND via direct state edit (simulates
-# successful UI review approval).
+# Transition Phase 2 → Phase 3 IMPLEMENTATION via direct state edit
+# (simulates successful design askq approval).
 python3 -c "
 import json
 p = '$_us_proj/.mcl/state.json'
 d = json.load(open(p))
-d['ui_sub_phase'] = 'BACKEND'
-d['ui_reviewed'] = True
+d['current_phase'] = 3
+d['phase_name'] = 'IMPLEMENTATION'
+d['design_approved'] = True
 open(p,'w').write(json.dumps(d))
 "
 
-# Same backend Write should now succeed.
+# Same backend Write should now succeed in Phase 3.
 _us_out_backend2="$(printf '%s' "$_us_payload" \
   | CLAUDE_PROJECT_DIR="$_us_proj" \
     MCL_STATE_DIR="$_us_proj/.mcl" \
@@ -101,15 +101,14 @@ _us_out_backend2="$(printf '%s' "$_us_payload" \
 
 if [ -z "$_us_out_backend2" ] || ! printf '%s' "$_us_out_backend2" | grep -q '"permissionDecision": "deny"'; then
   PASS=$((PASS+1))
-  printf '  PASS: [4c BACKEND] backend Write → allowed after UI review\n'
+  printf '  PASS: [Phase 3] backend Write → allowed after design approval\n'
 else
   FAIL=$((FAIL+1))
-  printf '  FAIL: [4c BACKEND] backend Write blocked unexpectedly\n'
+  printf '  FAIL: [Phase 3] backend Write blocked unexpectedly\n'
 fi
 
 # Annotation: vaad #2 (browser-rendered UI matches spec) is NOT
-# tested here. Synthetic-pass only. See RELEASE_9.2.1_REPORT.md
-# Limitation 7.
+# tested here. Synthetic-pass only.
 SKIP=$((SKIP+1))
 printf '  SKIP: vaad #2 — browser-rendered UI vs spec match (synthetic-pass; real-session required)\n'
 

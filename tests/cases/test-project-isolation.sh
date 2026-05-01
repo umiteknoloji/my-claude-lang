@@ -20,10 +20,11 @@ mkdir -p "$_iso_proj/.mcl"
 python3 - <<PY
 import json, time
 o = {
-    "schema_version": 2,
-    "current_phase": 4,
-    "phase_name": "EXECUTE",
-    "spec_approved": True,
+    "schema_version": 3,
+    "current_phase": 3,
+    "phase_name": "IMPLEMENTATION",
+    "is_ui_project": False,
+    "design_approved": True,
     "last_update": int(time.time()),
 }
 open("$_iso_state", "w").write(json.dumps(o))
@@ -106,10 +107,11 @@ _iso_assert_deny  "Grep cross-boundary path" "Grep"  '{"pattern":"x","path":"/Us
 python3 - <<PY
 import json, time
 o = {
-    "schema_version": 2,
+    "schema_version": 3,
     "current_phase": 1,
-    "phase_name": "COLLECT",
-    "spec_approved": False,
+    "phase_name": "INTENT",
+    "is_ui_project": False,
+    "design_approved": False,
     "last_update": int(time.time()),
 }
 open("$_iso_state", "w").write(json.dumps(o))

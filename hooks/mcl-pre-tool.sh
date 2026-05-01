@@ -552,8 +552,8 @@ fi
 # violations no longer gate any tool call. Phase 1 summary-confirm askq
 # is the only state-driving askq.
 
-# -------- Branch: block Task dispatch of Phase 4.5/4.6/5 as sub-agent --------
-# sub-agent-phase-discipline: Phase 4.5 (Risk Review), 4.6 (Impact Review),
+# -------- Branch: block Task dispatch of Phase 4/5 as sub-agent --------
+# sub-agent-phase-discipline: Phase 4 (Risk Review), 4.6 (Impact Review),
 # and Phase 5 (Verification Report) MUST run in the main MCL session as
 # interactive AskUserQuestion dialogs. Sub-agents cannot substitute them.
 if [ "$TOOL_NAME" = "Task" ] && command -v python3 >/dev/null 2>&1; then
@@ -563,7 +563,7 @@ try:
     obj = json.loads(sys.stdin.read())
     tin = obj.get("tool_input") or {}
     desc = (tin.get("description") or tin.get("prompt") or "").lower()
-    # Check for Phase 4.5/4.6/5 keywords indicating sub-agent substitution
+    # Check for Phase 4/5 keywords indicating sub-agent substitution
     patterns = [
         r"phase\s*4\.5", r"phase\s*4\.6", r"phase\s*5",
         r"risk\s+review", r"impact\s+review", r"verification\s+report",
@@ -587,7 +587,7 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL SUB-AGENT DISCIPLINE — Phase 4.5 (Risk Review), Phase 4.6 (Impact Review), and Phase 5 (Verification Report) cannot be dispatched to sub-agents. These phases require the main MCL session to run the interactive AskUserQuestion dialog directly with the developer. Run them in this session after all code sub-agents complete."
+        "permissionDecisionReason": "MCL SUB-AGENT DISCIPLINE — Phase 4 (Risk Review), Phase 4 (impact lens) (Impact Review), and Phase 5 (Verification Report) cannot be dispatched to sub-agents. These phases require the main MCL session to run the interactive AskUserQuestion dialog directly with the developer. Run them in this session after all code sub-agents complete."
     }
 }))
 ' 2>/dev/null
@@ -876,19 +876,21 @@ fi
 
 # Mutating tool attempted — consult state.
 CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
+DESIGN_APPROVED="$(mcl_state_get design_approved 2>/dev/null)"
+IS_UI_PROJECT="$(mcl_state_get is_ui_project 2>/dev/null)"
 PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
 
 # Default everything if state missing.
 CURRENT_PHASE="${CURRENT_PHASE:-1}"
-SPEC_APPROVED="${SPEC_APPROVED:-false}"
-PHASE_NAME="${PHASE_NAME:-COLLECT}"
+DESIGN_APPROVED="${DESIGN_APPROVED:-false}"
+IS_UI_PROJECT="${IS_UI_PROJECT:-false}"
+PHASE_NAME="${PHASE_NAME:-INTENT}"
 
 # -------- Branch: Phase 4 incremental security scan (since 8.7.1) --------
 # Edit/Write/MultiEdit to source files trigger HIGH-only quick scan.
 # Cache-keyed (file SHA1 + rules version), MEDIUM/LOW silent audit only.
 _SEC_SCAN_LIB="$SCRIPT_DIR/lib/mcl-security-scan.py"
-if [ "$CURRENT_PHASE" = "4" ] \
+if { [ "$CURRENT_PHASE" = "3" ] || [ "$CURRENT_PHASE" = "4" ]; } \
    && [ -f "$_SEC_SCAN_LIB" ] \
    && command -v python3 >/dev/null 2>&1 \
    && [ -n "${MCL_STATE_DIR:-}" ]; then
@@ -996,7 +998,7 @@ fi
 # HIGH-only DB scan. Cache-keyed via mcl-db-scan.py. Skipped if no
 # db-* stack tag detected.
 _DB_SCAN_LIB="$SCRIPT_DIR/lib/mcl-db-scan.py"
-if [ "$CURRENT_PHASE" = "4" ] \
+if { [ "$CURRENT_PHASE" = "3" ] || [ "$CURRENT_PHASE" = "4" ]; } \
    && [ -f "$_DB_SCAN_LIB" ] \
    && command -v python3 >/dev/null 2>&1 \
    && [ -n "${MCL_STATE_DIR:-}" ]; then
@@ -1103,7 +1105,7 @@ fi
 # Edit/Write/MultiEdit to UI files trigger HIGH-only a11y-critical scan.
 # Cache-keyed via mcl-ui-scan.py. Skipped if no fe stack tag.
 _UI_SCAN_LIB="$SCRIPT_DIR/lib/mcl-ui-scan.py"
-if [ "$CURRENT_PHASE" = "4" ] \
+if { [ "$CURRENT_PHASE" = "3" ] || [ "$CURRENT_PHASE" = "4" ]; } \
    && [ -f "$_UI_SCAN_LIB" ] \
    && command -v python3 >/dev/null 2>&1 \
    && [ -n "${MCL_STATE_DIR:-}" ]; then
@@ -1236,27 +1238,28 @@ _mcl_pre_is_approve_option() {
   return 1
 }
 
-# 9.3.0: Phase model simplified — Write/Edit gate now checks
-# current_phase only. Spec emission is documentation, not a gate.
-# Phase 1→4 transition is summary-confirm-driven (in Stop hook).
-# JIT auto-advance removed — no longer needed since phase=4 is
-# guaranteed before any Phase 4 Write turn (summary-confirm fires on
-# the previous Stop).
+# 10.0.0: Phase guard — current_phase semantics:
+#   1 INTENT          → all Write/Edit BLOCKED (locked)
+#   2 DESIGN_REVIEW   → frontend paths only (UI projects); backend BLOCKED
+#   3 IMPLEMENTATION  → all unlocked
+#   4 RISK_GATE       → all unlocked (severity scans run)
+#   5 VERIFICATION    → all unlocked
+#   6 FINAL_REVIEW    → all unlocked
 REASON=""
-if [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null; then
-  REASON="MCL: ${TOOL_NAME} blocked. phase=${CURRENT_PHASE} (Phase 1 / question phase). Phase 1 summary-confirm askq must be approved first; phase advances to 4 on approval, mutating tools unlock."
+if [ "$CURRENT_PHASE" -lt 2 ] 2>/dev/null; then
+  REASON="MCL: ${TOOL_NAME} blocked. phase=${CURRENT_PHASE} (Phase 1 INTENT). Phase 1 summary-confirm askq must be approved first; on approval phase advances to 2 (UI projects) or 3 (non-UI), mutating tools unlock."
 fi
 
-# -------- Branch: UI flow path-exception (Phase 4a BUILD_UI / 4b REVIEW) --------
-# When UI flow is active AND we're in BUILD_UI or REVIEW sub-phase, only
-# frontend paths + .mcl/ internals are writeable. Backend paths stay
-# locked until the developer approves the UI and MCL advances to the
-# BACKEND sub-phase. This prevents "Claude wrote the backend before I
-# saw the UI" regressions.
-if [ -z "$REASON" ]; then
+# -------- Branch: Phase 2 DESIGN_REVIEW path-exception --------
+# When current_phase=2 (DESIGN_REVIEW), only frontend paths + .mcl/ internals
+# are writeable. Backend paths stay locked until the developer approves the
+# design askq and MCL advances to Phase 3 (IMPLEMENTATION). This prevents
+# "Claude wrote the backend before I saw the UI" regressions.
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "2" ]; then
   UI_FLOW_ACTIVE="$(mcl_state_get ui_flow_active 2>/dev/null)"
   UI_SUB_PHASE="$(mcl_state_get ui_sub_phase 2>/dev/null)"
-  if [ "$UI_FLOW_ACTIVE" = "true" ] && { [ "$UI_SUB_PHASE" = "BUILD_UI" ] || [ "$UI_SUB_PHASE" = "REVIEW" ]; }; then
+  # Phase 2 always treats writes as BUILD_UI-equivalent (frontend-only).
+  if true; then
     UI_PATH_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json, re, sys
 try:
@@ -1295,6 +1298,10 @@ backend_patterns = [
     r"(^|/)netlify\.toml$",
     r"(^|/)server\.(js|ts|mjs)$",
     r"(^|/)index\.server\.",
+    r"(^|/)server(/|$)",             # standalone server/ directory (Express, Fastify, etc.)
+    r"(^|/)backend(/|$)",
+    r"(^|/)api(/|$)",                # standalone api/ directory
+    r"(^|/)routes(/|$)",
 ]
 for pat in backend_patterns:
     if re.search(pat, norm):
@@ -1303,30 +1310,105 @@ print("allow|")
 ' 2>/dev/null)"
     if [ "${UI_PATH_VERDICT%%|*}" = "deny" ]; then
       DENIED_PATH="${UI_PATH_VERDICT#deny|}"
-      REASON="MCL UI-BUILD LOCK — ui_sub_phase=${UI_SUB_PHASE}. Backend path \`${DENIED_PATH}\` is blocked until the developer approves the UI and MCL advances to the BACKEND sub-phase. Frontend code (components, pages, styles, fixtures), \`public/\`, \`.mcl/\` temp files, and framework-neutral files (README, package.json) are allowed. Build the UI with mock/fixture data only; integrate backend in Phase 4c."
+      REASON="MCL DESIGN-REVIEW LOCK — Phase 2 (DESIGN_REVIEW). Backend path \`${DENIED_PATH}\` is blocked until the developer approves the design (AskUserQuestion 'Tasarımı onaylıyor musun?' / 'Approve this design?') and MCL advances to Phase 3. Frontend code (components, pages, styles, fixtures), \`public/\`, \`.mcl/\` temp files, and framework-neutral files (README, package.json) are allowed. Build the UI skeleton with mock/fixture data only; integrate backend in Phase 3."
     fi
   fi
 fi
 
-# -------- Branch: Pattern Matching guard (Phase 3.5) --------
+# -------- Branch: Pattern Matching guard (Phase 3 entry pattern scan) --------
 # When pattern_scan_due=true, Claude must read existing sibling files before
-# writing anything. One-turn grace: after the first Phase 4 turn the stop
+# writing anything. One-turn grace: after the first Phase 3 turn the stop
 # hook clears the flag and writes are unblocked.
-if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "4" ]; then
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "3" ]; then
   _PS_DUE_PT="$(mcl_state_get pattern_scan_due 2>/dev/null)"
   if [ "$_PS_DUE_PT" = "true" ]; then
     _PAT_FILES_PT="$(mcl_state_get pattern_files 2>/dev/null)"
-    REASON="MCL PHASE 3.5 — Pattern scan pending. Before writing any Phase 4 code, read the existing sibling files listed in the PATTERN_MATCHING_NOTICE to extract naming, error handling, import style, and test structure patterns. Write nothing this turn — use Read tool on each listed file, note the patterns, then end the turn. Writes will unblock automatically on the next turn."
+    REASON="MCL PATTERN SCAN — Pattern scan pending. Before writing any Phase 3 code, read the existing sibling files listed in the PATTERN_MATCHING_NOTICE to extract naming, error handling, import style, and test structure patterns. Write nothing this turn — use Read tool on each listed file, note the patterns, then end the turn. Writes will unblock automatically on the next turn."
     mcl_audit_log "pattern-scan-block" "pre-tool" "tool=${TOOL_NAME}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_block
   fi
 fi
 
-# -------- Branch: Scope Guard (Phase 4) --------
+# -------- Branch: Intent Violation Check (Phase 3+) --------
+# Phase 4 RISK_GATE feature: scan phase1_intent for negation phrases
+# ("no backend", "frontend only", "no DB", "no auth", etc.); if a Write
+# attempt targets a path that violates the declared intent, deny with
+# HIGH severity. Stack-agnostic — patterns match any framework's
+# backend/api/db conventions.
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" -ge 3 ] 2>/dev/null \
+   && [ "${MCL_MINIMAL_CORE:-0}" != "1" ] \
+   && command -v python3 >/dev/null 2>&1; then
+  _IV_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, os, re, sys
+
+try:
+    obj = json.loads(sys.stdin.read())
+except Exception:
+    print("allow"); sys.exit(0)
+tin = obj.get("tool_input") or {}
+fp = tin.get("file_path") or tin.get("notebook_path") or ""
+if not fp:
+    print("allow"); sys.exit(0)
+
+# Read phase1_intent + phase1_constraints from state.json. Honor
+# MCL_STATE_DIR / CLAUDE_PROJECT_DIR env vars (set by hook entrypoint).
+_state_dir = os.environ.get("MCL_STATE_DIR")
+if not _state_dir:
+    _proj = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    _state_dir = os.path.join(_proj, ".mcl")
+state_file = os.path.join(_state_dir, "state.json")
+try:
+    with open(state_file, encoding="utf-8") as sf:
+        state = json.load(sf)
+except Exception:
+    print("allow"); sys.exit(0)
+intent = (state.get("phase1_intent") or "").lower()
+constraints = (state.get("phase1_constraints") or "").lower()
+combined = intent + " || " + constraints
+if not combined.strip(" |"):
+    print("allow"); sys.exit(0)
+
+# Negation rule packs: each is (intent_regex, path_regex, label, severity).
+NEGATIONS = [
+    # frontend-only / no-backend
+    (re.compile(r"frontend only|no backend|no api|sadece frontend|sadece ön ?yüz|backend yok|api yok"),
+     re.compile(r"(^|/)(?:app|pages|src)/api(/|$)|(^|/)(?:server|backend|api|routes)(/|$)|(^|/)src/server(/|$)|(^|/)src/services(/|$)|(^|/)src/backend(/|$)|server\.(?:js|ts|mjs)$"),
+     "no-backend", "HIGH"),
+    # no-db
+    (re.compile(r"no ?db|no database|no datastore|veritabanı yok|db yok|veritabanı kullanma"),
+     re.compile(r"(^|/)(?:prisma|drizzle|migrations|supabase)(/|$)|schema\.prisma$|sequelize|mongoose|typeorm|knex"),
+     "no-db", "MEDIUM"),
+    # no-auth
+    (re.compile(r"no auth|no authentication|kimlik doğrulama yok|auth yok"),
+     re.compile(r"next-auth|passport|clerk|auth0|@auth/|/auth/|(^|/)auth(/|$)"),
+     "no-auth", "MEDIUM"),
+]
+
+norm = fp.replace("\\\\", "/")
+for intent_re, path_re, label, sev in NEGATIONS:
+    if intent_re.search(combined) and path_re.search(norm):
+        print(f"deny|{label}|{sev}|{fp}")
+        sys.exit(0)
+print("allow")
+' 2>/dev/null || echo "allow")"
+  if [ "${_IV_VERDICT%%|*}" = "deny" ]; then
+    _IV_REST="${_IV_VERDICT#deny|}"
+    _IV_LABEL="${_IV_REST%%|*}"
+    _IV_REST2="${_IV_REST#*|}"
+    _IV_SEV="${_IV_REST2%%|*}"
+    _IV_PATH="${_IV_REST2#*|}"
+    REASON="MCL INTENT VIOLATION (severity=${_IV_SEV}, rule=${_IV_LABEL}) — \`${_IV_PATH}\` contradicts the declared phase1_intent. The Phase 1 brief explicitly excluded this layer; writing here is an intent-violation. Options: (A) revise Phase 1 intent if the scope genuinely changed (use AskUserQuestion to confirm with developer); (B) keep the work within declared scope. Do NOT silently expand scope."
+    mcl_audit_log "intent-violation-block" "pre-tool" "rule=${_IV_LABEL} severity=${_IV_SEV} path=${_IV_PATH} tool=${TOOL_NAME}"
+    command -v mcl_trace_append >/dev/null 2>&1 && \
+      mcl_trace_append intent_violation_block "${_IV_LABEL}|${_IV_SEV}"
+  fi
+fi
+
+# -------- Branch: Scope Guard (Phase 3) --------
 # When scope_paths is non-empty (spec listed explicit file paths / globs),
 # block writes to paths that don't match any declared pattern.
 # Empty scope_paths = spec had no explicit paths = no restriction.
-if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "4" ] && command -v python3 >/dev/null 2>&1; then
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "3" ] && command -v python3 >/dev/null 2>&1; then
   _SCOPE_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json, fnmatch, os, sys
 
@@ -1398,15 +1480,15 @@ print("allow")
 ' 2>/dev/null || echo "allow")"
   if [ "${_SCOPE_VERDICT%%|*}" = "deny" ]; then
     _SCOPE_DENIED_PATH="${_SCOPE_VERDICT#deny|}"
-    REASON="MCL SCOPE GUARD (Rule 2 — File Scope) — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. This also likely violates Rule 1 (Spec-Only): if this file needs changes, it should have been in the spec. Options: (A) surface as a Phase 4.5 risk and request scope extension; (B) if genuinely required now, ask the developer via AskUserQuestion BEFORE writing — never silently touch out-of-scope files."
+    REASON="MCL SCOPE GUARD (Rule 2 — File Scope) — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. This also likely violates Rule 1 (Spec-Only): if this file needs changes, it should have been in the spec. Options: (A) surface as a Phase 4 risk and request scope extension; (B) if genuinely required now, ask the developer via AskUserQuestion BEFORE writing — never silently touch out-of-scope files."
     mcl_audit_log "scope-guard-block" "pre-tool" "path=${_SCOPE_DENIED_PATH} tool=${TOOL_NAME}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_block "${_SCOPE_DENIED_PATH}"
   fi
 fi
 
 if [ -n "$REASON" ]; then
-  mcl_audit_log "deny-tool" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
-  mcl_debug_log "pre-tool" "deny" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
+  mcl_audit_log "deny-tool" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} design_approved=${DESIGN_APPROVED}"
+  mcl_debug_log "pre-tool" "deny" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} design_approved=${DESIGN_APPROVED}"
   python3 -c '
 import json, sys
 reason = sys.argv[1]

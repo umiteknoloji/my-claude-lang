@@ -75,24 +75,24 @@ on separate lines) — recommend the plugin for each.
    `typescript`/`javascript` and the plugin is missing, suggest it
    once per conversation with the install command above.
 
-2. **Auto-dispatch in Phase 4a (BUILD_UI)** — when the UI flow is
-   active (`ui_flow_active = true`) AND the plugin is installed, MCL
-   silently dispatches `frontend-design` at the start of Phase 4a
+2. **Auto-dispatch in Phase 2 (DESIGN_REVIEW)** — when the UI flow is
+   active (`is_ui_project = true`) AND the plugin is installed, MCL
+   silently dispatches `frontend-design` at the start of Phase 2
    under Rule B (multi-angle validation). The plugin's suggestions
-   are merged into the component code / Phase 4a prose; raw plugin
+   are merged into the component code / Phase 2 prose; raw plugin
    tool calls are not exposed to the developer. If the plugin is NOT
-   installed when Phase 4a starts, MCL proceeds without it — Phase
+   installed when Phase 2 starts, MCL proceeds without it — Phase
    4a is never blocked on an absent plugin.
 
 `frontend-design` is still NOT part of the curated REQUIRED set
 (`plugin-gate.md`). It is stack-conditional: required-quality when
 the stack matches AND UI flow is on; otherwise passive. Outside
-Phase 4a it runs only via its own explicit slash-command invocations
+Phase 2 it runs only via its own explicit slash-command invocations
 after install.
 
 Framework markers (`react-frontend`, `vue-frontend`,
 `svelte-frontend`, `html-static`) emitted by
-`mcl-stack-detect.sh` sharpen Phase 4a's dispatch — MCL passes the
+`mcl-stack-detect.sh` sharpen Phase 2's dispatch — MCL passes the
 detected framework as context to the plugin so its suggestions match
 the actual component syntax.
 

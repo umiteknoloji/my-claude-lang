@@ -10,8 +10,9 @@ _ms_proj="$(setup_test_dir)"
 _ms_init() {
   python3 - "$_ms_proj/.mcl/state.json" <<'PY'
 import json, sys, time
-o = {"schema_version": 2, "current_phase": 1, "phase_name": "COLLECT",
-     "spec_approved": False, "spec_hash": None, "last_update": int(time.time())}
+o = {"schema_version": 3, "current_phase": 1, "phase_name": "INTENT",
+     "is_ui_project": False, "design_approved": False,
+     "spec_hash": None, "last_update": int(time.time())}
 open(sys.argv[1], "w").write(json.dumps(o))
 PY
 }
@@ -81,7 +82,7 @@ PY
 _ms_run_partial_check "$_ms_t"
 assert_equals "multi-spec: latest complete spec wins → rc=1" "$_MS_LAST_RC" "1"
 
-# 9.3.0: spec emit no longer auto-advances. Phase 1 spec-emit is a no-op
+# 10.0.0: spec emit no longer auto-advances. Phase 1 spec-emit is a no-op
 # state tag (records hash for reference). State stays at phase=1 until
 # summary-confirm askq fires.
 _ms_init
@@ -92,7 +93,7 @@ printf '%s' "{\"transcript_path\":\"${_ms_t}\",\"session_id\":\"ms\",\"cwd\":\"$
     bash "$REPO_ROOT/hooks/mcl-stop.sh" >/dev/null 2>&1
 
 _ms_phase="$(python3 -c "import json; d=json.load(open('$_ms_proj/.mcl/state.json')); print(d.get('current_phase'))")"
-assert_equals "multi-spec on Phase 1 → state stays at 1 (9.3.0 no auto-advance)" "$_ms_phase" "1"
+assert_equals "multi-spec on Phase 1 → state stays at 1 (10.0.0 no auto-advance)" "$_ms_phase" "1"
 
 # Reverse case: latest spec is INCOMPLETE → block fires.
 _ms_init

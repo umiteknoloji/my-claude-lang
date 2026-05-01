@@ -24,9 +24,9 @@ without the developer asking, as a required part of every session.
 
 | Plugin               | Tier                           | Trigger                                                                            | MCL phase alignment                                                    |
 | -------------------- | ------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `feature-dev`        | tier-B (classifier-gated)      | Request-type classifier returns `feature`                                          | code-explorer → Phase 1; code-architect → Phase 4; code-reviewer → Phase 4.5; FD-7 → Phase 5 |
-| `code-review`        | tier-A (diff-gated)            | Meaningful diff exists in current git working tree                                 | Findings merge into Phase 4.5 dialog                                   |
-| `pr-review-toolkit`  | tier-A + selective             | Always-on for high-signal agents; selective sub-agents fire on code-shape triggers | Selective findings merge into Phase 4.5 dialog                         |
+| `feature-dev`        | tier-B (classifier-gated)      | Request-type classifier returns `feature`                                          | code-explorer → Phase 1; code-architect → Phase 4; code-reviewer → Phase 4; FD-7 → Phase 5 |
+| `code-review`        | tier-A (diff-gated)            | Meaningful diff exists in current git working tree                                 | Findings merge into Phase 4 dialog                                   |
+| `pr-review-toolkit`  | tier-A + selective             | Always-on for high-signal agents; selective sub-agents fire on code-shape triggers | Selective findings merge into Phase 4 dialog                         |
 | `security-guidance`  | tier-A (ambient hook)          | Plugin-native PreToolUse on Edit/Write/MultiEdit                                   | Write-time guardrail — shapes Phase 4 output before code lands         |
 
 `security-guidance` is a PreToolUse hook; MCL does not dispatch it
@@ -65,7 +65,7 @@ gate with a guarantee: no skip, because git is always present.
 - Decline → persist `git_ensure_consent: false`. Curated plugins
   that need git (code-review, git-aware pr-review-toolkit agents)
   silently skip for the rest of the project's lifetime, with a
-  one-line note in Phase 4.5 report ("code-review skipped: no git").
+  one-line note in Phase 4 report ("code-review skipped: no git").
 - Write failure (read-only mount, permission denied) → fail open:
   log to `<project>/.mcl/audit.log`, silently skip git-dependent
   plugins, do not block the session.
@@ -76,7 +76,7 @@ gate with a guarantee: no skip, because git is always present.
 ## Rule B — Different-angle dispatch + silent merge
 
 When MCL's own phase logic and a curated plugin cover overlapping
-ground (e.g., MCL Phase 4.5 risk review + feature-dev's
+ground (e.g., MCL Phase 4 risk review + feature-dev's
 code-reviewer + code-review's 4-agent PR review), the overlap is
 **multi-angle validation**, not redundancy. MCL dispatches all of
 them silently and merges their findings.
@@ -176,8 +176,8 @@ Alignment points between plugin sub-agents and MCL phases.
 | Phase 2 (spec)               | No plugin dispatch — MCL-native                                                                                                  | —                                        |
 | Phase 3 (verify)             | No plugin dispatch — MCL-native                                                                                                  | —                                        |
 | Phase 4 (execute)            | `feature-dev/code-architect` (if classifier=feature) — architecture options localized + presented alongside MCL's own analysis   | `security-guidance` (PreToolUse hook)    |
-| Phase 4.5 (risk review)      | `feature-dev/code-reviewer`; `code-review` 4-agent suite; `pr-review-toolkit` selective agents; Semgrep (Spec-1 SAST)             | —                                        |
-| Phase 4.6 (impact analysis)  | No plugin dispatch — MCL-native                                                                                                  | —                                        |
+| Phase 4 (risk review)      | `feature-dev/code-reviewer`; `code-review` 4-agent suite; `pr-review-toolkit` selective agents; Semgrep (Spec-1 SAST)             | —                                        |
+| Phase 4 impact lens (impact analysis)  | No plugin dispatch — MCL-native                                                                                                  | —                                        |
 | Phase 5 (verification)       | `feature-dev` FD-7 summary merged into MCL's Verification Report                                                                 | —                                        |
 
 ## Request-type classifier (tier-B gate)
@@ -205,7 +205,7 @@ during Phase 4:
 | Phase 4 output adds a comment                | `comment-analyzer`      |
 | Phase 4 output writes a test                 | `pr-test-analyzer`      |
 
-The trigger check runs once on Phase 4 → Phase 4.5 transition; the
+The trigger check runs once on Phase 4 → Phase 4 transition; the
 fired sub-agents run in parallel; results merge per Rule B.
 
 ## Install-suggestion protocol
@@ -289,12 +289,12 @@ this survey's partitioning.
 
 ## Dispatch Audit (since 7.9.5)
 
-Phase 4.5 has a mandatory dispatch manifest — specific plugins that MUST
-be dispatched before Phase 4.6/5 can proceed. The audit is enforced by
+Phase 4 has a mandatory dispatch manifest — specific plugins that MUST
+be dispatched before Phase 4 impact lens/5 can proceed. The audit is enforced by
 `hooks/lib/mcl-dispatch-audit.sh`, called from `mcl-activate.sh` on every
 turn where `phase_review_state=running`.
 
-### Phase 4.5 Manifest
+### Phase 4 Manifest
 
 | Dispatch type | Required plugin | Detection |
 |---|---|---|
@@ -311,7 +311,7 @@ When any manifest entry is missing:
 1. `PLUGIN_MISS_NOTICE` (`<mcl_audit name="plugin-dispatch-gap">`) is
    injected into `FULL_CONTEXT`.
 2. `audit.log` records `plugin-dispatch-gap | mcl-activate.sh | missing=<list>`.
-3. The `dispatch-audit` constraint in STATIC_CONTEXT blocks Phase 4.6/5
+3. The `dispatch-audit` constraint in STATIC_CONTEXT blocks Phase 4 impact lens/5
    until the gap is resolved.
 4. Once dispatched, the notice clears automatically on the next turn
    (no manual state clearing required).

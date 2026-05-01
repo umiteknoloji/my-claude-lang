@@ -1,31 +1,30 @@
-<mcl_phase name="phase4-execute">
+<mcl_phase name="phase3-execute">
 
-# Phase 4: Execution with Live Translation
+# Phase 3: Execution with Live Translation
 
-Called automatically when Phase 3 is confirmed.
+Called automatically when Phase 1 (non-UI path) or Phase 2 (UI
+path) approves.
 
-## Flow Split (since MCL 6.2.0)
+## Flow Split
 
-Phase 4 forks on `ui_flow_active`:
+Phase 3 forks on `is_ui_project`:
 
-- `ui_flow_active = true` (Phase 1 approve with UI included, default):
-  Phase 4 runs as three sub-phases in order:
-  - **Phase 4a BUILD_UI** — read `my-claude-lang/phase4a-ui-build.md`
-  - **Phase 4b UI_REVIEW** — read `my-claude-lang/phase4b-ui-review.md`
-  - **Phase 4c BACKEND** — read `my-claude-lang/phase4c-backend.md`
-  All rules below still apply inside each sub-phase; they describe
-  the shared Phase 4 behavior. Only Phase 4c reaches Phase 4.5.
-- `ui_flow_active = false` (Phase 1 approve with "skip UI") OR task
-  has no UI by construction: the default flow below runs top-to-bottom
-  and exits directly to Phase 4.5.
+- `is_ui_project = true`: the developer has already approved a
+  visual skeleton in Phase 2. Phase 3 swaps the Phase 2 fixtures
+  for real `fetch` / `axios` / DB calls and wires the data layer.
+  Read `my-claude-lang/phase3-backend.md` for the UI-after-design
+  backend procedure.
+- `is_ui_project = false`: write code directly per the Technical
+  Approach section. The default flow below runs top-to-bottom and
+  exits to Phase 4 (risk gate).
 
-Sub-phases share state (`spec_approved`, `current_phase`, `ui_sub_phase`)
-managed by `hooks/lib/mcl-state.sh`. Never transition sub-phase by
+State is managed by `hooks/lib/mcl-state.sh` (`current_phase=3`,
+`design_approved`, `is_ui_project`). Never transition phase by
 prose assertion alone — the stop hook is the only authority.
 
 1. All code, comments, variable names, commit messages → English
 2. All communication with the developer → their language
-3. When Claude Code asks a question:
+3. When Claude Code asks a question (Phase 3 mid-execution):
    - MCL applies Gate 2: verify the question is precise before translating
    - Translate the question to the developer's language
    - Add context: WHY Claude is asking this + WHAT each answer changes
@@ -92,29 +91,29 @@ prose assertion alone — the stop hook is the only authority.
    - MCL does NOT produce a Permission Summary at the end of Phase 4.
      The developer already saw and approved each permission at the
      prompt — restating adds no value. (Removed in MCL 5.2.0.)
-8. If the developer introduces a NEW task during Phase 4 execution
+8. If the developer introduces a NEW task during Phase 3 execution
    (scope creep, "by the way also fix...", "bu arada şunu da..."):
    - Do NOT fold the new task into the current spec
    - Acknowledge it: "I noted this as a separate task."
    - Ask: "Should I finish the current task first, or pause and
      switch to this new one?"
    - If finish first → save the new task, continue current execution
-   - If switch → pause current task at a safe point, run Phase 1-3
-     for the new task
-   - Either way, the new task gets its own Phase 1-3 cycle
+   - If switch → pause current task at a safe point, run Phase 1
+     (and Phase 2 if UI) for the new task
+   - Either way, the new task gets its own Phase 1 cycle
 
 <mcl_constraint name="spec-history">
 
 ## Spec History — automatic feature ledger
 
-On every AskUserQuestion approve-family tool_result that transitions
-phase to EXECUTE (audit event `approve-via-askuserquestion`), the Stop
-hook writes the full spec body to `.mcl/specs/NNNN-slug.md` with YAML
-frontmatter (spec_id, approved_at, spec_hash, branch, head_at_approval,
+On every Phase 3 entry (the turn the `📋 Spec:` block is emitted),
+the Stop hook writes the full spec body to
+`.mcl/specs/NNNN-slug.md` with YAML frontmatter (spec_id,
+approved_at, spec_hash, branch, head_at_approval,
 completion_commit=null, status=active). `.mcl/specs/INDEX.md` is
 regenerated as a pipe-table sorted newest-first.
 
-This is a background mechanism — Phase 4 prose flow does NOT change.
+This is a background mechanism — Phase 3 prose flow does NOT change.
 MCL does NOT need to announce the save in every turn. Mention it only
 when:
 

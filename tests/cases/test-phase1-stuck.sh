@@ -21,13 +21,17 @@ _p1s_init() {
   local phase="$1" count="$2"
   python3 -c "
 import json, time
+phase = $phase
+phase_name_map = {1: 'INTENT', 2: 'DESIGN_REVIEW', 3: 'IMPLEMENTATION',
+                  4: 'RISK_GATE', 5: 'VERIFICATION', 6: 'FINAL_REVIEW'}
 o = {
-    'schema_version':2, 'current_phase':$phase,
-    'phase_name':'COLLECT' if $phase == 1 else 'SPEC_REVIEW',
-    'spec_approved': False if $phase == 1 else True,
+    'schema_version': 3,
+    'current_phase': phase,
+    'phase_name': phase_name_map.get(phase, 'INTENT'),
+    'is_ui_project': False,
+    'design_approved': phase >= 3,
     'phase1_turn_count': $count,
-    'precision_audit_block_count': 0,
-    'last_update':int(time.time()),
+    'last_update': int(time.time()),
 }
 open('$_p1s_state','w').write(json.dumps(o))
 "

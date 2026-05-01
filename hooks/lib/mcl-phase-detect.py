@@ -19,7 +19,7 @@ Output schema (any field may be null):
         "phase1_ops":             {...} | null,
         "phase1_perf":            {...} | null,
         "ui_sub_phase_signal":    "UI_REVIEW" | null,
-        "phase4_5_overrides":     [{...}, ...] | null,
+        "phase4_overrides":     [{...}, ...] | null,
     }
 
 Sources, in order of preference:
@@ -195,7 +195,7 @@ def _extract_markers(text: str) -> dict[str, Any]:
     Returns a dict keyed by `kind` with parsed payloads. JSON-shaped
     payloads are parsed; anything else is left as a stripped string.
     Multiple markers with the same kind: last one wins, except for
-    `phase4-5-override` which accumulates into a list.
+    `phase4-override` which accumulates into a list.
     """
     out: dict[str, Any] = {}
     overrides: list[Any] = []
@@ -213,12 +213,12 @@ def _extract_markers(text: str) -> dict[str, Any]:
                 parsed = json.loads(payload)
             except Exception:
                 parsed = payload  # keep as string for forensic
-        if kind == "phase4-5-override":
+        if kind == "phase4-override":
             overrides.append(parsed)
         else:
             out[kind] = parsed
     if overrides:
-        out["phase4-5-override"] = overrides
+        out["phase4-override"] = overrides
     return out
 
 
@@ -231,7 +231,7 @@ def detect(transcript_path: str) -> dict[str, Any]:
         "phase1_ops": None,
         "phase1_perf": None,
         "ui_sub_phase_signal": None,
-        "phase4_5_overrides": None,
+        "phase4_overrides": None,
     }
     if not transcript_path or not Path(transcript_path).exists():
         return result
@@ -258,10 +258,10 @@ def detect(transcript_path: str) -> dict[str, Any]:
         v = markers["ui-sub-phase"]
         if isinstance(v, str) and v.strip() in ("UI_REVIEW", "BACKEND"):
             result["ui_sub_phase_signal"] = v.strip()
-    if "phase4-5-override" in markers:
-        v = markers["phase4-5-override"]
+    if "phase4-override" in markers:
+        v = markers["phase4-override"]
         if isinstance(v, list) and v:
-            result["phase4_5_overrides"] = v
+            result["phase4_overrides"] = v
 
     return result
 
@@ -435,7 +435,7 @@ def main() -> int:
             print(json.dumps({k: None for k in (
                 "phase1_intent", "phase1_constraints", "phase1_stack_declared",
                 "phase1_ops", "phase1_perf", "ui_sub_phase_signal",
-                "phase4_5_overrides",
+                "phase4_overrides",
             )}))
     return 0
 

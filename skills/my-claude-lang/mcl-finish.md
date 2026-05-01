@@ -4,16 +4,16 @@
 
 Introduced in MCL 5.14.0.
 
-`mcl-finish` is a slash-command that aggregates Phase 4.6 impacts
+`mcl-finish` is a slash-command that aggregates Phase 4 impact lens impacts
 accumulated since the last checkpoint and emits a project-level
 finish report. It is orthogonal to the Phase 1 → 5 pipeline — typing
 the literal keyword `mcl-finish` bypasses MCL's normal flow (no
-Phase 1 gather, no spec, no Phase 4.5/4.6/5) and runs the finish
+Phase 1 gather, no spec, no Phase 4/5) and runs the finish
 aggregation directly.
 
 ## Why It Exists
 
-Phase 4.6 surfaces one impact at a time in an interactive dialog. The
+Phase 4 impact lens surfaces one impact at a time in an interactive dialog. The
 developer replies `skip / apply fix / rule capture` and the session
 moves on. But many impacts are genuine "I should verify this next
 week" items — they belong to a horizon the developer can't act on
@@ -33,7 +33,7 @@ remote.
 ```
 .mcl/
 ├── impact/
-│   ├── 0001.md   ← one file per Phase 4.6 impact (append-only)
+│   ├── 0001.md   ← one file per Phase 4 impact lens impact (append-only)
 │   ├── 0002.md
 │   └── …
 └── finish/
@@ -44,7 +44,7 @@ remote.
 Both directories are created on demand (`mkdir -p`). Empty dirs are
 treated as "no entries", never an error.
 
-Impact file format is defined in `phase4-6-impact-review.md` under
+Impact file format is defined in `phase4-impact-lens.md` under
 "Impact Persistence".
 
 ## Trigger
@@ -110,9 +110,9 @@ There is NO automatic execution — the developer is always the trigger.
   aggregation. Whether an impact is still valid is the developer's
   call. Automated re-check is an explicit non-goal for 5.14.0 and
   may ship in a later iteration.
-- **Re-run Phase 4.5 / 4.6** on current diff. Full-project Semgrep
+- **Re-run Phase 4** on current diff. Full-project Semgrep
   rescan is the only re-scanning `mcl-finish` performs — and only
-  for SAST, not for the broader Phase 4.5 risk heuristic set.
+  for SAST, not for the broader Phase 4 risk-gate risk heuristic set.
 - **Auto-commit, push, branch, tag, or PR.** `mcl-finish` does not
   touch git. The checkpoint file is local state.
 - **External reporting** (Slack, email, issue trackers, CI gates).
@@ -121,7 +121,7 @@ There is NO automatic execution — the developer is always the trigger.
   run writes its own checkpoint id, so the outcomes don't corrupt,
   but impact-to-checkpoint assignment becomes ambiguous. MVP leaves
   this to the developer.
-- **Risk persistence.** `.mcl/risks/` does NOT exist. Phase 4.5
+- **Risk persistence.** `.mcl/risks/` does NOT exist. Phase 4 risk-gate
   risks are resolved in-session per the captured rule that
   unambiguous ones auto-fix silently and surfaced ones get an
   immediate skip/fix/rule decision.
@@ -137,7 +137,7 @@ the hook's intercept branches on the first-matching literal.
 
 - `hooks/mcl-activate.sh` — the literal-prompt intercept
 - `hooks/lib/mcl-finish.sh` — filesystem convention helper
-- `skills/my-claude-lang/phase4-6-impact-review.md` — impact
+- `skills/my-claude-lang/phase4-impact-lens.md` — impact
   persistence format
 - `skills/my-claude-lang/phase5-review.md` — tail reminder line
 

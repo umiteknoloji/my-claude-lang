@@ -57,26 +57,28 @@ Developer's language is auto-detected from their first message.
 Every response MUST start with `🌐 MCL {{MCL_VERSION}}` on its own line. This tells the developer
 that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
-## AskUserQuestion Protocol (since 6.0.0)
+## AskUserQuestion Protocol
 
 For full AskUserQuestion rules, read `my-claude-lang/askuserquestion-protocol.md`
 
 Every closed-ended MCL interaction — Phase 1 clarifying questions,
-Phase 1.7 GATE questions, summary confirmation, Phase 4.5 risk
-walkthrough, Phase 4.6 impact walkthrough, Phase 4b UI review, plugin
-consent, git-init consent, stack fallback, mcl-update, mcl-finish,
-pasted-CLI passthrough — uses Claude Code's native `AskUserQuestion`
-tool with `question` prefixed `MCL {{MCL_VERSION}} | `. The Stop hook
-parses tool_use/tool_result pairs to advance MCL state.
+Phase 1 summary confirmation, Phase 1.7 GATE questions, Phase 2
+design approval (UI projects only), Phase 4 risk walkthrough,
+Phase 4 impact walkthrough, plugin consent, git-init consent, stack
+fallback, mcl-update, mcl-finish, pasted-CLI passthrough — uses
+Claude Code's native `AskUserQuestion` tool with `question` prefixed
+`MCL {{MCL_VERSION}} | `. The Stop hook parses tool_use/tool_result
+pairs to advance MCL state.
 
-**SPEC APPROVAL DOES NOT USE AskUserQuestion (since 9.2.1).** The hook
-auto-approves on spec emit when format is valid. Do NOT call
-`AskUserQuestion` after the spec block. Do NOT ask "Is this spec
-correct?", "Onaylıyor musun?", "Faz 4'e geçelim mi?", or any
-equivalent. The spec block itself IS the approval signal — proceed
-silently, the next turn opens with state already at Phase 4.
+**SPEC APPROVAL DOES NOT EXIST AS A STATE GATE (since MCL 10.0.0).**
+The `📋 Spec:` block emitted at Phase 3 entry is documentation only.
+Format violations are advisory — they emit `spec-format-warn` audit
+entries but never `decision:block` and never an askq. Do NOT call
+`AskUserQuestion` after the spec block. Developer control is
+captured at Phase 1 summary-confirm and Phase 2 design approval
+(UI), not at the spec.
 
-The legacy `✅ MCL APPROVED` text marker is DEAD in 6.0.0 — never emit it.
+The legacy `✅ MCL APPROVED` text marker is DEAD — never emit it.
 
 ## MCL Tag Schema
 
@@ -117,12 +119,12 @@ Anti-sycophancy is absolute — no balancing qualifier.
 Each phase is a function. It advances ONLY when all required parameters are ready.
 
 ```
-phase1_understand(developer_message) → intent, constraints, success_criteria, context
-phase2_generate_spec(intent, constraints, success_criteria, context) → spec
-phase3_verify(spec) → verified_plan
-phase4_execute(spec, verified_plan) → code
-phase4_5_post_code_risk_review(code) → resolved_risks
-phase5_verification_report(code, resolved_risks) → report
+phase1_intent(developer_message) → intent, constraints, success_criteria, context, is_ui_project
+phase2_design_review(intent, brief)        → design_approved   # UI projects only
+phase3_implementation(intent, design?)     → spec_doc, code
+phase4_risk_gate(code, scope_paths, intent) → resolved_risks, resolved_impacts
+phase5_verification(code, resolved_risks)  → report
+phase6_final_review(report, audit_trail)   → forensic_pass
 ```
 
 Missing, invalid, or contradictory parameter → keep gathering. Do NOT advance.
@@ -193,7 +195,7 @@ MCL guarantees git by asking once per project for consent to run
 `git init` locally (no remote, read-only bookkeeping); Rule B —
 overlapping plugins are multi-angle validation, not redundancy, so
 dispatch runs silently and findings are merged; conflicts surface as
-provenance-labeled Phase 4.5 risk items — developer decides, no
+provenance-labeled Phase 4 risk items — developer decides, no
 automatic tiebreaker; Rule C — MCP-server plugins are
 filtered out of the curated set (binary CLIs invoked via Bash are
 allowed). Missing curated plugins are surfaced once in a single
@@ -242,66 +244,106 @@ parameters (precision-enriched by Phase 1.7 since 8.3.0). Skipped silently
 when source language is English. Not shown to the developer. Emits
 `engineering-brief` audit entry in all cases.
 
-## Phase Model (since 9.3.0 — simplified)
+## Phase Model (since MCL 10.0.0)
 
 ```
-Phase 1 (questions + summary-confirm askq) ──approve──▶  Phase 4 (EXECUTE)
-                                                          │
-                                                          ├─ 📋 Spec: doc emit (entry artifact)
-                                                          ├─ Code writes (Write/Edit/MultiEdit)
-                                                          ├─ Phase 4.5 risk review (per write)
-                                                          ├─ Phase 4.6 impact review
-                                                          ├─ Phase 5 verification report
-                                                          └─ Phase 6 double-check
+                                  is_ui_project=false
+                                 ┌──────────────────────────────────────┐
+                                 ▼                                      │
+Phase 1 INTENT  ──summary-confirm askq──▶  Phase 3 IMPLEMENTATION  ──▶  Phase 4 RISK_GATE  ──▶  Phase 5 VERIFICATION  ──▶  Phase 6 FINAL_REVIEW
+   │                                          ▲                              │ HIGH auto-block            │                          │
+   │ is_ui_project=true                       │                              ▼                            ▼                          ▼
+   ▼                                          │                       impact lens               must-test report          forensic audit
+Phase 2 DESIGN_REVIEW ──design-approve askq───┘
+   │ (UI skeleton + dev server)
+   │
+   ├─ Approve ──▶ design_approved=true, current_phase=3
+   ├─ Revise  ──▶ loops back into Phase 2
+   └─ Cancel  ──▶ task aborted
 ```
 
-Phase 2 (SPEC_REVIEW) and Phase 3 (USER_VERIFY) are **REMOVED in
-9.3.0**. The Phase 1 summary-confirm askq is the gate; once approved,
-state transitions directly to Phase 4. The spec block is documentation
-emitted as the opening artifact of Phase 4 (NOT a separate phase, NOT
-a state gate).
+Six phases, two paths. The phase numbers are stable — Phase 2 is
+ALWAYS the design-review phase (UI only); Phase 3 is ALWAYS the
+implementation phase. Non-UI projects skip Phase 2 entirely; the
+state machine transitions Phase 1 → Phase 3 directly when
+`is_ui_project = false`.
 
-## 📋 Spec Documentation (Phase 4 entry artifact)
+Phase summaries:
 
-For full template, read `my-claude-lang/phase-spec-doc.md`.
+| Phase | Name | Responsibility | Write Status | Approval | Applies |
+|-------|------|----------------|--------------|----------|---------|
+| 1 | INTENT | Questions, intent capture, precision audit (1.7) | Locked | Summary-confirm askq | All |
+| 2 | DESIGN_REVIEW | UI skeleton + dev server + design approval | Unlocked (frontend only) | Design approval askq | UI projects only |
+| 3 | IMPLEMENTATION | 📋 Spec emit + full code | Unlocked | None (advisory format only) | All |
+| 4 | RISK_GATE | Security, DB, UI/a11y, drift, intent violation scans + impact lens | Unlocked | Auto-block on HIGH | All |
+| 5 | VERIFICATION | Test, lint, build, smoke test report | Unlocked | None | All |
+| 6 | FINAL_REVIEW | Double-check, forensic audit | Unlocked | None | All |
 
-Emit at the START of the first Phase 4 turn (after summary-confirm
-approval), then continue with Phase 4 code in the SAME response:
+## Phase 2: Design Review (UI projects only)
 
-1. Announce: "All points are clear. Generating the specification..."
-2. Write a VISIBLE `📋 Spec:` block (📋 prefix + 7 H2 sections verbatim:
-   Title, Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases,
-   Technical Approach, Out of Scope).
+For full Phase 2 rules, read `my-claude-lang/phase2-design-review.md`
+
+When `is_ui_project = true` after Phase 1 summary-confirm, the
+state transitions to `current_phase = 2`. MCL writes a clickable
+UI skeleton (HTML/Tailwind/component layout, mock data) of at
+least 3 files (entry, base layout, 1-2 placeholder pages),
+configures the build tooling so `npm run dev` starts cleanly, runs
+the dev server in the background, prints the URL in chat, and
+calls the canonical design askq. Recharts, lucide-react, and
+similar UI libs are explicitly allowed; real `fetch` / DB / `.env`
+are deferred to Phase 3.
+
+The pinned askq body:
+- TR: "Tasarımı onaylıyor musun?" — Onayla / Değiştir / İptal
+- EN: "Approve this design?" — Approve / Revise / Cancel
+- Header MUST be `MCL <VERSION> | <body>` (auto-injected).
+
+Approve label match (case-insensitive contains): `onayla`, `evet`,
+`approve`, `yes`, `confirm`, `ok`, `proceed`. On approval:
+`design_approved = true`, `current_phase = 3`. Backend paths are
+blocked during Phase 2 (frontend skeleton only); the lock lifts on
+Phase 3 entry.
+
+Hook enforcement: Phase 2 cannot transition to Phase 3 until
+`design_approved = true`. Without the design askq, the Stop hook
+emits `decision:block` until it appears.
+
+## Phase 3: Implementation
+
+For full Phase 3 rules, read `my-claude-lang/phase3-implementation.md`
+For execution / live-translation rules, read `my-claude-lang/phase3-execute.md`
+For incremental TDD rules (red-green-refactor), read `my-claude-lang/phase3-tdd.md`
+For UI-after-design backend rules, read `my-claude-lang/phase3-backend.md`
+
+Phase 3 produces working code. The opening artifact is the
+`📋 Spec:` documentation block — written into the response so the
+developer (and the model) read the same English engineering
+interpretation. The block is documentation, NOT a state gate:
+
+1. Announce: "All points are clear. Writing the implementation specification..."
+2. Write a VISIBLE `📋 Spec:` block (📋 prefix + 7 H2 sections
+   verbatim: Objective, MUST, SHOULD, Acceptance Criteria, Edge
+   Cases, Technical Approach, Out of Scope).
 3. After the spec, explain in developer's language what it says.
-4. **No AskUserQuestion for spec** — state already at Phase 4. Spec is
-   recorded for `.mcl/specs/`, scope_paths, and Phase 6 promise-vs-
-   delivery checks. Format-invalid → `decision:block` for spec
-   re-emit ONLY (writes remain unlocked because phase=4 is independent
-   of spec format).
-5. Continue with Phase 4 code writes in the same response. The spec
-   is documentation prose, not a gate that pauses for input.
+4. **No AskUserQuestion for spec.** State is already at Phase 3.
+   Format violations emit `spec-format-warn` audit entries but
+   never block writes. Repeated violations (≥3) surface as a LOW
+   soft fail in Phase 6.
+5. Continue with Phase 3 code writes (`Write` / `Edit` /
+   `MultiEdit`) in the same response. The spec is documentation
+   prose, not a gate that pauses for input.
+6. UI path: swap Phase 2 fixtures for real `fetch` / `axios` / DB
+   calls; wire data layer; preserve type contract.
+7. Non-UI path: write code directly per the Technical Approach
+   section.
 
-To reject the direction after summary-confirm: `/mcl-restart`. To
-stop: `/mcl-finish`.
+To reject the direction after Phase 1 / Phase 2 approval:
+`/mcl-restart`. To stop: `/mcl-finish`.
 
-Spec = SINGLE SOURCE OF TRUTH. All code must satisfy the spec.
-
-**⛔ STOP RULE:** Phase 4 CANNOT start until the AskUserQuestion tool_result
-returns an approve-family option. An assistant-text "yes" without the
-corresponding tool_result is NOT confirmation.
-
-## Phase 4: Execute with Live Translation
-
-For full execution rules, read `my-claude-lang/phase4-execute.md`
-For incremental TDD rules (red-green-refactor), read `my-claude-lang/phase4-tdd.md`
-For Phase 4a BUILD_UI rules, read `my-claude-lang/phase4a-ui-build.md`
-For Phase 4b UI_REVIEW rules, read `my-claude-lang/phase4b-ui-review.md`
-For Phase 4c BACKEND rules, read `my-claude-lang/phase4c-backend.md`
-
-On every approval the Stop hook auto-saves the spec body to
+On every Phase 3 entry the Stop hook auto-saves the spec body to
 `.mcl/specs/NNNN-slug.md` with YAML frontmatter — background
-mechanism, no prose announcement needed (see `phase4-execute.md` for
-the `spec-history` constraint).
+mechanism, no prose announcement needed (see `phase3-execute.md`
+for the `spec-history` constraint).
 
 All code in English. All communication in developer's language.
 This INCLUDES Phase 4 execution prose: every inter-tool status line
@@ -327,107 +369,55 @@ installs, WebFetch/WebSearch, sudo/chmod/chown, writes under `~/.claude/`
 plan IS triggered, list every action with what/why/harness question
 (translated)/option meanings and wait for confirmation.
 
-## UI Flow (since MCL 6.2.0 — auto-detected since 6.5.2)
+## Phase 4: Risk Gate — MANDATORY
 
-UI flow activates automatically at session start based on a cheap
-stack heuristic — no developer prompt, no summary-confirm opt-out.
-`mcl-activate.sh` calls `mcl_is_ui_capable` from
-`hooks/lib/mcl-stack-detect.sh` on first activation per session; if
-it returns true, `ui_flow_active` is set to `true`, otherwise `false`.
-The heuristic looks for UI surfaces: `package.json` + `templates/`,
-`src/components/`, `src/pages/`, `src/app/`, `app/views/`, Django
-`manage.py` + `templates/`, root `index.html`, etc. Projects without
-a UI surface (CLI tools, config-only repos, pure-backend APIs) get
-`ui_flow_active=false` and run the standard Phase 4 flow directly.
-Phase 1 summary-confirm is a plain 3-option form (approve / edit /
-cancel); the "skip UI" option that existed in 6.2.0–6.5.1 is removed.
+For full Phase 4 rules, read `my-claude-lang/phase4-risk-gate.md`
+For Phase 4 impact-lens rules, read `my-claude-lang/phase4-impact-lens.md`
 
-When `ui_flow_active = true`, Phase 4 runs as three sub-phases:
-- **Phase 4a (BUILD_UI)** — MCL writes a runnable frontend with dummy
-  data only, emits a "run it" snippet (npm run dev / python -m
-  http.server), and transitions to Phase 4b. Backend writes are BLOCKED
-  by `mcl-pre-tool.sh` path exception during this sub-phase.
-- **Phase 4b (UI_REVIEW)** — MCL calls AskUserQuestion with options
-  "approve, proceed to backend" / "revise" / "see it yourself and
-  report" / "cancel". Revise loops back to 4a. The "see it yourself"
-  option is an opt-in visual-inspect pipeline (Playwright + screenshot
-  + multimodal Read) — MCL actually looks at the UI it built and
-  reports observations. Only "approve" exits to Phase 4c.
-- **Phase 4c (BACKEND)** — path lock lifts, MCL swaps dummy fixtures
-  for real API calls, writes data layer, wires error/loading/empty to
-  real async state, then flows into Phase 4.5.
+After Phase 3 writes code but BEFORE Phase 5 emits the Verification
+Report, MCL runs the Phase 4 risk gate — a sequential, interactive
+Missed Risks dialog covering security, DB, UI/a11y, architectural
+drift, intent violation, and the embedded code-review / simplify /
+performance / test-coverage lenses.
 
-When `ui_flow_active = false`, Phase 4 runs the single-path
-`phase4-execute.md` flow unchanged — 6.1.1 behavior is preserved
-bit-for-bit.
-
-## Phase 4.5: Post-Code Risk Review — MANDATORY
-
-For full Phase 4.5 rules, read `my-claude-lang/phase4-5-risk-review.md`
-
-After Phase 4 writes code but BEFORE Phase 5 emits the Verification Report,
-MCL runs an interactive Missed Risks dialog. This phase exists because
-the developer's decisions about missed risks can change the impact
-analysis and must-test list in the final report — so the report comes
-AFTER the risk review, not around it.
-
-- MCL presents **one** missed risk per turn with a short explanation of
-  why it is a risk.
-- MCL then **waits** for the developer's reply in the next message before
-  presenting the next risk.
+- MCL presents **one** risk per turn with a short explanation of
+  why it matters.
+- MCL **waits** for the developer's reply in the next message
+  before presenting the next risk.
 - Per risk, the developer may reply with:
-  - **skip / not important** → risk noted, move on
-  - **apply a specific fix** → MCL implements the fix, then continues
+  - **skip / not important** → risk noted, move on (skip is
+    forbidden for HIGH and for MEDIUM-security/db/intent — those
+    require an explicit override with reason)
+  - **apply a specific fix** → MCL implements the fix, then
+    continues
+  - **override** (HIGH or MEDIUM-sec/db/intent) → MCL captures a
+    one-sentence reason and logs it; the override flows into Phase
+    5 and Phase 6
   - **make this a general rule** → triggers the Rule Capture flow
     (see `my-claude-lang/rule-capture.md`)
-- If MCL detects **no missed risks**, Phase 4.5 is OMITTED entirely
-  from the response (no header, no placeholder sentence) and MCL
-  advances silently to Phase 4.6.
-- The dialog ends when all risks are resolved, the developer says
-  "skip all", or the developer explicitly moves to a new topic
-  (open risks marked skipped).
+- HIGH severity findings AUTO-BLOCK Write/Edit until resolved. The
+  pre-tool hook denies mutations with a localized message until
+  the dialog turn closes the item.
+- After all risk-gate items are resolved, the impact lens runs
+  (still part of Phase 4) — sequential one-impact-per-turn dialog
+  for downstream effects on OTHER project files / consumers /
+  contracts. An impact is NEVER meta-changelog or
+  self-reference.
+- If MCL detects **no risks AND no impacts**, Phase 4 is OMITTED
+  entirely from the response (no header, no placeholder
+  sentence) and MCL advances silently to Phase 5.
 
-⛔ STOP RULE: Do NOT emit Phase 4.6 until Phase 4.5 is complete.
-
-## Phase 4.6: Post-Risk Impact Review — MANDATORY
-
-For full Phase 4.6 rules, read `my-claude-lang/phase4-6-impact-review.md`
-
-After Phase 4.5 resolves all missed-risk decisions and BEFORE Phase 5
-emits the Verification Report, MCL runs an interactive Impact Review
-dialog. An "impact" is a real downstream effect of the newly-written
-code on something OTHER than itself: files that import the changed
-module, shared utilities whose behavior shifted, API/contract
-breakage, shared state/cache invalidation, schema/migration effects,
-configuration changes affecting other components. An impact is
-NEVER meta-changelog ("we updated X"), self-reference to the task's
-deliverables, version/setup notes, or items already handled in
-Phase 4.5.
-
-- MCL presents **one** impact per turn with a short explanation:
-  which concrete downstream artifact is affected (file path,
-  function, consumer) and one-sentence why.
-- MCL then **waits** for the developer's reply in the next message
-  before presenting the next impact.
-- Per impact, the developer may reply with:
-  - **skip** → noted, move on
-  - **apply a specific fix** → MCL patches the consumer, then
-    continues
-  - **make this a general rule** → triggers Rule Capture
-- If MCL detects **no real impacts**, Phase 4.6 is OMITTED entirely
-  from the response (no header, no placeholder sentence) and MCL
-  advances silently to Phase 5.
-
-⛔ STOP RULE: Do NOT emit Phase 5 until Phase 4.6 is complete.
+⛔ STOP RULE: Do NOT emit Phase 5 until Phase 4 (risk gate +
+impact lens) is complete.
 
 ## Phase 5: Verification Report — MANDATORY
 
 For full rules, read `my-claude-lang/phase5-review.md`
 
-After Phase 4.6 resolves all impact decisions, MCL produces a
-Verification Report with **up to 2 sections** in this order (any
-section whose content is empty is omitted entirely — no header, no
-placeholder sentence):
+After Phase 4 resolves all risk and impact decisions, MCL produces
+a Verification Report with **up to 3 sections** in this order (any
+section whose content is empty is omitted entirely — no header,
+no placeholder sentence):
 
 1. **Spec Compliance** — **mismatches only** (⚠️/❌). If every MUST/SHOULD
    is met, OMIT Section 1 entirely — no header, no "All MUST/SHOULD
@@ -435,22 +425,25 @@ placeholder sentence):
    all-clear signal. Do NOT list ✅ items.
 2. **`!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`** — the developer's must-test
    list, rendered in the developer's detected language, wrapped in
-   `!!! ... !!!`, updated to reflect Phase 4.5 and Phase 4.6
-   decisions. Examples:
+   `!!! ... !!!`, updated to reflect Phase 4 decisions (risks +
+   impacts, fixes + overrides). Examples:
    - Turkish: `!!! MUTLAKA TEST ETMENİZ GEREKENLER !!!`
    - English: `!!! YOU MUST TEST THESE !!!`
    - Spanish: `!!! DEBES PROBAR ESTO !!!`
+3. **Process Trace** — localized one-line-per-event rendering of
+   `.mcl/trace.log`.
 
-Missed Risks is NOT part of Phase 5 — it is its own Phase 4.5 and has
-already run by the time Phase 5 emits. The Permission Summary section
-has also been removed; the developer already saw and approved each
-permission at the harness prompt.
+Missed Risks is NOT part of Phase 5 — it is part of Phase 4 and
+has already run by the time Phase 5 emits. The Permission Summary
+section has also been removed; the developer already saw and
+approved each permission at the harness prompt.
 
-This report is NOT optional. It gives the developer confidence that the
-AI did the right thing. Phase 4.5 does NOT end without this report.
+This report is NOT optional. It gives the developer confidence
+that the AI did the right thing. Phase 4 does NOT end without
+this report following it.
 
 ⛔ STOP RULE: Do NOT write "all steps completed" or "done" without
-producing the 3-section Verification Report after Phase 4.5 finishes.
+producing the Verification Report after Phase 4 finishes.
 
 ## Phase 5.5: Localize Report
 
@@ -473,21 +466,22 @@ Introduced in MCL 7.1.8. The developer types the literal keyword
 current session. The command reads `trace.log`, `audit.log`, `state.json`,
 and the session diary; evaluates each step in `all-mcl.md` against the
 available evidence; and writes a structured report to `.mcl/log/hc.md`.
-Like `/mcl-finish` and `/mcl-update`, it bypasses the normal Phase 1–5
+Like `/mcl-finish` and `/mcl-update`, it bypasses the normal Phase 1–6
 pipeline. The check-up is READ-ONLY — it never modifies state, never
-triggers AskUserQuestion, never runs Phase 4.5/4.6/5.
+triggers AskUserQuestion, never runs Phase 4 / 5 / 6.
 
 Status codes: ✅ PASS / ❌ FAIL / ⚠️ WARN / ⏭️ SKIP / ❓ UNKNOWN
 
 ## `/mcl-restart` — Phase State Reset
 
 Introduced in MCL 7.2.0. The developer types the literal keyword `/mcl-restart`
-to clear all MCL phase and spec state (spec_approved → false, current_phase → 1,
-phase_review_state → null, partial_spec → false). Useful when a session got into
-an unrecoverable state (e.g., approved the wrong spec, need to restart from Phase 1
-without closing the conversation). Like `/mcl-finish` and `/mcl-update`, it bypasses
-the normal Phase 1–5 pipeline — the hook resets state and Claude confirms the reset
-in the developer's language. Does NOT start Phase 1 automatically.
+to clear all MCL phase state (current_phase → 1, design_approved → false,
+is_ui_project → null, phase_review_state → null, partial_spec → false). Useful
+when a session got into an unrecoverable state (e.g., approved the wrong design,
+need to restart from Phase 1 without closing the conversation). Like
+`/mcl-finish` and `/mcl-update`, it bypasses the normal Phase 1–6 pipeline — the
+hook resets state and Claude confirms the reset in the developer's language.
+Does NOT start Phase 1 automatically.
 
 ## Proje Hafızası — `.mcl/project.md`
 
@@ -511,37 +505,36 @@ tek satırda bildirir.
 For full `/mcl-finish` rules, read `my-claude-lang/mcl-finish.md`
 
 Introduced in MCL 5.14.0. The developer types the literal keyword
-`/mcl-finish` to aggregate Phase 4.6 impacts accumulated since the
-last checkpoint and emit a project-level finish report. Like
-`/mcl-update`, it bypasses the normal Phase 1 → 5 pipeline. Every
-Phase 5 Verification Report ends with a localized reminder line
-pointing at the command. Impact persistence to `.mcl/impact/` and
-checkpoint writes to `.mcl/finish/` are append-only; Phase 4.5
-risks are NOT persisted across sessions.
+`/mcl-finish` to aggregate Phase 4 impact-lens items accumulated
+since the last checkpoint and emit a project-level finish report.
+Like `/mcl-update`, it bypasses the normal Phase 1 → 6 pipeline.
+Every Phase 5 Verification Report ends with a localized reminder
+line pointing at the command. Impact persistence to `.mcl/impact/`
+and checkpoint writes to `.mcl/finish/` are append-only; Phase 4
+risk-gate items are NOT persisted across sessions.
 
 ## Partial Spec Recovery — Rate-Limit Interruption Defense
 
 For full partial-spec-recovery rules, read `my-claude-lang/partial-spec-recovery.md`
 
-Introduced in MCL 5.15.0; adapted to AskUserQuestion in 6.0.0. When a
-Phase 2 `📋 Spec:` emission is truncated mid-stream (rate-limit, network
-drop, process kill), the Stop hook detects structural incompleteness
-(missing any of the seven required section headers), raises
-`partial_spec=true` in state, and the next `mcl-activate` pass injects a
-localized recovery audit block telling Claude to re-emit the full spec
-and then call `AskUserQuestion` for a fresh approval. Belt-and-suspenders:
-while the flag is raised, the Stop hook mechanically IGNORES any
-AskUserQuestion approval (emits `askq-ignored-partial-spec` audit) — a
-subsequent approve cannot silently promote a truncated spec to EXECUTE.
-The flag clears automatically when a structurally-complete spec is
-detected on a later Stop pass.
+Introduced in MCL 5.15.0. When a Phase 3 `📋 Spec:` emission is
+truncated mid-stream (rate-limit, network drop, process kill), the
+Stop hook detects structural incompleteness (missing any of the
+seven required section headers) and raises `partial_spec=true` in
+state. The next `mcl-activate` pass injects a localized recovery
+audit block telling Claude to re-emit the full spec inline. Since
+the spec is documentation only in MCL 10.0.0, no askq is involved;
+the truncation surfaces as an advisory `spec-format-warn` and the
+re-emission is automatic. The flag clears when a
+structurally-complete spec is detected on a later Stop pass.
 
 ## Rule Capture
 
 For full rules, read `my-claude-lang/rule-capture.md`
 
-During the Missed Risks dialog (or anywhere a generalizable pattern
-appears), the developer may ask MCL to turn a fix into a durable rule.
+During the Phase 4 risk-gate or impact-lens dialog (or anywhere a
+generalizable pattern appears), the developer may ask MCL to turn
+a fix into a durable rule.
 MCL asks for scope — once only / this project / all my projects — then
 shows the exact English rule text plus a localized version for review.
 Only after explicit approval does MCL append the rule under
@@ -586,30 +579,31 @@ vague terms without challenging, never ask multiple questions at once.
 
 ## Mandatory Phase Execution
 
-ALL phases MUST be executed. No phase can be skipped. This is the core principle:
+ALL applicable phases MUST be executed. This is the core
+principle:
 
-- **Phase 1**: MUST gather all parameters before advancing. No exceptions.
-- **Phase 2**: MUST generate an English spec internally. This is how meaning transfers
-  from the developer's language to English. Without this step, Claude Code is just
-  guessing from a Turkish/Japanese/etc. message — not working from a verified spec.
-- **Phase 3**: MUST verify understanding. Claude Code reads the spec and summarizes
-  what it understood. MCL checks this summary and explains it to the developer.
-  The developer MUST confirm before Phase 4.
-- **Phase 4**: All execution happens from the verified spec. Mid-execution questions
-  go through the bridge (English ↔ developer's language).
-- **Phase 4.5**: Interactive Missed Risks dialog — one risk per turn, developer
-  replies with skip / specific fix / general rule. Phase 4.6 cannot start until
-  Phase 4.5 completes (or confirms no risks exist). When no risks: phase omitted
-  entirely.
-- **Phase 4.6**: Interactive Impact Review dialog — one downstream impact per
-  turn, same skip / fix / rule options. Impact = real effect on other parts
-  of the project, never meta-changelog. Phase 5 cannot start until 4.6
-  completes. When no impacts: phase omitted entirely.
-- **Phase 5**: Results are explained, not just listed. Up to 2 sections: Spec
-  Compliance (mismatches only — omitted when none),
-  `!!! <LOCALIZED-MUST-TEST> !!!`. Empty sections are omitted entirely.
+- **Phase 1 INTENT**: MUST gather all parameters before advancing.
+  Summary-confirm askq is the PRIMARY developer-control gate. The
+  brief parse sets `is_ui_project` deterministically.
+- **Phase 2 DESIGN_REVIEW** (UI projects only): MUST emit ≥3
+  files + dev server + design askq before transitioning to
+  Phase 3. Skipped entirely when `is_ui_project = false`.
+- **Phase 3 IMPLEMENTATION**: MUST emit the `📋 Spec:` documentation
+  block at entry, then write code. Spec format violations are
+  advisory; writes stay unlocked.
+- **Phase 4 RISK_GATE**: Interactive risk and impact dialog — one
+  item per turn, developer replies with skip / specific fix /
+  override / general rule. HIGH severity items auto-block writes.
+  Phase 5 cannot start until Phase 4 completes (or confirms no
+  risks AND no impacts exist). When clean: phase omitted entirely.
+- **Phase 5 VERIFICATION**: Results are explained, not just
+  listed. Up to 3 sections: Spec Compliance (mismatches only —
+  omitted when none), `!!! <LOCALIZED-MUST-TEST> !!!`, Process
+  Trace. Empty sections are omitted entirely.
+- **Phase 6 FINAL_REVIEW**: Forensic audit, double-check.
 
-Skipping any phase — especially Phase 2, 3, 4.5 — breaks the entire bridge.
-The three-way communication (User ↔ MCL ↔ Claude Code) only works when all
-phases run. Otherwise MCL is just a translator, not a meaning verification system.
+Skipping any applicable phase breaks the entire bridge. The
+three-way communication (User ↔ MCL ↔ Claude Code) only works
+when all phases run. Otherwise MCL is just a translator, not a
+meaning verification system.
 

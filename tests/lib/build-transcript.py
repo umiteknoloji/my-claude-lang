@@ -15,6 +15,10 @@ Transcript kinds:
   spec-partial "<missing-csv>"     — 📋 Spec: with some sections missing
   askq-spec-approve <selected>     — pinned body + selected option (TR)
   askq-non-pinned <body> <selected>— paraphrased body
+  summary-confirm-askq-onayla      — Phase 1 summary askq + "Onayla"
+  design-askq-onayla               — Phase 2 design askq + "Onayla"
+  design-skeleton-emit             — assistant turn with localhost URL
+                                      and frontend Write tool calls
   multi: "<kind>;<arg>" ...        — chain multiple turns
 
 The output is line-delimited JSON; each line is a transcript entry
@@ -261,7 +265,7 @@ def main():
 
     elif kind == "askq-only":
         # askq alone without preceding spec
-        question = args[0] if args else "MCL 9.2.1 | Spec'i onaylıyor musun?"
+        question = args[0] if args else "MCL 10.0.0 | Spec'i onaylıyor musun?"
         selected = args[1] if len(args) > 1 else "Evet, onayla"
         tu_id = "toolu_test01askonly"
         turns.append(user_turn("build it", 0))
@@ -273,6 +277,66 @@ def main():
                 2,
             )
         )
+
+    elif kind == "summary-confirm-askq-onayla":
+        # Phase 1 summary-confirm askq with "Onayla" selection.
+        question = "MCL 10.0.0 | Bu özet doğru mu?"
+        selected = args[0] if args else "Onayla"
+        tu_id = "toolu_summconfirm"
+        turns.append(user_turn("build admin panel", 0))
+        turns.append(assistant_text_turn(
+            "━━━━━\nÖzet:\n- intent: admin panel\n- stack: React + FastAPI\n━━━━━", 1))
+        turns.append(assistant_askq_turn(
+            question, [selected, "Düzenle", "İptal"], tu_id, 2))
+        turns.append(user_tool_result_turn(
+            tu_id,
+            f'User has answered your questions: "{question}"="{selected}".',
+            3,
+        ))
+
+    elif kind == "design-askq-onayla":
+        # Phase 2 design askq with "Onayla" selection.
+        question = "MCL 10.0.0 | Tasarımı onaylıyor musun?"
+        selected = args[0] if args else "Onayla"
+        tu_id = "toolu_designaskq"
+        turns.append(user_turn("build admin panel UI", 0))
+        turns.append(assistant_text_turn(
+            "UI iskelet hazır ve tarayıcıda açık: http://localhost:5173/users", 1))
+        turns.append(assistant_askq_turn(
+            question, [selected, "Değiştir", "İptal"], tu_id, 2))
+        turns.append(user_tool_result_turn(
+            tu_id,
+            f'User has answered your questions: "{question}"="{selected}".',
+            3,
+        ))
+
+    elif kind == "design-skeleton-emit":
+        # Assistant turn that builds frontend skeleton + opens dev server.
+        # Used to drive Phase 2 DESIGN_REVIEW askq trigger detection.
+        files = args[0].split(",") if args else [
+            "src/components/UserList.tsx",
+            "src/pages/Index.tsx",
+            "package.json",
+        ]
+        turns.append(user_turn("build admin panel UI", 0))
+        content_blocks = []
+        for i, fp in enumerate(files):
+            content_blocks.append({
+                "type": "tool_use",
+                "id": f"toolu_skel_{i}",
+                "name": "Write",
+                "input": {"file_path": fp.strip(),
+                          "content": "export default function P(){return null;}"},
+            })
+        content_blocks.append({
+            "type": "text",
+            "text": "UI hazır ve tarayıcıda açıldı: http://localhost:5173/users — incele.",
+        })
+        turns.append({
+            "type": "assistant",
+            "timestamp": _ts(10),
+            "message": {"role": "assistant", "content": content_blocks},
+        })
 
     else:
         print(f"unknown kind: {kind}", file=sys.stderr)

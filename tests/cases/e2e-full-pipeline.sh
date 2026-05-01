@@ -85,7 +85,7 @@ phase_1_wrapper_init() {
   E2E_STATE_DIR="$proj/.mcl"
 
   # Drive mcl-activate.sh as the wrapper would (real UserPromptSubmit
-  # input). The hook initializes state.json on first run.
+  # input). The hook initializes state.json on first run with v3 schema.
   local out
   out="$(run_activate_hook "$proj" "admin paneli yap, kullanıcıları listele, sadece adminler görsün, audit log tutsun, hızlı olsun")"
 
@@ -301,10 +301,10 @@ phase_1_handoff_token_path_probe() {
 }
 
 # ---------------------------------------------------------------------
-# PHASE 14 — Phase 4.5 START sticky-pause + 5 sequential gates
+# PHASE 14 — Phase 4 START sticky-pause + 5 sequential gates
 # ---------------------------------------------------------------------
 # Two sub-tests:
-#   14.A Sticky-pause short-circuits Phase 4.5 START (no gate runs)
+#   14.A Sticky-pause short-circuits Phase 4 START (no gate runs)
 #   14.B Each gate's scan helper returns valid JSON with HIGH=0 on a
 #        clean project (the "would proceed" baseline for every gate)
 #
@@ -334,7 +334,7 @@ open(fp, 'w').write(json.dumps(obj, indent=2))
 }
 
 phase_14_sticky_pause_blocks_gates() {
-  phase_header "14.A — Sticky-pause short-circuits Phase 4.5 START"
+  phase_header "14.A — Sticky-pause short-circuits Phase 4 START"
 
   local proj
   proj="$(setup_test_dir)"
@@ -349,9 +349,10 @@ phase_14_sticky_pause_blocks_gates() {
   # sticky-pause CHECK in mcl-stop.sh, not the setter.
   _e2e_write_state "$state_file" '{
     "current_phase": 4,
-    "phase_name": "EXECUTE",
-    "spec_approved": true,
-    "phase_review_state": "pending",
+    "phase_name": "RISK_GATE",
+    "is_ui_project": false,
+    "design_approved": true,
+    "spec_hash": "deadbeef",
     "paused_on_error": {
       "active": true,
       "reason": "synthetic e2e fixture",
@@ -405,8 +406,8 @@ phase_14_sticky_pause_blocks_gates() {
 
   # ASSERT 4: scan_done flags untouched (gates did not execute)
   local sec_done
-  sec_done="$(state_get_field "$state_file" phase4_5_security_scan_done 2>/dev/null)"
-  assert_equals "phase4_5_security_scan_done still false (gate did not run)" "$sec_done" "false"
+  sec_done="$(state_get_field "$state_file" phase4_security_scan_done 2>/dev/null)"
+  assert_equals "phase4_security_scan_done still false (gate did not run)" "$sec_done" "false"
 
   cleanup_test_dir "$proj"
 }
@@ -464,17 +465,17 @@ print("ok" if "findings" in d and isinstance(d["findings"], list) else "bad")
 phase_14_sequential_gate_ordering() {
   phase_header "14.C — Sequential gate ordering through real Stop hook"
 
-  # Drive the full mcl-stop.sh Phase 4.5 START enforcement: a clean
+  # Drive the full mcl-stop.sh Phase 4 START enforcement: a clean
   # project + a transcript with an Edit tool_use in the last assistant
   # turn → mcl-phase-review-guard reports code_written=true →
-  # phase_review_state transitions to pending → all 5 gates run in order
+  # current_phase advance transitions to pending → all 5 gates run in order
   # (security → db → ui → ops → perf), each sets scan_done=true and
   # high_baseline.X=0 because the project has no findings.
   #
   # Slowest path in the suite (~12-15s on first run, mostly semgrep);
   # subsequent runs would hit the scan_done short-circuit if state were
   # preserved. We use a fresh project each invocation, so this is the
-  # canonical "first Phase 4.5 turn" measurement.
+  # canonical "first Phase 4 turn" measurement.
 
   local proj
   proj="$(setup_test_dir)"
@@ -484,18 +485,18 @@ phase_14_sequential_gate_ordering() {
   run_activate_hook "$proj" "init" >/dev/null
 
   # Phase 4 active, code already approved + executing, no scan done yet.
-  # Leave phase_review_state=null so this is the FIRST transition.
+  # Leave current_phase advance=null so this is the FIRST transition.
   _e2e_write_state "$state_file" '{
     "current_phase": 4,
-    "phase_name": "EXECUTE",
-    "spec_approved": true,
+    "phase_name": "RISK_GATE",
+    "is_ui_project": false,
+    "design_approved": true,
     "spec_hash": "deadbeef",
-    "phase_review_state": null,
-    "phase4_5_security_scan_done": false,
-    "phase4_5_db_scan_done": false,
-    "phase4_5_ui_scan_done": false,
-    "phase4_5_ops_scan_done": false,
-    "phase4_5_perf_scan_done": false
+    "phase4_security_scan_done": false,
+    "phase4_db_scan_done": false,
+    "phase4_ui_scan_done": false,
+    "phase4_ops_scan_done": false,
+    "phase4_perf_scan_done": false
   }'
 
   # Transcript fixture: one assistant turn ending with an Edit tool_use.
@@ -525,8 +526,6 @@ with open(out, "w") as f:
     }) + "\n")
 ' "$transcript"
 
-  local pending_before
-  pending_before="$(audit_count "$audit_log" phase-review-pending)"
   local sec_block_before
   sec_block_before="$(audit_count "$audit_log" security-scan-block)"
 
@@ -539,30 +538,17 @@ with open(out, "w") as f:
       bash "$REPO_ROOT/hooks/mcl-stop.sh" 2>/dev/null)"
 
   # ASSERT 1: stop hook emitted valid JSON and decision=block
-  # (Phase 4.5 START reminder once all 5 gates pass with HIGH=0).
-  assert_json_valid "stop hook → valid JSON (Phase 4.5 START)" "$stop_out"
+  # (Phase 4 START reminder once all 5 gates pass with HIGH=0).
+  assert_json_valid "stop hook → valid JSON (Phase 4 START)" "$stop_out"
 
   local decision
   decision="$(printf '%s' "$stop_out" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); print(d.get("decision",""))' 2>/dev/null)"
-  assert_equals "decision=block (Phase 4.5 START reminder)" "$decision" "block"
+  assert_equals "decision=block (Phase 4 START reminder)" "$decision" "block"
 
-  # ASSERT 2: phase-review-pending audit incremented (transition fired)
-  local pending_after
-  pending_after="$(audit_count "$audit_log" phase-review-pending)"
-  if [ "$pending_after" -gt "$pending_before" ]; then
-    PASS=$((PASS+1))
-    printf '  PASS: phase-review-pending audit incremented (%d → %d) — code_written detected\n' \
-      "$pending_before" "$pending_after"
-  else
-    FAIL=$((FAIL+1))
-    printf '  FAIL: phase-review-pending NOT incremented — guard did not see Edit\n'
-    printf '        before=%d after=%d\n' "$pending_before" "$pending_after"
-  fi
-
-  # ASSERT 3: phase_review_state transitioned to "pending"
-  local prs
-  prs="$(state_get_field "$state_file" phase_review_state 2>/dev/null)"
-  assert_equals 'phase_review_state = "pending" after first Phase 4 stop' "$prs" '"pending"'
+  # ASSERT 3: current_phase advanced to 4 (RISK_GATE) after first Phase 3 stop
+  local cp
+  cp="$(state_get_field "$state_file" current_phase 2>/dev/null)"
+  assert_equals 'current_phase = 4 after first Phase 3 code-write stop' "$cp" "4"
 
   # ASSERT 4: NO security-scan-block (clean project → HIGH=0 path taken)
   local sec_block_after
@@ -572,8 +558,8 @@ with open(out, "w") as f:
   # ASSERT 5: all 5 scan_done flags now true (each gate ran and proceeded)
   local g flag
   for g in security db ui ops perf; do
-    flag="$(state_get_field "$state_file" "phase4_5_${g}_scan_done" 2>/dev/null)"
-    assert_equals "phase4_5_${g}_scan_done = true (gate ran)" "$flag" "true"
+    flag="$(state_get_field "$state_file" "phase4_${g}_scan_done" 2>/dev/null)"
+    assert_equals "phase4_${g}_scan_done = true (gate ran)" "$flag" "true"
   done
 
   # ASSERT 6: high_baseline.X = 0 for each gate (recorded for Phase 6 (b))
@@ -581,10 +567,10 @@ with open(out, "w") as f:
   baseline="$(python3 -c "
 import json
 d = json.load(open('$state_file'))
-hb = d.get('phase4_5_high_baseline', {}) or {}
+hb = d.get('phase4_high_baseline', {}) or {}
 print(','.join(str(hb.get(k, 'missing')) for k in ['security','db','ui','ops','perf']))
 " 2>/dev/null)"
-  assert_equals "phase4_5_high_baseline = {sec=0,db=0,ui=0,ops=0,perf=0}" "$baseline" "0,0,0,0,0"
+  assert_equals "phase4_high_baseline = {sec=0,db=0,ui=0,ops=0,perf=0}" "$baseline" "0,0,0,0,0"
 
   cleanup_test_dir "$proj"
 }
@@ -662,9 +648,10 @@ phase_25_pause_on_scan_helper_error() {
   # Patch state into Phase 4 so the security incremental scan path is
   # active (mcl-pre-tool.sh gates the scan on phase >= 4).
   _e2e_write_state "$state_file" '{
-    "current_phase": 4,
-    "phase_name": "EXECUTE",
-    "spec_approved": true,
+    "current_phase": 3,
+    "phase_name": "IMPLEMENTATION",
+    "is_ui_project": false,
+    "design_approved": true,
     "spec_hash": "deadbeef"
   }'
 

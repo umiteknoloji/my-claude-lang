@@ -1,44 +1,41 @@
-<mcl_phase name="phase4c-backend">
+<mcl_phase name="phase3-backend">
 
-# Phase 4c: BACKEND_INTEGRATION — Wire Real Data
+# Phase 3 (UI path): Backend Integration — Wire Real Data
 
 ## Entry Condition
 
-Phase 4c starts automatically when:
+This is the UI-after-design subset of Phase 3, entered when:
 
-- `current_phase = 4`
-- `spec_approved = true`
-- `ui_flow_active = true`
-- `ui_reviewed = true` (set by Phase 4b approve intent)
-- `ui_sub_phase = "BACKEND"`
+- `current_phase = 3`
+- `is_ui_project = true`
+- `design_approved = true` (set by Phase 2 design askq approve)
 
-When `ui_flow_active = false` — Phase 4c is NOT USED. The `phase4-execute.md`
-default path runs directly (no split).
+When `is_ui_project = false` — this file is NOT USED. The
+`phase3-execute.md` default path runs directly (no split).
 
 ## Path Discipline Change
 
-On entry to Phase 4c, `mcl-pre-tool.sh` lifts the UI-BUILD path
-restriction because `ui_sub_phase` is now `"BACKEND"`. All paths
-are open again, subject to the standard Phase 4 gate (spec approved,
-phase = 4). Frontend edits are still allowed — there is no new
-restriction in the opposite direction.
+On Phase 3 entry, `mcl-pre-tool.sh` lifts the Phase 2
+DESIGN-REVIEW path restriction. All paths are open again, subject
+to the standard Phase 3 gate. Frontend edits are still allowed
+— there is no new restriction in the opposite direction.
 
 ## Core Intent
 
-Swap the Phase 4a dummy fixtures for real data sources:
+Swap the Phase 2 dummy fixtures for real data sources:
 - API routes, service layer, database queries
 - `fetch` / `axios` / SDK calls from the frontend
 - `.env` / config wiring
 - Loading / error / empty states driven by actual async behavior
 
-The spec has not changed — the same MUST / SHOULD requirements the
-developer approved in Phase 3 still apply. Phase 4c is execution, not
-re-specification.
+The Phase 1 brief has not changed — the same MUST / SHOULD
+requirements still apply. Phase 3 backend integration is
+execution, not re-specification.
 
-## Phase 4c Procedure
+## Procedure
 
 1. Grep the frontend for `MOCK_` / `__fixtures__/` prefixes and the
-   Phase 4a files that import them. Enumerate the swap-sites.
+   Phase 2 files that import them. Enumerate the swap-sites.
 2. Write backend code in the conventional project location:
    - Next.js: `src/app/api/<route>/route.ts`
    - SvelteKit: `src/routes/<route>/+server.ts`
@@ -58,15 +55,15 @@ re-specification.
 5. Update `.env.example` (never `.env`) with any new required keys.
    Surface them to the developer with install/setup instructions.
 6. Run the test runner if `test_command` is configured
-   (see `phase1-rules.md` pre-flow) — failures block Phase 4.5 exit.
+   (see `phase1-rules.md` pre-flow) — failures block Phase 4 exit.
 
 ## Preserve the Type Contract
 
-The TypeScript types written alongside Phase 4a fixtures
+The TypeScript types written alongside Phase 2 fixtures
 (`src/types/user.ts` etc.) stay as-is. The real API returns data
 matching the same shape; the type is the boundary. If the real
 backend differs from the fixture shape, STOP and surface the
-mismatch to the developer as a Phase 1-3 micro-cycle — do not
+mismatch to the developer as a fresh Phase 1 micro-cycle — do not
 silently change the type.
 
 ## Remove Dev-Only Bits
@@ -94,9 +91,9 @@ Keep:
 
 ## Downstream Phases
 
-Phase 4c exits directly into Phase 4.5 (post-code risk review) per
-`phase4-5-risk-review.md`. Risk review covers BOTH the UI layer and
-the new backend layer. Then Phase 4.6, then Phase 5.
+Phase 3 backend integration exits directly into Phase 4 (risk gate)
+per `phase4-risk-gate.md`. The risk gate covers BOTH the UI layer
+and the new backend layer. The impact lens follows, then Phase 5.
 
 Phase 5's Verification Report "must-test" list MUST include:
 - UI interaction verification (click primary button, form submit, etc.)
@@ -104,18 +101,17 @@ Phase 5's Verification Report "must-test" list MUST include:
   status 200, payload matches type)
 - Error-path verification (what happens when the backend returns 500)
 
-## What Phase 4c Inherits from phase4-execute.md
+## Inherited Phase 3 Rules
 
-All the core Phase 4 rules still apply:
+All the core Phase 3 rules from `phase3-execute.md` still apply:
 - All code/comments/commits in English
 - All communication in the developer's language
 - Gate 1/2/3 on every Claude-Code question
 - Execution Plan ONLY for `rm`/`rmdir` shell commands (the
-  deletion-only rule from `phase4-execute.md` still holds)
-- Scope-creep handling: new tasks get fresh Phase 1-3
+  deletion-only rule from `phase3-execute.md` still holds)
+- Scope-creep handling: new tasks get fresh Phase 1 cycle
 
-Phase 4c does NOT re-implement those rules — it is Phase 4 execution
-with the UI already committed. Think of it as the second half of the
-`ui_flow_active = true` execution pair.
+This file does NOT re-implement those rules — it is the UI-after-
+design Phase 3 path with the visual skeleton already committed.
 
 </mcl_phase>

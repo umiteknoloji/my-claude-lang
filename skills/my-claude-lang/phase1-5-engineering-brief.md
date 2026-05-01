@@ -170,7 +170,7 @@ specific features and constraints require user mention.**
 4. **Preserve Phase 1.7 markers** verbatim (`[assumed: X]`,
    `[unspecified: X]`).
 5. **Reject forbidden additions** — if context tempts you to add scope
-   beyond verb implication, DO NOT. Wait for Phase 4.5 brief-drift lens
+   beyond verb implication, DO NOT. Wait for Phase 4 brief-drift lens
    to surface the missing piece if implementation reveals a gap.
 
 ## Audit
@@ -189,7 +189,7 @@ engineering-brief | phase1-5 | lang=<detected> skipped=<true|false> retries=<N> 
 - `clarification=true` when developer was asked a question during
   failure path.
 
-The audit is a detection control, not a permission gate. Phase 4.5
+The audit is a detection control, not a permission gate. Phase 4
 brief-drift lens catches scope drift; the audit's `upgraded` field tells
 the lens whether to scan.
 
@@ -213,9 +213,9 @@ A consistent brief produces:
 
 Once consistent, continue to Phase 2.
 
-## Phase 4.5 Brief-Drift Lens (Companion Check)
+## Phase 4 Brief-Drift Lens (Companion Check)
 
-When this audit emits `upgraded=true`, Phase 4.5 risk review runs Lens
+When this audit emits `upgraded=true`, Phase 4 risk review runs Lens
 (e): Brief-Phase-1 Scope Drift. The lens compares Phase 4 implementation
 against the user's ORIGINAL Phase 1 confirmed parameters (NOT the
 upgraded brief or downstream spec) and surfaces any element that:
@@ -223,9 +223,9 @@ upgraded brief or downstream spec) and surfaces any element that:
 - Lacks traceability to a Phase 1 confirmed parameter, AND
 - Lacks a `[default: X, changeable]` marker in the brief/spec.
 
-This is the safety net. If Phase 1.5 hallucinated scope, Phase 4.5
+This is the safety net. If Phase 1.5 hallucinated scope, Phase 4
 catches it before Phase 5 sign-off. See
-`my-claude-lang/phase4-5-risk-review.md` Lens (e) for full rules.
+`my-claude-lang/phase4-risk-gate.md` Lens (e) for full rules.
 
 ## Phase 3 Scope Changes Callout (Companion Check)
 

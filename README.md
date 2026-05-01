@@ -1,8 +1,8 @@
-# my-claude-lang (MCL)
+# my-claude-lang (MCL) 10.0.0
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-MCL is a Claude Code plugin that grafts two wings onto every conversation: a **language bridge** that lets developers think in their own language while Claude produces senior-level English engineering output, and an **AI discipline** layer that drags every change through a deterministic phase pipeline (Phase 1 → 1.5 → 1.7 → 2 → 3 → 3.5 → 4 → 4.5 → 5 → 6) with hook-enforced gates for security, DB design, UI accessibility, and operational hygiene. It runs entirely outside your project — zero files written into your repo since 8.5.0.
+MCL is a Claude Code plugin that grafts two wings onto every conversation: a **language bridge** that lets developers think in their own language while Claude produces senior-level English engineering output, and an **AI discipline** layer that drags every change through a deterministic 6-phase pipeline with hook-enforced gates for security, DB design, UI accessibility, and operational hygiene. It runs entirely outside your project — zero files written into your repo since 8.5.0. Rules are stack-agnostic: the same discipline applies to React, Python, Go, Rust, Java, Ruby, or any other stack.
 
 ---
 
@@ -33,61 +33,89 @@ cd ~/.mcl/lib && git pull --ff-only && bash install.sh
 ```
 Or type `/mcl-update` inside a session.
 
+> **Upgrading from 9.x?** State is auto-migrated to schema v3 on the first activate after install. A backup is kept at `.mcl/state.json.backup.pre-v3`. No manual action required. See [CHANGELOG.md](CHANGELOG.md#1000) for details.
+
+---
+
+## Phase model
+
+MCL 10.0.0 has six phases. Phase 2 (DESIGN_REVIEW) only runs for UI projects; for non-UI projects the flow goes Phase 1 → Phase 3 directly.
+
+| Phase | Name | Responsibility | Approval gate |
+|---|---|---|---|
+| 1 | INTENT | Clarifying questions, precision audit, brief, `is_ui_project` detection | Summary-confirm askq |
+| 2 | DESIGN_REVIEW | UI skeleton + dev server (UI projects only) | Design approval askq |
+| 3 | IMPLEMENTATION | 📋 Spec emission + full code (TDD, scope guard) | None |
+| 4 | RISK_GATE | Security, DB, UI/a11y, ops, perf, architectural drift, intent violation | Auto-block on HIGH |
+| 5 | VERIFICATION | Test, lint, build, smoke report | None |
+| 6 | FINAL_REVIEW | Audit-trail completeness, regression, promise-vs-delivery double-check | None |
+
+### Flow
+
+```
+Phase 1 ──approve──▶ [Phase 2 if is_ui_project] ──approve──▶ Phase 3 ──▶ Phase 4 ──▶ Phase 5 ──▶ Phase 6
+```
+
+Severity tier across all gates: **HIGH** = `decision:deny` / `decision:block`; **MEDIUM** = sequential dialog item; **LOW** = audit-only.
+
+### Approval gates
+
+There are exactly two askq approval gates:
+1. **Phase 1 summary-confirm** — the developer confirms the intent / constraints / success / context summary. This is the canonical scope contract. There is no separate spec-approval step.
+2. **Phase 2 design approval** — UI projects only. After the clickable skeleton + dev server are running, MCL asks "Approve this design?" / "Tasarımı onaylıyor musun?". Approval sets `state.design_approved=true` and advances to Phase 3.
+
+Phase 3's `📋 Spec:` block is **documentation** — it is the entry artifact for the implementation phase, populates `state.scope_paths` for the scope guard, and provides an English semantic bridge for non-English prompts. Format violations are advisory: the hook emits a `spec-format-warn` audit and continues; 3+ violations across turns trigger a Phase 6 LOW soft fail, never a Write block.
+
+### `is_ui_project` detection
+
+Phase 1 brief parser sets `state.is_ui_project` from three signals:
+- Intent keywords (`UI`, `frontend`, `tasarım`, `mockup`, `design`, …)
+- Stack tags from `mcl-stack-detect.sh` (react-frontend, vue-frontend, svelte-frontend, html-static, expo, …)
+- Project file hints (`vite.config.*`, `next.config.*`, `tailwind.config.*`, `index.html` at root, …)
+
+If signals are ambiguous, MCL defaults to `is_ui_project=true` (the cost of a skipped design review on a non-UI project is an extra confirmation; the cost of skipping it on a real UI project is a wrong-design implementation).
+
+### Phase 4 risk gate
+
+Phase 4 runs after every Phase 3 implementation step and before Phase 5. It aggregates findings across categories:
+
+- **Security** — 3-tier scan (design dimensions, per-Edit incremental, START gate full scan); 13 generic core rules + 7 stack add-ons + Semgrep `p/default` + SCA dispatch. HIGH blocks Write.
+- **DB design** — 10 generic + 8 ORM × 3 anchor = 34 rules; `squawk` + `alembic check` delegates.
+- **UI / a11y** — 9 a11y-critical rules trigger HIGH; design tokens / reuse / responsive = MEDIUM dialog.
+- **Ops** — 4 packs × 20 rules (deployment / monitoring / testing / docs).
+- **Performance** — 3 packs × 11 rules (bundle / CWV / image), FE-only trigger.
+- **Architectural drift** — `state.scope_paths` (from spec) vs actual Phase 3 writes. LOW if scope is empty (advisory), MEDIUM if writes touch a sibling layer, HIGH if they cross to a different layer (frontend → backend).
+- **Intent violation** — `state.phase1_intent` negations (`no auth`, `no DB`, `frontend only`) matched against import paths and modified files. HIGH violations block Write.
+
+Spec compliance is checked here too (each MUST/SHOULD vs the implementation), but format issues stay advisory.
+
+### Phase 6 double-check
+
+Three orthogonal checks run before the session can close:
+- **(a) Audit trail completeness** — required STEP audit events emitted? (Catches silently skipped phases.)
+- **(b) Final scan regression** — security + DB + UI scans re-run; new HIGH findings since the Phase 4 START baseline = block.
+- **(c) Promise-vs-delivery** — Phase 1 confirmed parameters keyword-matched against modified files (reverse Lens-e traceability).
+
+Skip impossible: state field `phase6_double_check_done` enforced via `decision:block`.
+
 ---
 
 ## Feature catalog
 
 ### Language bridge
-Detects the developer's language from the first message, keeps every clarifying question, risk dialog, verification report, and section header in that language. Internal engineering output (specs, code, technical tokens) stays English. 14 languages supported (TR / EN / AR / DE / ES / FR / HE / HI / ID / JA / KO / PT / RU / ZH); TR + EN fully localized for tooling output, others fall back to English for tool reports.
+Detects the developer's language from the first message, keeps every clarifying question, risk dialog, verification report, and section header in that language. Internal engineering output (specs, code, technical tokens) stays English. 14 languages supported (TR / EN / AR / DE / ES / FR / HE / HI / ID / JA / KO / PT / RU / ZH); TR + EN fully localized for tooling output.
 
 ### Per-project isolation
 MCL writes **zero files into your project**. State, hooks, skills, agents, audit logs, scan caches, dev-server logs — everything lives in `~/.mcl/projects/<key>/`. Per-project keys are SHA1 of `realpath($PWD)`, so renames lose state (intentional, no migration). Multiple projects work in parallel without state collision.
 
 ### Codebase scan — `/codebase-scan`
-Scans the project once with 12 pattern extractors (P1–P12: stack detection, architecture markers, naming convention, error handling style, test pattern, API style, state management, DB layer, logging, lint strictness, build/deploy, README intent). Writes high-confidence findings to `project.md` between `<!-- mcl-auto -->` markers (Phase 5 sections preserved); medium/low to `project-scan-report.md`.
-
-### Backend security — 3-tier — `/mcl-security-report`
-13 generic core rules + 7 stack add-ons (Django ALLOWED_HOSTS, FastAPI CORS, React unsafe HTML setter, Spring CSRF disabled, Rails strong params, Laravel debug, …) + Semgrep `p/default` integration + SCA tool dispatch (npm/pip/cargo/go/bundle audit). OWASP Top 10 + ASVS L1 subset. Severity-tiered: HIGH=`decision:deny` block, MEDIUM=Phase 4.5 sequential dialog, LOW=audit log.
-- **L1 Phase 1.7** — 5 design-time dimensions (auth model, authz unit, CSRF stance, secret management, deserialization input)
-- **L2 Phase 4 per-Edit** — incremental scan on Edit/Write/MultiEdit; `decision:deny` if HIGH
-- **L3 Phase 4.5 START gate** — full scan; HIGH keeps state in `pending`, blocks Phase 4.5 dialog until fixed
-
-### DB design discipline — `/mcl-db-report`, `/mcl-db-explain`
-10 generic core rules (missing PK, SELECT *, missing FK index, UPDATE/DELETE without WHERE, JSONB without validation, TIMESTAMP without timezone, text-id-not-UUID, enum-as-text, cascade-delete on user data, N+1 static heuristic) + 8 ORM add-ons × 3 anchor rules (Prisma, SQLAlchemy, Django ORM, ActiveRecord, Sequelize, TypeORM, GORM, Eloquent) = 34 rules. External delegates: `squawk` (Postgres migration linter) + `alembic check`. Optional `MCL_DB_URL` env enables `/mcl-db-explain` for live `EXPLAIN` plan analysis (no `ANALYZE` by default — production safety).
-
-### UI enforcement — `/mcl-ui-report`, `/mcl-ui-axe`
-10 generic core HTML/a11y rules (img-no-alt, button-no-name, link-no-href, input-no-label, div-onClick-no-keyboard, heading-skip, hardcoded color/spacing/font-size, magic breakpoint) + 12 framework add-ons across React / Vue / Svelte / HTML-static = 22 rules. **Severity tuned for UI iteration tempo:** only a11y-critical findings (9 rules, e.g. img-no-alt, controlled-input-without-onChange, html-no-lang) trigger HIGH `decision:deny`; design tokens / reuse / responsive / naming = MEDIUM dialog; advisory = LOW audit. Design tokens detected hybrid: project's `tailwind.config` / CSS vars / `theme.ts` / `design-tokens.json`, falling back to MCL default 8px grid + Tailwind-ish scale. Optional `MCL_UI_URL` enables `/mcl-ui-axe` for live `axe-core` runtime scan via Playwright.
+Scans the project once with 12 pattern extractors (P1–P12: stack detection, architecture markers, naming convention, error handling style, test pattern, API style, state management, DB layer, logging, lint strictness, build/deploy, README intent). Writes high-confidence findings to `project.md` between `<!-- mcl-auto -->` markers; medium/low confidence to `project-scan-report.md`.
 
 ### Pause-on-error — `/mcl-resume`
-When a scan helper crashes, validator returns malformed JSON, audit log fails to write, hook script crashes, or external delegate fails non-gracefully, MCL **explicitly pauses** instead of silent fail-open: state.paused_on_error.active=true, every subsequent tool returns `decision:deny` with the error context, suggested fix, and last-known phase. Resume with `/mcl-resume <your resolution>` (free-form natural-language argument), or via skill-driven natural-language acknowledgment. Sticky across session boundaries — paused state survives Claude Code restarts. Build errors from the dev server feed into the same channel.
-
-### Phase 6 Double-check — `/mcl-phase6-report`
-After Phase 5 verification, three orthogonal checks run before the session can close:
-- **(a) Audit trail completeness** — were all required STEP audit events emitted? (Catches silently skipped phases.)
-- **(b) Final scan aggregation** — re-runs security + DB + UI scans; new HIGH findings since the Phase 4.5 START baseline = regression block.
-- **(c) Promise-vs-delivery** — Phase 1 confirmed parameters (intent + constraints) keyword-matched against modified source files (reverse Lens-e traceability).
-
-Skip impossible: state field `phase6_double_check_done` enforced via `decision:block`.
+When a scan helper crashes, validator returns malformed JSON, audit log fails to write, hook script crashes, or external delegate fails non-gracefully, MCL **explicitly pauses** instead of silent fail-open: `state.paused_on_error.active=true`, every subsequent tool returns `decision:deny` with the error context. Resume with `/mcl-resume <your resolution>`.
 
 ### Interactive design loop — `/mcl-design-approve`, `/mcl-dev-server-start`, `/mcl-dev-server-stop`
-After Phase 4a UI build, MCL auto-starts a dev server (10 stack detection: vite, next, cra, vue-cli, sveltekit, rails, django, flask, expo, static) in the background, allocates a port (default + 4 fallbacks), tracks PID in `$MCL_STATE_DIR/dev-server.pid`, and surfaces the URL via state. Build errors detected from `dev-server.log` (stack-specific regex map) trigger pause-on-error. Headless environments (`MCL_HEADLESS`, `CI`, Linux SSH no-DISPLAY) skip auto-start with manual instructions. Loop closes with `/mcl-design-approve` (sets `ui_reviewed=true`, advances to Phase 4c BACKEND).
-
-### Operational discipline — `/mcl-ops-report`
-4 rule packs × 20 rules across deployment / monitoring / test coverage / documentation:
-- **Deployment** (8): no-CI, workflow YAML errors, Dockerfile root user, `:latest` tag, no `HEALTHCHECK`, missing `.env.example`, env drift, undocumented secrets
-- **Monitoring** (4): no structured logger (winston/pino/loguru/structlog), no `/metrics` endpoint, no error tracker (Sentry/Bugsnag/Rollbar), logger without level
-- **Testing** (3): coverage below threshold (configurable: HIGH < 50%, MEDIUM < 70%), no test framework, changed file without test
-- **Docs** (5): no README, no install section, no usage section, API surface without OpenAPI/Swagger, low function-level docstring coverage
-
-Coverage delegated to vitest / jest / pytest / go-test / cargo-tarpaulin (binary missing → graceful skip). Configurable via `$MCL_STATE_DIR/ops-config.json`.
-
-### Performance budget — `/mcl-perf-report`, `/mcl-perf-lighthouse`
-3 rule packs × 11 rules across **bundle / Core Web Vitals / image** — FE-only trigger:
-- **Bundle** (4): over-budget critical (>2× HIGH), over-budget (100-200% MEDIUM), no build output (LOW advisory), large chunk (LOW). Walks `dist/`, `build/`, `.next/static/chunks/`, `out/`; gzipped JS aggregation. Build is **not** invoked — assumes `npm run build` already ran.
-- **Core Web Vitals** (4): LCP poor (>4s HIGH), LCP needs improvement (2.5-4s MEDIUM), CLS poor (>0.25 MEDIUM), TBT poor (>600ms MEDIUM). Lighthouse delegate (`npx lighthouse --output=json --only-categories=performance`); runs only when explicitly invoked via `/mcl-perf-lighthouse` or `/mcl-perf-report` (not in the L3 stop-hook gate — 60s overhead).
-- **Image** (3): image huge (>500KB HIGH), image large (100-500KB MEDIUM), PNG without WebP/AVIF fallback (LOW). Walks `public/`, `static/`, `assets/`, `src/assets/`, `app/static/`.
-
-`/mcl-perf-lighthouse` reuses the **`MCL_UI_URL`** env var that `/mcl-ui-axe` uses — set one URL once, both runtime tools work against it. Audit logs distinguish via `tool=axe|lighthouse`. Configurable via `$MCL_STATE_DIR/perf-config.json`.
+During Phase 2 DESIGN_REVIEW, MCL auto-starts a dev server (10 stack detection: vite, next, cra, vue-cli, sveltekit, rails, django, flask, expo, static) in the background, allocates a port (default + 4 fallbacks), tracks PID in `$MCL_STATE_DIR/dev-server.pid`, and surfaces the URL via state. Build errors detected from `dev-server.log` trigger pause-on-error. Headless environments (`MCL_HEADLESS`, `CI`, Linux SSH no-DISPLAY) skip auto-start with manual instructions. The loop closes with `/mcl-design-approve` (sets `design_approved=true`, advances to Phase 3).
 
 ---
 
@@ -97,59 +125,88 @@ All keywords skip the normal MCL pipeline and run a dedicated mode. Type the key
 
 | Keyword | Purpose |
 |---|---|
-| `/mcl-doctor` | Token & cost accounting report (per-turn injection overhead, session totals) |
-| `/mcl-update` | `git pull` MCL repo + re-install (`bash install.sh`) |
-| `/mcl-restart` | Reset MCL state to Phase 1 within the same session (preserves project) |
-| `/codebase-scan` | Run 12-pattern codebase scan, write `project.md` + `project-scan-report.md` |
-| `/mcl-security-report` | Full backend security scan (generic + stack + Semgrep + SCA), localized markdown |
-| `/mcl-db-report` | Full DB design scan (generic + ORM + migration delegate), localized markdown |
-| `/mcl-db-explain` | Run `EXPLAIN` on saved query files (requires `MCL_DB_URL` env) |
-| `/mcl-ui-report` | Full UI scan (generic + framework + token + ESLint a11y delegate), localized markdown |
-| `/mcl-ui-axe` | Runtime `axe-core` accessibility scan via Playwright (requires `MCL_UI_URL` env) |
-| `/mcl-resume <resolution>` | Clear `paused_on_error` state with free-form resolution text |
-| `/mcl-phase6-report` | On-demand Phase 6 double-check report (audit trail + regression + promise-delivery) |
-| `/mcl-design-approve` | Stop dev server, advance from Phase 4b UI_REVIEW to Phase 4c BACKEND |
-| `/mcl-dev-server-start` | Manually start the dev server (auto-detect stack) |
-| `/mcl-dev-server-stop` | Manually stop the dev server (loop stays open) |
-| `/mcl-ops-report` | Full operational discipline scan (deployment + monitoring + testing + docs) |
-| `/mcl-perf-report` | Full performance scan (bundle gzipped + image walk + opt-in Lighthouse CWV) |
-| `/mcl-perf-lighthouse` | Runtime Core Web Vitals scan via Lighthouse (requires `MCL_UI_URL` env, shared with `/mcl-ui-axe`) |
+| `/mcl-doctor` | Token & cost accounting report |
+| `/mcl-update` | `git pull` MCL repo + re-install |
+| `/mcl-restart` | Reset MCL state to Phase 1 within the same session |
+| `/codebase-scan` | Run 12-pattern codebase scan |
+| `/mcl-security-report` | Full backend security scan |
+| `/mcl-db-report` | Full DB design scan |
+| `/mcl-db-explain` | Run `EXPLAIN` on saved query files (requires `MCL_DB_URL`) |
+| `/mcl-ui-report` | Full UI scan |
+| `/mcl-ui-axe` | Runtime `axe-core` accessibility scan via Playwright (requires `MCL_UI_URL`) |
+| `/mcl-resume <resolution>` | Clear `paused_on_error` state |
+| `/mcl-phase6-report` | On-demand Phase 6 double-check report |
+| `/mcl-design-approve` | Stop dev server, advance from Phase 2 to Phase 3 |
+| `/mcl-dev-server-start` | Manually start the dev server |
+| `/mcl-dev-server-stop` | Manually stop the dev server |
+| `/mcl-ops-report` | Full operational discipline scan |
+| `/mcl-perf-report` | Full performance scan |
+| `/mcl-perf-lighthouse` | Runtime Core Web Vitals scan via Lighthouse |
 
 ---
 
-## Phase pipeline
-
-Each developer message flows through this sequence. A phase doesn't advance without its required parameters.
+## Example transcript (UI project)
 
 ```
-Phase 1     Understanding             intent / constraints / success / context
-Phase 1.5   Engineering Brief         translator + verb upgrade (vague → surgical English)
-Phase 1.7   Precision Audit           7 core dims + stack add-ons + 5 security + 7 DB; SILENT-ASSUME / SKIP-MARK / GATE
-Phase 2     Spec emission             📋 Spec block with MUST/SHOULD requirements
-Phase 3     Verification + approval   developer reviews scope-changes callout, approves
-Phase 3.5   Pattern matching          read project code, extract conventions
-Phase 4     Code authoring (TDD)      4a BUILD_UI dummy data → 4b UI_REVIEW (dev server) → 4c BACKEND
-Phase 4.5   Risk Review               sticky-pause → security gate → db gate → ui gate → ops gate → standard reminder
-Phase 4.6   Impact analysis           track downstream effects of fixes
-Phase 5     Verification report       spec coverage + manual-test surface + process trace + 5.5 localized
-Phase 6     Double-check              audit trail + final scan regression + promise-vs-delivery
+dev:  Build a small task list app, React + Tailwind, no backend yet — just dummy data.
+
+MCL Phase 1 — INTENT
+  - Asks 2 GATE questions (auth model? persistence?)
+  - Detects is_ui_project=true (intent + stack hints)
+  - Summary askq: "Confirm this scope?" → dev approves → state.current_phase=2
+
+MCL Phase 2 — DESIGN_REVIEW
+  - Builds clickable skeleton (React + Tailwind, dummy data)
+  - Auto-starts vite dev server on http://localhost:5173
+  - askq: "Tasarımı onaylıyor musun?" → dev approves
+    → state.design_approved=true, current_phase=3
+
+MCL Phase 3 — IMPLEMENTATION
+  - Emits 📋 Spec block (documentation; populates scope_paths)
+  - TDD red-green-refactor over Acceptance Criteria
+  - Pattern matching against project conventions
+
+MCL Phase 4 — RISK_GATE
+  - Security / DB / UI / ops / perf scans
+  - Architectural drift: scope_paths vs writes
+  - Intent violation: phase1_intent negations vs imports
+  - HIGH findings block Write; MEDIUM → sequential dialog
+
+MCL Phase 5 — VERIFICATION
+  - Test + lint + build + smoke report
+  - Spec coverage table (MUST/SHOULD vs tests)
+
+MCL Phase 6 — FINAL_REVIEW
+  - Audit-trail completeness check
+  - Regression vs Phase 4 baseline
+  - Promise-vs-delivery (Phase 1 params vs modified files)
 ```
 
-Severity tier across all gates: **HIGH** = `decision:deny` / `decision:block`; **MEDIUM** = sequential dialog item; **LOW** = audit-only.
+For a non-UI project (e.g. a Go CLI), Phase 2 is skipped: Phase 1 → Phase 3 → Phase 4 → Phase 5 → Phase 6.
+
+---
+
+## Stack-agnostic discipline
+
+MCL rules are not tied to any one ecosystem. Stack detection (`mcl-stack-detect.sh`) informs which add-on rule packs run; it never gates the core pipeline. The same TDD discipline, scope guard, risk gate, and verification report apply whether you are working on:
+
+- **Frontend** — React, Vue, Svelte, plain HTML
+- **Backend** — Python (FastAPI/Django), Java (Spring/Quarkus), C# (ASP.NET), Ruby (Rails/Sinatra), PHP (Laravel/Symfony), Go, Rust, Node.js
+- **Mobile** — Swift, Kotlin
+- **Systems / data** — C/C++, Lua, data pipelines (Airflow/dbt/Prefect/Dagster), ML inference
+
+Detection informs add-on selection; it never gates the core pipeline.
 
 ---
 
 ## Known limitations
 
 - **Project rename** loses state (path-SHA1 keying; intentional for setup-free).
-- **Headless `/mcl-ui-axe`, `/mcl-perf-lighthouse`, and `/mcl-db-explain`** require explicit env vars (`MCL_UI_URL` shared by axe + Lighthouse; `MCL_DB_URL` for DB EXPLAIN); skip with localized advisory otherwise.
-- **Bundle size** measured from existing build output only — `npm run build` is not invoked automatically; advisory if no `dist/`/`build/`/`.next/static/chunks/`/`out/` present.
-- **External tool delegates** (Semgrep, squawk, hadolint, eslint-plugin-jsx-a11y, `axe-core`, `playwright`, `pip-audit`, `cargo-audit`, `govulncheck`, `bundle-audit`) gracefully skip when binaries are missing — install them for full coverage.
-- **14 languages supported, but only TR + EN are fully localized for tool reports.** Others fall back to English for scan output (clarifying questions and risk dialog still respect the developer's language via skill prose).
-- **N+1 detection is static-only**; runtime profiling (test-runner integration) deferred to 8.x.
-- **Phase 5 `phase5-verify` audit event** is model-behavioral; older skill files don't emit it. Phase 6 (a) treats absence as LOW soft fail with transcript fallback (`Verification Report` / `Doğrulama Raporu` string match).
-- **L2 ops scan** (per-Edit Dockerfile / workflow / README block) deferred to 8.13.x; 8.13.0 has L3 + manual `/mcl-ops-report` only.
-- **Cloud DB** (BigQuery / Snowflake / DynamoDB) detected at the stack-tag level; dialect-specific rule packs deferred to 8.8.x.
+- **Headless `/mcl-ui-axe`, `/mcl-perf-lighthouse`, and `/mcl-db-explain`** require explicit env vars (`MCL_UI_URL` for axe + Lighthouse, `MCL_DB_URL` for DB EXPLAIN); skip with localized advisory otherwise.
+- **Bundle size** measured from existing build output only — `npm run build` is not invoked automatically.
+- **External tool delegates** (Semgrep, squawk, hadolint, eslint-plugin-jsx-a11y, `axe-core`, Playwright, `pip-audit`, `cargo-audit`, `govulncheck`, `bundle-audit`) gracefully skip when binaries are missing.
+- **14 languages supported, but only TR + EN are fully localized for tool reports.** Others fall back to English for scan output (clarifying questions and risk dialog still respect the developer's language).
+- **N+1 detection is static-only**; runtime profiling deferred.
 
 For full per-version detail, see [CHANGELOG.md](CHANGELOG.md).
 

@@ -5,7 +5,7 @@ Three checks:
   (a) Audit trail completeness — required STEP audit events present in
       current session window
   (b) Final scan aggregation — re-run codebase/security/db/ui full scans;
-      compare HIGH count against phase4_5_high_baseline; new HIGH = regression
+      compare HIGH count against phase4_high_baseline; new HIGH = regression
   (c) Promise-vs-delivery — Phase 1 confirmed params (intent/constraints)
       keyword-match against modified files
 
@@ -13,7 +13,7 @@ Modes:
   run     — enforcement (returns JSON consumed by mcl-stop.sh)
   report  — on-demand markdown for /mcl-phase6-report
 
-Trigger: mcl-stop.sh after standard Phase 4.5 reminder, when
+Trigger: mcl-stop.sh after standard Phase 4 reminder, when
 phase_review_state=="done" AND phase6_double_check_done!=true.
 
 Since 8.11.0.
@@ -28,8 +28,8 @@ REQUIRED_EVENTS = {
     "engineering-brief": "Phase 1.5 Engineering Brief",
     "spec-approve": "Phase 3 spec approval",
     "phase-review-pending": "Phase 4 → 4.5 transition",
-    "phase-review-running": "Phase 4.5 dialog active",
-    "phase-review-impact": "Phase 4.6 impact review",
+    "phase-review-running": "Phase 4 dialog active",
+    "phase-review-impact": "Phase 4 (impact lens) impact review",
 }
 # phase5-verify is opt-in (8.11.0+ skill emits); soft fail on absence.
 SOFT_REQUIRED_EVENTS = {
@@ -142,7 +142,7 @@ def check_audit_trail(state_dir: Path) -> tuple[list[dict], list[dict]]:
             })
     # Severity-skip violation check (since 8.19.0): for each HIGH or
     # MEDIUM-sec/db finding that the dialog SKIPPED (rather than fixing
-    # or overriding), require a matching `phase4_5_override` audit event
+    # or overriding), require a matching `phase4_override` audit event
     # naming the same rule_id. Mismatch → LOW soft fail.
     low.extend(check_severity_skip_violations(audit_log))
     # State-hack attempt check (since 9.0.0): any `deny-write | bash |
@@ -198,11 +198,11 @@ def check_state_hack_attempts(audit_log: Path) -> list[dict]:
 
 
 def check_severity_skip_violations(audit_log: Path) -> list[dict]:
-    """Cross-reference Phase 4.5 dialog skip events against override events.
+    """Cross-reference Phase 4 dialog skip events against override events.
 
     Audit format expected (skill prose / hook records, all best-effort):
-      `phase4_5_dialog | phase4-5 | rule=<RULE_ID> severity=<HIGH|MED|LOW> category=<sec|db|...> action=<apply|skip|override|make-rule>`
-      `phase4_5_override | phase4-5 | rule=<RULE_ID> severity=<HIGH|MEDIUM> category=<sec|db|...> reason=<text>`
+      `phase4_dialog | phase4 | rule=<RULE_ID> severity=<HIGH|MED|LOW> category=<sec|db|...> action=<apply|skip|override|make-rule>`
+      `phase4_override | phase4 | rule=<RULE_ID> severity=<HIGH|MEDIUM> category=<sec|db|...> reason=<text>`
 
     The `8.19.0` skill prose emits the override event whenever the
     severity-aware dialog forces an override. If a HIGH or MEDIUM-sec/db
@@ -220,7 +220,7 @@ def check_severity_skip_violations(audit_log: Path) -> list[dict]:
             if len(parts) < 4:
                 continue
             event, _, detail = parts[1].strip(), parts[2].strip(), parts[3].strip()
-            if event == "phase4_5_dialog":
+            if event == "phase4_dialog":
                 d = _parse_kv(detail)
                 rule = d.get("rule") or ""
                 sev = (d.get("severity") or "").upper()
@@ -231,7 +231,7 @@ def check_severity_skip_violations(audit_log: Path) -> list[dict]:
                 strict = sev == "HIGH" or (sev in ("MED", "MEDIUM") and cat in ("sec", "security", "db", "database"))
                 if strict:
                     skipped_strict.append((rule, sev))
-            elif event == "phase4_5_override":
+            elif event == "phase4_override":
                 d = _parse_kv(detail)
                 rule = d.get("rule") or ""
                 if rule:
@@ -246,8 +246,8 @@ def check_severity_skip_violations(audit_log: Path) -> list[dict]:
             "rule_id": "P6-A-severity-skip-without-override",
             "file": str(audit_log), "line": 0,
             "message": (
-                f"Phase 4.5 dialog skipped {sev} finding '{rule}' without a "
-                f"matching `phase4_5_override` audit event — severity-aware "
+                f"Phase 4 dialog skipped {sev} finding '{rule}' without a "
+                f"matching `phase4_override` audit event — severity-aware "
                 f"enforcement (8.19.0) requires override-with-reason for HIGH "
                 f"and MEDIUM-sec/db findings."
             ),
@@ -303,13 +303,13 @@ def run_scan(orch_path: Path, state_dir: Path, project_dir: Path, lang: str) -> 
 
 
 def check_final_scans(state_dir: Path, project_dir: Path, lang: str) -> list[dict]:
-    """(b) re-run 4 scans; compare HIGH against phase4_5_high_baseline."""
+    """(b) re-run 4 scans; compare HIGH against phase4_high_baseline."""
     here = Path(__file__).parent
     state_file = state_dir / "state.json"
     baseline = {"security": 0, "db": 0, "ui": 0}
     try:
         d = json.loads(state_file.read_text(encoding="utf-8"))
-        b = d.get("phase4_5_high_baseline") or {}
+        b = d.get("phase4_high_baseline") or {}
         for k in ("security", "db", "ui"):
             baseline[k] = int(b.get(k, 0))
     except Exception:
@@ -333,7 +333,7 @@ def check_final_scans(state_dir: Path, project_dir: Path, lang: str) -> list[dic
             findings.append({
                 "severity": "HIGH", "source": "phase6", "rule_id": f"P6-B-{cat}-regression",
                 "file": sample.get("file", "?"), "line": sample.get("line", 0),
-                "message": f"{cat}: {delta} new HIGH finding(s) since Phase 4.5 baseline (was {baseline[cat]}, now {cur}). Phase 4.5 dialog fixes may have introduced regression.",
+                "message": f"{cat}: {delta} new HIGH finding(s) since Phase 4 baseline (was {baseline[cat]}, now {cur}). Phase 4 dialog fixes may have introduced regression.",
                 "category": "phase6-regression",
             })
     # codebase-scan does not have severity routing the same way — skip in MVP

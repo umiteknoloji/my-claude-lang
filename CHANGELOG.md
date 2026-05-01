@@ -7,6 +7,34 @@
 
 ## [Unreleased]
 
+## 10.0.0 — 2026-05-01
+
+### Breaking changes
+- Phase model restructured. Old Phase 4 (EXECUTE) is now Phase 3 (IMPLEMENTATION); old Phase 4.5 is now Phase 4 (RISK_GATE). Old Phase 2 (SPEC_REVIEW) and Phase 3 (USER_VERIFY) are deleted entirely. New Phase 2 (DESIGN_REVIEW) added for UI projects.
+- State schema bumped to v3. `spec_approved`, `precision_audit_block_count`, `precision_audit_skipped`, `phase_review_state` fields removed. New: `is_ui_project`, `design_approved`. State files auto-migrated on first activate.
+- All `phase4_5_*` state fields renamed to `phase4_*` (e.g. `phase4_5_security_scan_done` → `phase4_security_scan_done`).
+- Skill files renamed: `phase-spec-doc.md` → `phase3-implementation.md`; `phase4-5-risk-review.md` → `phase4-risk-gate.md`; `phase4a-ui-build.md` + `phase4b-ui-review.md` merged into `phase2-design-review.md`. Deleted: `phase3-verify.md`.
+- Audit event names renamed: `phase-transition-to-execute` → `phase-transition-to-implementation`; `phase4_5_*` → `phase4_*`; `auto-approve-spec` removed.
+
+### Added
+- `is_ui_project` auto-detection in Phase 1 brief parse from intent keywords, stack tags, and project file hints. Default true if ambiguous.
+- Phase 2 DESIGN_REVIEW: UI projects build a clickable skeleton + dev server, then call AskUserQuestion with pinned body "Tasarımı onaylıyor musun?" / "Approve this design?". Approve advances state.design_approved=true and current_phase=3.
+- Phase 4 architectural drift detection: scope_paths vs Phase 3 writes; LOW if scope empty, MEDIUM if sibling layer, HIGH if different layer (frontend→backend).
+- Phase 4 intent violation check: phase1_intent negations ("no auth", "no DB", "frontend only") matched against import / path patterns; HIGH violations block Write.
+- Spec format advisory mechanism: format violations emit `spec-format-warn` audit (no block); 3+ violations across turns → Phase 6 LOW soft fail.
+- State migration audit event: `state-migrated-10.0.0` with backup at `.mcl/state.json.backup.pre-v3`.
+
+### Removed
+- Spec approval mechanism (askq-driven and auto-approve). Phase 1 summary-confirm IS the approval gate.
+- `spec_approved` state field, `auto-approve-spec` audit, `askq-incomplete-spec` block, `transition-1-to-2`/`transition-2-to-4` audits.
+- `phase3-verify.md` skill (no longer applicable).
+- Tests: `test-spec-format-enforcement.sh` (replaced by `test-spec-advisory.sh`), `test-askq-incomplete-spec-block.sh` (mechanism removed), `test-partial-spec-post-approval.sh` (no approval mechanism).
+
+### Migration guide
+Existing projects: state.json is automatically migrated on first activate after install. A backup is kept at `.mcl/state.json.backup.pre-v3`. No manual action required. The migration sets `is_ui_project=true` and `design_approved=true` on existing projects so the UI review askq does not re-trigger on already-completed work.
+
+---
+
 ## [9.3.0] - 2026-05-01 — BREAKING: phase model simplified
 
 ### Breaking change

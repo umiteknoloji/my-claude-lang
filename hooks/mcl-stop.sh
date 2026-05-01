@@ -85,7 +85,7 @@ fi
 [ -f "$_MCL_HOOK_DIR/lib/mcl-log-append.sh" ] && source "$_MCL_HOOK_DIR/lib/mcl-log-append.sh"
 
 # Portable timeout shim (since 9.2.1). macOS lacks `timeout` by default;
-# without this, all five Phase 4.5 scan commands and Phase 6 silently
+# without this, all five Phase 4 scan commands and Phase 6 silently
 # returned empty JSON (timeout: command not found → empty stdout →
 # scanner output discarded → HIGH findings missed). Honor `timeout` or
 # `gtimeout` when available, otherwise run the command directly (the
@@ -123,7 +123,8 @@ except Exception:
 phase = state.get("current_phase") or 1
 phase_name = state.get("phase_name") or ""
 spec_hash = (state.get("spec_hash") or "")[:8]
-spec_approved = state.get("spec_approved") is True
+is_ui_project = state.get("is_ui_project") is True
+design_approved = state.get("design_approved") is True
 phase_review_state = state.get("phase_review_state") or ""
 pattern_scan_due = state.get("pattern_scan_due") is True
 plan_critique_done = state.get("plan_critique_done") is True
@@ -138,19 +139,25 @@ else:
     active = f"Phase {phase} ({phase_name})"
 def resolve_next():
     if phase_review_state == "pending":
-        return "Phase 4.5 risk review başlat"
+        return "Phase 4 risk review başlat"
     if phase_review_state == "running":
-        return "Phase 4.5/4.6 dialog'u devam ettir"
+        return "Phase 4 dialog'u devam ettir"
     if pattern_scan_due:
-        return "Phase 3.5 pattern scan"
+        return "Pattern scan turn"
     if plan_files and not plan_critique_done:
         return "Plan critique subagent çalıştır (Sonnet 4.6)"
     if phase == 1:
         return "Phase 1 parametre toplama"
-    if phase in (2, 3) and not spec_approved:
-        return "Spec onayı bekleniyor"
-    if phase >= 4 and spec_approved:
-        return "Phase 4 execute (kod yazımı)"
+    if phase == 2 and not design_approved:
+        return "Phase 2 tasarım onayı bekleniyor"
+    if phase == 3:
+        return "Phase 3 implementation (kod yazımı)"
+    if phase == 4:
+        return "Phase 4 risk gate"
+    if phase == 5:
+        return "Phase 5 verification"
+    if phase == 6:
+        return "Phase 6 final review"
     return "Belirsiz — state'e bak"
 next_step = resolve_next()
 lines = [
@@ -167,7 +174,7 @@ lines.append(f"**Sıradaki adım:** {next_step}")
 if plan_files and not plan_critique_done:
     lines.append(f"**Yarım plan:** {os.path.relpath(plan_files[0], project_dir)} — critique pending")
 elif phase_review_state == "pending":
-    lines.append("**Yarım iş:** Phase 4.5 başlatılmadı")
+    lines.append("**Yarım iş:** Phase 4 başlatılmadı")
 body = "\n".join(lines) + "\n"
 tmp = sc_path + ".tmp"
 try:
@@ -319,15 +326,20 @@ PARTIAL_RC=$?
 PARTIAL_STATE="$(mcl_state_get partial_spec 2>/dev/null)"
 case "$PARTIAL_RC" in
   0)
-    # 9.3.0: spec format violation is ADVISORY, not a block. Audit only.
+    # 10.0.0: spec format violation is ADVISORY, not a block. Audit only.
     # Spec is documentation, not a state gate; Write/Edit stays unlocked.
+    # Increment spec_format_warn_count so Phase 6 can fire LOW soft-fail
+    # after 3+ violations.
     mcl_state_set partial_spec true
     if [ -n "$SPEC_HASH" ]; then
       mcl_state_set partial_spec_body_sha "\"${SPEC_HASH:0:16}\""
     fi
     _PS_MISSING_CSV="$(printf '%s' "$PARTIAL_MISSING" | tr '\n' ',' | sed 's/,$//')"
-    mcl_audit_log "spec-format-warn" "stop" "missing=${_PS_MISSING_CSV}"
-    mcl_debug_log "stop" "spec-format-warn" "missing=$(printf '%s' "$PARTIAL_MISSING" | tr '\n' '|')"
+    _PS_WARN_NOW="$(mcl_state_get spec_format_warn_count 2>/dev/null)"
+    _PS_WARN_NEXT=$(( ${_PS_WARN_NOW:-0} + 1 ))
+    mcl_state_set spec_format_warn_count "$_PS_WARN_NEXT" >/dev/null 2>&1 || true
+    mcl_audit_log "spec-format-warn" "stop" "missing=${_PS_MISSING_CSV} count=${_PS_WARN_NEXT}"
+    mcl_debug_log "stop" "spec-format-warn" "missing=$(printf '%s' "$PARTIAL_MISSING" | tr '\n' '|') count=${_PS_WARN_NEXT}"
     # No decision:block — let the turn continue. Advisory text appears
     # via session-context bridge on the next activate prompt.
     ;;
@@ -340,11 +352,14 @@ case "$PARTIAL_RC" in
     fi
     ;;
   3)
-    # 9.3.0: spec without 📋 prefix → advisory only. Audit + continue.
+    # 10.0.0: spec without 📋 prefix → advisory only. Audit + continue.
     _PS_OFFENDER="$(printf '%s' "$PARTIAL_MISSING" | head -c 80)"
-    mcl_audit_log "spec-format-warn" "stop" "offender=${_PS_OFFENDER} reason=missing-emoji"
-    mcl_debug_log "stop" "spec-format-warn" "offender=${_PS_OFFENDER}"
-    # 9.3.0: advisory only — no decision:block, no exit 0.
+    _PS3_WARN_NOW="$(mcl_state_get spec_format_warn_count 2>/dev/null)"
+    _PS3_WARN_NEXT=$(( ${_PS3_WARN_NOW:-0} + 1 ))
+    mcl_state_set spec_format_warn_count "$_PS3_WARN_NEXT" >/dev/null 2>&1 || true
+    mcl_audit_log "spec-format-warn" "stop" "offender=${_PS_OFFENDER} reason=missing-emoji count=${_PS3_WARN_NEXT}"
+    mcl_debug_log "stop" "spec-format-warn" "offender=${_PS_OFFENDER} count=${_PS3_WARN_NEXT}"
+    # advisory only — no decision:block.
     ;;
   *)
     :
@@ -524,21 +539,21 @@ _mcl_is_vision_request_option() {
 mcl_state_init
 CURRENT_PHASE="$(mcl_state_get current_phase)"
 
-# --- Phase 4.5 / 4.6 / 5 review enforcement (since 7.1.3) ---
+# --- Phase 4 / 4.6 / 5 review enforcement (since 7.1.3) ---
 #
-# Core invariant: after Phase 4 code is written, Claude MUST run Phase 4.5
-# Risk Review, Phase 4.6 Impact Review, and Phase 5 Verification Report before
+# Core invariant: after Phase 4 code is written, Claude MUST run Phase 4
+# Risk Review, Phase 4 (impact lens) Impact Review, and Phase 5 Verification Report before
 # the session can end. This is enforced via `decision: block` — Claude Code
-# refuses to close the turn until Claude starts Phase 4.5.
+# refuses to close the turn until Claude starts Phase 4.
 #
 # State machine (stored in phase_review_state):
 #   null / absent — Phase 4 hasn't written code yet (no enforcement needed)
-#   "pending"     — code was written, Phase 4.5 not yet started → BLOCK
-#   "running"     — Phase 4.5/4.6 dialog is in progress → allow through
+#   "pending"     — code was written, Phase 4 not yet started → BLOCK
+#   "running"     — Phase 4 dialog is in progress → allow through
 #
 # Transitions:
 #   code_written=true AND askuq=false         → pending  (block)
-#   code_written=true AND askuq=true          → running  (Phase 4.5 fix + next-risk)
+#   code_written=true AND askuq=true          → running  (Phase 4 fix + next-risk)
 #   code_written=false AND askuq=true         → running  (pure dialog turn)
 #   pending AND code_written=false AND askuq=false → pending  (sticky — re-block)
 #   Session boundary resets state to null (mcl-activate.sh).
@@ -552,12 +567,11 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
   _PR_ACTIVE_PHASE="$(mcl_get_active_phase 2>/dev/null)"
   _PR_REVIEW_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
 
-  # 9.2.3: Phase 4.5 fires only AFTER UI review is complete. While in
-  # BUILD_UI / UI_REVIEW sub-phases, the UI gate (line ~1820) handles
-  # enforcement — Phase 4.5 risk review runs after BACKEND code lands.
-  # Without this guard, Phase 4.5 reminder fires on every UI file write,
-  # blocking Phase 4a/4b entirely (vaad #2 regression).
-  if echo "$_PR_ACTIVE_PHASE" | grep -qE '^(4|4c|3\.5)$'; then
+  # 10.0.0: Phase 4 RISK_GATE fires when current_phase=3 (IMPLEMENTATION,
+  # writes done) so the next stop turn requires the risk review askq, OR
+  # when current_phase=4 already (sticky review state). Phase 2 (DESIGN_REVIEW)
+  # is handled by the design askq gate below, not this branch.
+  if echo "$_PR_ACTIVE_PHASE" | grep -qE '^[34]$'; then
     _PR_JSON="$(python3 "$_PR_GUARD" "$TRANSCRIPT_PATH" 2>/dev/null)"
     _PR_CODE="$(printf '%s' "$_PR_JSON" | python3 -c \
       'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("code_written") else "false")' 2>/dev/null)"
@@ -566,14 +580,14 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
 
     # 8.19.0 refactor: gates run on EITHER state-set path (askuq=true OR
     # code_written/pending). Real-session telemetry (8.10-8.17) showed
-    # askuq=true skipped Phase 4.5 START gates entirely because the
+    # askuq=true skipped Phase 4 START gates entirely because the
     # branch returned without entering the gate code. Greenfield clean
     # codebases hid this; with HIGH/MEDIUM findings this would let
     # critical issues bypass the gate. Gates are idempotent via
-    # phase4_5_*_scan_done flags — second invocation is a no-op.
+    # phase4_*_scan_done flags — second invocation is a no-op.
     if [ "$_PR_CODE" = "true" ] || [ "$_PR_ASKUQ" = "true" ] || [ "$_PR_REVIEW_STATE" = "pending" ]; then
      if [ "$_PR_ASKUQ" = "true" ]; then
-      # Phase 4.5/4.6 dialog is running this turn — transition to "running"
+      # Phase 4 dialog is running this turn — transition to "running"
       # regardless of whether code was also written (risk-fix + next-risk turn).
       if [ "$_PR_REVIEW_STATE" != "running" ]; then
         mcl_state_set phase_review_state '"running"' >/dev/null 2>&1 || true
@@ -648,16 +662,16 @@ PYEOF
       fi
      fi  # end inner if/else (askuq=true vs code_written) — 8.19.0
 
-      # 8.19.0: Phase 4.5 START gates run for BOTH paths (askuq=true and
-      # code_written). Each gate is idempotent via its phase4_5_*_scan_done
+      # 8.19.0: Phase 4 START gates run for BOTH paths (askuq=true and
+      # code_written). Each gate is idempotent via its phase4_*_scan_done
       # flag, so re-entry on subsequent turns short-circuits.
 
-      # ---- Phase 4.5 START security gate (since 8.7.1) ----
+      # ---- Phase 4 START security gate (since 8.7.1) ----
       # Run full security scan on first pending entry; HIGH bulgu varsa
-      # emit security-specific block instead of the standard Phase 4.5 reminder;
+      # emit security-specific block instead of the standard Phase 4 reminder;
       # HIGH=0 ise mark done and append MEDIUM list to standard block reason.
       _SEC_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-security-scan.py"
-      _SEC_SCAN_DONE="$(mcl_state_get phase4_5_security_scan_done 2>/dev/null)"
+      _SEC_SCAN_DONE="$(mcl_state_get phase4_security_scan_done 2>/dev/null)"
       _SEC_MEDIUM_PROSE=""
       if [ -f "$_SEC_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_SEC_SCAN_DONE" != "true" ]; then
@@ -693,27 +707,27 @@ print(str(len(high)) + "|" + "\n".join(lines) + extra)
           mcl_audit_log "security-scan-block" "mcl-stop" "full-scan high=${_SEC_HIGH_COUNT}"
           command -v mcl_trace_append >/dev/null 2>&1 && \
             mcl_trace_append security_scan_block "high=${_SEC_HIGH_COUNT}"
-          # Emit security-specific block. State stays pending; phase4_5_security_scan_done stays false.
+          # Emit security-specific block. State stays pending; phase4_security_scan_done stays false.
           python3 -c '
 import json, sys
 count, lst = sys.argv[1], sys.argv[2]
-reason = ("⚠️ MCL SECURITY — Phase 4.5 START gate\n\n"
+reason = ("⚠️ MCL SECURITY — Phase 4 START gate\n\n"
           "Full security scan found " + count + " HIGH severity issue(s):\n"
           + lst + "\n\n"
-          "Phase 4.5 Risk Review CANNOT begin until these are resolved. Required actions:\n"
+          "Phase 4 Risk Review CANNOT begin until these are resolved. Required actions:\n"
           "  1. Read each finding above; identify the file and rule.\n"
           "  2. Apply Edit/Write to fix the issue (parameterized queries, env-var secrets, safe API choice, etc.).\n"
           "  3. Per-Edit incremental scan re-validates each fix; if HIGH remains, Edit will be blocked.\n"
-          "  4. Once all HIGH issues are fixed, this Phase 4.5 START gate re-runs on the next Stop.\n\n"
+          "  4. Once all HIGH issues are fixed, this Phase 4 START gate re-runs on the next Stop.\n\n"
           "Bare skip is forbidden. Auth/crypto/secret/authz fixes must NEVER be silent — explain each fix in one sentence.")
 print(json.dumps({"decision": "block", "reason": reason}))
 ' "$_SEC_HIGH_COUNT" "$_SEC_HIGH_LIST" 2>/dev/null
           exit 0
         fi
         # HIGH = 0 → mark done; capture MEDIUM list for the standard block reason.
-        mcl_state_set phase4_5_security_scan_done true >/dev/null 2>&1 || true
+        mcl_state_set phase4_security_scan_done true >/dev/null 2>&1 || true
         # 8.11.0: record baseline for Phase 6 (b) regression detection
-        mcl_state_set phase4_5_high_baseline.security 0 >/dev/null 2>&1 || true
+        mcl_state_set phase4_high_baseline.security 0 >/dev/null 2>&1 || true
         _SEC_MEDIUM_PROSE="$(printf '%s' "$_SEC_FULL_JSON" | python3 -c '
 import json, sys
 try:
@@ -723,7 +737,7 @@ except Exception:
 med = [f for f in r.get("findings", []) if f.get("severity") == "MEDIUM"]
 if not med:
     sys.exit(0)
-lines = ["", "Security scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [Security] item in the Phase 4.5 sequential dialog:"]
+lines = ["", "Security scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [Security] item in the Phase 4 sequential dialog:"]
 for f in med[:8]:
     rid = f.get("rule_id", "?")
     fl = f.get("file", "?")
@@ -733,14 +747,14 @@ for f in med[:8]:
 print("\\n".join(lines))
 ' 2>/dev/null)"
       fi
-      # ---- end of Phase 4.5 START security gate ----
+      # ---- end of Phase 4 START security gate ----
 
-      # ---- Phase 4.5 START DB gate (since 8.8.0) ----
+      # ---- Phase 4 START DB gate (since 8.8.0) ----
       # Parallel to security gate. Runs after security gate has cleared
-      # (phase4_5_security_scan_done=true OR security helper missing).
+      # (phase4_security_scan_done=true OR security helper missing).
       # Skips if no db-* stack tag detected.
       _DB_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-db-scan.py"
-      _DB_SCAN_DONE="$(mcl_state_get phase4_5_db_scan_done 2>/dev/null)"
+      _DB_SCAN_DONE="$(mcl_state_get phase4_db_scan_done 2>/dev/null)"
       _DB_MEDIUM_PROSE=""
       if [ -f "$_DB_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_DB_SCAN_DONE" != "true" ]; then
@@ -759,8 +773,8 @@ except Exception:
 ' 2>/dev/null)"
         if [ "$_DB_NO_STACK" = "true" ]; then
           # No DB stack — mark done, audit (already logged by orchestrator), continue.
-          mcl_state_set phase4_5_db_scan_done true >/dev/null 2>&1 || true
-          mcl_state_set phase4_5_high_baseline.db 0 >/dev/null 2>&1 || true
+          mcl_state_set phase4_db_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_high_baseline.db 0 >/dev/null 2>&1 || true
         else
           _DB_HIGH_BLOCK="$(printf '%s' "$_DB_FULL_JSON" | python3 -c '
 import json, sys
@@ -792,10 +806,10 @@ print(str(len(high)) + "|" + "\n".join(lines) + extra)
             python3 -c '
 import json, sys
 count, lst = sys.argv[1], sys.argv[2]
-reason = ("⚠️ MCL DB DESIGN — Phase 4.5 START gate\n\n"
+reason = ("⚠️ MCL DB DESIGN — Phase 4 START gate\n\n"
           "Full DB design scan found " + count + " HIGH severity issue(s):\n"
           + lst + "\n\n"
-          "Phase 4.5 Risk Review CANNOT begin until these are resolved. Required actions:\n"
+          "Phase 4 Risk Review CANNOT begin until these are resolved. Required actions:\n"
           "  1. Read each finding above; note the rule_id and category (db-schema / db-query / db-migration / db-index / db-n-plus-one).\n"
           "  2. Apply Edit/Write to fix: add PRIMARY KEY, add WHERE clause, replace data-loss migration with expand-contract pattern, add explicit FK index, etc.\n"
           "  3. Per-Edit incremental DB scan re-validates each fix; if HIGH remains, Edit will be blocked.\n"
@@ -805,8 +819,8 @@ print(json.dumps({"decision": "block", "reason": reason}))
 ' "$_DB_HIGH_COUNT" "$_DB_HIGH_LIST" 2>/dev/null
             exit 0
           fi
-          mcl_state_set phase4_5_db_scan_done true >/dev/null 2>&1 || true
-          mcl_state_set phase4_5_high_baseline.db 0 >/dev/null 2>&1 || true
+          mcl_state_set phase4_db_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_high_baseline.db 0 >/dev/null 2>&1 || true
           _DB_MEDIUM_PROSE="$(printf '%s' "$_DB_FULL_JSON" | python3 -c '
 import json, sys
 try:
@@ -816,7 +830,7 @@ except Exception:
 med = [f for f in r.get("findings", []) if f.get("severity") == "MEDIUM"]
 if not med:
     sys.exit(0)
-lines = ["", "DB design scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [DB-Design] item in the Phase 4.5 sequential dialog:"]
+lines = ["", "DB design scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [DB-Design] item in the Phase 4 sequential dialog:"]
 for f in med[:8]:
     rid = f.get("rule_id", "?")
     fl = f.get("file", "?")
@@ -827,11 +841,11 @@ print("\\n".join(lines))
 ' 2>/dev/null)"
         fi
       fi
-      # ---- end of Phase 4.5 START DB gate ----
+      # ---- end of Phase 4 START DB gate ----
 
-      # ---- Phase 4.5 START UI gate (since 8.9.0) ----
+      # ---- Phase 4 START UI gate (since 8.9.0) ----
       _UI_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-ui-scan.py"
-      _UI_SCAN_DONE="$(mcl_state_get phase4_5_ui_scan_done 2>/dev/null)"
+      _UI_SCAN_DONE="$(mcl_state_get phase4_ui_scan_done 2>/dev/null)"
       _UI_MEDIUM_PROSE=""
       if [ -f "$_UI_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_UI_SCAN_DONE" != "true" ]; then
@@ -849,8 +863,8 @@ except Exception:
     print("false")
 ' 2>/dev/null)"
         if [ "$_UI_NO_FE" = "true" ]; then
-          mcl_state_set phase4_5_ui_scan_done true >/dev/null 2>&1 || true
-          mcl_state_set phase4_5_high_baseline.ui 0 >/dev/null 2>&1 || true
+          mcl_state_set phase4_ui_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_high_baseline.ui 0 >/dev/null 2>&1 || true
         else
           _UI_HIGH_BLOCK="$(printf '%s' "$_UI_FULL_JSON" | python3 -c '
 import json, sys
@@ -880,10 +894,10 @@ print(str(len(high)) + "|" + "\n".join(lines) + extra)
             python3 -c '
 import json, sys
 count, lst = sys.argv[1], sys.argv[2]
-reason = ("⚠️ MCL UI A11Y — Phase 4.5 START gate\n\n"
+reason = ("⚠️ MCL UI A11Y — Phase 4 START gate\n\n"
           "Full UI scan found " + count + " HIGH a11y-critical issue(s):\n"
           + lst + "\n\n"
-          "Phase 4.5 Risk Review CANNOT begin until these are resolved. Required actions:\n"
+          "Phase 4 Risk Review CANNOT begin until these are resolved. Required actions:\n"
           "  1. Read each finding above; identify the rule and file.\n"
           "  2. Apply Edit/Write to fix: add alt, aria-label, semantic <button>, htmlFor, lang attribute.\n"
           "  3. Per-Edit incremental UI scan re-validates each fix; if HIGH a11y remains, Edit will be blocked.\n"
@@ -892,8 +906,8 @@ print(json.dumps({"decision": "block", "reason": reason}))
 ' "$_UI_HIGH_COUNT" "$_UI_HIGH_LIST" 2>/dev/null
             exit 0
           fi
-          mcl_state_set phase4_5_ui_scan_done true >/dev/null 2>&1 || true
-          mcl_state_set phase4_5_high_baseline.ui 0 >/dev/null 2>&1 || true
+          mcl_state_set phase4_ui_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_high_baseline.ui 0 >/dev/null 2>&1 || true
           _UI_MEDIUM_PROSE="$(printf '%s' "$_UI_FULL_JSON" | python3 -c '
 import json, sys
 try:
@@ -903,7 +917,7 @@ except Exception:
 med = [f for f in r.get("findings", []) if f.get("severity") == "MEDIUM"]
 if not med:
     sys.exit(0)
-lines = ["", "UI scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [UI-Design] item in the Phase 4.5 sequential dialog:"]
+lines = ["", "UI scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [UI-Design] item in the Phase 4 sequential dialog:"]
 for f in med[:8]:
     rid = f.get("rule_id", "?")
     fl = f.get("file", "?")
@@ -916,15 +930,15 @@ print("\\n".join(lines))
 ' 2>/dev/null)"
         fi
       fi
-      # ---- end of Phase 4.5 START UI gate ----
+      # ---- end of Phase 4 START UI gate ----
 
-      # ---- Phase 4.5 START Ops gate (since 8.13.0) ----
+      # ---- Phase 4 START Ops gate (since 8.13.0) ----
       _OPS_MEDIUM_PROSE=""
       if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-        mcl_state_set phase4_5_ops_scan_done true >/dev/null 2>&1 || true
+        mcl_state_set phase4_ops_scan_done true >/dev/null 2>&1 || true
       else
       _OPS_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-ops-scan.py"
-      _OPS_SCAN_DONE="$(mcl_state_get phase4_5_ops_scan_done 2>/dev/null)"
+      _OPS_SCAN_DONE="$(mcl_state_get phase4_ops_scan_done 2>/dev/null)"
       if [ -f "$_OPS_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_OPS_SCAN_DONE" != "true" ]; then
         _OPS_FULL_JSON="$(_mcl_timeout 120 python3 "$_OPS_FULL_LIB" \
@@ -961,10 +975,10 @@ print(str(len(high)) + "|" + "\n".join(lines) + extra)
           python3 -c '
 import json, sys
 count, lst = sys.argv[1], sys.argv[2]
-reason = ("⚠️ MCL OPS — Phase 4.5 START gate\n\n"
+reason = ("⚠️ MCL OPS — Phase 4 START gate\n\n"
           "Full ops scan found " + count + " HIGH severity issue(s):\n"
           + lst + "\n\n"
-          "Phase 4.5 Risk Review CANNOT begin until these are resolved. Required actions:\n"
+          "Phase 4 Risk Review CANNOT begin until these are resolved. Required actions:\n"
           "  1. Read each finding above; identify the rule and category (deployment / monitoring / testing / docs).\n"
           "  2. Apply Edit/Write to fix: add USER directive to Dockerfile, add README, raise test coverage above threshold, etc.\n"
           "  3. Per-Edit incremental ops scan re-validates each fix; HIGH remaining → Edit blocked.\n"
@@ -973,8 +987,8 @@ print(json.dumps({"decision": "block", "reason": reason}))
 ' "$_OPS_HIGH_COUNT" "$_OPS_HIGH_LIST" 2>/dev/null
           exit 0
         fi
-        mcl_state_set phase4_5_ops_scan_done true >/dev/null 2>&1 || true
-        mcl_state_set phase4_5_high_baseline.ops 0 >/dev/null 2>&1 || true
+        mcl_state_set phase4_ops_scan_done true >/dev/null 2>&1 || true
+        mcl_state_set phase4_high_baseline.ops 0 >/dev/null 2>&1 || true
         _OPS_MEDIUM_PROSE="$(printf '%s' "$_OPS_FULL_JSON" | python3 -c '
 import json, sys
 try:
@@ -984,7 +998,7 @@ except Exception:
 med = [f for f in r.get("findings", []) if f.get("severity") == "MEDIUM"]
 if not med:
     sys.exit(0)
-lines = ["", "Ops scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [Ops-<sub>] item in the Phase 4.5 sequential dialog:"]
+lines = ["", "Ops scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [Ops-<sub>] item in the Phase 4 sequential dialog:"]
 for f in med[:8]:
     rid = f.get("rule_id", "?")
     fl = f.get("file", "?")
@@ -998,13 +1012,13 @@ print("\\n".join(lines))
       fi # end Ops gate (MCL_MINIMAL_CORE guard)
       # ---- end Ops gate ----
 
-      # ---- Phase 4.5 START Perf gate (since 8.14.0) ----
+      # ---- Phase 4 START Perf gate (since 8.14.0) ----
       _PERF_MEDIUM_PROSE=""
       if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-        mcl_state_set phase4_5_perf_scan_done true >/dev/null 2>&1 || true
+        mcl_state_set phase4_perf_scan_done true >/dev/null 2>&1 || true
       else
       _PERF_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-perf-scan.py"
-      _PERF_SCAN_DONE="$(mcl_state_get phase4_5_perf_scan_done 2>/dev/null)"
+      _PERF_SCAN_DONE="$(mcl_state_get phase4_perf_scan_done 2>/dev/null)"
       if [ -f "$_PERF_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_PERF_SCAN_DONE" != "true" ]; then
         _PERF_FULL_JSON="$(_mcl_timeout 90 python3 "$_PERF_FULL_LIB" \
@@ -1021,7 +1035,7 @@ except Exception:
     print("false")
 ' 2>/dev/null)"
         if [ "$_PERF_NO_FE" = "true" ]; then
-          mcl_state_set phase4_5_perf_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_perf_scan_done true >/dev/null 2>&1 || true
         else
           _PERF_HIGH_BLOCK="$(printf '%s' "$_PERF_FULL_JSON" | python3 -c '
 import json, sys
@@ -1051,10 +1065,10 @@ print(str(len(high)) + "|" + "\n".join(lines) + extra)
             python3 -c '
 import json, sys
 count, lst = sys.argv[1], sys.argv[2]
-reason = ("⚠️ MCL PERF — Phase 4.5 START gate\n\n"
+reason = ("⚠️ MCL PERF — Phase 4 START gate\n\n"
           "Full perf scan found " + count + " HIGH severity issue(s):\n"
           + lst + "\n\n"
-          "Phase 4.5 Risk Review CANNOT begin until these are resolved. Required actions:\n"
+          "Phase 4 Risk Review CANNOT begin until these are resolved. Required actions:\n"
           "  1. Read each finding above; identify the rule and category (bundle / cwv / image).\n"
           "  2. Apply Edit/Write to fix: code-split, compress images, convert PNG to WebP, drop heavy deps.\n"
           "  3. Re-run /mcl-perf-report after fixes; this gate re-runs on next Stop.\n"
@@ -1063,8 +1077,8 @@ print(json.dumps({"decision": "block", "reason": reason}))
 ' "$_PERF_HIGH_COUNT" "$_PERF_HIGH_LIST" 2>/dev/null
             exit 0
           fi
-          mcl_state_set phase4_5_perf_scan_done true >/dev/null 2>&1 || true
-          mcl_state_set phase4_5_high_baseline.perf 0 >/dev/null 2>&1 || true
+          mcl_state_set phase4_perf_scan_done true >/dev/null 2>&1 || true
+          mcl_state_set phase4_high_baseline.perf 0 >/dev/null 2>&1 || true
           _PERF_MEDIUM_PROSE="$(printf '%s' "$_PERF_FULL_JSON" | python3 -c '
 import json, sys
 try:
@@ -1074,7 +1088,7 @@ except Exception:
 med = [f for f in r.get("findings", []) if f.get("severity") == "MEDIUM"]
 if not med:
     sys.exit(0)
-lines = ["", "Perf scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [Perf-<sub>] item in the Phase 4.5 sequential dialog:"]
+lines = ["", "Perf scan also surfaced " + str(len(med)) + " MEDIUM finding(s) — surface each one as a [Perf-<sub>] item in the Phase 4 sequential dialog:"]
 for f in med[:8]:
     rid = f.get("rule_id", "?")
     fl = f.get("file", "?")
@@ -1088,7 +1102,7 @@ print("\\n".join(lines))
       fi # end Perf gate (MCL_MINIMAL_CORE guard)
       # ---- end Perf gate ----
 
-      # ---- Phase 4.5 architectural drift + intent violation (since 9.3.0) ----
+      # ---- Phase 4 architectural drift + intent violation (since 9.3.0) ----
       # Advisory only — emits audit entries but does not block. Helps
       # /mcl-finish + Phase 6 surface scope-creep and intent-mismatch.
       if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
@@ -1107,18 +1121,18 @@ print("\\n".join(lines))
           if [ "$_DRIFT_COUNT" -gt 0 ] 2>/dev/null; then
             _DRIFT_FILES="$(printf '%s' "$_DRIFT_JSON" | python3 -c \
               'import json,sys; r=json.loads(sys.stdin.read() or "{}"); print(",".join(f.get("file","?") for f in r.get("drift_findings",[])[:5]))' 2>/dev/null)"
-            mcl_audit_log "phase4-5-drift" "mcl-stop" "count=${_DRIFT_COUNT} files=${_DRIFT_FILES}"
+            mcl_audit_log "phase4-drift" "mcl-stop" "count=${_DRIFT_COUNT} files=${_DRIFT_FILES}"
           fi
           if [ "$_IV_COUNT" -gt 0 ] 2>/dev/null; then
             _IV_RULES="$(printf '%s' "$_DRIFT_JSON" | python3 -c \
               'import json,sys; r=json.loads(sys.stdin.read() or "{}"); print(",".join(f.get("rule_id","?") for f in r.get("intent_violations",[])[:5]))' 2>/dev/null)"
-            mcl_audit_log "phase4-5-intent-violation" "mcl-stop" "count=${_IV_COUNT} rules=${_IV_RULES}"
+            mcl_audit_log "phase4-intent-violation" "mcl-stop" "count=${_IV_COUNT} rules=${_IV_RULES}"
           fi
         fi
       fi
       # ---- end drift + intent violation scan ----
 
-      # ---- Phase 4.5 START test-coverage lens (since 8.19.0) ----
+      # ---- Phase 4 START test-coverage lens (since 8.19.0) ----
       _TEST_MEDIUM_PROSE=""
       if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
       # Surfaces missing test categories (unit/integration/e2e/load) as
@@ -1126,7 +1140,7 @@ print("\\n".join(lines))
       # dialog. Unlike security/db/ui/ops/perf gates, test coverage
       # lacks a HIGH-severity blocking path — even TST-T01 (zero unit
       # tests) is advisory-MEDIUM here; the developer answers via the
-      # severity-aware option matrix in phase4-5-risk-review.md.
+      # severity-aware option matrix in phase4-risk-review.md.
       _TC_HELPER="$_MCL_HOOK_DIR/lib/mcl-test-coverage.py"
       if [ -f "$_TC_HELPER" ] && command -v python3 >/dev/null 2>&1 \
          && [ -n "${MCL_STATE_DIR:-}" ]; then
@@ -1165,7 +1179,7 @@ print("\\n".join(lines))
       fi # end test-coverage lens (MCL_MINIMAL_CORE guard)
       # ---- end test-coverage lens ----
 
-      # 8.19.0: emit the standard Phase 4.5 reminder ONLY when the model
+      # 8.19.0: emit the standard Phase 4 reminder ONLY when the model
       # has not yet entered the dialog (askuq=false). When askuq=true,
       # the model is already presenting a risk via AskUserQuestion;
       # forcing a reminder block over its own dialog turn is hostile UX.
@@ -1175,7 +1189,7 @@ print("\\n".join(lines))
       # Return decision:block so Claude is forced to continue.
       printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written but Phase 4.5 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4.5 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4.5 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4.5 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Phase 4.5 risks are resolved → run Phase 4.6 Impact Review.\n    4. After Phase 4.6 → run Phase 5 Verification Report.\n\nPhase 4.5 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.${_SEC_MEDIUM_PROSE}${_DB_MEDIUM_PROSE}${_UI_MEDIUM_PROSE}${_OPS_MEDIUM_PROSE}${_PERF_MEDIUM_PROSE}${_TEST_MEDIUM_PROSE}\"
+  \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written but Phase 4 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Phase 4 risks are resolved → run Phase 4 (impact lens) Impact Review.\n    4. After Phase 4 (impact lens) → run Phase 5 Verification Report.\n\nPhase 4 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.${_SEC_MEDIUM_PROSE}${_DB_MEDIUM_PROSE}${_UI_MEDIUM_PROSE}${_OPS_MEDIUM_PROSE}${_PERF_MEDIUM_PROSE}${_TEST_MEDIUM_PROSE}\"
 }"
       exit 0
       fi  # 8.19.0: end askuq-aware reminder gate
@@ -1185,7 +1199,7 @@ fi
 
 # --- Phase 5 skip detection (since 8.2.7) ---
 # When phase_review_state="running" persists at stop AND no MCL-prefixed
-# AskUserQuestion ran this turn (ASKQ_INTENT empty), the Phase 4.5/4.6 dialog
+# AskUserQuestion ran this turn (ASKQ_INTENT empty), the Phase 4 dialog
 # has ended but Phase 5 Verification Report did not clear the state — Phase 5
 # was skipped. Audit-only (non-blocking); mcl-activate.sh injects the warn
 # next turn as PHASE5_SKIP_NOTICE. Detection is state-driven (no transcript
@@ -1474,34 +1488,40 @@ PYPS_EARLY
   command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_cleared
 fi
 
-# If neither spec nor AskUserQuestion approval present, nothing to do.
+# If neither spec nor AskUserQuestion approval present, exit early —
+# UNLESS we're in Phase 2 DESIGN_REVIEW with design_approved=false, in
+# which case the design-askq-trigger gate (below, ~line 1860) needs to
+# evaluate whether the model wrote frontend skeleton without an askq.
+_EARLY_DA="$(mcl_state_get design_approved 2>/dev/null)"
+_EARLY_IS_UI="$(mcl_state_get is_ui_project 2>/dev/null)"
 if [ -z "$SPEC_HASH" ] && [ -z "$ASKQ_INTENT" ]; then
-  exit 0
+  if ! { [ "$CURRENT_PHASE" = "2" ] && [ "$_EARLY_DA" != "true" ] \
+         && [ "$_EARLY_IS_UI" = "true" ]; }; then
+    exit 0
+  fi
 fi
 CURRENT_HASH="$(mcl_state_get spec_hash)"
-SPEC_APPROVED="$(mcl_state_get spec_approved)"
 
-# --- Spec emission as Phase 4 documentation artifact (since 9.3.0) ---
-# Phase model simplified in 9.3.0: spec is documentation, not a state
-# gate. Phase 1→4 transition fires on summary-confirm askq approval
-# (handled below). Spec emission only:
+# --- Spec emission as Phase 3 documentation artifact (since 10.0.0) ---
+# Phase model in 10.0.0: spec is documentation, not a state gate. Phase
+# 1→3 (non-UI) or Phase 1→2→3 (UI) transitions are askq-driven (handled
+# below). Spec emission only:
 #   - records spec_hash for reference
-#   - extracts scope_paths (used by Phase 4 path guard)
+#   - extracts scope_paths (used by Phase 4 risk gate + scope guard)
 #   - triggers spec-save (.mcl/specs/NNNN.md)
 # Format invalid (partial-spec rc=0 / rc=3) is handled at the top of
-# the hook with a decision:block — that's the spec-format guard.
+# the hook with an ADVISORY warning audit (`spec-format-warn`) and an
+# additionalContext message — never a hard block.
 if [ -n "$SPEC_HASH" ]; then
   case "$CURRENT_PHASE" in
-    1)
-      # Spec emitted while still in Phase 1 — store the hash for
-      # reference but do NOT auto-advance. Phase 1→4 is summary-confirm-
-      # driven only. This is rare (model usually emits spec after
-      # summary-confirm) but we accept it as a no-op state tag.
+    1|2)
+      # Spec emitted before Phase 3 — store the hash for reference but
+      # do NOT auto-advance. Phase advancement is askq-driven.
       mcl_state_set spec_hash "\"$SPEC_HASH\""
-      mcl_debug_log "stop" "spec-emit-phase1-noop" "hash=${SPEC_HASH:0:12}"
+      mcl_debug_log "stop" "spec-emit-pre-phase3-noop" "hash=${SPEC_HASH:0:12} phase=${CURRENT_PHASE}"
       ;;
-    4|5)
-      # First spec emit on Phase 4 entry — record hash, extract scope,
+    3|4|5|6)
+      # Spec emitted at Phase 3+ entry — record hash, extract scope,
       # save spec file. Subsequent emits (revisions) update the hash.
       if [ "$CURRENT_HASH" != "$SPEC_HASH" ]; then
         mcl_state_set spec_hash "\"$SPEC_HASH\""
@@ -1670,13 +1690,13 @@ else:
     fi
 fi # end auto-advance side effects (9.2.1)
 
-# --- Phase 1 summary-confirm → Phase 1→4 transition (since 9.3.0) ---
-# Phase model simplified in 9.3.0: spec_approved removed, Phase 2/3
-# (SPEC_REVIEW / USER_VERIFY) gone. The Phase 1 summary-confirm askq
-# IS the gate — once the developer approves the Phase 1 summary,
-# state advances directly to Phase 4 (EXECUTE). The 📋 Spec: block
-# emitted in Phase 4's first turn is documentation, not a transition
-# trigger.
+# --- Phase 1 summary-confirm → Phase 1→2 (UI) or Phase 1→3 (non-UI) transition (since 10.0.0) ---
+# Phase model in 10.0.0:
+#   Phase 1 INTENT → summary-confirm askq → if is_ui_project=true: Phase 2 DESIGN_REVIEW
+#                                          → otherwise: Phase 3 IMPLEMENTATION
+# The 📋 Spec: block emitted in Phase 3's first turn is documentation, not a
+# transition trigger. is_ui_project must already be set by Phase 1 brief
+# parse (default false; activate hook detects it from intent + stack tags).
 if [ "$ASKQ_INTENT" = "summary-confirm" ]; then
   if _mcl_is_approve_option "$ASKQ_SELECTED"; then
     _SC_CUR_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
@@ -1684,25 +1704,40 @@ if [ "$ASKQ_INTENT" = "summary-confirm" ]; then
     mcl_debug_log "stop" "summary-confirm-approve" "selected=${ASKQ_SELECTED}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append summary_confirmed approved
     if [ "$_SC_CUR_PHASE" = "1" ]; then
-      mcl_state_set current_phase 4
-      mcl_state_set phase_name '"EXECUTE"'
-      # Backward-compat: spec_approved still settable for older readers.
-      mcl_state_set spec_approved true >/dev/null 2>&1 || true
+      _SC_IS_UI="$(mcl_state_get is_ui_project 2>/dev/null)"
       mcl_state_set phase1_turn_count 0 >/dev/null 2>&1 || true
-      mcl_audit_log "phase-transition-to-execute" "stop" "1->4 source=summary-confirm"
-      command -v mcl_trace_append >/dev/null 2>&1 && {
-        mcl_trace_append phase_transition 1 4
-        mcl_trace_append summary_confirm_advance "1->4"
-      }
-      command -v mcl_log_append >/dev/null 2>&1 && \
-        mcl_log_append "Faz 1 özeti onaylandı. Faz 1 → 4 (EXECUTE) geçişi."
-      # UI flow check — if active, enter BUILD_UI sub-phase.
-      _SC_UI_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
-      if [ "$_SC_UI_ON" = "true" ]; then
-        mcl_state_set ui_sub_phase '"BUILD_UI"'
-        mcl_audit_log "ui-flow-enter-build" "stop" "source=summary-confirm"
+
+      if [ "$_SC_IS_UI" = "true" ]; then
+        # UI project → Phase 2 DESIGN_REVIEW. design_approved stays false
+        # until the model emits a UI skeleton + dev-server-started + design askq.
+        mcl_state_set current_phase 2
+        mcl_state_set phase_name '"DESIGN_REVIEW"'
+        mcl_state_set ui_flow_active true >/dev/null 2>&1 || true
+        mcl_state_set ui_sub_phase '"BUILD_UI"' >/dev/null 2>&1 || true
+        mcl_audit_log "phase-transition-to-design-review" "stop" "1->2 source=summary-confirm"
+        command -v mcl_trace_append >/dev/null 2>&1 && {
+          mcl_trace_append phase_transition 1 2
+          mcl_trace_append summary_confirm_advance "1->2"
+        }
+        command -v mcl_log_append >/dev/null 2>&1 && \
+          mcl_log_append "Faz 1 özeti onaylandı. Faz 1 → 2 (DESIGN_REVIEW) geçişi."
+      else
+        # Non-UI project → Phase 3 IMPLEMENTATION directly.
+        # design_approved stays false for non-UI projects (the field is
+        # only meaningful for UI projects; pre-tool guard never reads it
+        # on the non-UI path).
+        mcl_state_set current_phase 3
+        mcl_state_set phase_name '"IMPLEMENTATION"'
+        mcl_audit_log "phase-transition-to-implementation" "stop" "1->3 source=summary-confirm"
+        command -v mcl_trace_append >/dev/null 2>&1 && {
+          mcl_trace_append phase_transition 1 3
+          mcl_trace_append summary_confirm_advance "1->3"
+        }
+        command -v mcl_log_append >/dev/null 2>&1 && \
+          mcl_log_append "Faz 1 özeti onaylandı. Faz 1 → 3 (IMPLEMENTATION) geçişi."
       fi
-      # Rollback checkpoint — record HEAD SHA before any Phase 4 writes.
+
+      # Rollback checkpoint — record HEAD SHA before any Phase 2/3 writes.
       _SC_ROLLBACK_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
       if [ -n "$_SC_ROLLBACK_SHA" ]; then
         mcl_state_set rollback_sha "\"${_SC_ROLLBACK_SHA}\"" >/dev/null 2>&1 || true
@@ -1716,6 +1751,37 @@ if [ "$ASKQ_INTENT" = "summary-confirm" ]; then
   fi
 fi
 
+# --- Phase 2 design-review askq → Phase 2→3 transition (since 10.0.0) ---
+# When the developer approves the design askq (`is_ui_project=true`,
+# current_phase=2), state advances to Phase 3 IMPLEMENTATION and writes
+# unlock for backend paths. ui-review askq (legacy 4b) maps to design
+# approval intent for backward compat in transcripts.
+if [ "$ASKQ_INTENT" = "design-review" ] || [ "$ASKQ_INTENT" = "ui-review" ]; then
+  _DR_CUR_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+  if [ "$_DR_CUR_PHASE" = "2" ]; then
+    if _mcl_is_approve_option "$ASKQ_SELECTED"; then
+      mcl_state_set current_phase 3
+      mcl_state_set phase_name '"IMPLEMENTATION"'
+      mcl_state_set design_approved true
+      mcl_state_set ui_reviewed true >/dev/null 2>&1 || true
+      mcl_state_set ui_sub_phase '"BACKEND"' >/dev/null 2>&1 || true
+      mcl_audit_log "design-approve-via-askuserquestion" "stop" "selected=${ASKQ_SELECTED} 2->3"
+      mcl_debug_log "stop" "design-approve" "2->3"
+      command -v mcl_trace_append >/dev/null 2>&1 && {
+        mcl_trace_append design_approved
+        mcl_trace_append phase_transition 2 3
+      }
+      command -v mcl_log_append >/dev/null 2>&1 && \
+        mcl_log_append "Tasarım onaylandı. Faz 2 → 3 (IMPLEMENTATION) geçişi."
+    else
+      mcl_audit_log "design-review-non-approve" "stop" "selected=${ASKQ_SELECTED}"
+      mcl_debug_log "stop" "design-review-non-approve" "selected=${ASKQ_SELECTED}"
+    fi
+  else
+    mcl_audit_log "design-review-stray" "stop" "phase=${_DR_CUR_PHASE} selected=${ASKQ_SELECTED}"
+  fi
+fi
+
 # --- Phase 4b ui-review dispatch ---
 # Emitted when the developer selects an option on the UI review askq.
 # - approve-family: advance ui_sub_phase to BACKEND, unlock backend paths
@@ -1724,36 +1790,17 @@ fi
 #   No persistent flag needed.
 # - revise or cancel: noop. Free-text feedback is handled inline by
 #   Claude on the next turn.
-if [ "$ASKQ_INTENT" = "ui-review" ]; then
-  UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
-  UI_SUB_NOW="$(mcl_state_get ui_sub_phase 2>/dev/null)"
-  if [ "$UI_FLOW_ON" != "true" ]; then
-    mcl_audit_log "ui-review-stray" "stop" "ui_flow=${UI_FLOW_ON} sub=${UI_SUB_NOW}"
-    mcl_debug_log "stop" "ui-review-stray" "ui_flow=${UI_FLOW_ON} sub=${UI_SUB_NOW}"
-  elif _mcl_is_approve_option "$ASKQ_SELECTED"; then
-    mcl_state_set ui_reviewed true
-    mcl_state_set ui_sub_phase '"BACKEND"'
-    mcl_audit_log "approve-ui-review-via-askuserquestion" "stop" "sub=${UI_SUB_NOW}->BACKEND"
-    mcl_debug_log "stop" "ui-review-approve" "sub=${UI_SUB_NOW}->BACKEND"
-    command -v mcl_trace_append >/dev/null 2>&1 && {
-      mcl_trace_append ui_review_approved
-      mcl_trace_append backend_start "sub=${UI_SUB_NOW}->BACKEND"
-    }
-  elif _mcl_is_vision_request_option "$ASKQ_SELECTED"; then
-    mcl_audit_log "ui-review-vision-request" "stop" "selected=${ASKQ_SELECTED}"
-    mcl_debug_log "stop" "ui-review-vision-request" "selected=${ASKQ_SELECTED}"
-  else
-    mcl_audit_log "ui-review-noop" "stop" "selected=${ASKQ_SELECTED}"
-    mcl_debug_log "stop" "ui-review-noop" "selected=${ASKQ_SELECTED}"
-  fi
-fi
+# NOTE: 10.0.0 — legacy ui-review askq dispatcher merged into the new
+# design-review handler above. Kept as a no-op stub to avoid breaking
+# transcripts that contain old "ui-review" intent on resume — handler
+# above accepts both intents.
 
 # --- Phase 3.5 pattern-scan clearance (late fallback for code-write turns) ---
 # Handles the case where pattern_scan_due=true but a Write call happened in the
 # same turn — the early block above ran, so this is now a no-op guard.
 _PS_DUE="$(mcl_state_get pattern_scan_due 2>/dev/null)"
 _PS_ACTIVE_PHASE="$(mcl_get_active_phase 2>/dev/null)"
-if [ "$_PS_DUE" = "true" ] && echo "$_PS_ACTIVE_PHASE" | grep -qE '^(4|4a|4b|4c|3\.5)$' && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+if [ "$_PS_DUE" = "true" ] && echo "$_PS_ACTIVE_PHASE" | grep -qE '^[23]$' && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   _PS_SUMMARY="$(python3 - "$TRANSCRIPT_PATH" << 'PYPS'
 import json, re, sys
 
@@ -1816,24 +1863,25 @@ PYPS
   command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_cleared
 fi
 
-# --- Phase 4a → 4b auto-advance + UI_REVIEW gate enforcement (since 9.2.3) ---
-# Vaad #2 enforcement: when UI flow is active and the model has written
-# frontend files in the BUILD_UI sub-phase, auto-advance to UI_REVIEW
-# and block Stop until the model calls AskUserQuestion for visual
-# approval. Replaces the deleted 9.1.0 silent auto-advance fallback —
-# this version is hard-enforcement, not a quiet bypass.
+# --- Phase 2 DESIGN_REVIEW askq gate (since 10.0.0) ---
+# Vaad #2 enforcement: when current_phase=2 (DESIGN_REVIEW) and the model
+# has written frontend skeleton files in the current session, block Stop
+# until the model calls AskUserQuestion with the pinned design-approval
+# body. Hard enforcement, no silent fallback.
 #
-# Two assertions:
-#   (1) BUILD_UI + frontend files written this session → advance to UI_REVIEW
-#       (so dev server auto-start below can fire)
-#   (2) UI_REVIEW + no ui-review askq in transcript → decision:block
-#       mandating the askq call
-if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
+# Trigger conditions ALL true:
+#   - current_phase = 2
+#   - design_approved != true
+#   - is_ui_project = true (or ui_flow_active=true legacy alias)
+#   - At least 1 frontend file written this session
+#   - No design-review askq in transcript
+if [ "${MCL_MINIMAL_CORE:-0}" != "1" ] \
+   && [ "$CURRENT_PHASE" = "2" ]; then
+  _UI_GATE_DA="$(mcl_state_get design_approved 2>/dev/null)"
+  _UI_GATE_IS_UI="$(mcl_state_get is_ui_project 2>/dev/null)"
   _UI_GATE_FLOW="$(mcl_state_get ui_flow_active 2>/dev/null)"
-  _UI_GATE_SUB="$(mcl_state_get ui_sub_phase 2>/dev/null | tr -d '"')"
-  _UI_GATE_REVIEWED="$(mcl_state_get ui_reviewed 2>/dev/null)"
-  if [ "$_UI_GATE_FLOW" = "true" ] && [ "$_UI_GATE_REVIEWED" != "true" ] \
-     && { [ "$_UI_GATE_SUB" = "BUILD_UI" ] || [ "$_UI_GATE_SUB" = "UI_REVIEW" ]; } \
+  if [ "$_UI_GATE_DA" != "true" ] \
+     && { [ "$_UI_GATE_IS_UI" = "true" ] || [ "$_UI_GATE_FLOW" = "true" ]; } \
      && [ -n "${TRANSCRIPT_PATH:-}" ] && [ -f "$TRANSCRIPT_PATH" ] \
      && command -v python3 >/dev/null 2>&1; then
     _UI_GATE_INFO="$(python3 - "$TRANSCRIPT_PATH" <<'PYEOF'
@@ -1892,29 +1940,20 @@ PYEOF
     _UI_GATE_FILES="${_UI_GATE_INFO%%|*}"; _UI_GATE_FILES="${_UI_GATE_FILES#files=}"
     _UI_GATE_ASKQ="${_UI_GATE_INFO##*askq=}"
     if [ "${_UI_GATE_FILES:-0}" -ge 1 ] 2>/dev/null; then
-      # (1) Auto-advance BUILD_UI → UI_REVIEW so dev-server auto-start fires.
-      if [ "$_UI_GATE_SUB" = "BUILD_UI" ]; then
-        mcl_state_set ui_sub_phase '"UI_REVIEW"' >/dev/null 2>&1 || true
-        mcl_audit_log "ui-sub-phase-auto-advance" "mcl-stop" \
-          "BUILD_UI->UI_REVIEW reason=fe-files-written count=${_UI_GATE_FILES}"
-        command -v mcl_trace_append >/dev/null 2>&1 && \
-          mcl_trace_append ui_sub_phase_advance "UI_REVIEW"
-        _UI_GATE_SUB="UI_REVIEW"
-      fi
-      # (2) UI_REVIEW + no ui-review askq → block until the model asks.
-      if [ "$_UI_GATE_SUB" = "UI_REVIEW" ] && [ "$_UI_GATE_ASKQ" = "no" ]; then
-        mcl_audit_log "ui-review-gate-block" "mcl-stop" \
+      # Phase 2 + skeleton files written + no design askq → block Stop.
+      if [ "$_UI_GATE_ASKQ" = "no" ]; then
+        mcl_audit_log "design-review-gate-block" "mcl-stop" \
           "files=${_UI_GATE_FILES} askq=missing"
         printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"MCL: UI hazır. Phase 4b zorunlu — dev server URL'sini paylaş ve AskUserQuestion ile onay iste. Soru body: 'Tasarımı onaylıyor musun?'. Options: Onayla / Değiştir / İptal. Detay: phase4b-ui-review.md.\"
+  \"reason\": \"MCL: Tasarım hazır. Phase 2 zorunlu — dev server URL'sini paylaş ve AskUserQuestion ile onay iste. Soru body: 'Tasarımı onaylıyor musun?'. Options: Onayla / Değiştir / İptal. Detay: phase2-design-review.md.\"
 }"
         exit 0
       fi
     fi
   fi
 fi
-# --- end UI_REVIEW gate ---
+# --- end Phase 2 DESIGN_REVIEW askq gate ---
 
 # --- Dev server auto-start (since 8.12.0) ---
 # Trigger: ui_flow_active=true AND ui_sub_phase=UI_REVIEW AND dev_server.active=false
@@ -1942,15 +1981,16 @@ fi
 # --- end dev server auto-start ---
 
 # --- Phase 6 Double-check gate (since 8.11.0) ---
-# Triggers when phase 4.5 dialog has been running AND phase5-verify event
+# Triggers when phase 4 dialog has been running AND phase5-verify event
 # has been emitted by the model AND phase6_double_check_done != true.
 _PHASE6_LIB="$_MCL_HOOK_DIR/lib/mcl-phase6.py"
 _PHASE6_DONE="$(mcl_state_get phase6_double_check_done 2>/dev/null)"
 _PHASE6_REVIEW_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
+_PHASE6_CUR="$(mcl_state_get current_phase 2>/dev/null)"
 if [ -f "$_PHASE6_LIB" ] && command -v python3 >/dev/null 2>&1 \
    && [ "${MCL_MINIMAL_CORE:-0}" != "1" ] \
    && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_PHASE6_DONE" != "true" ] \
-   && [ "$_PHASE6_REVIEW_STATE" = "running" ]; then
+   && { [ "$_PHASE6_REVIEW_STATE" = "running" ] || [ "$_PHASE6_CUR" = "4" ]; }; then
   # Trigger detection (hybrid): phase5-verify audit event present OR
   # transcript contains "Verification Report" / lokalize equivalent.
   _PHASE6_TRIGGER=0

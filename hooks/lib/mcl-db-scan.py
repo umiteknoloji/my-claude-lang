@@ -12,7 +12,7 @@ State:
   $MCL_STATE_DIR/db-findings.jsonl  — append-only
 
 Trigger gating: if no `db-*` stack tag detected, exits with empty result
-(Phase 4.5 START gate sets phase4_5_db_scan_done=true and skips).
+(Phase 4.5 START gate sets phase4_db_scan_done=true and skips).
 
 Since 8.8.0.
 """

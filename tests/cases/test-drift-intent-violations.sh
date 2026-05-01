@@ -1,7 +1,7 @@
 #!/bin/bash
-# Test: 9.3.0 Phase 4.5 architectural drift + intent violation advisories.
+# Test: 10.0.0 Phase 4 RISK_GATE architectural drift + intent violation advisories.
 #
-# mcl-drift-scan.py compares Phase 4 writes against:
+# mcl-drift-scan.py compares Phase 3/4 writes against:
 #   (a) state.scope_paths — Technical Approach declared paths
 #   (b) state.phase1_intent + state.phase1_constraints
 # Findings are ADVISORY (audit only) — no decision:block.
@@ -19,17 +19,17 @@ _dr_init() {
   python3 - "$_dr_proj/.mcl/state.json" "$1" "$2" <<'PY'
 import json, sys, time
 state_path, intent, constraints = sys.argv[1:4]
-o = {"schema_version": 2, "current_phase": 4, "phase_name": "EXECUTE",
+o = {"schema_version": 3, "current_phase": 4, "phase_name": "RISK_GATE",
+     "is_ui_project": False, "design_approved": True,
      "spec_hash": "deadbeef",
      "phase1_intent": intent,
      "phase1_constraints": constraints,
      "scope_paths": ["src/components/", "src/pages/", "package.json"],
-     "phase4_5_security_scan_done": False,
-     "phase4_5_db_scan_done": False,
-     "phase4_5_ui_scan_done": False,
-     "phase4_5_ops_scan_done": False,
-     "phase4_5_perf_scan_done": False,
-     "ui_flow_active": False,
+     "phase4_security_scan_done": False,
+     "phase4_db_scan_done": False,
+     "phase4_ui_scan_done": False,
+     "phase4_ops_scan_done": False,
+     "phase4_perf_scan_done": False,
      "last_update": int(time.time())}
 open(state_path, "w").write(json.dumps(o))
 PY
@@ -115,12 +115,12 @@ fi
 
 # Hook integration: stop hook should emit phase4-5-drift audit.
 _dr_run_stop "$_dr_t1"
-if grep -q "phase4-5-drift" "$_dr_proj/.mcl/audit.log" 2>/dev/null; then
+if grep -q "phase4-drift" "$_dr_proj/.mcl/audit.log" 2>/dev/null; then
   PASS=$((PASS+1))
-  printf '  PASS: [1] phase4-5-drift audit captured by stop hook\n'
+  printf '  PASS: [1] phase4-drift audit captured by stop hook\n'
 else
   FAIL=$((FAIL+1))
-  printf '  FAIL: [1] phase4-5-drift audit missing from stop hook run\n'
+  printf '  FAIL: [1] phase4-drift audit missing from stop hook run\n'
 fi
 
 # Critical: drift is ADVISORY — Write should still be allowed.
@@ -160,12 +160,12 @@ fi
 
 rm -f "$_dr_proj/.mcl/audit.log"
 _dr_run_stop "$_dr_t2"
-if grep -q "phase4-5-intent-violation" "$_dr_proj/.mcl/audit.log" 2>/dev/null; then
+if grep -q "phase4-intent-violation" "$_dr_proj/.mcl/audit.log" 2>/dev/null; then
   PASS=$((PASS+1))
-  printf '  PASS: [2] phase4-5-intent-violation audit captured\n'
+  printf '  PASS: [2] phase4-intent-violation audit captured\n'
 else
   FAIL=$((FAIL+1))
-  printf '  FAIL: [2] phase4-5-intent-violation audit missing\n'
+  printf '  FAIL: [2] phase4-intent-violation audit missing\n'
 fi
 
 # ---- Case 3: clean write within scope, no intent violation → no findings ----

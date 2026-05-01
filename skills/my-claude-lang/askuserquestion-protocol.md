@@ -1,4 +1,4 @@
-# AskUserQuestion Protocol (since MCL 6.0.0)
+# AskUserQuestion Protocol (since MCL 6.0.0; phase model rewritten in MCL 10.0.0)
 
 Every CLOSED-ENDED MCL interaction uses Claude Code's native
 `AskUserQuestion` tool. The legacy `✅ MCL APPROVED` text marker is
@@ -18,43 +18,60 @@ AskUserQuestion({
 ```
 
 The Stop hook parses the most-recent `AskUserQuestion` tool_use /
-tool_result pair with the `MCL {version} | ` prefix and transitions state
-based on the selected option.
+tool_result pair with the `MCL {version} | ` prefix and transitions
+state based on the selected option.
 
-## The 12 closed-ended moments
+## Canonical askq moments
 
-Every one of these MUST use `AskUserQuestion`. Plain-text "reply yes/no"
-prompts are forbidden for these moments.
+There are exactly **3 canonical askq moments for UI projects** and
+**2 for non-UI projects**:
 
-| # | Moment | Where it fires | Approve-family option |
-|---|--------|----------------|-----------------------|
-| 1 | Phase 1 clarifying questions (multi-option choice) | When developer's prompt is ambiguous and requires picking from a limited set | n/a — open-ended choice questions, not approve/reject |
-| 2 | Phase 1 summary confirmation | After parameter gathering is complete | "Evet, doğru" / "Yes, correct" / "Sí, correcto" / … |
-| 3 | Phase 1.7 GATE questions (precision-audit) | When a precision dimension has architectural impact requiring developer decision | n/a — surgical option list per dimension |
-| 4 | Rule A git-init consent | First MCL activation per project when no `.git/` exists | "Evet, git init çalıştır" / "Yes, run git init" / … |
-| 5 | Plugin suggestion (per plugin) | First-message plugin-install suggestion block | "Kur" / "Install" / "Instalar" / … |
-| 6 | Stack auto-detect fallback | Phase 1 if `mcl-stack-detect.sh` returns empty | "Python" / "Node" / "Go" / … (stack options) |
-| 7 | Phase 4.5 risk walkthrough (per risk) | Each detected risk — one AskUserQuestion per risk | "Kabul et" / "Düzelt" / "Atla" / "Kural yap" |
-| 8 | Phase 4.6 impact walkthrough (per impact) | Each detected impact | Same as Phase 4.5 |
-| 9 | Phase 4b UI review | When ui_sub_phase=REVIEW and developer must approve UI before backend | "Onayla" / "Düzenle" / "Sen de bak" |
-| 10 | `mcl-update` confirmation | After status report, before running `git pull && bash install.sh` | "Güncelle" / "Update" / … |
-| 11 | `mcl-finish` confirmation | Before writing the checkpoint file | "Finalize et" / "Finalize" / … |
-| 12 | Pasted-CLI passthrough | When pasted command hits a genuinely ambiguous parameter | Surgical option list for the parameter |
+| # | Moment | Path | Where it fires | Approve-family option |
+|---|--------|------|----------------|-----------------------|
+| 1 | Phase 1 clarifying questions (multi-option choice) | both | When developer's prompt is ambiguous and requires picking from a limited set | n/a — open-ended choice questions, not approve/reject |
+| 2 | Phase 1 summary-confirm (final intent confirmation) | both | After parameter gathering is complete | "Evet, doğru" / "Yes, correct" / "Sí, correcto" / … |
+| 3 | Phase 2 design approval | UI only | After Phase 2 emits ≥3 files, dev server is up, and the URL is in chat | "Onayla" / "Approve" / "Sí, aprobar" / … |
 
-**REMOVED from this list (since 9.2.1):**
-- ~~Phase 3 spec approval~~ — auto-approve on spec emit (hook-driven). Do NOT call AskUserQuestion after the `📋 Spec:` block.
-- ~~Partial-spec recovery askq~~ — model re-emits spec inline when hook returns `decision:block`; no askq involved.
+**Plus 1 other always-on askq moment**: Phase 1.7 GATE questions
+(precision-audit dimensions with architectural impact requiring
+developer decision). Phase 1.7 GATE askq is surgical — one
+question per dimension that triggers GATE classification.
+
+**No spec-approval askq.** The `📋 Spec:` block emitted in Phase 3
+is documentation, NOT an approval gate. Format violations produce
+advisory warnings (`spec-format-warn`), never `decision:block` and
+never an askq.
+
+## Other ambient askq moments (administrative, not phase gates)
+
+These exist in the framework but are NOT part of the canonical
+phase pipeline above:
+
+| Moment | Where it fires | Approve-family option |
+|--------|----------------|-----------------------|
+| Rule A git-init consent | First MCL activation per project when no `.git/` exists | "Evet, git init çalıştır" / "Yes, run git init" |
+| Plugin suggestion (per plugin) | First-message plugin-install suggestion block | "Kur" / "Install" |
+| Stack auto-detect fallback | Phase 1 if `mcl-stack-detect.sh` returns empty | "Python" / "Node" / "Go" / … (stack options) |
+| Phase 4 risk walkthrough (per risk) | Each detected risk — one AskUserQuestion per risk | "Düzelt" / "Atla" / "Override" / "Kural yap" |
+| Phase 4 impact walkthrough (per impact) | Each detected impact | "Düzelt" / "Atla" / "Kural yap" |
+| `/mcl-update` confirmation | After status report, before running `git pull && bash install.sh` | "Güncelle" / "Update" |
+| `/mcl-finish` confirmation | Before writing the checkpoint file | "Finalize et" / "Finalize" |
+| Pasted-CLI passthrough | When pasted command hits a genuinely ambiguous parameter | Surgical option list for the parameter |
+
+**REMOVED in MCL 10.0.0:**
+- ~~Phase 3 spec approval askq~~ — never existed in 10.0.0; spec is documentation only.
+- ~~Phase 4b UI review askq~~ — replaced by the canonical Phase 2 design askq above.
+- ~~Partial-spec recovery askq~~ — model re-emits spec inline when the format warn fires; no askq involved.
 
 ## Does NOT apply to (stay as plain text)
 
-- Phase 1 OPEN-ENDED gathering ("What do you want to build?", "What are the
-  constraints?") — these go through prose, not askq
-- Spec body itself — the `📋 Spec:` block is plain markdown
-- Phase 3 spec language explanation (prose that precedes auto-approve)
-- Phase 4 code writing (Edit/Write/MultiEdit tool calls, not developer
-  questions)
-- Phase 5 Verification Report (prose output)
-- **Spec approval (since 9.2.1)** — auto-approve on spec emit, no askq
+- Phase 1 OPEN-ENDED gathering ("What do you want to build?",
+  "What are the constraints?") — these go through prose, not askq.
+- The `📋 Spec:` block itself — plain markdown documentation
+  emitted at Phase 3 entry.
+- Phase 3 implementation prose (Edit/Write/MultiEdit tool calls,
+  not developer questions).
+- Phase 5 Verification Report (prose output).
 
 **Phase 1 questions ARE askq-driven for multi-choice.** When the
 developer's intent has 2-5 valid interpretations, present them via
@@ -85,9 +102,9 @@ Stop hook can deterministically detect approval.
 | Portuguese | aprovar, sim, confirmar                                         |
 | Russian    | одобрить, да, подтвердить                                       |
 
-Non-approve options (edit, cancel, skip, reject, change) are free-form
-in the developer's language — the Stop hook simply treats any
-non-approve option as a "do not advance state" signal and logs
+Non-approve options (edit, cancel, skip, reject, change, revise) are
+free-form in the developer's language — the Stop hook simply treats
+any non-approve option as a "do not advance state" signal and logs
 `askq-non-approve`.
 
 ## Stop-hook behavior summary
@@ -96,20 +113,18 @@ non-approve option as a "do not advance state" signal and logs
   `name=="AskUserQuestion"` and pairs each with its `tool_result` by
   `tool_use_id`.
 - Filters by the `^MCL \d+\.\d+\.\d+ \| (.+)$` prefix regex.
-- Classifies semantic intent (`summary-confirm`, `ui-review`, `other`)
-  by substring matching the question body against a fixed token table.
-  **Note:** `spec-approve` intent is no longer transition-driving since
-  9.2.1; the scanner still detects it as a diagnostic but no state
-  changes — spec auto-approve happens on spec emit, not askq response.
+- Classifies semantic intent (`summary-confirm`, `design-approve`,
+  `phase4-risk`, `phase4-impact`, `other`) by substring matching the
+  question body against a fixed token table.
 - Extracts the selected option from the tool_result by matching against
   `tool_use.input.options` first, then raw tool_result text.
-
-- Never transitions on a text-only `yes` without the paired tool_result.
+- Never transitions on a text-only `yes` without the paired
+  tool_result.
 
 ## Malformed-prefix handling
 
 If Claude emits an AskUserQuestion with a prefix that does not match
 `^MCL \d+\.\d+\.\d+ \| ` (e.g., `MCL 6 |`, `MCL | `, or no prefix at
 all), the Stop hook skips it silently (logs `askq-ignored-wrong-phase`
-/ `askq-ignored-no-spec` depending on state). No state transition
+or `askq-ignored-no-spec` depending on state). No state transition
 occurs. Claude must re-issue the question with the correct prefix.

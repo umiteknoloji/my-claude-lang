@@ -17,11 +17,11 @@ _mc_proj="$(setup_test_dir)"
 _mc_init_phase4_state() {
   python3 - "$_mc_proj/.mcl/state.json" <<'PY'
 import json, sys, time
-o = {"schema_version": 2, "current_phase": 4, "phase_name": "EXECUTE",
-     "spec_approved": True,
+o = {"schema_version": 3, "current_phase": 4, "phase_name": "RISK_GATE",
+     "is_ui_project": False, "design_approved": True,
      "spec_hash": "deadbeefcafef00d1234567890abcdef",
-     "phase4_5_ops_scan_done": False,
-     "phase4_5_perf_scan_done": False,
+     "phase4_ops_scan_done": False,
+     "phase4_perf_scan_done": False,
      "last_update": int(time.time())}
 open(sys.argv[1], "w").write(json.dumps(o))
 PY
@@ -52,8 +52,8 @@ MCL_MINIMAL_CORE=1 \
   bash "$REPO_ROOT/hooks/mcl-stop.sh" >/dev/null 2>&1 \
   <<< "{\"transcript_path\":\"${_mc_t1}\",\"session_id\":\"mc1\",\"cwd\":\"${_mc_proj}\"}"
 
-_ops_done="$(python3 -c "import json; print(json.load(open('$_mc_proj/.mcl/state.json')).get('phase4_5_ops_scan_done', False))")"
-_perf_done="$(python3 -c "import json; print(json.load(open('$_mc_proj/.mcl/state.json')).get('phase4_5_perf_scan_done', False))")"
+_ops_done="$(python3 -c "import json; print(json.load(open('$_mc_proj/.mcl/state.json')).get('phase4_ops_scan_done', False))")"
+_perf_done="$(python3 -c "import json; print(json.load(open('$_mc_proj/.mcl/state.json')).get('phase4_perf_scan_done', False))")"
 assert_equals "[MINIMAL] ops scan marked done (skip-mode)" "$_ops_done" "True"
 assert_equals "[MINIMAL] perf scan marked done (skip-mode)" "$_perf_done" "True"
 
@@ -70,8 +70,8 @@ fi
 _mc_init_phase2() {
   python3 - "$_mc_proj/.mcl/state.json" <<'PY'
 import json, sys, time
-o = {"schema_version": 2, "current_phase": 2, "phase_name": "SPEC_REVIEW",
-     "spec_approved": False,
+o = {"schema_version": 3, "current_phase": 2, "phase_name": "DESIGN_REVIEW",
+     "is_ui_project": True, "design_approved": False,
      "last_update": int(time.time())}
 open(sys.argv[1], "w").write(json.dumps(o))
 PY

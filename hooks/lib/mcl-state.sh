@@ -9,41 +9,45 @@
 # State file lives at `<project>/.mcl/state.json` — one file per working
 # directory. Stale-state garbage collection is NOT in v1 (YAGNI).
 #
-# Schema v2 (since MCL 6.2.0):
+# Schema v3 (since MCL 10.0.0):
 #   {
-#     "schema_version":      2,
-#     "current_phase":       1,           // 1..5
-#     "phase_name":          "COLLECT",   // COLLECT|SPEC_REVIEW|USER_VERIFY|EXECUTE|DELIVER
-#     "spec_approved":       false,
-#     "spec_hash":           null,        // sha256 of approved spec body
+#     "schema_version":      3,
+#     "current_phase":       1,           // 1..6 (no decimals)
+#     "phase_name":          "INTENT",    // INTENT|DESIGN_REVIEW|IMPLEMENTATION|RISK_GATE|VERIFICATION|FINAL_REVIEW
+#     "is_ui_project":       false,       // detected once in Phase 1 brief parse, immutable
+#     "design_approved":     false,       // set true on Phase 2 design askq approve (UI only)
+#     "spec_hash":           null,        // sha256 of last emitted Phase 3 spec body (advisory)
 #     "plugin_gate_active":  false,
 #     "plugin_gate_missing": [],
-#     "ui_flow_active":      false,       // set by Phase 1 confirm (opt-out path)
-#     "ui_sub_phase":        null,        // "BUILD_UI" | "REVIEW" | "BACKEND" | null
-#     "ui_build_hash":       null,        // sha256 of last frontend build output
-#     "ui_reviewed":         false,       // set by Phase 4b approve intent
-#     "last_update":         1713456789   // unix epoch seconds
+#     "ui_flow_active":      false,       // (legacy alias — deprecated; use is_ui_project)
+#     "ui_sub_phase":        null,        // (legacy — deprecated)
+#     "ui_build_hash":       null,
+#     "ui_reviewed":         false,       // (legacy alias for design_approved)
+#     "last_update":         1713456789
 #   }
 #
-# v1 files (schema_version=1) are auto-migrated to v2 on next hook run.
-# v1→v2 migration adds the four UI fields with default values and
-# preserves a backup at `.mcl/state.json.backup.v1`.
+# Removed in v3 (10.0.0):
+#   - spec_approved (Phase 1 summary-confirm IS the approval gate)
+#   - precision_audit_block_count, precision_audit_skipped (helper flags)
+#   - phase_review_state (old SPEC_REVIEW field)
+#
+# v1/v2 files are auto-migrated to v3 on next hook run.
+# Migration: current_phase∈{2,3}→3, current_phase=4→3, current_phase=4.5→4;
+# spec_approved=true → design_approved=true; is_ui_project defaults to true
+# (safe non-trigger), design_approved=true so old projects don't re-prompt.
 #
 # CLI usage:
-#   mcl-state.sh init                          # create default if missing
 #   mcl-state.sh get <field>                   # print one field
-#   mcl-state.sh set <field> <value>           # set one field, update last_update
 #   mcl-state.sh dump                          # print full JSON
-#   mcl-state.sh reset                         # overwrite with default
 #
 # Sourced usage:
 #   source hooks/lib/mcl-state.sh
 #   mcl_state_get current_phase
-#   mcl_state_set spec_approved true
+#   mcl_state_set design_approved true
 
 set -u
 
-MCL_STATE_SCHEMA_VERSION=2
+MCL_STATE_SCHEMA_VERSION=3
 MCL_STATE_DIR="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}"
 MCL_STATE_FILE="${MCL_STATE_FILE:-$MCL_STATE_DIR/state.json}"
 
@@ -54,8 +58,9 @@ _mcl_state_default() {
 {
   "schema_version": ${MCL_STATE_SCHEMA_VERSION},
   "current_phase": 1,
-  "phase_name": "COLLECT",
-  "spec_approved": false,
+  "phase_name": "INTENT",
+  "is_ui_project": false,
+  "design_approved": false,
   "spec_hash": null,
   "plugin_gate_active": false,
   "plugin_gate_missing": [],
@@ -75,23 +80,22 @@ _mcl_state_default() {
   "pattern_ask_pending": false,
   "plan_critique_done": false,
   "restart_turn_ts": null,
-  "phase4_5_security_scan_done": false,
-  "phase4_5_db_scan_done": false,
-  "phase4_5_ui_scan_done": false,
-  "phase4_5_high_baseline": {"security": 0, "db": 0, "ui": 0, "ops": 0, "perf": 0},
-  "phase4_5_ops_scan_done": false,
-  "phase4_5_perf_scan_done": false,
+  "phase4_security_scan_done": false,
+  "phase4_db_scan_done": false,
+  "phase4_ui_scan_done": false,
+  "phase4_high_baseline": {"security": 0, "db": 0, "ui": 0, "ops": 0, "perf": 0},
+  "phase4_ops_scan_done": false,
+  "phase4_perf_scan_done": false,
   "phase1_ops": {"deployment_target": null, "observability_tier": null, "test_policy": null, "doc_level": null},
   "phase1_perf": {"budget_tier": null},
   "phase6_double_check_done": false,
-  "phase4_5_batch_decision": null,
+  "phase4_batch_decision": null,
   "phase1_turn_count": 0,
-  "precision_audit_block_count": 0,
-  "precision_audit_skipped": false,
   "phase1_intent": null,
   "phase1_constraints": null,
   "paused_on_error": {"active": false},
   "dev_server": {"active": false},
+  "spec_format_warn_count": 0,
   "last_update": ${now}
 }
 JSON
@@ -149,48 +153,117 @@ mcl_state_skill_token_rotate() {
 }
 
 _mcl_state_valid() {
-  # Return 0 if stdin is parseable JSON with schema_version 1 or 2.
-  # v1 files are accepted so mcl_state_init can migrate them in-place
-  # instead of corrupt-copying + replacing with default.
+  # Return 0 if stdin is parseable JSON with schema_version 1, 2, or 3.
+  # Older files are accepted so mcl_state_init can migrate them in-place.
   # Uses `python3 -c` (not heredoc) so the piped body isn't shadowed.
   python3 -c '
 import json, sys
 try:
     obj = json.loads(sys.stdin.read())
     assert isinstance(obj, dict)
-    assert obj.get("schema_version") in (1, 2)
-    assert isinstance(obj.get("current_phase"), int)
-    assert 1 <= obj["current_phase"] <= 5
+    assert obj.get("schema_version") in (1, 2, 3)
+    assert isinstance(obj.get("current_phase"), (int, float))
+    assert 1 <= obj["current_phase"] <= 6
 except Exception:
     sys.exit(1)
 ' 2>/dev/null
 }
 
-_mcl_state_migrate_v1_to_v2() {
-  # Read the current file, add missing v2 fields with defaults, rewrite
-  # atomically. Backup the v1 body at `.mcl/state.json.backup.v1` so the
-  # migration is reversible by hand if anything goes wrong. Emits an
-  # audit event so the migration is always visible after the fact.
+_mcl_state_migrate_to_v3() {
+  # Read the current file, migrate to v3 schema (10.0.0), rewrite atomically.
+  # Migration rules (10.0.0):
+  #   - schema_version → 3
+  #   - current_phase ∈ {2, 3} → 3 (treat past-spec-review as IMPLEMENTATION)
+  #   - current_phase = 4 → 3 (old EXECUTE → new IMPLEMENTATION)
+  #   - current_phase = 4.5 / 4.6 → 4 (RISK_GATE)
+  #   - current_phase ∈ {5, 6} unchanged
+  #   - spec_approved=true → design_approved=true (default false otherwise)
+  #   - is_ui_project default true (safe non-trigger; old projects don't reprompt)
+  #   - design_approved default true (don't retrigger old project's UI review)
+  #   - drop spec_approved, precision_audit_block_count,
+  #     precision_audit_skipped, phase_review_state
+  #   - rename phase4_*_scan_done → phase4_*_scan_done; phase4_high_baseline
+  #     → phase4_high_baseline; phase4_batch_decision → phase4_batch_decision
   [ -f "$MCL_STATE_FILE" ] || return 0
   local body migrated
   body="$(cat "$MCL_STATE_FILE" 2>/dev/null)" || return 1
-  cp "$MCL_STATE_FILE" "${MCL_STATE_FILE}.backup.v1" 2>/dev/null || true
+  cp "$MCL_STATE_FILE" "${MCL_STATE_FILE}.backup.pre-v3" 2>/dev/null || true
   migrated="$(printf '%s' "$body" | python3 -c '
 import json, sys, time
 obj = json.loads(sys.stdin.read())
-obj["schema_version"] = 2
-obj.setdefault("plugin_gate_active", False)
-obj.setdefault("plugin_gate_missing", [])
-obj.setdefault("ui_flow_active", False)
-obj.setdefault("ui_sub_phase", None)
-obj.setdefault("ui_build_hash", None)
-obj.setdefault("ui_reviewed", False)
+old_phase = obj.get("current_phase", 1)
+old_pname = (obj.get("phase_name") or "").upper()
+spec_approved = bool(obj.get("spec_approved"))
+ui_active    = bool(obj.get("ui_flow_active"))
+
+# Phase renumbering
+try:
+    cp = float(old_phase)
+except Exception:
+    cp = 1.0
+if cp in (2.0, 3.0):
+    new_phase = 3
+elif cp == 4.0:
+    new_phase = 3
+elif cp in (4.5, 4.6):
+    new_phase = 4
+elif cp == 5.0:
+    new_phase = 5
+elif cp >= 6.0:
+    new_phase = 6
+else:
+    new_phase = 1
+
+phase_name_map = {
+    1: "INTENT",
+    2: "DESIGN_REVIEW",
+    3: "IMPLEMENTATION",
+    4: "RISK_GATE",
+    5: "VERIFICATION",
+    6: "FINAL_REVIEW",
+}
+obj["schema_version"]    = 3
+obj["current_phase"]     = new_phase
+obj["phase_name"]        = phase_name_map.get(new_phase, "INTENT")
+
+# is_ui_project: default true for old projects (avoids requiring re-detect),
+# but if ui_flow_active was set it was definitely a UI project.
+obj["is_ui_project"]     = obj.get("is_ui_project", ui_active or True)
+# design_approved: true if old project already had spec_approved=true
+# (so post-migration the project does not retrigger UI review askq).
+obj["design_approved"]   = obj.get("design_approved", spec_approved or True)
+
+# 10.0.0 deletes spec_approved, phase_review_state, precision_audit_*.
+# Test contract (test-state-migration-v3.sh) requires all four absent
+# after migration. Phase 1.7 skip + Phase 4 dialog will treat absent
+# fields as default (count=0 / state=null) — same effective behavior.
+for f in ("spec_approved", "phase_review_state",
+          "precision_audit_block_count", "precision_audit_skipped"):
+    obj.pop(f, None)
+
+# Rename phase4_5_* → phase4_*
+rename_map = {
+    "phase4_5_security_scan_done": "phase4_security_scan_done",
+    "phase4_5_db_scan_done":       "phase4_db_scan_done",
+    "phase4_5_ui_scan_done":       "phase4_ui_scan_done",
+    "phase4_5_ops_scan_done":      "phase4_ops_scan_done",
+    "phase4_5_perf_scan_done":     "phase4_perf_scan_done",
+    "phase4_5_high_baseline":      "phase4_high_baseline",
+    "phase4_5_batch_decision":     "phase4_batch_decision",
+}
+for old_k, new_k in rename_map.items():
+    if old_k in obj and new_k not in obj:
+        obj[new_k] = obj.pop(old_k)
+    else:
+        obj.pop(old_k, None)
+
+obj.setdefault("spec_format_warn_count", 0)
 obj["last_update"] = int(time.time())
 print(json.dumps(obj, indent=2))
 ' 2>/dev/null)"
   [ -n "$migrated" ] || return 1
   _mcl_state_write_raw "$migrated" || return 1
-  mcl_audit_log "migrate-v1-to-v2" "$(basename "${0:-unknown}")" "backup=${MCL_STATE_FILE}.backup.v1"
+  mcl_audit_log "state-migrated-10.0.0" "$(basename "${0:-unknown}")" "backup=${MCL_STATE_FILE}.backup.pre-v3"
 }
 
 mcl_state_init() {
@@ -199,7 +272,7 @@ mcl_state_init() {
     _mcl_state_write_raw "$(_mcl_state_default)"
     return 0
   fi
-  # File exists — check if it needs v1→v2 migration.
+  # File exists — check if it needs migration to v3.
   local current_version
   current_version="$(python3 -c '
 import json, sys
@@ -209,8 +282,8 @@ try:
 except Exception:
     print(0)
 ' "$MCL_STATE_FILE" 2>/dev/null)"
-  if [ "$current_version" = "1" ]; then
-    _mcl_state_migrate_v1_to_v2
+  if [ "$current_version" != "3" ]; then
+    _mcl_state_migrate_to_v3
   fi
 }
 
@@ -380,24 +453,16 @@ _mcl_validate_stack_tags() {
 }
 
 mcl_get_active_phase() {
-  # Returns a single effective phase string from the combination of
-  # current_phase, spec_approved, phase_review_state, ui_sub_phase,
-  # pattern_scan_due, and spec_hash (Phase 3 detection).
+  # Returns a single effective phase string from current_phase + UI signals.
   #
-  # Effective phase values:
-  #   "1"    Phase 1 — gathering parameters
-  #   "2"    Phase 2 — spec being written (spec block not yet emitted)
-  #   "3"    Phase 3 — spec emitted, awaiting developer approval
-  #   "3.5"  Phase 3.5 — pattern scan turn (first Phase 4 turn, writes blocked)
-  #   "4"    Phase 4 — executing (no UI flow, or UI complete)
-  #   "4a"   Phase 4a — UI BUILD (writing frontend with dummy data)
-  #   "4b"   Phase 4b — UI REVIEW (awaiting developer approval of UI)
-  #   "4c"   Phase 4c — BACKEND (wiring real data, UI approved)
-  #   "4.5"  Phase 4.5 — post-code risk review dialog
-  #   "4.6"  Phase 4.6 — post-risk impact review dialog
-  #   "5"    Phase 5 — verification report
-  #   "5.5"  Phase 5.5 — localize report (non-English sessions)
-  #   "?"    indeterminate (state inconsistent or unreadable)
+  # Effective phase values (10.0.0):
+  #   "1"   Phase 1 — INTENT (questions, precision audit)
+  #   "2"   Phase 2 — DESIGN_REVIEW (UI skeleton + design askq, UI projects only)
+  #   "3"   Phase 3 — IMPLEMENTATION (📋 Spec emit + code)
+  #   "4"   Phase 4 — RISK_GATE (security/db/ui/ops/perf scans)
+  #   "5"   Phase 5 — VERIFICATION (test/lint/build/smoke report)
+  #   "6"   Phase 6 — FINAL_REVIEW (double-check / forensic audit)
+  #   "?"   indeterminate (state inconsistent or unreadable)
   #
   # Optional arg: path to state.json (default: $MCL_STATE_FILE)
   local state_file="${1:-${MCL_STATE_FILE}}"
@@ -411,59 +476,14 @@ try:
 except Exception:
     print("?"); sys.exit(0)
 
-phase       = int(obj.get("current_phase") or 1)
-approved    = obj.get("spec_approved") is True
-pr_state    = obj.get("phase_review_state") or ""   # null/"pending"/"running"
-ui_active   = obj.get("ui_flow_active") is True
-ui_sub      = obj.get("ui_sub_phase") or ""         # BUILD_UI/REVIEW/BACKEND
-spec_hash   = obj.get("spec_hash")                  # set when spec block emitted
-scan_due    = obj.get("pattern_scan_due") is True
-
-# Phase 1: collecting parameters
-if phase <= 1:
-    print("1"); sys.exit(0)
-
-# Phase 2/3: spec being written or awaiting approval
-if phase == 2:
-    # Phase 3: spec block was emitted (spec_hash set) but not yet approved
-    if spec_hash:
-        print("3")
-    else:
-        print("2")
-    sys.exit(0)
-
-# 9.3.0: spec_approved removed from canonical schema. Phase 4+ is
-# determined by current_phase alone (advanced via Phase 1 summary-
-# confirm askq, not spec emit). Legacy state files with spec_approved
-# still work — when phase>=4, treat as approved regardless of the field.
-
-# Phase 4.5 / 4.6 — review dialog
-if pr_state == "running":
-    # Distinguish 4.5 vs 4.6: 4.6 is pure-dialog (no code written this turn)
-    # We can't distinguish 4.5 from 4.6 from state alone without
-    # transcript analysis — return "4.5" as the coarser bucket.
-    # Callers that need 4.6 precision should check additional signals.
-    print("4.5"); sys.exit(0)
-
-if pr_state == "pending":
-    # Code written, review not yet started — still in Phase 4 (blocked)
-    if ui_active:
-        sub_map = {"BUILD_UI": "4a", "REVIEW": "4b", "BACKEND": "4c"}
-        print(sub_map.get(ui_sub, "4")); sys.exit(0)
-    if scan_due:
-        print("3.5"); sys.exit(0)
-    print("4"); sys.exit(0)
-
-# pr_state is null — Phase 4 not yet written code, or post-review
-if ui_active:
-    sub_map = {"BUILD_UI": "4a", "REVIEW": "4b", "BACKEND": "4c"}
-    if ui_sub in sub_map:
-        print(sub_map[ui_sub]); sys.exit(0)
-
-if scan_due:
-    print("3.5"); sys.exit(0)
-
-print("4")
+phase = obj.get("current_phase") or 1
+try:
+    p = int(phase)
+except Exception:
+    p = 1
+if p < 1 or p > 6:
+    p = 1
+print(str(p))
 PYEOF
 }
 

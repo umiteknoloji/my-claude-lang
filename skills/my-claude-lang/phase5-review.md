@@ -7,19 +7,19 @@ that gives the developer confidence that the AI did the right thing.
 
 ## When Phase 5 Runs
 
-After **Phase 4.6 (Post-Risk Impact Review)** is fully resolved — i.e.
+After **Phase 4 impact lens (Post-Risk Impact Review)** is fully resolved — i.e.
 every impact MCL surfaced has been answered by the developer (skip /
-apply fix / make general rule), and Phase 4.5 before it is also
+apply fix / make general rule), and Phase 4 before it is also
 resolved — MCL MUST produce the Verification Report. This is NOT
-optional. Phase 4.6 is NOT the last step.
+optional. Phase 4 impact lens is NOT the last step.
 
-If you wrote code and stopped without running Phase 4.5, Phase 4.6
+If you wrote code and stopped without running Phase 4, Phase 4 impact lens
 AND emitting this report, you skipped phases — go back and produce
 all of them.
 
 ⛔ STOP RULE: Phase 4 does NOT end with "done" or a summary of changes.
-Phase 4 hands off to Phase 4.5; Phase 4.5 hands off to Phase 4.6;
-Phase 4.6 hands off to Phase 5. Phase 5 is the last step. If you find
+Phase 3 hands off to Phase 4; Phase 4 risk gate hands off to the impact lens;
+Phase 4 impact lens hands off to Phase 5. Phase 5 is the last step. If you find
 yourself writing "all steps completed" without any of the sections
 below, you are violating this rule.
 
@@ -54,17 +54,17 @@ phase file.
 
 ### TDD mode — skip re-invocation
 
-When `tdd=true` (see `phase4-tdd.md`) AND Phase 4 **or Phase 4.5**
+When `tdd=true` (see `phase3-tdd.md`) AND Phase 3 **or Phase 4**
 has already emitted a `🟢 GREEN verify` block in this session, DO NOT
 invoke the runner again here. Phase 5 starts instead with a localized
 TDD-cycle summary line. Examples:
 
-- Phase 4 GREEN only (no Phase 4.5 re-verify):
+- Phase 3 GREEN only (no Phase 4 re-verify):
   - Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama tamamlandı`
   - English: `✅ TDD cycle: RED baseline → GREEN verify complete`
-- Phase 4 GREEN + Phase 4.5 re-verify GREEN:
-  - Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama → Phase 4.5 re-doğrulama tamamlandı`
-  - English: `✅ TDD cycle: RED baseline → GREEN verify → Phase 4.5 re-verify complete`
+- Phase 3 GREEN + Phase 4 re-verify GREEN:
+  - Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama → Phase 4 re-doğrulama tamamlandı`
+  - English: `✅ TDD cycle: RED baseline → GREEN verify → Phase 4 re-verify complete`
 
 Then proceed to Section 1. A double (or triple) runner invocation
 would be noise — the earlier GREEN blocks already carry the diagnostic
@@ -73,9 +73,9 @@ if TDD mode was enabled but fell through due to missing `test_command`,
 the normal Phase 5 runner invocation above still applies.
 
 The TDD-cycle summary line is MANDATORY whenever a GREEN verify
-happened in Phase 4 or Phase 4.5 — even when Phase 4.5 and Phase 4.6
-both emitted nothing (their "omit entirely" rule does not extend to
-this line). The summary is the single most compact proof to the
+happened in Phase 3 or Phase 4 — even when Phase 4 risk gate and
+impact lens both emitted nothing (their "omit entirely" rule does
+not extend to this line). The summary is the single most compact proof to the
 developer that the runner blocks were the ground truth Phase 5 is
 standing on; without it, Phase 5 opens with nothing tying back to
 the TDD cycle.
@@ -88,14 +88,14 @@ entirely** (no header, no placeholder sentence, no filler). Section 1 in
 particular is omitted when every MUST/SHOULD is satisfied — the
 absence of the section IS the all-clear signal.
 (Prior to MCL 5.4.0 the report had a third section, Impact Analysis,
-which was extracted into its own Phase 4.6 interactive dialog;
+which was extracted into its own Phase 4 impact lens interactive dialog;
 prior to MCL 5.3.0 the report had 4 sections with Missed Risks
 embedded; prior to MCL 5.2.0 it had 5 with a Permission Summary.
 All are removed.)
 
 ## Section 1: Spec Compliance — Mismatches Only
 
-Walk every MUST and SHOULD requirement from the Phase 2 spec, but
+Walk every MUST and SHOULD requirement from the Phase 3 spec, but
 **only report items that did NOT fully comply**. Use ⚠️ for partial
 compliance and ❌ for missing/failed items.
 
@@ -119,8 +119,8 @@ placeholder telling them there is nothing to read.
 ## Section 2: `!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`
 
 Items the developer MUST verify in a running environment — because the
-sandboxed Claude cannot. This list must reflect both Phase 4.5 and
-Phase 4.6 decisions (tests for applied fixes; acceptance smoke for
+sandboxed Claude cannot. This list must reflect both Phase 4 risk-gate and
+impact-lens decisions (tests for applied fixes; acceptance smoke for
 skipped risks; regression coverage for impacted consumers).
 
 The section title MUST be wrapped in `!!! ... !!!` and rendered in the
@@ -150,17 +150,17 @@ Content format:
 !!! MUTLAKA TEST ETMENİZ GEREKENLER !!!
 - [ ] [Step 1: specific action → expected result]
 - [ ] [Step 2: specific action → expected result]
-- [ ] [Edge case test from Phase 2 spec]
-- [ ] [Regression test for consumers surfaced in Phase 4.6]
-- [ ] [Smoke test for any risk the developer skipped in Phase 4.5]
+- [ ] [Edge case test from Phase 3 spec]
+- [ ] [Regression test for consumers surfaced in Phase 4 impact lens]
+- [ ] [Smoke test for any risk the developer skipped in Phase 4]
 ```
 
 Tests must be:
 - Specific (not "test the feature" but "click X button, expect Y")
 - Cover the golden path (happy case)
 - Cover edge cases from the spec
-- Cover regression for consumers surfaced in Phase 4.6
-- Cover residual exposure from Phase 4.5 skipped risks
+- Cover regression for consumers surfaced in Phase 4 impact lens
+- Cover residual exposure from Phase 4 skipped risks
 
 ## Section 3: Process Trace (MCL 6.3.0+)
 
@@ -208,11 +208,11 @@ short sentence per event in the developer's language):
 - `session_start,<version>` → "MCL `<version>` oturumu başladı." / "MCL `<version>` session started."
 - `stack_detected,<tags>` → "Stack algılandı: `<tags>`." / "Stack detected: `<tags>`."
 - `phase_transition,<from>,<to>` → "Faz `<from>` → `<to>`." / "Phase `<from>` → `<to>`."
-- `summary_confirmed,ui_enabled` → "Özet onaylandı (UI akışı açık)." / "Summary confirmed (UI flow on)."
-- `summary_confirmed,ui_skipped` → "Özet onaylandı (UI atlandı)." / "Summary confirmed (UI skipped)."
-- `spec_approved,<hash12>` → "Spec onaylandı (`<hash12>`)." / "Spec approved (`<hash12>`)."
-- `ui_flow_enabled` → "UI akışı BUILD_UI'ya girdi." / "UI flow entered BUILD_UI."
-- `ui_review_approved` → "UI review onaylandı → BACKEND." / "UI review approved → BACKEND."
+- `summary_confirmed,is_ui_project_true` → "Özet onaylandı (UI projesi → Faz 2)." / "Summary confirmed (UI project → Phase 2)."
+- `summary_confirmed,is_ui_project_false` → "Özet onaylandı (UI değil → Faz 3)." / "Summary confirmed (non-UI → Phase 3)."
+- `design_approved,<hash12>` → "Tasarım onaylandı (`<hash12>`)." / "Design approved (`<hash12>`)."
+- `phase2_design_build` → "Faz 2 tasarım iskeleti yazıldı." / "Phase 2 design skeleton written."
+- `dev_server_started,<port>` → "Dev sunucu açıldı (port `<port>`)." / "Dev server started (port `<port>`)."
 - `plugin_dispatched,<subagent>` → "Plugin çağrıldı: `<subagent>`." / "Plugin dispatched: `<subagent>`."
 - Unknown event key → render it verbatim as a single bullet, do
   NOT omit. Future events added to the hook library will surface
@@ -289,8 +289,8 @@ secondary signal.
 
 - ALL sections are in the developer's language
 - Code snippets and file names stay in English
-- Do NOT include a Missed Risks section — Phase 4.5 handled that
-- Do NOT include an Impact Analysis section — Phase 4.6 handled that
+- Do NOT include a Missed Risks section — Phase 4 handled that
+- Do NOT include an Impact Analysis section — Phase 4 impact lens handled that
 - Do NOT include a Permission Summary section — removed in MCL 5.2.0
 - Do NOT list ✅-compliant items in Section 1 — mismatches only
 - After the full report, ask: "Do you understand everything? (yes / no)"
@@ -303,7 +303,7 @@ Every Phase 5 Verification Report MUST end with a single localized
 reminder line pointing at the `mcl-finish` slash-command. The line
 sits AFTER Section 2 (the must-test checklist) as the final
 user-facing line of the report. Its purpose is to keep the
-session-local developer aware that Phase 4.6 impacts are
+session-local developer aware that Phase 4 impact lens impacts are
 accumulating on disk and a cross-session finish pass is one
 keyword away.
 
@@ -329,7 +329,7 @@ Rules:
 - The reminder is MANDATORY on every Phase 5 report — even when
   Section 1 is omitted and Section 2 is the only visible section.
 - The reminder is NOT subject to the empty-section-omission rule.
-  Unlike Phase 4.5 / 4.6 / Section 1 — which can vanish when
+  Unlike Phase 4 / 4.6 / Section 1 — which can vanish when
   empty — this line always renders.
 - The reminder is a single line. Do NOT wrap it in a named section
   header. Do NOT add surrounding prose explaining what

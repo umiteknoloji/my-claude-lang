@@ -15,13 +15,13 @@ _sb_state="$_sb_proj/.mcl/state.json"
 _sb_init_phase4() {
   python3 - "$_sb_state" <<'PY'
 import json, sys, time
-o = {"schema_version": 2, "current_phase": 4, "phase_name": "EXECUTE",
-     "spec_approved": True,
+o = {"schema_version": 3, "current_phase": 4, "phase_name": "RISK_GATE",
+     "is_ui_project": False, "design_approved": True,
      "spec_hash": "deadbeefcafef00d1234567890abcdef",
-     "phase4_5_security_scan_done": True, "phase4_5_db_scan_done": True,
-     "phase4_5_ui_scan_done": True, "phase4_5_ops_scan_done": True,
-     "phase4_5_perf_scan_done": True,
-     "phase4_5_high_baseline": {"security": 0, "db": 0, "ui": 0, "ops": 0, "perf": 0},
+     "phase4_security_scan_done": True, "phase4_db_scan_done": True,
+     "phase4_ui_scan_done": True, "phase4_ops_scan_done": True,
+     "phase4_perf_scan_done": True,
+     "phase4_high_baseline": {"security": 0, "db": 0, "ui": 0, "ops": 0, "perf": 0},
      "last_update": int(time.time())}
 open(sys.argv[1], "w").write(json.dumps(o))
 PY

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Test: Phase 4 → 4.5 → 5 → 6 cycle on a 2nd-iteration code change.
+# Test: Phase 4 RISK_GATE → 5 VERIFICATION → 6 FINAL_REVIEW cycle on a
+# 2nd-iteration code change.
 #
 # Validates that the regression-detection layer (since 8.16.0) actually
 # fires:
@@ -8,26 +9,26 @@
 #     finding. Phase 6 (b) check compares HIGH count against baseline
 #     and emits phase6-block.
 
-echo "--- test-phase4-5-to-6-cycle ---"
+echo "--- test-phase4-to-6-cycle ---"
 
 if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  printf '  SKIP: phase4-5-to-6-cycle disabled (MCL_MINIMAL_CORE=1)\n'
+  printf '  SKIP: phase4-to-6-cycle disabled (MCL_MINIMAL_CORE=1)\n'
   return 0 2>/dev/null || true
 fi
 
 _pc_proj="$(setup_test_dir)"
 
-# Plant a Phase 4 state with the baseline ALREADY recorded (security HIGH=0).
-# This simulates "iteration 1 already passed Phase 4.5 + 5".
+# Plant a Phase 4 RISK_GATE state with baseline ALREADY recorded (security HIGH=0).
+# This simulates "iteration 1 already passed Phase 4 + 5".
 python3 - "$_pc_proj/.mcl/state.json" <<'PY'
 import json, sys, time
-o = {"schema_version": 2, "current_phase": 4, "phase_name": "EXECUTE",
-     "spec_approved": True, "spec_hash": "deadbeefcafef00d",
-     "phase4_5_security_scan_done": True, "phase4_5_db_scan_done": True,
-     "phase4_5_ui_scan_done": True, "phase4_5_ops_scan_done": True,
-     "phase4_5_perf_scan_done": True,
-     "phase4_5_high_baseline": {"security": 0, "db": 0, "ui": 0, "ops": 0, "perf": 0},
-     "phase_review_state": "running",
+o = {"schema_version": 3, "current_phase": 4, "phase_name": "RISK_GATE",
+     "is_ui_project": False, "design_approved": True,
+     "spec_hash": "deadbeefcafef00d",
+     "phase4_security_scan_done": True, "phase4_db_scan_done": True,
+     "phase4_ui_scan_done": True, "phase4_ops_scan_done": True,
+     "phase4_perf_scan_done": True,
+     "phase4_high_baseline": {"security": 0, "db": 0, "ui": 0, "ops": 0, "perf": 0},
      "phase6_double_check_done": False,
      "last_update": int(time.time())}
 open(sys.argv[1], "w").write(json.dumps(o))
@@ -147,7 +148,7 @@ fi
 # Verify the security baseline did NOT silently increase (8.16.0 design
 # — baseline frozen at first scan; new HIGHs are regressions, not
 # new-baseline).
-_pc_baseline="$(python3 -c "import json; d=json.load(open('$_pc_proj/.mcl/state.json')); b=d.get('phase4_5_high_baseline',{}); print(b.get('security','MISSING'))")"
+_pc_baseline="$(python3 -c "import json; d=json.load(open('$_pc_proj/.mcl/state.json')); b=d.get('phase4_high_baseline',{}); print(b.get('security','MISSING'))")"
 assert_equals "security baseline preserved at 0 (not silently raised)" "$_pc_baseline" "0"
 
 # Verify either phase6-block OR security-scan-block (regression caught).

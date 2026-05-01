@@ -39,13 +39,14 @@ output breaks rendering.
 
 ### `<mcl_phase>`
 
-- Phase sub-blocks inside the hook (Phase 4.5 rule, Phase 4.6 rule,
-  Phase 5 rule, Rule-Capture rule, Empty-Section-Omission rule)
+- Phase sub-blocks inside the hook (Phase 2 rule, Phase 3 rule,
+  Phase 4 rule, Phase 5 rule, Rule-Capture rule,
+  Empty-Section-Omission rule)
 - Each skill file `phase*-*.md`, plus `rule-capture.md`,
   `language-detection.md`, `technical-disambiguation.md`,
   `cultural-pragmatics.md`, `gates.md`
 
-Attribute form: `<mcl_phase name="phase4-5-risk-review">...`
+Attribute form: `<mcl_phase name="phase4-risk-gate">...`
 
 ### `<mcl_constraint>`
 

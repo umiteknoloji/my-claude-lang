@@ -7,7 +7,7 @@
 # Example:
 #   2026-04-23T14:32:01Z | session_start | 6.3.0
 #   2026-04-23T14:35:10Z | summary_confirmed
-#   2026-04-23T14:37:44Z | spec_approved
+#   2026-04-23T14:37:44Z | design_approved
 #   2026-04-23T14:40:12Z | plugin_dispatched | code-reviewer
 #   2026-04-23T14:55:08Z | verification_emitted
 #

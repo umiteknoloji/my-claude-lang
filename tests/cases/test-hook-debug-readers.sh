@@ -21,8 +21,8 @@ _hd_state="$_hd_proj/.mcl/state.json"
 mkdir -p "$_hd_proj/.mcl"
 python3 -c "
 import json, time
-o = {'schema_version':2, 'current_phase':2, 'phase_name':'SPEC_REVIEW',
-     'spec_approved':False, 'last_update':int(time.time())}
+o = {'schema_version':3, 'current_phase':2, 'phase_name':'DESIGN_REVIEW',
+     'is_ui_project':True, 'design_approved':False, 'last_update':int(time.time())}
 open('$_hd_state','w').write(json.dumps(o))
 "
 
@@ -59,8 +59,8 @@ assert_equals "Read project file → no block (empty stdout)" "$_hd_out4" ""
 # ---- Test 5: Phase 4 → block does NOT fire ----
 python3 -c "
 import json, time
-o = {'schema_version':2, 'current_phase':4, 'phase_name':'EXECUTE',
-     'spec_approved':True, 'last_update':int(time.time())}
+o = {'schema_version':3, 'current_phase':4, 'phase_name':'RISK_GATE',
+     'is_ui_project':False, 'design_approved':True, 'last_update':int(time.time())}
 open('$_hd_state','w').write(json.dumps(o))
 "
 _hd_out5="$(_hd_run "Read" '{"file_path":"~/.mcl/lib/skills/my-claude-lang.md"}')"

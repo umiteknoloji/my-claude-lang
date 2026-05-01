@@ -54,7 +54,7 @@ default carries near-zero implementation cost. Mark in the spec as
 ### SKIP-MARK (since 8.3.0)
 Dimension applies but **no industry-default assumption is safe**. Recording
 silence as a default would be wrong — instead, mark explicitly that the
-dimension is unspecified. Phase 4.5 risk review can lens these markers and
+dimension is unspecified. Phase 4 risk review can lens these markers and
 surface them as risks if the dimension turns out to matter at execution time.
 Spec marker: `[unspecified: <reason>]` (e.g., `[unspecified: no SLA stated]`).
 
@@ -162,7 +162,7 @@ Who can call this endpoint / module / write path? What identity is presented and
 
 ### 9. Authz Unit / Resource-Owner Check (OWASP A01)
 For each resource access: which actor owns / can access this specific record? BOLA/IDOR is the most common production breach and SAST cannot detect it semantically.
-- **SILENT-ASSUME default:** none — authorization SHOULD be explicit per-resource. Default is `[unspecified: authz unit]` and Phase 4.5 lens (d) re-checks.
+- **SILENT-ASSUME default:** none — authorization SHOULD be explicit per-resource. Default is `[unspecified: authz unit]` and Phase 4 lens (d) re-checks.
 - **GATE triggers:** any resource fetched / mutated by ID. Always ask: "Does the actor have a relationship to this resource ID?"
 - **Sample question (TR):** "GET /users/:id — bu ID herhangi biri olabilir. Owner check uygulansın mı (sadece kendi kaydı), admin bypass var mı?"
 
@@ -182,7 +182,7 @@ Where do credentials live? Repo (forbidden), env var (acceptable), secret manage
 Will the code parse externally-controlled serialized data? Untrusted deserialization is RCE-equivalent.
 - **SILENT-ASSUME default:** JSON-only ingress with schema validation (Pydantic, Zod, Joi) → `[assumed: JSON + schema]`. No SILENT for binary formats.
 - **GATE triggers:** YAML / Python-pickle-format / Marshal / Java serialization of any external input; webhooks ingesting opaque payload; file upload that may contain serialized object.
-- **SKIP-MARK alternative:** if the input source is genuinely undecided, mark `[unspecified: deser-source]` and Phase 4.5 lens (d) blocks until explicit source confirmed.
+- **SKIP-MARK alternative:** if the input source is genuinely undecided, mark `[unspecified: deser-source]` and Phase 4 lens (d) blocks until explicit source confirmed.
 - **Sample question (TR):** "Bu endpoint dış kaynaktan ne format alıyor — JSON+schema mı, YAML/binary-serialization mı? İkincisi attack surface."
 
 ## DB Design Dimensions (since 8.8.0, design-time)
@@ -235,7 +235,7 @@ Pool size + saturation behavior?
 
 Four ops dimensions and one perf dimension, applied per their trigger
 conditions. They feed `phase1_ops` and `phase1_perf` state objects which
-are read by Phase 4.5 ops/perf gates and Phase 6 (a) audit-trail check.
+are read by Phase 4 ops/perf gates and Phase 6 (a) audit-trail check.
 
 ### 20. Deployment Strategy (DEP)
 How does this code reach production? CI/CD / manual approval / Docker / serverless / static-deploy?
@@ -338,7 +338,7 @@ the **safety net** — text emission only, no tool invocation, no auth
 required. If neither path runs, Phase 6 (a) reports the LOW soft
 fail and downstream phases proceed with default state.
 
-These state objects feed Phase 4.5 ops gate (8.13.0) and Phase 4.5 perf
+These state objects feed Phase 4 ops gate (8.13.0) and Phase 4 perf
 gate (8.14.0), and inform threshold defaults (e.g. perf budget_tier
 "strict" lowers `bundle_budget_kb` from 200 to 100).
 
@@ -545,7 +545,7 @@ A consistent run produces:
 
 ## Enforcement (since 8.3.2 — hard tier)
 
-Phase 1.7 is enforced at the same tier as Phase 4.5: `mcl-stop.sh` returns
+Phase 1.7 is enforced at the same tier as Phase 4: `mcl-stop.sh` returns
 `{"decision": "block", ...}` when a Phase 2 spec block (`📋 Spec:`) is
 detected in the turn AND no `precision-audit` audit entry was emitted earlier
 in the same session. State stays at `current_phase=1`; the Phase 1→2

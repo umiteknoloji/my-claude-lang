@@ -13,7 +13,7 @@ verify.
 
 The capture flow may trigger in two situations:
 
-1. **During the Phase 4.5 Post-Code Risk Review dialog**: when the user
+1. **During the Phase 4 Post-Code Risk Review dialog**: when the user
    says "make this a general rule" for a risk being discussed. (Before
    MCL 5.3.0 this dialog lived inside Phase 5; it is now its own phase.)
 2. **Anywhere MCL detects a generalizable pattern**: if during normal
@@ -196,9 +196,9 @@ captured yet."* in the user's language.
 - Not irreversible — captured rules live in plain `CLAUDE.md` files.
   The user can edit or delete them with any text editor at any time.
 
-## Integration with Phase 4.5
+## Integration with Phase 4
 
-During the Phase 4.5 Post-Code Risk Review interactive dialog, when the
+During the Phase 4 Post-Code Risk Review interactive dialog, when the
 user picks "make this a general rule" for a risk, MCL:
 
 1. Triggers the rule capture flow immediately for that risk.

@@ -5,16 +5,15 @@ echo "--- test-restart ---"
 
 _rs_dir="$(setup_test_dir)"
 
-# Pre-write a non-default state (phase 4, spec approved).
+# Pre-write a non-default state (phase 3, design approved).
 python3 -c "
 import json, sys
 path = sys.argv[1]
 state = {
-    'schema_version': 2, 'current_phase': 4, 'phase_name': 'EXECUTE',
-    'spec_approved': True, 'spec_hash': 'abc123def456',
+    'schema_version': 3, 'current_phase': 3, 'phase_name': 'IMPLEMENTATION',
+    'is_ui_project': False, 'design_approved': True,
+    'spec_hash': 'abc123def456',
     'plugin_gate_active': False, 'plugin_gate_missing': [],
-    'ui_flow_active': False, 'ui_sub_phase': None,
-    'ui_build_hash': None, 'ui_reviewed': False,
     'last_update': 1700000000
 }
 with open(path, 'w') as f:
@@ -29,9 +28,9 @@ assert_contains    "mcl-restart → MCL_RESTART_MODE"     "$_out" "MCL_RESTART_M
 # Verify state was reset by the hook.
 if [ -f "$_rs_dir/.mcl/state.json" ]; then
   _phase="$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('current_phase',9))" "$_rs_dir/.mcl/state.json" 2>/dev/null)"
-  _approved="$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get('spec_approved',True)).lower())" "$_rs_dir/.mcl/state.json" 2>/dev/null)"
-  assert_equals "mcl-restart → current_phase reset to 1"       "$_phase"    "1"
-  assert_equals "mcl-restart → spec_approved reset to false"   "$_approved" "false"
+  _approved="$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(str(d.get('design_approved',True)).lower())" "$_rs_dir/.mcl/state.json" 2>/dev/null)"
+  assert_equals "mcl-restart → current_phase reset to 1"        "$_phase"    "1"
+  assert_equals "mcl-restart → design_approved reset to false"  "$_approved" "false"
 fi
 
 cleanup_test_dir "$_rs_dir"

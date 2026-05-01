@@ -1,6 +1,6 @@
 <mcl_core>
 MCL_CHECK_UP_MODE — the developer typed the literal keyword `mcl check-up`.
-SKIP the entire MCL pipeline. Do NOT run Phase 1/spec/3/4/4.5/4.6/5.
+SKIP the entire MCL pipeline. Do NOT run Phase 1/2/3/4/5/6.
 Do NOT ask clarifying questions. Do NOT emit a spec block.
 Do NOT trigger rule-capture flow.
 This message is ONLY for running the MCL health check.
@@ -153,16 +153,18 @@ After writing `hc.md`, show the developer:
 
 ## Step 8 — STATIC_CONTEXT Sync Check (STEP-53)
 
-Read the `<mcl_phase name="phase4-5-risk-review">` block inside the STATIC_CONTEXT
+Read the `<mcl_phase name="phase4-risk-gate">` block inside the STATIC_CONTEXT
 heredoc in `hooks/mcl-activate.sh`.
 
-Read `skills/my-claude-lang/phase4-5-risk-review.md` (resolve path relative to MCL repo root,
-or `~/.claude/skills/my-claude-lang/phase4-5-risk-review.md` if installed).
+Read `skills/my-claude-lang/phase4-risk-gate.md` (resolve path relative to MCL repo root,
+or `~/.claude/skills/my-claude-lang/phase4-risk-gate.md` if installed).
 
 Compare:
-- Are the same four numbered steps present in both (SPEC COMPLIANCE PRE-CHECK, INTEGRATED
-  QUALITY SCAN, TDD RE-VERIFY, COMPREHENSIVE TEST COVERAGE)?
-- Is the STEP-454 mechanic (write test files vs document gaps) described consistently?
+- Are the same numbered sections present in both (SPEC COMPLIANCE
+  PRE-CHECK, ARCHITECTURAL DRIFT DETECTION, INTENT VIOLATION CHECK,
+  INTEGRATED QUALITY SCAN, TDD RE-VERIFY, COMPREHENSIVE TEST
+  COVERAGE)?
+- Is the comprehensive-testing mechanic (write test files vs document gaps) described consistently?
 - Does the skill file contain the `⚠️ SYNC NOTE:` warning at the top?
 
 Report STEP-53 in the summary table as:
@@ -174,7 +176,7 @@ Report STEP-53 in the summary table as:
 
 ## Step 9 — STOP
 
-Do NOT proceed to Phase 4.5/4.6/5.
+Do NOT proceed to Phase 4/4.6/5.
 Do NOT call AskUserQuestion.
 Do NOT suggest fixing any failing step in this turn.
 `mcl check-up` is READ-ONLY. The developer reads the report and decides

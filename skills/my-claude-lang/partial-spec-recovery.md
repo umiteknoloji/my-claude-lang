@@ -4,19 +4,19 @@
 
 Introduced in MCL 5.15.0; adapted to AskUserQuestion in 6.0.0.
 
-A Phase 2 `📋 Spec:` emission can be cut off mid-stream by a
-rate-limit, a network drop, or a process kill. Before 5.15.0, a
-follow-up `yes` from the developer would transition the MCL state
-machine to Phase 4 (EXECUTE) anyway — because the Stop hook's only
-input was a text marker, not the structural completeness of the
-spec body. A truncated spec could therefore be silently promoted to
-an approved spec, and the developer had no recourse short of a
-manual `rm .mcl/state.json`.
+A Phase 3 `📋 Spec:` documentation emission can be cut off
+mid-stream by a rate-limit, a network drop, or a process kill.
+Before this constraint, a truncated spec could be saved as
+documentation under `.mcl/specs/`, and downstream phases (Phase 4
+risk gate, Phase 6 promise-vs-delivery) would read an incomplete
+artifact. In MCL 10.0.0 the spec is documentation only — there is
+no spec-approval state transition to worry about — but a
+truncated spec is still a documentation defect and must be
+re-emitted in full.
 
 This constraint closes that hole by detecting structural
 truncation at the Stop-hook layer, raising a state flag, and
-instructing Claude to re-emit the full spec before any approval
-can take effect.
+instructing Claude to re-emit the full spec inline.
 
 ## Detection: Structural Completeness
 
@@ -66,39 +66,32 @@ in `hooks/lib/mcl-state.sh` — no custom helpers.
 
 ## Stop-Hook Transitions
 
-After the Stop hook extracts `SPEC_HASH`, and **before** the
-AskUserQuestion approval branch, it calls the partial-spec helper:
+After the Stop hook extracts `SPEC_HASH`, it calls the
+partial-spec helper:
 
 | helper rc | state transition                                    |
 | --------- | --------------------------------------------------- |
-| 0 (partial) | write `partial_spec=true`, `partial_spec_body_sha=<prefix>` |
+| 0 (partial) | write `partial_spec=true`, `partial_spec_body_sha=<prefix>`; emit `spec-format-warn` audit |
 | 1 (complete) | if `partial_spec=true` → clear both fields        |
 | 2 (no spec) | leave any existing flag alone                     |
 
-The AskUserQuestion approval branch early-returns (no phase
-transition, emits `askq-ignored-partial-spec` audit) when
-`partial_spec=true`, even if the developer picked an approve-family
-option. This is defense-in-depth alongside Claude's own recovery
-guidance.
+Spec-save is suppressed while `partial_spec=true` — the truncated
+body is not written to `.mcl/specs/` until the structural-
+completeness check passes on a later turn.
 
 ## Activate-Hook Recovery Audit
 
-When `mcl-activate` reads `partial_spec=true` from state, it injects
-an `<mcl_audit name="partial-spec-recovery">` block into
+When `mcl-activate` reads `partial_spec=true` from state, it
+injects an `<mcl_audit name="partial-spec-recovery">` block into
 `additionalContext` telling Claude to:
 
 1. Open with ONE localized line acknowledging the interruption.
 2. Re-emit the FULL `📋 Spec:` block from Phase 1 context —
    every required section present.
-3. NOT emit the legacy `✅ MCL APPROVED` text (dead in 6.0.0).
-4. End with a Phase 3 `AskUserQuestion` call (prefix
-   `MCL {{MCL_VERSION}} | `) asking for fresh spec approval, then STOP.
-   Note: the Stop hook IGNORES the tool_result while
-   `partial_spec=true` (emits `askq-ignored-partial-spec`). The
-   flag clears on the same turn if and only if the re-emitted
-   spec passes the structural-completeness check. The DEVELOPER
-   must approve again in the FOLLOWING turn, once the flag is
-   clear.
+3. Continue Phase 3 implementation in the same response. No askq
+   is involved — the spec is documentation, not a state gate.
+4. The flag clears on the same turn if and only if the re-emitted
+   spec passes the structural-completeness check.
 
 The audit repeats every turn until a structurally-complete spec
 clears the flag — this is a deliberate exception to the
@@ -113,8 +106,8 @@ recovered spec, every turn must carry the recovery instruction.
   sufficient; let the developer judge the content.
 - **Applying to non-spec turns**. The helper exits 2 when no
   `📋 Spec:` marker is present — there is nothing to check.
-- **Broadening to Phase 1 summaries**. This rule covers Phase 2
-  spec emissions only; Phase 1 truncation is handled by MCL's
-  normal "ask one question at a time" loop.
+- **Broadening to Phase 1 summaries**. This rule covers Phase 3
+  spec documentation emissions only; Phase 1 truncation is handled
+  by MCL's normal "ask one question at a time" loop.
 
 </mcl_constraint>

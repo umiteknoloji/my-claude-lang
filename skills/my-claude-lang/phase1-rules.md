@@ -72,18 +72,14 @@ AskUserQuestion({
 })
 ```
 
-The 3-option form is canonical since 6.5.2. `ui_flow_active` is
-NOT decided here — it is auto-detected at session activation by
-`mcl-activate.sh` running the stack heuristic
-(`mcl_is_ui_capable` in `hooks/lib/mcl-stack-detect.sh`). The
-heuristic returns true when the project has a UI surface
-(package.json + templates/, `src/components/**`, Django + templates/,
-Rails `app/views/`, root `index.html`, etc.) and false otherwise.
-The developer is never prompted about UI skip — if there is no UI
-surface, Phase 4a is silently bypassed and standard Phase 4 runs.
+The 3-option form is canonical. `is_ui_project` is detected in
+the brief parse (see "is_ui_project Detection" below) — it
+decides whether the developer's next gate is Phase 2 (design
+review, UI projects) or Phase 3 (implementation, non-UI
+projects).
 
 Reference approve/edit/cancel label triples (full 14-language set
-pinned in `phase3-verify.md` Label Discipline section):
+follows):
 
 | Locale | Approve    | Edit        | Cancel     |
 | ------ | ---------- | ----------- | ---------- |
@@ -109,13 +105,67 @@ the spec now." STOP and wait for the tool_result.
 
 5. If the tool_result is non-approve-family (edit/cancel/etc.) → ask
    "What did I get wrong?" and re-run gathering.
-6. **On approve (since 9.3.0).** Stop hook transitions state directly
-   to `current_phase=4` (EXECUTE) on summary-confirm approve. Phase 2
-   (SPEC_REVIEW) and Phase 3 (USER_VERIFY) are removed — summary-confirm
-   IS the gate. Next turn: model emits `📋 Spec:` documentation block
-   (per `phase-spec-doc.md`) AND begins Phase 4 code writing in the
-   same response. UI flow side effects (BUILD_UI sub-phase, rollback
-   checkpoint) fire here too.
+6. **On approve — PRIMARY developer-control gate.** Phase 1
+   summary-confirm IS the canonical intent gate. Spec approval
+   does NOT exist as a separate state transition; the spec block
+   is documentation emitted in Phase 3 (advisory format only).
+   The Stop hook routes the transition based on `is_ui_project`:
+   - `is_ui_project = true` → state transitions `current_phase = 2`
+     (Phase 2 Design Review). Next turn: model writes the UI
+     skeleton, starts the dev server, and calls the design askq
+     (see `phase2-design-review.md`).
+   - `is_ui_project = false` → state transitions `current_phase = 3`
+     (Phase 3 Implementation). Next turn: model emits the
+     `📋 Spec:` documentation block (per
+     `phase3-implementation.md`) and begins Phase 3 code writing
+     in the same response.
+   No intermediate "spec approval" askq fires in either path — the
+   developer's control was captured here at summary-confirm (and
+   later at Phase 2 design askq for UI projects).
+
+## is_ui_project Detection (brief parse)
+
+After Phase 1 summary-confirm approval and BEFORE the state
+transition to Phase 2 / Phase 3, the brief is parsed for a
+boolean `is_ui_project` flag. The flag drives which gate runs
+next:
+- `true` → Phase 2 (Design Review) is the next gate.
+- `false` → Phase 3 (Implementation) is the next gate.
+
+Detection rules (any positive signal flips the flag to `true`;
+all signals must be absent for `false`):
+
+1. **Intent keywords in the brief**: `panel`, `dashboard`,
+   `frontend`, `web`, `site`, `ui`, `form`, `page`, `admin`,
+   `interface`, `backoffice`. Match is case-insensitive and
+   substring; equivalents in the developer's language count too
+   (e.g. TR `panel`, `arayüz`, `sayfa`; ES `panel`, `interfaz`,
+   `página`).
+2. **Stack tags from `mcl-stack-detect.sh`**: any of
+   `react-frontend`, `vue-frontend`, `next`, `nuxt`, `svelte`,
+   `angular`, `html`, `vite`.
+3. **Project file hints**: `index.html` at repo root,
+   `package.json` containing a frontend dependency
+   (`react`, `vue`, `next`, `nuxt`, `svelte`, `@angular/core`,
+   `vite`).
+
+**Default if ambiguous**: `is_ui_project = true`. False-negative
+cost (a UI project skipping Phase 2 and writing logic against an
+unverified visual shape) is greater than false-positive cost (a
+non-UI project briefly entering Phase 2 and the developer
+clicking Cancel). Bias toward design review.
+
+State write at Phase 1 summary-confirm approval:
+
+```bash
+mcl_state_set is_ui_project true   # or false
+mcl_audit_log "is_ui_project_detected" "phase1" "value=true source=intent-keyword:dashboard"
+```
+
+The `source=` field carries the first signal that flipped the
+flag (intent-keyword:NAME / stack-tag:NAME / file-hint:PATH /
+ambiguous-default), used by `/mcl-checkup` and Phase 6 for
+auditability.
 
 ## Disambiguation Triage
 
@@ -154,9 +204,11 @@ Ask only when writing the spec is impossible without the answer:
 - Yes → assume silently, mark it.
 - No → ask.
 
-**Safety net:** Phase 3 spec review shows all assumptions. If an assumption
-was wrong, the developer corrects it there — before any code is written.
-This means a wrong silent assumption has zero implementation cost.
+**Safety net:** Phase 4 risk gate surfaces drift between the
+Phase 1 brief and Phase 3 code (Lens (e) Brief-Phase-1 Scope
+Drift, plus the new architectural-drift and intent-violation
+checks). If a silent assumption was wrong, drift detection
+surfaces it as a Phase 4 risk before the Verification Report.
 
 ## Question Flow Rule
 
@@ -319,7 +371,7 @@ After Phase 1 summary is approved (AskUserQuestion confirmed, developer
 accepted the captured intent / constraints / success / context), emit
 the following Bash commands BEFORE handing off to Phase 1.5/1.7. These
 populate state fields that downstream phases (Phase 1.7 ops/perf
-add-ons, Phase 4.5 ops/perf gates, Phase 6 promise-vs-delivery) rely on:
+add-ons, Phase 4 risk-gate ops/perf gates, Phase 6 promise-vs-delivery) rely on:
 
 ```bash
 bash -c '
@@ -355,9 +407,10 @@ forgotten, Phase 6 (a) reports a LOW soft fail.
 `phase1_stack_declared` is the **greenfield fallback** for
 `mcl-stack-detect.sh` — when the project has no manifest yet but the
 developer has stated the stack in Phase 1, downstream stack-add-on
-gates (Phase 1.7 DB / UI / ops / perf dimensions) read this field and
-apply the relevant rule subset. Without it, Phase 1.7 stack add-ons
-silently skip on greenfield projects.
+gates (Phase 1.7 DB / UI / ops / perf dimensions; Phase 4 risk-gate
+DB / UI / Security orchestrators) read this field and apply the
+relevant rule subset. Without it, stack add-ons silently skip on
+greenfield projects.
 
 `phase1_intent` and `phase1_constraints` are required by Phase 6 (c)
 promise-vs-delivery — keyword extraction reads these fields and
