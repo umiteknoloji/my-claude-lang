@@ -443,7 +443,7 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — reading MCL hook/lib/state files is blocked. The pipeline is healthy and self-managing; if a block fired (precision-audit / partial-spec / etc.), the only required action is to follow the block reason in your CURRENT response — not to debug the hook system. Allowed legitimate Phase 1.7 helpers: `bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect $(pwd)`, and skill-prose `bash -c \"source ... mcl-state.sh; mcl_state_set ...\"`. Everything else under ~/.mcl/ or ~/.claude/hooks/ is off-limits until Phase 4. Trust the pipeline or type /mcl-restart."
+        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — Bash debugging of MCL system files (cat / grep / find against ~/.mcl/lib/ or ~/.claude/hooks/) is blocked. ALLOWED for diagnostics: the current project .mcl/state.json, .mcl/audit.log, .mcl/trace.log, .mcl/debug.log via Read tool. Phase 1.7 helpers stay open: bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect $(pwd). STUCK? Type /mcl-restart to reset all phase state and try again from a clean slate."
     }
 }))
 ' 2>/dev/null
@@ -484,6 +484,18 @@ for k in ("file_path", "path", "pattern"):
         candidates.append(v)
 blob = "\n".join(candidates)
 
+# 10.0.3 (Bug 4 carve-out): Allow Read/Grep/Glob of the current
+# project diagnostic surface: .mcl/state.json, .mcl/audit.log,
+# .mcl/trace.log, .mcl/debug.log, .mcl/specs/. Blocking these traps
+# the developer when something goes wrong. The system-wide MCL state
+# under ~/.mcl/lib/ and ~/.mcl/projects/<sha>/state/ stays blocked.
+project_diag_re = re.compile(
+    r"(^|/)\.mcl/(state\.json|audit\.log|trace\.log|debug\.log|specs(/|$))"
+)
+if project_diag_re.search(blob):
+    print("")
+    sys.exit(0)
+
 patterns = [
     r"~/\.mcl(/|$|\b)",
     r"\$HOME/\.mcl(/|$|\b)",
@@ -514,7 +526,7 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — Read / Grep / Glob on MCL hook/lib/state paths is blocked. There is no legitimate Phase 1-3 reason to inspect `~/.mcl/lib/`, `~/.claude/hooks/`, or `~/.mcl/projects/<key>/state/`. If a block fired (precision-audit / partial-spec / etc.), follow the block reason in your CURRENT response. Trust the pipeline or type /mcl-restart."
+        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — Read / Grep / Glob on MCL system files (~/.mcl/lib/, ~/.claude/hooks/, ~/.mcl/projects/<key>/state/) is blocked. ALLOWED for diagnostics: the current project .mcl/state.json, .mcl/audit.log, .mcl/trace.log, .mcl/debug.log, .mcl/specs/ — read those instead. STUCK? Type /mcl-restart to reset all phase state and try again from a clean slate."
     }
 }))
 ' 2>/dev/null
@@ -1250,7 +1262,7 @@ _mcl_pre_is_approve_option() {
 #   6 FINAL_REVIEW    → all unlocked
 REASON=""
 if [ "$CURRENT_PHASE" -lt 2 ] 2>/dev/null; then
-  REASON="MCL: ${TOOL_NAME} blocked. phase=${CURRENT_PHASE} (Phase 1 INTENT). Phase 1 summary-confirm askq must be approved first; on approval phase advances to 2 (UI projects) or 3 (non-UI), mutating tools unlock."
+  REASON="MCL: ${TOOL_NAME} blocked. phase=${CURRENT_PHASE} (Phase 1 INTENT). Phase 1 summary-confirm must be approved first — emit a brief summary of intent, then wait for the developer approval (Onayla / evet / approve / yes); on approval the phase advances to 2 (UI projects) or 3 (non-UI) and Write/Edit unlock. STUCK? Read the current project .mcl/state.json and .mcl/audit.log for diagnostic context, or type /mcl-restart to reset all phase state."
 fi
 
 # -------- Branch: Phase 2 DESIGN_REVIEW path-exception --------

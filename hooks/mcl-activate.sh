@@ -15,7 +15,9 @@ _MCL_CWD_REAL="$(cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" 2>/dev/null && pwd || true)"
 _MCL_REPO_REAL="$(cd "$MCL_REPO_PATH" 2>/dev/null && pwd || true)"
 if [ -n "$_MCL_REPO_REAL" ] && [ "$_MCL_CWD_REAL" = "$_MCL_REPO_REAL" ]; then
   cat >/dev/null 2>&1 || true  # drain stdin
-  printf '{"hookSpecificOutput":{"additionalContext":""}}'
+  # 10.0.3 (Bug 1 fix): include hookEventName so Claude Code's
+  # UserPromptSubmit schema validator accepts the empty no-op response.
+  printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":""}}'
   exit 0
 fi
 

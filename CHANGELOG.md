@@ -7,6 +7,76 @@
 
 ## [Unreleased]
 
+## 10.0.3 — 2026-05-01
+
+### Fixed (4 critical real-session bugs)
+
+**Bug 1 — UserPromptSubmit JSON missing `hookEventName`:**
+The self-project guard early-exit emitted
+`{"hookSpecificOutput":{"additionalContext":""}}` without
+`hookEventName`, failing Claude Code's UserPromptSubmit schema
+validation. Fixed by including
+`"hookEventName":"UserPromptSubmit"` in that response.
+
+**Bug 2 (CRITICAL) — Phase 1 → 2/3 transition never fired:**
+Real Claude Code sessions ask Phase 1 clarifying questions in plain
+prose, not via the `AskUserQuestion` tool. The askq-scanner saw no
+approval token, so after the developer typed `evet` the state stayed
+at `current_phase=1` and Write/Edit stayed locked.
+
+Added a plain-text summary-confirm fallback in `mcl-stop.sh`:
+- Last assistant text must contain a summary marker (Özet:/Summary:/
+  Brief:/intent:/MUST:/SHOULD:/Acceptance Criteria/Edge Cases) or a
+  fenced ━━━ / ─── style separator.
+- Last user message must be a clean approve token (TR + EN whitelist:
+  `onayla`, `onaylıyorum`, `evet`, `kabul`, `tamam`, `olur`, `ok'le`,
+  `approve`, `yes`, `confirm`, `ok`, `okay`, `proceed`, `accept`),
+  ≤ 30 chars, no other content.
+- No AskUserQuestion already detected this turn.
+- → Synthesizes `ASKQ_INTENT="summary-confirm"` so the existing
+  Phase 1 → 2/3 transition branch fires. Audit:
+  `plaintext-summary-confirm-detected`.
+
+**Bug 3 — 📋 Spec emitted at `current_phase=1`:**
+The spec-emit branch silently no-op'd when phase < 3. Now Phase 1
+spec emission emits a `decision:block` citing premature emission and
+prescribing the correct flow (summary → approval → spec). Phase 2
+re-emits remain tolerated (design review iteration). Audit:
+`spec-emit-pre-phase3-block`.
+
+Also added an early Phase 1 → 2/3 transition in `mcl-stop.sh` that
+fires _before_ the spec-emit branch. When summary-confirm approval
+is detected this turn (askq OR plaintext) and `current_phase=1`,
+state advances first so the spec processes under the correct phase
+(no longer dropped silently).
+
+**Bug 4 — Hook blocks trapped the developer:**
+When Phase 1 blocked Write/Edit, Read of state files was also blocked
+and `/mcl-restart` was buried. Two carve-outs:
+- Read / Grep / Glob now allows the current project's
+  `.mcl/state.json`, `.mcl/audit.log`, `.mcl/trace.log`,
+  `.mcl/debug.log`, `.mcl/specs/` for diagnostics. The system-wide
+  MCL state under `~/.mcl/lib/` and `~/.mcl/projects/<sha>/state/`
+  stays blocked.
+- All four major Phase 1-3 block reasons (mutating-tool guard,
+  Bash-debug guard, Read/Grep/Glob hook-debug guard, design-review
+  gate) now lead with the `STUCK? Type /mcl-restart …` escape hatch.
+
+### Added
+- `tests/cases/test-real-session-plaintext-flow.sh` — full regression
+  test that mirrors the failing real-session transcript: prompt →
+  3 plain-text questions → answers → summary turn → developer types
+  `evet` → expect Phase 1 → 2 transition → expect frontend Write to
+  succeed → expect spec at phase=1 to block → expect Read of project
+  `.mcl/state.json` to be allowed → expect self-project guard JSON
+  to include `hookEventName`. All 4 bugs verified in one synthetic
+  fixture.
+
+### Test posture
+- 211 unit + 53 e2e PASS / 0 FAIL.
+
+---
+
 ## 10.0.2 — 2026-05-01
 
 ### Fixed

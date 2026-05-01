@@ -411,68 +411,106 @@ mcl_audit_log "askq-scanner-result" "mcl-stop" \
 # was detected AND current_phase=2 AND spec_hash is set, scan the most
 # recent USER message for approve-family text. If found, synthesize a
 # spec-approve intent so the phase-advance branch below fires.
+# 10.0.3 (Bug 2 fix): Plain-text approval fallback for Phase 1
+# summary-confirm. Real Claude Code sessions rarely emit clarifying
+# questions through the AskUserQuestion tool — instead the model asks
+# in plain prose. The askq-scanner sees no AskUserQuestion and the
+# Phase 1 → 2/3 transition never fires.
+#
+# Fallback rule (current_phase=1):
+#   - Last assistant text contains a summary marker
+#     (Özet:/Summary:/Brief:/intent:/MUST:/SHOULD:)
+#   - Last user message is a clean approve token (one of the
+#     TR + EN approve words, optionally with trailing punctuation)
+#   - No AskUserQuestion already detected this turn
+# → synthesize ASKQ_INTENT="summary-confirm" + ASKQ_SELECTED="<text>"
+# so the existing Phase 1 transition branch fires.
 _PLAINTEXT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-_PLAINTEXT_HASH="$(mcl_state_get spec_hash 2>/dev/null)"
-if [ "$ASKQ_INTENT" != "spec-approve" ] && \
-   [ "$_PLAINTEXT_PHASE" = "2" ] && \
-   [ -n "$_PLAINTEXT_HASH" ] && \
+if [ -z "$ASKQ_INTENT" ] && \
+   [ "$_PLAINTEXT_PHASE" = "1" ] && \
    [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] && \
    command -v python3 >/dev/null 2>&1; then
   _PT_RESULT="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
-import json, sys
+import json, re, sys
 
 path = sys.argv[1]
-approve_words = {
-    "onayla", "onaylıyorum", "onayliyorum", "onaylıyorum", "evet", "kabul", "tamam",
-    "approve", "yes", "confirm", "ok", "proceed", "accept",
-    "aprobar", "sí", "si", "confirmar",
-    "approuver", "oui", "confirmer",
-    "genehmigen", "bestätigen", "ja",
-    "承認", "はい", "確認", "了解",
-    "승인", "네", "확인", "예",
-    "批准", "是", "确认",
-    "موافق", "نعم",
-    "אשר", "כן",
-    "स्वीकार", "हाँ", "हां",
-    "setujui", "ya",
-    "aprovar", "sim",
-    "одобрить", "да",
+# 10.0.1 policy: TR + EN only.
+APPROVE_WORDS = {
+    "onayla", "onaylıyorum", "onayliyorum", "evet", "kabul", "tamam", "olur", "ok'le",
+    "approve", "yes", "confirm", "ok", "okay", "proceed", "accept",
 }
+SUMMARY_RE = re.compile(
+    r"(?:^|\n)\s*(?:[#*-]+\s*)?(?:📋\s*)?"
+    r"(?:Özet|Brief|Summary|Engineering Brief|İntent|Intent|MUST|SHOULD|"
+    r"Acceptance Criteria|Kabul Kriterleri|Edge Cases|Sınır Durumlar)",
+    re.MULTILINE,
+)
+SUMMARY_FENCE_RE = re.compile(r"━+|─+|─{3,}")
+
 last_user_text = None
+last_assistant_text = None
 try:
     with open(path, "r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
+        for raw in f:
+            raw = raw.strip()
+            if not raw:
                 continue
             try:
-                obj = json.loads(line)
+                obj = json.loads(raw)
             except Exception:
                 continue
             msg = obj if "role" in obj else obj.get("message", {})
             if not isinstance(msg, dict):
                 continue
-            if msg.get("role") == "user":
-                content = msg.get("content", "")
-                if isinstance(content, str):
-                    last_user_text = content.strip()
-                elif isinstance(content, list):
-                    parts = [b.get("text","") for b in content if isinstance(b,dict) and b.get("type")=="text"]
-                    last_user_text = " ".join(parts).strip()
+            role = msg.get("role")
+            content = msg.get("content", "")
+            text = ""
+            if isinstance(content, str):
+                text = content.strip()
+            elif isinstance(content, list):
+                parts = [b.get("text","") for b in content if isinstance(b,dict) and b.get("type")=="text"]
+                text = "\n".join(p for p in parts if p).strip()
+            if not text:
+                continue
+            if role == "user":
+                last_user_text = text
+            elif role == "assistant":
+                last_assistant_text = text
 except Exception:
     pass
 
-if last_user_text:
-    norm = last_user_text.lower().strip(" .,!?")
-    if norm in approve_words or any(norm.startswith(w) for w in approve_words):
-        print(f"approve|{last_user_text}")
+if not last_user_text or not last_assistant_text:
+    sys.exit(0)
+
+# Approve check on user message — must be a *clean* approve token, not
+# a sentence that happens to contain "evet". Allow trailing
+# punctuation but no other content.
+norm = last_user_text.lower().strip(" .,!?\n\t")
+if not norm:
+    sys.exit(0)
+if len(norm) > 30:
+    sys.exit(0)
+if norm not in APPROVE_WORDS and not any(
+    norm == w or norm.startswith(w + " ") or norm.startswith(w + ",")
+    for w in APPROVE_WORDS
+):
+    sys.exit(0)
+
+# Summary check on the immediately-preceding assistant turn — must
+# contain at least one summary section marker OR a fenced-summary
+# block (━━━ / ─── style), so a plain "yes" answer to a clarifying
+# question never fires this fallback.
+if not (SUMMARY_RE.search(last_assistant_text) or SUMMARY_FENCE_RE.search(last_assistant_text)):
+    sys.exit(0)
+
+print(f"approve|{last_user_text}")
 PYEOF
 )"
   if [ -n "$_PT_RESULT" ]; then
-    ASKQ_INTENT="spec-approve"
+    ASKQ_INTENT="summary-confirm"
     ASKQ_SELECTED="${_PT_RESULT#*|}"
-    mcl_audit_log "plaintext-approve-detected" "stop" "text=${ASKQ_SELECTED}"
-    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plaintext_approve_detected "${ASKQ_SELECTED}"
+    mcl_audit_log "plaintext-summary-confirm-detected" "stop" "text=${ASKQ_SELECTED}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plaintext_summary_confirm "${ASKQ_SELECTED}"
   fi
 fi
 
@@ -1462,6 +1500,38 @@ if [ -z "$SPEC_HASH" ] && [ -z "$ASKQ_INTENT" ]; then
 fi
 CURRENT_HASH="$(mcl_state_get spec_hash)"
 
+# 10.0.3 (Bug 2/3 fix): Early Phase 1 → 2/3 transition.
+# When summary-confirm approval (askq OR plaintext) is detected this
+# turn AND current_phase=1, advance the phase BEFORE the spec-emit
+# branch evaluates so the spec processes under the correct phase. This
+# fixes the real-session pattern where the model emits the spec in the
+# same turn as the approval response — without this, spec-emit ran
+# under phase=1 and silently no-op'd.
+if [ "$ASKQ_INTENT" = "summary-confirm" ] && [ "$CURRENT_PHASE" = "1" ] \
+   && command -v _mcl_is_approve_option >/dev/null 2>&1 \
+   && _mcl_is_approve_option "$ASKQ_SELECTED"; then
+  _SC_EARLY_IS_UI="$(mcl_state_get is_ui_project 2>/dev/null)"
+  mcl_state_set phase1_turn_count 0 >/dev/null 2>&1 || true
+  if [ "$_SC_EARLY_IS_UI" = "true" ]; then
+    mcl_state_set current_phase 2 >/dev/null 2>&1 || true
+    mcl_state_set phase_name '"DESIGN_REVIEW"' >/dev/null 2>&1 || true
+    mcl_state_set ui_flow_active true >/dev/null 2>&1 || true
+    mcl_state_set ui_sub_phase '"BUILD_UI"' >/dev/null 2>&1 || true
+    mcl_audit_log "phase-transition-to-design-review" "stop" "1->2 source=summary-confirm-early"
+    CURRENT_PHASE=2
+  else
+    mcl_state_set current_phase 3 >/dev/null 2>&1 || true
+    mcl_state_set phase_name '"IMPLEMENTATION"' >/dev/null 2>&1 || true
+    mcl_audit_log "phase-transition-to-implementation" "stop" "1->3 source=summary-confirm-early"
+    CURRENT_PHASE=3
+  fi
+  command -v mcl_trace_append >/dev/null 2>&1 && {
+    mcl_trace_append summary_confirm_advance "early"
+  }
+  # Mark as already-handled so the late summary-confirm branch skips.
+  _SC_ALREADY_ADVANCED=1
+fi
+
 # --- Spec emission as Phase 3 documentation artifact (since 10.0.0) ---
 # Phase model in 10.0.0: spec is documentation, not a state gate. Phase
 # 1→3 (non-UI) or Phase 1→2→3 (UI) transitions are askq-driven (handled
@@ -1474,11 +1544,29 @@ CURRENT_HASH="$(mcl_state_get spec_hash)"
 # additionalContext message — never a hard block.
 if [ -n "$SPEC_HASH" ]; then
   case "$CURRENT_PHASE" in
-    1|2)
-      # Spec emitted before Phase 3 — store the hash for reference but
-      # do NOT auto-advance. Phase advancement is askq-driven.
+    1)
+      # 10.0.3 (Bug 3 fix): Spec emission at phase=1 with no summary-
+      # confirm approval in flight is premature. Block the turn with
+      # guidance: complete Phase 1 first (summary + approval), then
+      # emit spec. /mcl-restart escape hatch always surfaced.
+      # Phase 2 spec re-emits are tolerated (design review iteration);
+      # the design-review-gate handles Phase 2 enforcement separately.
       mcl_state_set spec_hash "\"$SPEC_HASH\""
-      mcl_debug_log "stop" "spec-emit-pre-phase3-noop" "hash=${SPEC_HASH:0:12} phase=${CURRENT_PHASE}"
+      mcl_audit_log "spec-emit-pre-phase3-block" "stop" "hash=${SPEC_HASH:0:12} phase=${CURRENT_PHASE}"
+      mcl_debug_log "stop" "spec-emit-pre-phase3-block" "hash=${SPEC_HASH:0:12} phase=${CURRENT_PHASE}"
+      printf '%s\n' "{
+  \"decision\": \"block\",
+  \"reason\": \"MCL: Spec bloğu Phase 1 INTENT sırasında erken yayımlandı. Önce kısa bir özet emit et, geliştirici onayını bekle (Onayla / evet / approve / yes); onaylandığında state Phase 2 (UI projesi) veya Phase 3 (non-UI) seviyesine geçer ve spec aynı veya bir sonraki turda işlenir. STUCK? /mcl-restart komutu tüm phase state'i sıfırlar.\"
+}"
+      exit 0
+      ;;
+    2)
+      # Phase 2 DESIGN_REVIEW: spec re-emits are tolerated (model may
+      # iterate the spec while design askq is still pending). Stash
+      # the hash for reference; full processing happens once Phase 3
+      # entry fires via design askq approval.
+      mcl_state_set spec_hash "\"$SPEC_HASH\"" >/dev/null 2>&1 || true
+      mcl_debug_log "stop" "spec-emit-phase2-noop" "hash=${SPEC_HASH:0:12}"
       ;;
     3|4|5|6)
       # Spec emitted at Phase 3+ entry — record hash, extract scope,
