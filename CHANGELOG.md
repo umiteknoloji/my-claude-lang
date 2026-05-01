@@ -7,6 +7,61 @@
 
 ## [Unreleased]
 
+## 10.0.4 — 2026-05-01
+
+### Fixed (Phase 1 transition false-positives)
+
+**Bug A — Approve check accepted "evet, ama X" sentences:**
+The Python plaintext-fallback approve check in `mcl-stop.sh` used
+`startswith(w + " ")` and `startswith(w + ",")` branches that
+accepted user messages like `evet, ama X de ekle` (TR: "yes, but
+add X") as clean approve tokens. The user's "but X" intent was
+silently dropped and state advanced to Phase 2 anyway. The 30-char
+limit didn't save short prompts.
+
+Fixed by removing the loose `startswith` branches — only exact
+match (after the existing trailing-punct strip) now qualifies.
+
+Defense-in-depth: the Bash `_mcl_is_approve_option` helper used by
+the AskUserQuestion tool-result path was tightened from
+`*pattern*` glob to exact-match with lead/trail whitespace+punct
+stripping.
+
+**Bug C (NEW) — No cancel-path rollback once Phase 2/3 reached:**
+Once state advanced to Phase 2 or 3, plain-text user messages
+like `iptal`, `geri al`, `cancel`, `undo` were no-ops. The user
+had no recovery from a premature transition without
+`/mcl-restart`.
+
+Added a new branch in `mcl-stop.sh`: when `current_phase > 1` AND
+the last user message is a clean cancel token (TR + EN: `iptal`,
+`iptal et`, `geri al`, `yanlış`, `yanlis`, `vazgeç`, `vazgec`,
+`cancel`, `undo`, `revert`, `abort`) using approval-style
+tightening (≤30 chars, exact match after lowercase + lead/trail
+strip), state rolls back to Phase 1 (INTENT) and all Phase 2+
+flags clear: `design_approved`, `ui_flow_active`, `ui_reviewed`,
+`risk_accepted`, `spec_gate_passed`, all `phase4_*_scan_done`,
+`phase6_double_check_done`, `pattern_scan_due`,
+`phase1_turn_count`. Audit: `phase-rollback-via-cancel`.
+
+### Plan-critique
+Devtime plan-critique subagent (Sonnet 4.6, 10 lenses) caught an
+initial misdiagnosis: an earlier scope claimed `SUMMARY_RE`
+lacked a line-anchor. Verification showed
+`(?:^|\n)\s*(?:[#*-]+\s*)?(?:📋\s*)?` prefix already exists. That
+patch was discarded; only Bug A and Bug C remain.
+
+### Notes
+- Regression test deliberately skipped per developer decision;
+  pre-commit smoke (`python3 -c` + `bash -c`, 25 inputs total)
+  verified exact-match tightening, multi-word rejection, and
+  TR/EN cancel tokens.
+- Self-project guard blocks MCL pipeline activation in
+  `my-claude-lang` itself, so dogfood verification of these
+  patches must run from a separate project directory.
+
+---
+
 ## 10.0.3 — 2026-05-01
 
 ### Fixed (4 critical real-session bugs)

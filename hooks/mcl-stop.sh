@@ -490,10 +490,7 @@ if not norm:
     sys.exit(0)
 if len(norm) > 30:
     sys.exit(0)
-if norm not in APPROVE_WORDS and not any(
-    norm == w or norm.startswith(w + " ") or norm.startswith(w + ",")
-    for w in APPROVE_WORDS
-):
+if norm not in APPROVE_WORDS:
     sys.exit(0)
 
 # Summary check on the immediately-preceding assistant turn — must
@@ -516,14 +513,18 @@ fi
 
 # Helper: is $1 an "approve family" option string?
 # 10.0.1: TR + EN only (the two languages MCL officially supports).
+# 10.0.4: glob *pattern* tightened to exact-match (lead/trail
+# whitespace+punct stripped). Plaintext fallback path is upstream-
+# guarded in the Python block; this is defense-in-depth for the
+# AskUserQuestion tool-result path.
 _mcl_is_approve_option() {
   local raw="$1"
   [ -z "$raw" ] && return 1
   local norm
-  norm="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  norm="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:].,!?]+//; s/[[:space:].,!?]+$//')"
   case "$norm" in
-    *onayla*|*onaylıyorum*|*evet*|*kabul*|*tamam*) return 0 ;;
-    *approve*|*yes*|*confirm*|*ok*|*proceed*|*accept*) return 0 ;;
+    onayla|onaylıyorum|onayliyorum|evet|kabul|tamam|olur|"ok'le") return 0 ;;
+    approve|yes|confirm|ok|okay|proceed|accept) return 0 ;;
   esac
   return 1
 }
@@ -1827,6 +1828,92 @@ if [ "$ASKQ_INTENT" = "design-review" ] || [ "$ASKQ_INTENT" = "ui-review" ]; the
     fi
   else
     mcl_audit_log "design-review-stray" "stop" "phase=${_DR_CUR_PHASE} selected=${ASKQ_SELECTED}"
+  fi
+fi
+
+# --- Phase 2/3 → Phase 1 cancel-path rollback (since 10.0.4) ---
+# Plain-text cancel intent: when current_phase > 1 AND last user message
+# is a clean cancel token (TR + EN: iptal, geri al, yanlış, vazgeç,
+# cancel, undo, revert, abort), reset state to Phase 1 and clear all
+# Phase 2+ flags. Approval-style tightening (≤30 chars, exact match
+# after lowercase + lead/trail strip) prevents false-positives like
+# "geri al feature X" matching as cancel intent.
+_CP_CUR_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+if [ -n "$_CP_CUR_PHASE" ] && [ "$_CP_CUR_PHASE" != "1" ] && [ "$_CP_CUR_PHASE" != "0" ] && \
+   [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] && \
+   command -v python3 >/dev/null 2>&1; then
+  _CP_RESULT="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
+import json, sys
+
+path = sys.argv[1]
+CANCEL_WORDS = {
+    "iptal", "iptal et", "geri al", "yanlış", "yanlis", "vazgeç", "vazgec",
+    "cancel", "undo", "revert", "abort",
+}
+
+last_user_text = None
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+            except Exception:
+                continue
+            msg = obj if "role" in obj else obj.get("message", {})
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role")
+            content = msg.get("content", "")
+            text = ""
+            if isinstance(content, str):
+                text = content.strip()
+            elif isinstance(content, list):
+                parts = [b.get("text","") for b in content if isinstance(b,dict) and b.get("type")=="text"]
+                text = "\n".join(p for p in parts if p).strip()
+            if not text:
+                continue
+            if role == "user":
+                last_user_text = text
+except Exception:
+    pass
+
+if not last_user_text:
+    sys.exit(0)
+
+norm = last_user_text.lower().strip(" .,!?\n\t")
+if not norm or len(norm) > 30:
+    sys.exit(0)
+if norm not in CANCEL_WORDS:
+    sys.exit(0)
+
+print(f"cancel|{last_user_text}")
+PYEOF
+)"
+  if [ -n "$_CP_RESULT" ]; then
+    _CP_TOKEN="${_CP_RESULT#*|}"
+    mcl_state_set current_phase 1
+    mcl_state_set phase_name '"INTENT"'
+    mcl_state_set design_approved false >/dev/null 2>&1 || true
+    mcl_state_set ui_flow_active false >/dev/null 2>&1 || true
+    mcl_state_set ui_sub_phase '"BUILD_UI"' >/dev/null 2>&1 || true
+    mcl_state_set ui_reviewed false >/dev/null 2>&1 || true
+    mcl_state_set risk_accepted false >/dev/null 2>&1 || true
+    mcl_state_set spec_gate_passed false >/dev/null 2>&1 || true
+    mcl_state_set phase4_security_scan_done false >/dev/null 2>&1 || true
+    mcl_state_set phase4_db_scan_done false >/dev/null 2>&1 || true
+    mcl_state_set phase4_ui_scan_done false >/dev/null 2>&1 || true
+    mcl_state_set phase4_ops_scan_done false >/dev/null 2>&1 || true
+    mcl_state_set phase6_double_check_done false >/dev/null 2>&1 || true
+    mcl_state_set pattern_scan_due false >/dev/null 2>&1 || true
+    mcl_state_set phase1_turn_count 0 >/dev/null 2>&1 || true
+    mcl_audit_log "phase-rollback-via-cancel" "stop" "from=${_CP_CUR_PHASE} token=${_CP_TOKEN}"
+    mcl_debug_log "stop" "phase-rollback-via-cancel" "from=${_CP_CUR_PHASE} token=${_CP_TOKEN}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_rollback_cancel "${_CP_CUR_PHASE}->1"
+    command -v mcl_log_append >/dev/null 2>&1 && \
+      mcl_log_append "İptal alındı. Faz ${_CP_CUR_PHASE} → 1 (INTENT) geri dönüş."
   fi
 fi
 

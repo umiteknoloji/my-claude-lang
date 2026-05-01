@@ -64,6 +64,8 @@ Yalnızca iki askq onay noktası vardır:
 1. **Phase 1 summary-confirm** — geliştirici intent / constraints / success / context özetini onaylar. Kanonik scope kontratı budur. Ayrı bir spec onayı yoktur.
 2. **Phase 2 tasarım onayı** — yalnızca UI projeleri. Tıklanabilir iskelet + dev server çalıştıktan sonra MCL "Tasarımı onaylıyor musun?" / "Approve this design?" sorusunu sorar. Onay `state.design_approved=true` set eder ve Phase 3'e geçirir.
 
+Onay ve iptal token'ları katı eşleştirilir: yalnızca tam token'lar (lowercase + ön/son boşluk+noktalama strip sonrası) kabul edilir. `evet`, `Evet.`, `yes` kabul edilir; `evet, ama X de ekle` (ek niyet taşıyan) ve çok-kelimeli ifadeler reddedilir — geliştiricinin `ama X` niyeti, approve-fallback tarafından sessizce yutulmak yerine korunur. Phase 2 veya Phase 3'ten temiz bir iptal token'ı (`iptal`, `geri al`, `yanlış`, `vazgeç`, `cancel`, `undo`, `revert`, `abort`) yazılırsa state Phase 1'e (INTENT) geri döner ve tüm Phase 2+ flag'leri (`design_approved`, scan-done flag'leri vb.) temizlenir — uçuş halindeki rollback için `/mcl-restart` gerekmez.
+
 Phase 3'ün `📋 Spec:` bloğu **dokümantasyondur** — implementation fazının entry artifact'i, scope guard için `state.scope_paths`'i doldurur ve İngilizce olmayan prompt'lar için İngilizce semantic bridge görevi görür. Format ihlalleri advisory'dir: hook `spec-format-warn` audit yazar ve devam eder; tur boyunca 3+ ihlal Phase 6 LOW soft fail tetikler, hiçbir zaman Write blok'u değil.
 
 ### `is_ui_project` tespiti

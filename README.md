@@ -64,6 +64,8 @@ There are exactly two askq approval gates:
 1. **Phase 1 summary-confirm** — the developer confirms the intent / constraints / success / context summary. This is the canonical scope contract. There is no separate spec-approval step.
 2. **Phase 2 design approval** — UI projects only. After the clickable skeleton + dev server are running, MCL asks "Approve this design?" / "Tasarımı onaylıyor musun?". Approval sets `state.design_approved=true` and advances to Phase 3.
 
+Approve and cancel tokens are matched strictly: only exact tokens (after lowercase + lead/trail whitespace+punct strip) qualify. `evet`, `Evet.`, `yes` are accepted; `evet, ama X de ekle` (carrying additional intent) and multi-word phrases are rejected — the developer's `but X` intent is preserved instead of being silently swallowed by an approve-fallback. From Phase 2 or Phase 3, typing a clean cancel token (`iptal`, `geri al`, `yanlış`, `vazgeç`, `cancel`, `undo`, `revert`, `abort`) rolls state back to Phase 1 (INTENT) and clears all Phase 2+ flags (`design_approved`, scan-done flags, etc.) — no `/mcl-restart` needed for in-flight rollback.
+
 Phase 3's `📋 Spec:` block is **documentation** — it is the entry artifact for the implementation phase, populates `state.scope_paths` for the scope guard, and provides an English semantic bridge for non-English prompts. Format violations are advisory: the hook emits a `spec-format-warn` audit and continues; 3+ violations across turns trigger a Phase 6 LOW soft fail, never a Write block.
 
 ### `is_ui_project` detection
