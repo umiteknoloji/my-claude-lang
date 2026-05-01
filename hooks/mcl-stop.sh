@@ -316,13 +316,8 @@ fi
 # 10.0.0: spec format violations are advisory regardless of phase.
 # Detection still runs to surface format issues via `spec-format-warn`
 # audit, but emits NO decision:block — Phase 1 summary-confirm is the
-# canonical developer-control gate, not spec format. The detector is
-# also gated by MCL_MINIMAL_CORE=1 (skip entirely) so very lean
-# deployments stay quiet.
+# canonical developer-control gate, not spec format.
 _PS_PHASE_PRE="$(mcl_state_get current_phase 2>/dev/null)"
-if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  : # minimal-core — spec format detection skipped
-else
 PARTIAL_MISSING="$(bash "$_MCL_HOOK_DIR/lib/mcl-partial-spec.sh" check "$TRANSCRIPT_PATH" 2>/dev/null)"
 PARTIAL_RC=$?
 PARTIAL_STATE="$(mcl_state_get partial_spec 2>/dev/null)"
@@ -367,7 +362,6 @@ case "$PARTIAL_RC" in
     :
     ;;
 esac
-fi  # end partial-spec advisory block (9.3.0: minimal-core skip only)
 
 # --- AskUserQuestion approval scanner (shared lib since 6.5.6) ---
 # The scanner lives at hooks/lib/mcl-askq-scanner.py. Stop and PreToolUse
@@ -483,35 +477,23 @@ PYEOF
 fi
 
 # Helper: is $1 an "approve family" option string?
-# Lowercase substring match on a fixed 14-language whitelist.
+# 10.0.1: TR + EN only (the two languages MCL officially supports).
 _mcl_is_approve_option() {
   local raw="$1"
   [ -z "$raw" ] && return 1
   local norm
   norm="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
   case "$norm" in
-    *onayla*|*onaylıyorum*|*onaylıyorum*|*evet*|*kabul*|*tamam*) return 0 ;;
+    *onayla*|*onaylıyorum*|*evet*|*kabul*|*tamam*) return 0 ;;
     *approve*|*yes*|*confirm*|*ok*|*proceed*|*accept*) return 0 ;;
-    *aprobar*|*sí*|*si*|*confirmar*) return 0 ;;
-    *approuver*|*oui*|*confirmer*) return 0 ;;
-    *genehmigen*|*bestätigen*|*ja*) return 0 ;;
-    *承認*|*はい*|*確認*|*了解*) return 0 ;;
-    *승인*|*네*|*확인*|*예*) return 0 ;;
-    *批准*|*是*|*确认*) return 0 ;;
-    *موافق*|*نعم*|*تأكيد*) return 0 ;;
-    *אשר*|*כן*|*אישור*) return 0 ;;
-    *स्वीकार*|*हाँ*|*हां*) return 0 ;;
-    *setujui*|*ya*|*konfirmasi*) return 0 ;;
-    *aprovar*|*sim*|*confirmar*) return 0 ;;
-    *одобрить*|*да*|*подтвердить*) return 0 ;;
   esac
   return 1
 }
 
-# Helper: does the selected option on the Phase 4b ui-review askq ask
-# MCL to visually inspect the built UI itself (opt-in vision loop)?
-# Returns 0 when the developer picks the "see and report back yourself"
-# option. 14-language substring match via direct UTF-8 characters.
+# Helper: does the selected option on the design askq ask MCL to
+# visually inspect the built UI itself (opt-in vision loop)? Returns 0
+# when the developer picks the "see and report back yourself" option.
+# 10.0.1: TR + EN only.
 _mcl_is_vision_request_option() {
   local raw="$1"
   [ -z "$raw" ] && return 1
@@ -520,18 +502,6 @@ _mcl_is_vision_request_option() {
   case "$norm" in
     *"sen de bak"*|*"kendin bak"*|*"kendin gör"*) return 0 ;;
     *"see it yourself"*|*"look yourself"*|*"inspect yourself"*|*"you look"*) return 0 ;;
-    *"míralo tú"*|*"revisa tú mismo"*) return 0 ;;
-    *"regarde toi-même"*|*"inspecte toi-même"*) return 0 ;;
-    *"schau selbst"*|*"selbst prüfen"*) return 0 ;;
-    *"自分で確認"*|*"自分で見"*) return 0 ;;
-    *"직접 확인"*|*"직접 보"*) return 0 ;;
-    *"你自己看"*|*"自己检查"*) return 0 ;;
-    *"تحقق بنفسك"*) return 0 ;;
-    *"תבדוק בעצמך"*) return 0 ;;
-    *"खुद देखें"*) return 0 ;;
-    *"lihat sendiri"*|*"cek sendiri"*) return 0 ;;
-    *"veja você mesmo"*|*"inspecione você"*) return 0 ;;
-    *"посмотри сам"*|*"проверь сам"*) return 0 ;;
   esac
   return 1
 }
@@ -936,9 +906,6 @@ print("\\n".join(lines))
 
       # ---- Phase 4 START Ops gate (since 8.13.0) ----
       _OPS_MEDIUM_PROSE=""
-      if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-        mcl_state_set phase4_ops_scan_done true >/dev/null 2>&1 || true
-      else
       _OPS_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-ops-scan.py"
       _OPS_SCAN_DONE="$(mcl_state_get phase4_ops_scan_done 2>/dev/null)"
       if [ -f "$_OPS_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
@@ -1011,14 +978,10 @@ for f in med[:8]:
 print("\\n".join(lines))
 ' 2>/dev/null)"
       fi
-      fi # end Ops gate (MCL_MINIMAL_CORE guard)
       # ---- end Ops gate ----
 
       # ---- Phase 4 START Perf gate (since 8.14.0) ----
       _PERF_MEDIUM_PROSE=""
-      if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-        mcl_state_set phase4_perf_scan_done true >/dev/null 2>&1 || true
-      else
       _PERF_FULL_LIB="$_MCL_HOOK_DIR/lib/mcl-perf-scan.py"
       _PERF_SCAN_DONE="$(mcl_state_get phase4_perf_scan_done 2>/dev/null)"
       if [ -f "$_PERF_FULL_LIB" ] && command -v python3 >/dev/null 2>&1 \
@@ -1101,13 +1064,11 @@ print("\\n".join(lines))
 ' 2>/dev/null)"
         fi
       fi
-      fi # end Perf gate (MCL_MINIMAL_CORE guard)
       # ---- end Perf gate ----
 
       # ---- Phase 4 architectural drift + intent violation (since 9.3.0) ----
       # Advisory only — emits audit entries but does not block. Helps
       # /mcl-finish + Phase 6 surface scope-creep and intent-mismatch.
-      if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
         _DRIFT_LIB="$_MCL_HOOK_DIR/lib/mcl-drift-scan.py"
         if [ -f "$_DRIFT_LIB" ] && command -v python3 >/dev/null 2>&1 \
            && [ -n "${MCL_STATE_DIR:-}" ] && [ -n "${TRANSCRIPT_PATH:-}" ]; then
@@ -1131,12 +1092,10 @@ print("\\n".join(lines))
             mcl_audit_log "phase4-intent-violation" "mcl-stop" "count=${_IV_COUNT} rules=${_IV_RULES}"
           fi
         fi
-      fi
       # ---- end drift + intent violation scan ----
 
       # ---- Phase 4 START test-coverage lens (since 8.19.0) ----
       _TEST_MEDIUM_PROSE=""
-      if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
       # Surfaces missing test categories (unit/integration/e2e/load) as
       # MEDIUM findings the model must thread into the sequential
       # dialog. Unlike security/db/ui/ops/perf gates, test coverage
@@ -1178,7 +1137,6 @@ for f in findings[:8]:
 print("\\n".join(lines))
 ' 2>/dev/null)"
       fi
-      fi # end test-coverage lens (MCL_MINIMAL_CORE guard)
       # ---- end test-coverage lens ----
 
       # 8.19.0: emit the standard Phase 4 reminder ONLY when the model
@@ -1877,8 +1835,7 @@ fi
 #   - is_ui_project = true (or ui_flow_active=true legacy alias)
 #   - At least 1 frontend file written this session
 #   - No design-review askq in transcript
-if [ "${MCL_MINIMAL_CORE:-0}" != "1" ] \
-   && [ "$CURRENT_PHASE" = "2" ]; then
+if [ "$CURRENT_PHASE" = "2" ]; then
   _UI_GATE_DA="$(mcl_state_get design_approved 2>/dev/null)"
   _UI_GATE_IS_UI="$(mcl_state_get is_ui_project 2>/dev/null)"
   _UI_GATE_FLOW="$(mcl_state_get ui_flow_active 2>/dev/null)"
@@ -1990,7 +1947,6 @@ _PHASE6_DONE="$(mcl_state_get phase6_double_check_done 2>/dev/null)"
 _PHASE6_REVIEW_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
 _PHASE6_CUR="$(mcl_state_get current_phase 2>/dev/null)"
 if [ -f "$_PHASE6_LIB" ] && command -v python3 >/dev/null 2>&1 \
-   && [ "${MCL_MINIMAL_CORE:-0}" != "1" ] \
    && [ -n "${MCL_STATE_DIR:-}" ] && [ "$_PHASE6_DONE" != "true" ] \
    && { [ "$_PHASE6_REVIEW_STATE" = "running" ] || [ "$_PHASE6_CUR" = "4" ]; }; then
   # Trigger detection (hybrid): phase5-verify audit event present OR
@@ -1999,7 +1955,7 @@ if [ -f "$_PHASE6_LIB" ] && command -v python3 >/dev/null 2>&1 \
   if [ -f "$MCL_STATE_DIR/audit.log" ] && grep -q "phase5-verify" "$MCL_STATE_DIR/audit.log" 2>/dev/null; then
     _PHASE6_TRIGGER=1
   elif [ -n "${TRANSCRIPT_PATH:-}" ] && [ -f "$TRANSCRIPT_PATH" ] \
-       && grep -lE "(Verification Report|Doğrulama Raporu|Rapport de Vérification|Verifizierungsbericht|Informe de Verificación|検証レポート|검증 보고서|验证报告|تقرير التحقق|דוח אימות|सत्यापन रिपोर्ट|Laporan Verifikasi|Relatório de Verificação|Отчёт о проверке)" "$TRANSCRIPT_PATH" >/dev/null 2>&1; then
+       && grep -lE "(Verification Report|Doğrulama Raporu)" "$TRANSCRIPT_PATH" >/dev/null 2>&1; then
     _PHASE6_TRIGGER=1
   fi
   if [ "$_PHASE6_TRIGGER" = "1" ]; then

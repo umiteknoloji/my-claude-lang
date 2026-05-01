@@ -103,7 +103,7 @@ Skip impossible: state field `phase6_double_check_done` enforced via `decision:b
 ## Feature catalog
 
 ### Language bridge
-Detects the developer's language from the first message, keeps every clarifying question, risk dialog, verification report, and section header in that language. Internal engineering output (specs, code, technical tokens) stays English. 14 languages supported (TR / EN / AR / DE / ES / FR / HE / HI / ID / JA / KO / PT / RU / ZH); TR + EN fully localized for tooling output.
+Detects the developer's language from the first message, keeps every clarifying question, risk dialog, verification report, and section header in that language. Internal engineering output (specs, code, technical tokens) stays English. TR + EN supported. All section headers, audit messages, and skill prose are localized for these two languages only.
 
 ### Per-project isolation
 MCL writes **zero files into your project**. State, hooks, skills, agents, audit logs, scan caches, dev-server logs — everything lives in `~/.mcl/projects/<key>/`. Per-project keys are SHA1 of `realpath($PWD)`, so renames lose state (intentional, no migration). Multiple projects work in parallel without state collision.
@@ -205,7 +205,7 @@ Detection informs add-on selection; it never gates the core pipeline.
 - **Headless `/mcl-ui-axe`, `/mcl-perf-lighthouse`, and `/mcl-db-explain`** require explicit env vars (`MCL_UI_URL` for axe + Lighthouse, `MCL_DB_URL` for DB EXPLAIN); skip with localized advisory otherwise.
 - **Bundle size** measured from existing build output only — `npm run build` is not invoked automatically.
 - **External tool delegates** (Semgrep, squawk, hadolint, eslint-plugin-jsx-a11y, `axe-core`, Playwright, `pip-audit`, `cargo-audit`, `govulncheck`, `bundle-audit`) gracefully skip when binaries are missing.
-- **14 languages supported, but only TR + EN are fully localized for tool reports.** Others fall back to English for scan output (clarifying questions and risk dialog still respect the developer's language).
+- **TR + EN only.** Other languages are out of scope; if the developer writes in a third language MCL asks once whether to continue in Turkish or English.
 - **N+1 detection is static-only**; runtime profiling deferred.
 
 For full per-version detail, see [CHANGELOG.md](CHANGELOG.md).

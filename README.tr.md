@@ -103,7 +103,7 @@ Skip imkânsız: state field `phase6_double_check_done` `decision:block` ile enf
 ## Özellik kataloğu
 
 ### Dil köprüsü
-İlk mesajdan geliştiricinin dilini tespit eder; her clarifying question, risk dialog, doğrulama raporu, section başlığı o dilde kalır. İç mühendislik çıktısı (spec, kod, teknik token) İngilizce. 14 dil desteği (TR / EN / AR / DE / ES / FR / HE / HI / ID / JA / KO / PT / RU / ZH); araç çıktıları için TR + EN tam lokalize.
+İlk mesajdan geliştiricinin dilini tespit eder; her clarifying question, risk dialog, doğrulama raporu, section başlığı o dilde kalır. İç mühendislik çıktısı (spec, kod, teknik token) İngilizce. TR + EN destekli. Tüm section başlıkları, audit mesajları ve skill prose bu iki dil için lokalize.
 
 ### Per-project izolasyon
 MCL projene **sıfır dosya yazar**. State, hook, skill, agent, audit log, scan cache, dev-server log — her şey `~/.mcl/projects/<key>/` altında. Project key'ler `realpath($PWD)` SHA1; rename'de state kaybolur (kasıtlı, migration yok).
@@ -205,7 +205,7 @@ Tespit add-on seçimini bilgilendirir; core pipeline'ı asla gate'lemez.
 - **Headless `/mcl-ui-axe`, `/mcl-perf-lighthouse` ve `/mcl-db-explain`** explicit env var gerektirir (`MCL_UI_URL` axe + Lighthouse arasında shared; `MCL_DB_URL` DB EXPLAIN).
 - **Bundle size** sadece mevcut build çıktısından ölçülür — `npm run build` otomatik invoke edilmez.
 - **External tool delegate'leri** (Semgrep, squawk, hadolint, eslint-plugin-jsx-a11y, `axe-core`, Playwright, `pip-audit`, `cargo-audit`, `govulncheck`, `bundle-audit`) binary yoksa graceful skip.
-- **14 dil destekli, ama tool raporları için sadece TR + EN tam lokalize.** Diğerleri scan çıktısı için İngilizce fallback.
+- **Sadece TR + EN.** Üçüncü bir dilde mesaj gelirse MCL tek seferde Türkçe ya da İngilizce devam etmek isteyip istemediğini sorar.
 - **N+1 detection statik-only**; runtime profiling ertelendi.
 
 Sürüm-bazlı tam ayrıntı için: [CHANGELOG.md](CHANGELOG.md).

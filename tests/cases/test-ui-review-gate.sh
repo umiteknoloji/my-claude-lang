@@ -11,14 +11,10 @@
 # server but does NOT call AskUserQuestion → Stop hook injects
 # guidance demanding the design askq.
 #
-# Skipped under MCL_MINIMAL_CORE=1 (UI gate is non-essential there).
+# 
 
 echo "--- test-ui-review-gate ---"
 
-if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  printf '  SKIP: ui-review-gate disabled (MCL_MINIMAL_CORE=1)\n'
-  return 0 2>/dev/null || true
-fi
 
 _ur_proj="$(setup_test_dir)"
 

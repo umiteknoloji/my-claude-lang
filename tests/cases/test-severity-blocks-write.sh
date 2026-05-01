@@ -1,13 +1,9 @@
 #!/bin/bash
 # Test: HIGH-severity findings (security/db/ui) block individual writes
-# at the pre-tool layer in DEFAULT mode. Skipped under MCL_MINIMAL_CORE=1.
+# at the pre-tool layer.
 
 echo "--- test-severity-blocks-write ---"
 
-if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  printf '  SKIP: severity-blocks-write disabled (MCL_MINIMAL_CORE=1)\n'
-  return 0 2>/dev/null || true
-fi
 
 _sb_proj="$(setup_test_dir)"
 _sb_state="$_sb_proj/.mcl/state.json"

@@ -24,7 +24,7 @@ Phase 1 ──onay──▶ [Phase 2 (is_ui_project ise)] ──onay──▶ Ph
 ```
 
 ### Dil Köprüsü
-- Tüm iletişim geliştiricinin dilinde (14 dil: TR, EN, AR, DE, ES, FR, HE, HI, ID, JA, KO, PT, RU, ZH)
+- Tüm iletişim geliştiricinin dilinde (TR + EN destekli)
 - Spec ve kod İngilizce — model her zaman İngilizce mühendislik çıktısı üretir
 - Dil otomatik tespiti — ilk mesajdan belirlenir, sonraki tüm fazlarda korunur
 
@@ -338,7 +338,7 @@ Pre-tool, general-purpose+sonnet Task'ı yakaladığında transcript'i tarayıp 
 Cross-session bilgi köprüsü: `mcl-stop.sh` her Stop'ta `.mcl/session-context.md` yazar. Yeni session başında `mcl-activate.sh` dosyayı okur ve `SESSION_CONTEXT_NOTICE` olarak `additionalContext`'e enjekte eder.
 
 ### Root Cause Chain Discipline
-Plan-mode + all-mode keyword scan: 14 dilli (TR/EN/ES/FR/DE/JA/KO/ZH/AR/HE/HI/ID/PT/RU) heuristik trigger keyword seti. Eksikse audit'e `root-cause-chain-skipped-warn` yazılır.
+Plan-mode + all-mode keyword scan: TR + EN heuristik trigger keyword seti. Eksikse audit'e `root-cause-chain-skipped-warn` yazılır.
 
 ---
 

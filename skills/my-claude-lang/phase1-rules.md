@@ -78,7 +78,7 @@ decides whether the developer's next gate is Phase 2 (design
 review, UI projects) or Phase 3 (implementation, non-UI
 projects).
 
-Reference approve/edit/cancel label triples (full 14-language set
+Reference approve/edit/cancel label triples (TR + EN
 follows):
 
 | Locale | Approve    | Edit        | Cancel     |

@@ -9,10 +9,6 @@
 
 echo "--- test-spec-format-repeated-violations ---"
 
-if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  printf '  SKIP: spec-format-repeated-violations disabled (MCL_MINIMAL_CORE=1)\n'
-  return 0 2>/dev/null || true
-fi
 
 _sr_proj="$(setup_test_dir)"
 

@@ -7,6 +7,41 @@
 
 ## [Unreleased]
 
+## 10.0.1 — 2026-05-01
+
+### Removed
+- **14-language scaffolding** (TR + EN only is now the supported policy):
+  - `mcl-askq-scanner.py` token sets reduced from 88 to 25 entries —
+    only Turkish and English approve / summary-confirm / design-review
+    tokens remain.
+  - `_mcl_is_approve_option()` (mcl-stop.sh + mcl-pre-tool.sh) and
+    `_mcl_is_vision_request_option()` (mcl-stop.sh) trimmed to TR + EN
+    case branches.
+  - `mcl-phase-detect.py` `_P5V_HEADERS` reduced to `Verification
+    Report` + `Doğrulama Raporu`.
+  - `mcl-stop.sh` Phase 6 verification-report regex reduced to TR + EN.
+  - Skill prose: `language-detection.md`, `cultural-pragmatics.md`,
+    `askuserquestion-protocol.md`, `phase1-rules.md`,
+    `phase5-review.md` rewritten / pruned for TR + EN only.
+  - Activate-hook `additionalContext` framing changed from "every
+    language including English" to "Turkish or English".
+  - `tests/cases/test-14lang.sh` and `tests/fixtures/prompts-14lang.txt`
+    deleted.
+- **`MCL_MINIMAL_CORE` feature flag** removed entirely. All systems are
+  now always active. Hooks unwrap every `if [ MINIMAL ]` guard; tests
+  drop their `SKIP under MCL_MINIMAL_CORE=1` stanzas;
+  `tests/cases/test-minimal-core-skips.sh` deleted. Single-mode runtime
+  matches the project policy of full enforcement everywhere.
+
+### Changed
+- README, README.tr, FEATURES.md, docs/state-schema.md updated to
+  describe TR+EN-only policy and the single-mode runtime.
+
+### Test posture
+- 202 unit + 53 e2e PASS / 0 FAIL in the (now single) default mode.
+
+---
+
 ## 10.0.0 — 2026-05-01
 
 ### Breaking changes

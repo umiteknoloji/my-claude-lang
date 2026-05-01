@@ -78,29 +78,17 @@ developer's intent has 2-5 valid interpretations, present them via
 AskUserQuestion with surgical options ("E-ticaret", "SaaS admin",
 "İçerik yönetimi", "Diğer") rather than open prose.
 
-## Approve family — 14-language token whitelist
+## Approve family — TR + EN token whitelist
 
 The Stop hook's `_mcl_is_approve_option()` matches the selected option
 via case-insensitive substring against the following token set. Claude
 should always include one option containing one of these tokens so the
 Stop hook can deterministically detect approval.
 
-| Language   | Approve tokens (substring match, case-insensitive)              |
-|------------|-----------------------------------------------------------------|
-| Turkish    | onayla, onaylıyorum, evet, kabul, tamam                         |
-| English    | approve, yes, confirm, ok, proceed, accept                      |
-| Spanish    | aprobar, sí / si, confirmar                                     |
-| French     | approuver, oui, confirmer                                       |
-| German     | genehmigen, bestätigen, ja                                      |
-| Japanese   | 承認, はい, 確認, 了解                                           |
-| Korean     | 승인, 네, 확인, 예                                               |
-| Chinese    | 批准, 是, 确认                                                   |
-| Arabic     | موافق, نعم, تأكيد                                               |
-| Hebrew     | אשר, כן, אישור                                                  |
-| Hindi      | स्वीकार, हाँ / हां                                                |
-| Indonesian | setujui, ya, konfirmasi                                         |
-| Portuguese | aprovar, sim, confirmar                                         |
-| Russian    | одобрить, да, подтвердить                                       |
+| Language   | Approve tokens (substring match, case-insensitive) |
+|------------|----------------------------------------------------|
+| Turkish    | onayla, onaylıyorum, evet, kabul, tamam            |
+| English    | approve, yes, confirm, ok, proceed, accept         |
 
 Non-approve options (edit, cancel, skip, reject, change, revise) are
 free-form in the developer's language — the Stop hook simply treats

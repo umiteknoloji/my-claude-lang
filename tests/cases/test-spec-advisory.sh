@@ -9,10 +9,6 @@
 
 echo "--- test-spec-advisory ---"
 
-if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  printf '  SKIP: spec-advisory disabled (MCL_MINIMAL_CORE=1)\n'
-  return 0 2>/dev/null || true
-fi
 
 _sa_proj="$(setup_test_dir)"
 

@@ -9,10 +9,6 @@
 
 echo "--- test-design-review-askq-trigger ---"
 
-if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  printf '  SKIP: design-review-askq-trigger disabled (MCL_MINIMAL_CORE=1)\n'
-  return 0 2>/dev/null || true
-fi
 
 _drt_proj="$(setup_test_dir)"
 

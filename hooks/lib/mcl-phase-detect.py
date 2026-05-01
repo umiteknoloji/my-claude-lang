@@ -271,25 +271,10 @@ def detect(transcript_path: str) -> dict[str, Any]:
 # Each runs in its own --mode so callers don't pay for a full detect()
 # when only one fact is needed.
 
-# Phase 5 verification report headers across the 14 supported MCL
-# locales. Kept in sync with skills/.../phase5-5-localize-report.md and
-# the mcl-stop.sh:1769 trigger fallback regex. Single source-of-truth
-# would be a constants module — deferred to 9.2 (see CHANGELOG limits).
+# 10.0.1: Phase 5 verification report headers — TR + EN only.
 _P5V_HEADERS = [
     "Verification Report",
     "Doğrulama Raporu",
-    "Rapport de Vérification",
-    "Verifizierungsbericht",
-    "Informe de Verificación",
-    "検証レポート",
-    "검증 보고서",
-    "验证报告",
-    "تقرير التحقق",
-    "דוח אימות",
-    "सत्यापन रिपोर्ट",
-    "Laporan Verifikasi",
-    "Relatório de Verificação",
-    "Отчёт о проверке",
 ]
 _P5V_RE = re.compile(
     r"^\s*(?:#+\s+|━+\s*\n\s*)?(?:" +

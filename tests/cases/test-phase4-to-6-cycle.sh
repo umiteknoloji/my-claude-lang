@@ -11,10 +11,6 @@
 
 echo "--- test-phase4-to-6-cycle ---"
 
-if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  printf '  SKIP: phase4-to-6-cycle disabled (MCL_MINIMAL_CORE=1)\n'
-  return 0 2>/dev/null || true
-fi
 
 _pc_proj="$(setup_test_dir)"
 

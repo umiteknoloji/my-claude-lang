@@ -11,10 +11,6 @@
 
 echo "--- test-architectural-drift ---"
 
-if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  printf '  SKIP: architectural-drift disabled (MCL_MINIMAL_CORE=1)\n'
-  return 0 2>/dev/null || true
-fi
 
 _ad_proj="$(setup_test_dir)"
 

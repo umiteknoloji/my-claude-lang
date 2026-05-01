@@ -379,7 +379,6 @@ if [ "$TOOL_NAME" = "TodoWrite" ]; then
 fi
 
 # -------- Branch: block hook/lib debugging Bash in Phase 1-3 (since 8.19.3) --------
-if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
 # Real-session telemetry: when a Phase 1.7 precision-audit block fires,
 # the model often interprets the technical reason (`transition-rewind`,
 # `partial_spec`, etc.) as a bug to investigate — and starts cat-ing /
@@ -453,10 +452,8 @@ print(json.dumps({
       ;;
   esac
 fi
-fi # end hook-debug Bash (MCL_MINIMAL_CORE guard)
 
 # -------- Branch: block hook/lib debugging via Read/Grep/Glob in Phase 1-3 (9.0.0) --------
-if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
 # Bash branch (above) catches `cat / grep / find` invocations. Real-session
 # telemetry shows the model also reaches for the dedicated Read/Grep/Glob
 # tools when looping. There is no legitimate Phase 1-3 reason to inspect
@@ -526,7 +523,6 @@ print(json.dumps({
       ;;
   esac
 fi
-fi # end hook-debug Read/Grep/Glob (MCL_MINIMAL_CORE guard)
 
 # -------- Branch: project isolation (since 9.1.3, all phases) --------
 # Vaad #1: per-project state + per-project hook scope = "this MCL only
@@ -986,7 +982,7 @@ suffix = " (OWASP " + owasp + ")" if owasp else ""
 print(rule + suffix + " at " + real + ":" + str(line) + " — " + msg)
 ' "$_SEC_TARGET_PATH" 2>/dev/null)"
             rm -f "$_SEC_TMP" 2>/dev/null
-            if [ -n "$_SEC_BLOCK" ] && [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
+            if [ -n "$_SEC_BLOCK" ]; then
               # Audit + block.
               _SEC_RULE="$(printf '%s' "$_SEC_BLOCK" | awk '{print $1}')"
               mcl_audit_log "security-scan-block" "mcl-pre-tool" "rule=${_SEC_RULE} tool=${TOOL_NAME} file=${_SEC_TARGET_PATH} severity=HIGH"
@@ -1095,7 +1091,7 @@ suffix = " [" + cat + "]" if cat else ""
 print(rule + suffix + " at " + real + ":" + str(line) + " — " + msg)
 ' "$_DB_TARGET_PATH" 2>/dev/null)"
             rm -f "$_DB_TMP" 2>/dev/null
-            if [ -n "$_DB_BLOCK" ] && [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
+            if [ -n "$_DB_BLOCK" ]; then
               _DB_RULE="$(printf '%s' "$_DB_BLOCK" | awk '{print $1}')"
               mcl_audit_log "db-scan-block" "mcl-pre-tool" "rule=${_DB_RULE} tool=${TOOL_NAME} file=${_DB_TARGET_PATH} severity=HIGH"
               python3 -c '
@@ -1201,7 +1197,7 @@ msg = top.get("message", "")
 print(rule + " at " + real + ":" + str(line) + " — " + msg)
 ' "$_UI_TARGET_PATH" 2>/dev/null)"
             rm -f "$_UI_TMP" 2>/dev/null
-            if [ -n "$_UI_BLOCK" ] && [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
+            if [ -n "$_UI_BLOCK" ]; then
               _UI_RULE="$(printf '%s' "$_UI_BLOCK" | awk '{print $1}')"
               mcl_audit_log "ui-scan-block" "mcl-pre-tool" "rule=${_UI_RULE} tool=${TOOL_NAME} file=${_UI_TARGET_PATH} severity=HIGH category=ui-a11y"
               python3 -c '
@@ -1233,6 +1229,7 @@ fi
 # phase gate, so a spec approved mid-turn doesn't force the developer
 # to pay for a second turn (or pay tokens for a re-emitted spec).
 _mcl_pre_is_approve_option() {
+  # 10.0.1: TR + EN only (the two languages MCL officially supports).
   local raw="$1"
   [ -z "$raw" ] && return 1
   local norm
@@ -1240,18 +1237,6 @@ _mcl_pre_is_approve_option() {
   case "$norm" in
     *onayla*|*onaylıyorum*|*evet*|*kabul*|*tamam*) return 0 ;;
     *approve*|*yes*|*confirm*|*ok*|*proceed*|*accept*) return 0 ;;
-    *aprobar*|*sí*|*si*|*confirmar*) return 0 ;;
-    *approuver*|*oui*|*confirmer*) return 0 ;;
-    *genehmigen*|*bestätigen*|*ja*) return 0 ;;
-    *承認*|*はい*|*確認*|*了解*) return 0 ;;
-    *승인*|*네*|*확인*|*예*) return 0 ;;
-    *批准*|*是*|*确认*) return 0 ;;
-    *موافق*|*نعم*|*تأكيد*) return 0 ;;
-    *אשר*|*כן*|*אישור*) return 0 ;;
-    *स्वीकार*|*हाँ*|*हां*) return 0 ;;
-    *setujui*|*ya*|*konfirmasi*) return 0 ;;
-    *aprovar*|*sim*) return 0 ;;
-    *одобрить*|*да*|*подтвердить*) return 0 ;;
   esac
   return 1
 }
@@ -1354,7 +1339,6 @@ fi
 # HIGH severity. Stack-agnostic — patterns match any framework's
 # backend/api/db conventions.
 if [ -z "$REASON" ] && [ "$CURRENT_PHASE" -ge 3 ] 2>/dev/null \
-   && [ "${MCL_MINIMAL_CORE:-0}" != "1" ] \
    && command -v python3 >/dev/null 2>&1; then
   _IV_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json, os, re, sys

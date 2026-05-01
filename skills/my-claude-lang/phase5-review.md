@@ -276,7 +276,7 @@ mcl_audit_log "phase5-verify" "phase5" "report-emitted" >/dev/null 2>&1
 
 This audit event is the **deterministic signal** for Phase 6 (a)
 audit-trail completeness check. Without it, Phase 6 falls back to
-transcript header string match — heuristic, lokalize 14 dile bağımlı,
+transcript header string match — heuristic, lokalize TR/EN'e bağımlı,
 gerçek emit garantisi vermez. Explicit `mcl_audit_log "phase5-verify"`
 çağrısı Phase 6'ya report'un yazıldığını net olarak söyler.
 
