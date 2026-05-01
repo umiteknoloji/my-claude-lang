@@ -366,7 +366,7 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — TodoWrite is blocked. MCL manages phase state via state.json; Phase 1-3 todo checklists duplicate that and pull the model into a parallel workflow. Proceed directly with MCL Phase 1 parameter gathering."
+        "permissionDecisionReason": "MCL Phase 1-3 — TodoWrite blocked (phase state managed via state.json)."
     }
 }))
 ' 2>/dev/null
@@ -443,7 +443,7 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — Bash debugging of MCL system files (cat / grep / find against ~/.mcl/lib/ or ~/.claude/hooks/) is blocked. ALLOWED for diagnostics: the current project .mcl/state.json, .mcl/audit.log, .mcl/trace.log, .mcl/debug.log via Read tool. Phase 1.7 helpers stay open: bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect $(pwd). STUCK? Type /mcl-restart to reset all phase state and try again from a clean slate."
+        "permissionDecisionReason": "MCL Phase 1-3 — Bash on MCL system files blocked (use Read on project .mcl/state.json, audit.log, debug.log for diagnostics; /mcl-restart to reset)."
     }
 }))
 ' 2>/dev/null
@@ -526,7 +526,7 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL ACTIVE (Phase 1-3) — Read / Grep / Glob on MCL system files (~/.mcl/lib/, ~/.claude/hooks/, ~/.mcl/projects/<key>/state/) is blocked. ALLOWED for diagnostics: the current project .mcl/state.json, .mcl/audit.log, .mcl/trace.log, .mcl/debug.log, .mcl/specs/ — read those instead. STUCK? Type /mcl-restart to reset all phase state and try again from a clean slate."
+        "permissionDecisionReason": "MCL Phase 1-3 — Read/Grep/Glob on MCL system files blocked (use project .mcl/state.json, audit.log, debug.log, specs/ for diagnostics)."
     }
 }))
 ' 2>/dev/null
@@ -563,7 +563,7 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL ISOLATION — operations outside project directory ($CLAUDE_PROJECT_DIR) are blocked. Stay in the current project. Allowed system paths: build scratch (/tmp, /var/folders), package caches (~/.npm, ~/.cache, ~/.yarn, ~/.pnpm-store, ~/.cargo, ~/.gradle, ~/.m2, ~/.bun), MCL skill files (~/.claude/skills/my-claude-lang), Phase 1.7 stack-detect (~/.claude/hooks/lib/mcl-stack-detect.sh), MCL state (~/.mcl), system bins (/usr). For sibling project access, exit and re-enter MCL inside that project."
+        "permissionDecisionReason": "MCL — operations outside project directory ($CLAUDE_PROJECT_DIR) blocked. Stay in the current project (build scratch /tmp + package caches + /usr allowed)."
     }
 }))
 ' 2>/dev/null
@@ -1262,7 +1262,11 @@ _mcl_pre_is_approve_option() {
 #   6 FINAL_REVIEW    → all unlocked
 REASON=""
 if [ "$CURRENT_PHASE" -lt 2 ] 2>/dev/null; then
-  REASON="MCL: ${TOOL_NAME} blocked. phase=${CURRENT_PHASE} (Phase 1 INTENT). Phase 1 summary-confirm must be approved first — emit a brief summary of intent, then wait for the developer approval (Onayla / evet / approve / yes); on approval the phase advances to 2 (UI projects) or 3 (non-UI) and Write/Edit unlock. STUCK? Read the current project .mcl/state.json and .mcl/audit.log for diagnostic context, or type /mcl-restart to reset all phase state."
+  # 10.0.7: terse single-line reason (was a 5-line wall of guidance,
+  # repeated red-block on every same-turn Write retry). Full guidance
+  # already injected by mcl-activate.sh SUMMARY_ASKQ_NOTICE on the
+  # next turn; no need to re-emit it on each PreToolUse deny.
+  REASON="MCL Phase 1 — summary AskUserQuestion approval required (state.json + /mcl-restart for diagnostics)."
 fi
 
 # -------- Branch: Phase 2 DESIGN_REVIEW path-exception --------
@@ -1325,7 +1329,7 @@ print("allow|")
 ' 2>/dev/null)"
     if [ "${UI_PATH_VERDICT%%|*}" = "deny" ]; then
       DENIED_PATH="${UI_PATH_VERDICT#deny|}"
-      REASON="MCL DESIGN-REVIEW LOCK — Phase 2 (DESIGN_REVIEW). Backend path \`${DENIED_PATH}\` is blocked until the developer approves the design (AskUserQuestion 'Tasarımı onaylıyor musun?' / 'Approve this design?') and MCL advances to Phase 3. Frontend code (components, pages, styles, fixtures), \`public/\`, \`.mcl/\` temp files, and framework-neutral files (README, package.json) are allowed. Build the UI skeleton with mock/fixture data only; integrate backend in Phase 3."
+      REASON="MCL Phase 2 DESIGN_REVIEW — backend path \`${DENIED_PATH}\` blocked (frontend/public/.mcl/README/package.json allowed; design askq approval advances to Phase 3)."
     fi
   fi
 fi

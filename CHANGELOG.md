@@ -7,6 +7,61 @@
 
 ## [Unreleased]
 
+## 10.0.7 — 2026-05-01
+
+### Changed (block reason verbosity reduced)
+
+Real-session UX problem: when the assistant attempted multiple
+Write/Edit calls in the same Phase 1 turn (Sonnet 4.6 behavioral
+drift — see Sorun 2), Claude Code's UI rendered each `permission
+Decision: deny` as a multi-line red block. The pre-tool reason
+strings were 5+ lines of guidance ("STUCK?", "/mcl-restart", "Read
+state.json", phase semantics), repeated red-banner-style on every
+same-turn retry. Visually overwhelming, and the assistant doesn't
+need the full guidance N times — once is enough.
+
+Reduced six block reasons in `mcl-pre-tool.sh` to single-line form
+(80–165 chars, was 200–700 chars):
+
+| Block | Tool | Phase |
+|---|---|---|
+| Phase 1 mutating-tool guard | Write/Edit/etc. | 1 |
+| TodoWrite block | TodoWrite | 1-3 |
+| Bash hook-debug guard | Bash | 1-3 |
+| Read/Grep/Glob hook-debug guard | Read/Grep/Glob | 1-3 |
+| Project-isolation guard | Bash (path-out) | any |
+| Design-review-gate (backend lock) | Write/Edit (backend) | 2 |
+
+Full guidance (recovery, escape hatches, semantics) is still
+emitted once per turn by `mcl-activate.sh` notices
+(`SUMMARY_ASKQ_NOTICE`, `PHASE1_STUCK_NOTICE`,
+`PRECISION_ESCAPE_NOTICE`) — the pre-tool reason no longer
+duplicates them. Decision payload remains `deny` (UI red), but
+the visual footprint is ~1/8th the size.
+
+Out of scope this release: pattern-scan, intent-violation,
+scope-guard, plan-critique gates — those reasons are still verbose
+but trigger in Phase 3+ where the model is past the tight
+clarification loop. Will be revisited if real-session noise emerges
+there too.
+
+### Updated
+- `tests/cases/test-canonical-flow.sh` — `[neg] reason mentions
+  phase=1` assertion updated to match new shorter reason
+  (`Phase 1` instead of `phase=1`).
+
+### Test posture
+- 237 passed / 0 failed / 4 skipped (full `tests/run-tests.sh`).
+
+### Notes
+- README.md / README.tr.md unchanged: cosmetic UX patch, no
+  user-facing feature change.
+- No state schema changes. No behavioral changes to phase
+  transitions, scans, or hook decisions — only the reason
+  strings emitted by deny outcomes are shorter.
+
+---
+
 ## 10.0.6 — 2026-05-01
 
 ### Changed (Phase 1 summary approval — AskUserQuestion mandatory)

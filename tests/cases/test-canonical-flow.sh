@@ -183,6 +183,6 @@ _cf_t_p1="$_cf_proj/t_p1.jsonl"
 python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_cf_t_p1" user-only "build it"
 _cf_out_neg="$(_cf_run_pretool_write "$_cf_t_p1" "$_cf_proj/src/x.ts")"
 assert_contains "[neg] Phase 1 Write → permissionDecision deny" "$_cf_out_neg" '"permissionDecision": "deny"'
-assert_contains "[neg] reason mentions phase=1" "$_cf_out_neg" "phase=1"
+assert_contains "[neg] reason mentions Phase 1" "$_cf_out_neg" "Phase 1"
 
 cleanup_test_dir "$_cf_proj"
