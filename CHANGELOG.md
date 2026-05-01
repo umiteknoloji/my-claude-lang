@@ -7,6 +7,54 @@
 
 ## [Unreleased]
 
+## 10.0.5 — 2026-05-01
+
+### Fixed (cancel-path reachability)
+
+**Bug — 10.0.4 cancel-path branch was unreachable in real sessions:**
+The Phase 2/3 → Phase 1 cancel-path rollback added in 10.0.4 was
+placed AFTER the "no SPEC_HASH and no ASKQ_INTENT" early-exit gate
+in `mcl-stop.sh`. When a developer typed a clean cancel token
+(`iptal`, `cancel`, etc.), neither a spec hash nor an askq intent
+existed in that turn, so the early-exit fired first and the cancel
+branch never executed. The 10.0.4 release shipped the feature in
+name only.
+
+Fixed by relocating the cancel-path branch to BEFORE the early-exit
+gate (`-86 / +94` in `mcl-stop.sh` — true relocate, not duplication).
+The local `CURRENT_PHASE` shell variable is now also updated in-place
+so any later branches in `mcl-stop.sh` see the rolled-back phase.
+
+### Added
+- `tests/cases/test-cancel-path.sh` — regression test that the
+  10.0.4 changelog explicitly noted as "deliberately skipped per
+  developer decision". Now lands alongside the reachability fix.
+  5 cases:
+    1. Phase 2 + `iptal` → rollback + `phase-rollback-via-cancel`
+       audit captured (`from=2`).
+    2. Phase 3 + `cancel` → rollback + all Phase 2+ flags cleared
+       (`ui_flow_active`, `spec_gate_passed`, `phase4_*_scan_done`,
+       `phase1_turn_count=0`).
+    3. Phase 2 + `geri al feature X` → no rollback (multi-word
+       guard prevents false-positive).
+    4. Phase 1 + `iptal` → noop (no rollback audit fired).
+    5. Phase 2 + 50-char message containing `iptal` inside prose →
+       no rollback (>30-char guard intact).
+
+### Test posture
+- 227 passed / 0 failed / 4 skipped (full `tests/run-tests.sh`).
+
+### Notes
+- README.md / README.tr.md unchanged: no new feature added; the
+  bug fix restores already-documented 10.0.4 behavior. Per the
+  version-independent README rule, READMEs describe features, not
+  patch-level fixes.
+- Self-project guard still blocks MCL pipeline activation in
+  `my-claude-lang` itself; dogfood verification of this patch
+  must run from a separate project directory.
+
+---
+
 ## 10.0.4 — 2026-05-01
 
 ### Fixed (Phase 1 transition false-positives)
