@@ -1,25 +1,43 @@
-<mcl_phase name="phase2-spec">
+<mcl_phase name="phase-spec-doc">
 
-# Phase 2: Generate English Spec
+# Phase 4 Entry: 📋 Spec Documentation Artifact
 
-Called automatically when Phase 1 parameters are complete and confirmed.
+> **The spec is a living documentation artifact, not a hard gate.**
+> Developer control is enforced primarily at Phase 1 summary
+> confirmation (the askq) and Phase 1.7 precision audit (GATE
+> questions). Spec format is enforced by **advisory warning only**
+> in 9.3.0 — Write/Edit stays unlocked even when the spec block is
+> malformed. Audit log records `spec-format-warn` for diagnostic
+> visibility; `/mcl-finish` and Phase 6 surface accumulated warnings.
 
-## Purpose
+Called as the FIRST output of Phase 4 (EXECUTE), immediately after the
+Phase 1 summary-confirm askq is approved (state already at
+`current_phase=4`).
 
-This is the MOST CRITICAL phase of MCL. Without this phase, the developer
-is not getting the benefit of English-native Claude Code. The spec transforms
-a non-English request into a precise English engineering document — as if
-a senior English-speaking engineer wrote the requirements themselves.
+## Purpose (since 9.3.0)
+
+The spec is **documentation**, not a state gate. State already advanced
+to Phase 4 via Phase 1 summary-confirm; the spec block records the
+English engineering interpretation MCL is operating against. Three
+roles:
+
+- **Audit trail**: written to `.mcl/specs/NNNN-slug.md` by spec-save
+  for `/mcl-finish` and Phase 6 promise-vs-delivery checks.
+- **Scope guard input**: file paths in Technical Approach become
+  `state.scope_paths`; pre-tool blocks Phase 4 writes outside scope.
+- **English semantic bridge**: the developer (and the model) read the
+  same engineering artifact — non-English prompts get senior-engineer
+  English documentation as a side effect.
 
 ## Rules
 
 1. Announce: "All points are clear. Generating the specification..."
 2. Write the spec in a visible `📋 Spec:` block in the response — NOT internally
 3. The spec MUST be visible to the developer in the conversation output
-4. **⛔ SPEC BLOCK — PINNED VERBATIM (9.2.1, MANDATORY).** Copy the
-   template below EXACTLY. The Stop hook scanner matches the literal
-   `📋 Spec:` line-anchored prefix; ANY deviation produces
-   `decision:block` and forces re-emit:
+4. **⛔ SPEC BLOCK — PINNED VERBATIM (since 9.2.1, MANDATORY).** Copy
+   the template below EXACTLY. The Stop hook scanner matches the
+   literal `📋 Spec:` line-anchored prefix; ANY deviation produces
+   `decision:block` and forces re-emit (spec re-emit, NOT Write block):
    - First non-blank line MUST be `📋 Spec:` (clipboard emoji + space +
      `Spec` + colon). Plain `Spec:`, `## Spec`, `## Faz N — Spec` are
      FORBIDDEN.
@@ -48,17 +66,20 @@ a senior English-speaking engineer wrote the requirements themselves.
    ```
    ```
 5. After the spec, explain in the developer's language what it says.
-6. **Auto-approve flow (9.2.1).** When the spec block passes the hook's
-   format gate (📋 prefix + 7 H2 sections, all present), the Stop hook
-   automatically transitions state to `current_phase=4`,
-   `spec_approved=true` in the SAME turn — NO AskUserQuestion call,
-   NO tool_result wait. Developer review happened in Phase 1 (intent
-   questions) and Phase 1.7 (precision-audit GATE questions); the spec
-   block is the materialized answer. Proceed directly to Phase 4
-   (code execution) on the next turn.
+6. **Spec is documentation, not a gate (since 9.3.0).** State is already
+   at `current_phase=4` when this spec emits — Phase 1 summary-confirm
+   askq drove the transition. The spec block:
+   - Records `spec_hash` for reference
+   - Triggers `mcl-spec-save.sh` (writes `.mcl/specs/NNNN.md`)
+   - Populates `state.scope_paths` from Technical Approach paths
+   - Format-invalid → `decision:block` for SPEC RE-EMIT only (writes
+     stay unlocked because phase=4 is independent of spec format)
 7. Do NOT call `AskUserQuestion` for spec approval — that step was
-   removed in 9.2.1 because it duplicated Phase 1 / 1.7 control and
-   was the dominant source of pipeline-stall bugs.
+   removed in 9.2.1. State changes are summary-confirm-driven, not
+   spec-driven.
+8. Proceed to Phase 4 code writing (Write/Edit/MultiEdit) in the
+   SAME response after the spec block. No need for a separate turn —
+   the spec is the opening prose of the Phase 4 work.
 
 ## Spec Quality Standard
 

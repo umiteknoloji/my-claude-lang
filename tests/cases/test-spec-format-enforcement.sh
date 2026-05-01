@@ -1,33 +1,27 @@
 #!/bin/bash
-# Test: 9.2.1 spec block format enforcement.
+# Test: 9.3.0 spec format violations are ADVISORY (audit only).
 #
-# Real-session bug: model emitted spec-LIKE text without `📋 Spec:`
-# prefix → scanner returned spec_hash="" → Phase 1→2 transition never
-# fired → Write blocked indefinitely. 9.2.1 fix: hook detects three
-# spec-attempt patterns and emits `decision:block` forcing re-emit
-# with the canonical template.
-#
-# Patterns covered:
-#   1. Bare "Spec:" (no 📋 emoji)
-#   2. "## Spec" H2 heading
-#   3. "## Faz N — Spec" H2 heading (the actual real-session form)
-#   4. Canonical 📋 Spec: + 7 sections → no block (rc=1, complete)
-#   5. 📋 Spec: with missing headers → existing rc=0 path still works
+# Spec emission is documentation, not a state gate. Format violations
+# (missing 7 H2 sections, no 📋 prefix) → audit warning + continue.
+# Write/Edit stays unlocked because Phase 4 is independent of spec
+# format (Phase 1 summary-confirm is the gate).
 
 echo "--- test-spec-format-enforcement ---"
 
 if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  printf '  SKIP: test-spec-format-enforcement disabled (MCL_MINIMAL_CORE=1)\n'
+  printf '  SKIP: spec-format-enforcement disabled (MCL_MINIMAL_CORE=1)\n'
   return 0 2>/dev/null || true
 fi
 
 _sf_proj="$(setup_test_dir)"
 
-_sf_init_state() {
+_sf_init() {
   python3 - "$_sf_proj/.mcl/state.json" <<'PY'
-import json, os, sys, time
-o = {"schema_version": 2, "current_phase": 1, "phase_name": "COLLECT",
-     "spec_approved": False, "spec_hash": None, "last_update": int(time.time())}
+import json, sys, time
+o = {"schema_version": 2, "current_phase": 4, "phase_name": "EXECUTE",
+     "spec_hash": None,
+     "ui_flow_active": False,
+     "last_update": int(time.time())}
 open(sys.argv[1], "w").write(json.dumps(o))
 PY
 }
@@ -38,83 +32,100 @@ _sf_run_partial_check() {
   _SF_LAST_OUT="$(bash "$REPO_ROOT/hooks/lib/mcl-partial-spec.sh" check "$transcript" 2>/dev/null)"
   _SF_LAST_RC=$?
   set -e
-  return 0
 }
 
 _sf_run_stop() {
-  local transcript="$1"
-  printf '%s' "{\"transcript_path\":\"${transcript}\",\"session_id\":\"sf\",\"cwd\":\"${_sf_proj}\"}" \
+  printf '%s' "{\"transcript_path\":\"$1\",\"session_id\":\"sf\",\"cwd\":\"${_sf_proj}\"}" \
     | CLAUDE_PROJECT_DIR="$_sf_proj" \
       MCL_STATE_DIR="$_sf_proj/.mcl" \
       MCL_REPO_PATH="$REPO_ROOT" \
       bash "$REPO_ROOT/hooks/mcl-stop.sh" 2>/dev/null
 }
 
-# ---- Case 1: bare "Spec:" without 📋 ----
-_sf_init_state
+# ---- Case 1: bare "Spec:" → rc=3, advisory only ----
+_sf_init
 _sf_t1="$_sf_proj/t1.jsonl"
 python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_sf_t1" spec-no-emoji-bare
 _sf_run_partial_check "$_sf_t1"
 assert_equals "bare 'Spec:' → partial-spec rc=3" "$_SF_LAST_RC" "3"
 
 _sf_out1="$(_sf_run_stop "$_sf_t1")"
-assert_contains "bare 'Spec:' → stop emits decision:block" "$_sf_out1" '"decision": "block"'
-assert_contains "bare 'Spec:' → reason mentions 📋 Spec:" "$_sf_out1" "📋 Spec:"
-assert_contains "bare 'Spec:' → reason flags MCL: format invalid" "$_sf_out1" "format invalid"
-if grep -q "spec-no-emoji-block" "$_sf_proj/.mcl/audit.log" 2>/dev/null; then
+# Advisory only — no decision:block in output.
+if printf '%s' "$_sf_out1" | grep -q '"decision": "block"'; then
+  FAIL=$((FAIL+1))
+  printf '  FAIL: [1] bare Spec: produced decision:block (should be advisory)\n'
+else
   PASS=$((PASS+1))
-  printf '  PASS: bare Spec: → spec-no-emoji-block audit captured\n'
+  printf '  PASS: [1] bare Spec: → no decision:block (advisory)\n'
+fi
+if grep -q "spec-format-warn" "$_sf_proj/.mcl/audit.log" 2>/dev/null; then
+  PASS=$((PASS+1))
+  printf '  PASS: [1] spec-format-warn audit captured\n'
 else
   FAIL=$((FAIL+1))
-  printf '  FAIL: spec-no-emoji-block audit missing\n'
+  printf '  FAIL: [1] spec-format-warn audit missing\n'
 fi
 
-# ---- Case 2: "## Spec" H2 heading ----
-_sf_init_state
+# ---- Case 2: missing H2 sections → rc=0, advisory only ----
+_sf_init
 rm -f "$_sf_proj/.mcl/audit.log"
 _sf_t2="$_sf_proj/t2.jsonl"
-python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_sf_t2" spec-h2-heading
+python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_sf_t2" spec-partial "Edge Cases,Out of Scope"
 _sf_run_partial_check "$_sf_t2"
-assert_equals "## Spec heading → partial-spec rc=3" "$_SF_LAST_RC" "3"
-
-# ---- Case 3: "## Faz 2 — Spec" heading (real-session form) ----
-_sf_init_state
-rm -f "$_sf_proj/.mcl/audit.log"
-_sf_t3="$_sf_proj/t3.jsonl"
-python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_sf_t3" spec-faz-heading
-_sf_run_partial_check "$_sf_t3"
-assert_equals "## Faz N — Spec heading → partial-spec rc=3" "$_SF_LAST_RC" "3"
-
-_sf_out3="$(_sf_run_stop "$_sf_t3")"
-assert_contains "Faz heading → reason points to phase2-spec.md" "$_sf_out3" "phase2-spec.md"
-
-# ---- Case 4: canonical complete spec → rc=1, no block ----
-_sf_init_state
-rm -f "$_sf_proj/.mcl/audit.log"
-_sf_t4="$_sf_proj/t4.jsonl"
-python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_sf_t4" spec-correct "Admin Panel"
-_sf_run_partial_check "$_sf_t4"
-assert_equals "canonical spec → partial-spec rc=1 (complete)" "$_SF_LAST_RC" "1"
-
-# ---- Case 5: 📋 Spec: with missing sections → rc=0 (existing path) ----
-_sf_init_state
-rm -f "$_sf_proj/.mcl/audit.log"
-_sf_t5="$_sf_proj/t5.jsonl"
-python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_sf_t5" spec-partial "Edge Cases,Out of Scope"
-_sf_run_partial_check "$_sf_t5"
 assert_equals "missing sections → partial-spec rc=0" "$_SF_LAST_RC" "0"
 
-_sf_out5="$(_sf_run_stop "$_sf_t5")"
-assert_contains "missing sections → decision:block" "$_sf_out5" '"decision": "block"'
-assert_contains "missing sections → cites Edge Cases" "$_sf_out5" "Edge Cases"
-assert_contains "missing sections → points to phase2-spec.md" "$_sf_out5" "phase2-spec.md"
+_sf_out2="$(_sf_run_stop "$_sf_t2")"
+if printf '%s' "$_sf_out2" | grep -q '"decision": "block".*[Ss]pec.*missing\|MCL.*Spec.*eksik'; then
+  FAIL=$((FAIL+1))
+  printf '  FAIL: [2] missing sections produced spec-format block (should be advisory)\n'
+else
+  PASS=$((PASS+1))
+  printf '  PASS: [2] missing sections → no spec-format block (advisory)\n'
+fi
+if grep -q "spec-format-warn" "$_sf_proj/.mcl/audit.log" 2>/dev/null; then
+  PASS=$((PASS+1))
+  printf '  PASS: [2] spec-format-warn audit captured (missing sections)\n'
+else
+  FAIL=$((FAIL+1))
+  printf '  FAIL: [2] spec-format-warn audit missing\n'
+fi
 
-# ---- Case 6: empty transcript → rc=2 ----
-_sf_init_state
+# ---- Case 3: canonical spec → rc=1 (clean) ----
+_sf_init
 rm -f "$_sf_proj/.mcl/audit.log"
-_sf_t6="$_sf_proj/t6.jsonl"
-python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_sf_t6" user-only "build it"
-_sf_run_partial_check "$_sf_t6"
-assert_equals "no spec at all → partial-spec rc=2" "$_SF_LAST_RC" "2"
+_sf_t3="$_sf_proj/t3.jsonl"
+python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_sf_t3" spec-correct "Test"
+_sf_run_partial_check "$_sf_t3"
+assert_equals "canonical spec → partial-spec rc=1" "$_SF_LAST_RC" "1"
+
+# ---- Case 4: Phase 4 Write attempt with bad spec → STILL ALLOWED ----
+_sf_init
+rm -f "$_sf_proj/.mcl/audit.log"
+_sf_t4="$_sf_proj/t4.jsonl"
+python3 "$REPO_ROOT/tests/lib/build-transcript.py" "$_sf_t4" spec-no-emoji-bare
+# Pre-tool Write attempt with state at phase=4 (already past summary-confirm).
+_sf_payload="$(python3 -c "
+import json,sys
+print(json.dumps({
+  'tool_name':'Write',
+  'tool_input':{'file_path':sys.argv[1],'content':'export default 1;'},
+  'transcript_path':sys.argv[2],
+  'session_id':'sf','cwd':sys.argv[3]
+}))" "$_sf_proj/src/x.ts" "$_sf_t4" "$_sf_proj")"
+
+_sf_out4="$(printf '%s' "$_sf_payload" \
+  | CLAUDE_PROJECT_DIR="$_sf_proj" \
+    MCL_STATE_DIR="$_sf_proj/.mcl" \
+    MCL_REPO_PATH="$REPO_ROOT" \
+    bash "$REPO_ROOT/hooks/mcl-pre-tool.sh" 2>/dev/null)"
+
+if [ -z "$_sf_out4" ] || ! printf '%s' "$_sf_out4" | grep -q '"permissionDecision": "deny"'; then
+  PASS=$((PASS+1))
+  printf '  PASS: [4] Phase 4 Write with bad spec → ALLOWED (advisory only)\n'
+else
+  FAIL=$((FAIL+1))
+  printf '  FAIL: [4] Phase 4 Write blocked despite advisory spec format\n'
+  printf '        output: %s\n' "$(printf '%s' "$_sf_out4" | head -c 200)"
+fi
 
 cleanup_test_dir "$_sf_proj"

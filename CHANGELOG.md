@@ -7,6 +7,134 @@
 
 ## [Unreleased]
 
+## [9.3.0] - 2026-05-01 — BREAKING: phase model simplified
+
+### Breaking change
+
+The MCL phase model is restructured. Phase 2 (SPEC_REVIEW) and Phase 3
+(USER_VERIFY) are removed. The flow is now:
+
+```
+Phase 1 (questions + summary-confirm askq) ──approve──▶ Phase 4 (EXECUTE)
+                                                          │
+                                                          ├─ 📋 Spec: doc emit (entry artifact)
+                                                          ├─ Code writes (Write/Edit/MultiEdit)
+                                                          ├─ Phase 4.5 risk review
+                                                          ├─ Phase 4.6 impact review
+                                                          ├─ Phase 5 verification report
+                                                          └─ Phase 6 double-check
+```
+
+**State transition driver:** Phase 1 summary-confirm askq approval.
+The askq is the only gate; on approval, `current_phase` advances
+directly from 1 to 4, `phase_name` becomes `EXECUTE`. Spec emission
+no longer drives state — it is documentation.
+
+### Spec is documentation, not a gate
+
+The `📋 Spec:` block emitted at Phase 4 entry serves three roles:
+- Audit artifact (`.mcl/specs/NNNN.md` via `mcl-spec-save.sh`)
+- Scope guard input (Technical Approach paths populate
+  `state.scope_paths`)
+- English semantic bridge for non-English prompts
+
+Spec format violations (missing 7 H2 sections, no `📋` prefix) are
+**advisory** in 9.3.0. The hook emits `spec-format-warn` audit; no
+`decision:block`, no Write tool block. Models can correct format
+without losing forward progress on the actual code task.
+
+### Removed
+
+- `spec_approved` field as a state gate. Field still written for
+  legacy compatibility (auto-set true on Phase 1→4 transition) but
+  hooks no longer read it for transition decisions.
+- `auto-approve-spec` audit (was: spec emit auto-advanced state).
+- `block-askq-incomplete-spec` PreToolUse block (askq is no longer
+  used for spec approval, so guard is moot).
+- `MCL SPEC RECOVERY` and `MCL SPEC FORMAT` decision:block paths.
+  These now emit `spec-format-warn` audit only.
+- Phase 2 (SPEC_REVIEW) and Phase 3 (USER_VERIFY) phase logic from
+  `mcl-stop.sh` case-on-current_phase.
+- `phase2-spec.md` skill file → renamed to `phase-spec-doc.md` and
+  rewritten as documentation artifact spec, not state-gating.
+
+### Added (Phase 4.5 advisory checks)
+
+**Architectural drift detection** (`hooks/lib/mcl-drift-scan.py`).
+Compares Phase 4 Write tool calls against `state.scope_paths`. Writes
+outside declared scope → `phase4-5-drift` audit (advisory).
+
+**Intent violation detection.** Compares Phase 4 writes against
+`state.phase1_intent` + `state.phase1_constraints`. Anti-pattern
+matrix:
+- Phase 1 says "no auth / no backend" + writes import `next-auth`
+  / create `src/api/` → `IV-no-auth-or-backend` finding
+- Phase 1 says "no DB / in-memory" + writes import Prisma / create
+  `prisma/` → `IV-no-db` finding
+- Phase 1 says "offline / local only" + writes import `axios` /
+  `node-fetch` → `IV-offline-only` finding
+
+Both checks emit `phase4-5-intent-violation` audit when matched.
+Advisory only in 9.3.0; can be promoted to hard blocks in 9.4+.
+
+### Pre-tool Write guard simplified
+
+`mcl-pre-tool.sh` Write/Edit/MultiEdit gate now checks
+`current_phase < 4` only. The `spec_approved != true` check and the
+JIT auto-advance branch are removed (no longer needed since
+phase=4 is set on summary-confirm before any Phase 4 turn starts).
+
+### Test coverage (5 new/updated scenarios)
+
+- `test-phase1-to-phase4.sh` (new): summary-confirm approve →
+  state=4; non-approve → state stays at 1; idempotency on already-4.
+- `test-canonical-flow.sh` (rewritten): summary-confirm transcript +
+  spec-emit fixture; verifies state advance, Write unlock, spec-hash
+  recording.
+- `test-spec-format-enforcement.sh` (rewritten): bare `Spec:` /
+  missing sections → `spec-format-warn` audit + NO `decision:block`;
+  Phase 4 Write with bad spec → STILL ALLOWED.
+- `test-drift-intent-violations.sh` (new): scope drift fixture
+  (`src/api/users.ts` outside `src/components`) → `phase4-5-drift`
+  audit; intent violation fixture (`no auth` + `import NextAuth`)
+  → `phase4-5-intent-violation` audit; clean writes → 0 findings.
+- `test-multi-spec-latest-wins.sh` (updated): no auto-advance on
+  Phase 1 spec emit (state stays at 1).
+- `test-partial-spec-post-approval.sh` (updated): partial-spec
+  detector emits `spec-format-warn` audit, no hard block.
+- `test-askq-incomplete-spec-block.sh` (deleted — feature removed).
+
+### Test results
+
+- Default mode: unit **172/0/4**, e2e **54/0/0**
+- MCL_MINIMAL_CORE=1: unit **126/0/3**, e2e **54/0/0**
+
+**Total: 406 passing assertions across both modes, both suites. Zero failures.**
+
+### Internal: `mcl_get_active_phase` updated
+
+`hooks/lib/mcl-state.sh:mcl_get_active_phase` no longer requires
+`spec_approved=True` to return Phase 4+ values. Phase determination
+is `current_phase`-driven (the source of truth in 9.3.0). Legacy
+state files with `spec_approved=False` and `current_phase=4` now
+return correct Phase 4 instead of `?`.
+
+### Skill prose updates
+
+- `phase2-spec.md` → renamed `phase-spec-doc.md`. Top-of-file
+  declaration: "Spec is a living documentation artifact, not a hard
+  gate. Developer control is enforced primarily at Phase 1 summary
+  confirmation and Phase 1.7 precision audit. Spec format is
+  enforced by advisory warning only."
+- `phase1-rules.md` rule 6: "On approve (since 9.3.0). Stop hook
+  transitions state directly to current_phase=4 (EXECUTE) on
+  summary-confirm approve. Phase 2/3 are removed — summary-confirm
+  IS the gate."
+- `my-claude-lang.md`: phase model diagram + Phase 2/3 paragraphs
+  removed; replaced with "📋 Spec Documentation" section describing
+  the documentation artifact role.
+- `all-mcl.md` STEP-22 already updated in 9.2.2.
+
 ## [9.2.3] - 2026-05-01 — UI_REVIEW gate restored as core enforcement
 
 Real-session 9.2.2 ship worked end-to-end (spec auto-approve + Phase 4

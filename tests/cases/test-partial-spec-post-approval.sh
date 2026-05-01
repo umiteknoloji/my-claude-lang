@@ -124,15 +124,23 @@ o = {
 open(os.environ["PSP_STATE"], "w").write(json.dumps(o))
 PY
 
+# 9.3.0: spec format is advisory. The detector still RUNS, but emits
+# `spec-format-warn` audit instead of decision:block. Test now verifies
+# audit-only behavior.
 _psp_out_pre="$(_psp_run_stop || true)"
-if printf '%s' "$_psp_out_pre" | grep -q '"decision": "block"' && \
-   printf '%s' "$_psp_out_pre" | grep -qE "Spec eksik|spec.*missing|phase2-spec.md"; then
+if grep -q "spec-format-warn" "$_psp_proj/.mcl/audit.log" 2>/dev/null; then
   PASS=$((PASS+1))
-  printf '  PASS: pre-approval — partial-spec detector still fires legitimately\n'
+  printf '  PASS: pre-approval — spec-format-warn audit captured (advisory)\n'
 else
   FAIL=$((FAIL+1))
-  printf '  FAIL: pre-approval branch broken (recovery should fire here)\n'
-  printf '        output snippet: %s\n' "$(printf '%s' "$_psp_out_pre" | head -c 200)"
+  printf '  FAIL: pre-approval — spec-format-warn audit missing\n'
+fi
+if printf '%s' "$_psp_out_pre" | grep -qE "MCL SPEC RECOVERY|MCL SPEC FORMAT"; then
+  FAIL=$((FAIL+1))
+  printf '  FAIL: pre-approval — spec format produced hard block (should be advisory)\n'
+else
+  PASS=$((PASS+1))
+  printf '  PASS: pre-approval — no hard block, advisory only\n'
 fi
 fi # end MCL_MINIMAL_CORE skip for Test 4
 

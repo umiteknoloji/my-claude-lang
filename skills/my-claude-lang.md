@@ -240,52 +240,51 @@ For full Phase 1.5 rules, read `my-claude-lang/phase1-5-engineering-brief.md`
 Produces an internal English Engineering Brief from the confirmed Phase 1
 parameters (precision-enriched by Phase 1.7 since 8.3.0). Skipped silently
 when source language is English. Not shown to the developer. Emits
-`engineering-brief` audit entry in all cases. After Phase 1.5 → Phase 2 begins.
+`engineering-brief` audit entry in all cases.
 
-## Phase 2: Generate English Spec — MANDATORY, NEVER SKIP
+## Phase Model (since 9.3.0 — simplified)
 
-For full spec template, read `my-claude-lang/phase2-spec.md`
+```
+Phase 1 (questions + summary-confirm askq) ──approve──▶  Phase 4 (EXECUTE)
+                                                          │
+                                                          ├─ 📋 Spec: doc emit (entry artifact)
+                                                          ├─ Code writes (Write/Edit/MultiEdit)
+                                                          ├─ Phase 4.5 risk review (per write)
+                                                          ├─ Phase 4.6 impact review
+                                                          ├─ Phase 5 verification report
+                                                          └─ Phase 6 double-check
+```
 
-This is the most critical phase. Without it, the developer gets chatbot-quality
-output instead of senior-engineer-quality output. The spec ensures Claude Code
-processes the request AS IF a native English engineer wrote it.
+Phase 2 (SPEC_REVIEW) and Phase 3 (USER_VERIFY) are **REMOVED in
+9.3.0**. The Phase 1 summary-confirm askq is the gate; once approved,
+state transitions directly to Phase 4. The spec block is documentation
+emitted as the opening artifact of Phase 4 (NOT a separate phase, NOT
+a state gate).
+
+## 📋 Spec Documentation (Phase 4 entry artifact)
+
+For full template, read `my-claude-lang/phase-spec-doc.md`.
+
+Emit at the START of the first Phase 4 turn (after summary-confirm
+approval), then continue with Phase 4 code in the SAME response:
 
 1. Announce: "All points are clear. Generating the specification..."
-2. Write the spec in a VISIBLE `📋 Spec:` block — the developer MUST see it
-3. Write it like a senior engineer with 15+ years experience
-4. BASE SECTIONS (always): Objective, MUST/SHOULD requirements,
-   Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope.
-   CONDITIONAL SECTIONS (include only when triggered):
-   Non-functional Requirements / Failure Modes & Degradation /
-   Observability / Reversibility+Rollback / Data Contract.
-   See `phase2-spec.md` for triggers and templates.
-5. After the spec, explain in developer's language what it says.
-6. **Auto-approve flow (since 9.2.1).** No AskUserQuestion call. When
-   the spec block passes the hook's format gate (📋 prefix + 7 H2
-   sections), the Stop hook automatically transitions state to
-   `current_phase=4`, `spec_approved=true` in the SAME turn. Developer
-   review happened in Phase 1 / 1.7. To reject a spec, the developer
-   types `/mcl-restart`. To stop, `/mcl-finish`.
+2. Write a VISIBLE `📋 Spec:` block (📋 prefix + 7 H2 sections verbatim:
+   Title, Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases,
+   Technical Approach, Out of Scope).
+3. After the spec, explain in developer's language what it says.
+4. **No AskUserQuestion for spec** — state already at Phase 4. Spec is
+   recorded for `.mcl/specs/`, scope_paths, and Phase 6 promise-vs-
+   delivery checks. Format-invalid → `decision:block` for spec
+   re-emit ONLY (writes remain unlocked because phase=4 is independent
+   of spec format).
+5. Continue with Phase 4 code writes in the same response. The spec
+   is documentation prose, not a gate that pauses for input.
 
-**⛔ STOP RULE:** After emitting the `📋 Spec:` block, your response
-ENDS. Do NOT call AskUserQuestion. Do NOT write code in the same turn.
-The next turn (after Stop hook auto-approves) begins Phase 4.
+To reject the direction after summary-confirm: `/mcl-restart`. To
+stop: `/mcl-finish`.
 
 Spec = SINGLE SOURCE OF TRUTH. All code must satisfy the spec.
-
-## Phase 3: Verify Understanding
-
-For full verification rules, read `my-claude-lang/phase3-verify.md`
-
-Phase 3 is COMBINED with Phase 2 — when the spec is shown, the developer
-verifies it. The explanation after the spec IS Phase 3. Before calling
-AskUserQuestion, Claude runs a **Technical Challenge Pass**: silently checks
-the spec for concrete technical problems (race conditions, scale issues,
-missing auth, N+1, cascading failures). If a concrete problem is found,
-one `⚠️ Teknik not:` line is added — not a gate, but visible before approval.
-Phase 3 `AskUserQuestion` call with prefix `MCL {{MCL_VERSION}} | `.
-Developer must understand AND pick an approve-family option in the
-tool_result → then Phase 4 begins (Stop hook flips state).
 
 **⛔ STOP RULE:** Phase 4 CANNOT start until the AskUserQuestion tool_result
 returns an approve-family option. An assistant-text "yes" without the

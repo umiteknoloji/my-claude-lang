@@ -547,61 +547,10 @@ print(json.dumps({
   esac
 fi
 
-# -------- Branch: block AskUserQuestion when most-recent spec is incomplete (9.1.4) --------
-# Real-session bug: model emits a short `📋 Spec:` block (Project /
-# Pages / Stack notes — no canonical 7-section structure) AND an
-# AskUserQuestion in the same turn. Stop-hook partial-spec block fires
-# AFTER the askq tool_use was already processed, so the askq still
-# reaches the user. User clicks an approve-family option; subsequent
-# Write attempts hit the Phase 1 lock (transition was rewound by the
-# partial-spec block).
-#
-# Fix: deny the askq itself at PreToolUse time when the most-recent
-# assistant text (the same turn that is emitting this askq) carries
-# an incomplete spec. Forces the model to re-emit a complete 7-section
-# spec BEFORE asking for approval.
-#
-# Whitelist: Phase 4.5 / 4.6 risk-and-impact dialogs, Phase 4b UI
-# review, Phase 1 summary-confirm, ui-flow stack fallback prompts,
-# Rule A git-init consent — all use askq with question bodies that
-# do NOT mention "spec" approval. We detect the spec-approval
-# scenario by:
-#   - state.current_phase ∈ {1, 2, 3} (pre-Phase-4 window), AND
-#   - last assistant text contains a `📋 Spec:` block, AND
-#   - that spec block is missing 1+ required headers
-# Phase 4+ askq calls always pass through (different intent).
-if [ "$TOOL_NAME" = "AskUserQuestion" ] && command -v python3 >/dev/null 2>&1; then
-  _AQI_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-  case "$_AQI_PHASE" in
-    1|2|3)
-      _AQI_PARTIAL_LIB="$SCRIPT_DIR/lib/mcl-partial-spec.sh"
-      if [ -n "${TRANSCRIPT_PATH:-}" ] && [ -f "${TRANSCRIPT_PATH:-/dev/null}" ] \
-         && [ -f "$_AQI_PARTIAL_LIB" ]; then
-        _AQI_MISSING="$(bash "$_AQI_PARTIAL_LIB" check "$TRANSCRIPT_PATH" 2>/dev/null)"
-        _AQI_RC=$?
-        if [ "$_AQI_RC" = "0" ]; then
-          # Last assistant turn has an incomplete spec block. Deny
-          # this askq so the user does not approve a half-spec.
-          _AQI_MISSING_CSV="$(printf '%s' "$_AQI_MISSING" | tr '\n' ',' | sed 's/,$//')"
-          mcl_audit_log "block-askq-incomplete-spec" "pre-tool" \
-            "phase=${_AQI_PHASE} missing=${_AQI_MISSING_CSV}"
-          python3 -c '
-import json, sys
-missing = sys.argv[1]
-print(json.dumps({
-    "hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL: Spec eksik bölüm — " + missing + ". Re-emit complete spec; auto-approve fires on next Stop (no askq needed since 9.2.1)."
-    }
-}))
-' "$_AQI_MISSING_CSV" 2>/dev/null
-          exit 0
-        fi
-      fi
-      ;;
-  esac
-fi
+# 9.3.0: askq-incomplete-spec block REMOVED. Spec format is advisory
+# only; the model can call AskUserQuestion at any time, and spec format
+# violations no longer gate any tool call. Phase 1 summary-confirm askq
+# is the only state-driving askq.
 
 # -------- Branch: block Task dispatch of Phase 4.5/4.6/5 as sub-agent --------
 # sub-agent-phase-discipline: Phase 4.5 (Risk Review), 4.6 (Impact Review),
@@ -1287,62 +1236,15 @@ _mcl_pre_is_approve_option() {
   return 1
 }
 
-# 9.2.1: JIT auto-advance on spec emit. Same-turn rescue — when the
-# model emits a complete `📋 Spec:` in the same turn it tries to Write,
-# Stop hook hasn't fired yet so state is still phase=1. Pre-tool runs
-# the partial-spec checker on the transcript: rc=1 (complete) → advance
-# state to phase=4 + spec_approved=true here so the Write can proceed.
-# rc=0/3 → keep phase=1, the Write still gets denied (correct).
-JIT_PARTIAL_LIB="$SCRIPT_DIR/lib/mcl-partial-spec.sh"
-JIT_SCANNER="$SCRIPT_DIR/lib/mcl-askq-scanner.py"
-if [ "$SPEC_APPROVED" != "true" ] \
-   && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] \
-   && [ -f "$JIT_PARTIAL_LIB" ] && [ -f "$JIT_SCANNER" ] \
-   && command -v python3 >/dev/null 2>&1; then
-  set +e
-  bash "$JIT_PARTIAL_LIB" check "$TRANSCRIPT_PATH" >/dev/null 2>&1
-  _JIT_PARTIAL_RC=$?
-  set -e
-  if [ "$_JIT_PARTIAL_RC" = "1" ]; then
-    # Complete spec present in transcript. Compute its hash.
-    JIT_SPEC_HASH="$(python3 "$JIT_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null \
-      | python3 -c 'import json,sys; print((json.loads(sys.stdin.read() or "{}").get("spec_hash") or ""))' 2>/dev/null)"
-    if [ -n "$JIT_SPEC_HASH" ]; then
-      mcl_state_set spec_hash "\"$JIT_SPEC_HASH\""
-      mcl_state_set spec_approved true
-      mcl_state_set current_phase 4
-      mcl_state_set phase_name '"EXECUTE"'
-      UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
-      UI_INTENT_SCANNER="$SCRIPT_DIR/lib/mcl-spec-ui-intent.py"
-      if [ "$UI_FLOW_ON" != "true" ] && [ -f "$UI_INTENT_SCANNER" ]; then
-        UI_INTENT_VERDICT="$(python3 "$UI_INTENT_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
-        if [ "$UI_INTENT_VERDICT" = "true" ]; then
-          mcl_state_set ui_flow_active true
-          UI_FLOW_ON="true"
-          mcl_audit_log "ui-flow-spec-intent" "pre-tool" "hash=${JIT_SPEC_HASH:0:12}"
-        fi
-      fi
-      if [ "$UI_FLOW_ON" = "true" ]; then
-        mcl_state_set ui_sub_phase '"BUILD_UI"'
-      fi
-      mcl_audit_log "auto-approve-spec-jit" "pre-tool" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->4"
-      command -v mcl_trace_append >/dev/null 2>&1 && {
-        mcl_trace_append spec_approved "${JIT_SPEC_HASH:0:12}"
-        mcl_trace_append phase_transition "$CURRENT_PHASE" 4
-      }
-      bash "$SCRIPT_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$JIT_SPEC_HASH" 2>/dev/null || true
-      # Re-read state for downstream gate evaluation.
-      CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-      SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
-      PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
-    fi
-  fi
-fi
-
-
+# 9.3.0: Phase model simplified — Write/Edit gate now checks
+# current_phase only. Spec emission is documentation, not a gate.
+# Phase 1→4 transition is summary-confirm-driven (in Stop hook).
+# JIT auto-advance removed — no longer needed since phase=4 is
+# guaranteed before any Phase 4 Write turn (summary-confirm fires on
+# the previous Stop).
 REASON=""
-if [ "$SPEC_APPROVED" != "true" ]; then
-  REASON="MCL: ${TOOL_NAME} blocked. phase=${CURRENT_PHASE} spec_approved=false. Emit format-valid 📋 Spec: block first — auto-approves on next Stop."
+if [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null; then
+  REASON="MCL: ${TOOL_NAME} blocked. phase=${CURRENT_PHASE} (Phase 1 / question phase). Phase 1 summary-confirm askq must be approved first; phase advances to 4 on approval, mutating tools unlock."
 fi
 
 # -------- Branch: UI flow path-exception (Phase 4a BUILD_UI / 4b REVIEW) --------

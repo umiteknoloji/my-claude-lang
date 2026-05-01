@@ -81,7 +81,9 @@ PY
 _ms_run_partial_check "$_ms_t"
 assert_equals "multi-spec: latest complete spec wins → rc=1" "$_MS_LAST_RC" "1"
 
-# Same transcript through Stop hook → auto-advance fires (last spec is complete).
+# 9.3.0: spec emit no longer auto-advances. Phase 1 spec-emit is a no-op
+# state tag (records hash for reference). State stays at phase=1 until
+# summary-confirm askq fires.
 _ms_init
 printf '%s' "{\"transcript_path\":\"${_ms_t}\",\"session_id\":\"ms\",\"cwd\":\"${_ms_proj}\"}" \
   | CLAUDE_PROJECT_DIR="$_ms_proj" \
@@ -90,9 +92,7 @@ printf '%s' "{\"transcript_path\":\"${_ms_t}\",\"session_id\":\"ms\",\"cwd\":\"$
     bash "$REPO_ROOT/hooks/mcl-stop.sh" >/dev/null 2>&1
 
 _ms_phase="$(python3 -c "import json; d=json.load(open('$_ms_proj/.mcl/state.json')); print(d.get('current_phase'))")"
-_ms_appr="$(python3 -c "import json; d=json.load(open('$_ms_proj/.mcl/state.json')); print(str(d.get('spec_approved')).lower())")"
-assert_equals "multi-spec → Stop auto-advances to phase=4" "$_ms_phase" "4"
-assert_equals "multi-spec → spec_approved=true" "$_ms_appr" "true"
+assert_equals "multi-spec on Phase 1 → state stays at 1 (9.3.0 no auto-advance)" "$_ms_phase" "1"
 
 # Reverse case: latest spec is INCOMPLETE → block fires.
 _ms_init

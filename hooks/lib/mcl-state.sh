@@ -432,10 +432,10 @@ if phase == 2:
         print("2")
     sys.exit(0)
 
-# phase >= 4: spec approved, executing or reviewing
-if not approved:
-    # Shouldn't happen (phase=4 requires approved=true), but guard it
-    print("?"); sys.exit(0)
+# 9.3.0: spec_approved removed from canonical schema. Phase 4+ is
+# determined by current_phase alone (advanced via Phase 1 summary-
+# confirm askq, not spec emit). Legacy state files with spec_approved
+# still work — when phase>=4, treat as approved regardless of the field.
 
 # Phase 4.5 / 4.6 — review dialog
 if pr_state == "running":

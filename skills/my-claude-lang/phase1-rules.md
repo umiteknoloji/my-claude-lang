@@ -109,9 +109,13 @@ the spec now." STOP and wait for the tool_result.
 
 5. If the tool_result is non-approve-family (edit/cancel/etc.) → ask
    "What did I get wrong?" and re-run gathering.
-6. Only after the tool_result returns an approve-family option → call
-   Phase 2. `ui_flow_active` is already set by activation; stop hook
-   does NOT touch it on summary-confirm.
+6. **On approve (since 9.3.0).** Stop hook transitions state directly
+   to `current_phase=4` (EXECUTE) on summary-confirm approve. Phase 2
+   (SPEC_REVIEW) and Phase 3 (USER_VERIFY) are removed — summary-confirm
+   IS the gate. Next turn: model emits `📋 Spec:` documentation block
+   (per `phase-spec-doc.md`) AND begins Phase 4 code writing in the
+   same response. UI flow side effects (BUILD_UI sub-phase, rollback
+   checkpoint) fire here too.
 
 ## Disambiguation Triage
 

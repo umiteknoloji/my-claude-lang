@@ -310,35 +310,26 @@ fi
 # transcript scan can match a quoted spec snippet from earlier
 # turns or a short ad-hoc spec the model emitted in Phase 4 prose
 # (project/pages/stack notes, etc.) and mistake it for truncation.
-_PS_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
-if [ "$_PS_APPROVED" = "true" ] || [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
-  : # spec already approved or minimal-core — partial-spec detection skipped
+_PS_PHASE_PRE="$(mcl_state_get current_phase 2>/dev/null)"
+if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
+  : # minimal-core — spec format detection skipped
 else
 PARTIAL_MISSING="$(bash "$_MCL_HOOK_DIR/lib/mcl-partial-spec.sh" check "$TRANSCRIPT_PATH" 2>/dev/null)"
 PARTIAL_RC=$?
 PARTIAL_STATE="$(mcl_state_get partial_spec 2>/dev/null)"
 case "$PARTIAL_RC" in
   0)
+    # 9.3.0: spec format violation is ADVISORY, not a block. Audit only.
+    # Spec is documentation, not a state gate; Write/Edit stays unlocked.
     mcl_state_set partial_spec true
     if [ -n "$SPEC_HASH" ]; then
       mcl_state_set partial_spec_body_sha "\"${SPEC_HASH:0:16}\""
     fi
     _PS_MISSING_CSV="$(printf '%s' "$PARTIAL_MISSING" | tr '\n' ',' | sed 's/,$//')"
-    mcl_audit_log "partial-spec" "stop" "missing=${_PS_MISSING_CSV}"
-    mcl_debug_log "stop" "partial-spec" "missing=$(printf '%s' "$PARTIAL_MISSING" | tr '\n' '|')"
-    # 9.0.0: emit decision:block with the concrete header template AND
-    # the specific missing-section list. Pre-9.0 path was audit-only; the
-    # PARTIAL_SPEC_NOTICE on the NEXT activate told the model what to do,
-    # but real-session telemetry showed the model often re-emitted the
-    # same incomplete spec because the previous turn's instruction was
-    # too generic. Forcing in-turn recovery via decision:block + a copy-
-    # paste-ready template + a "DO NOT debug hook files" line breaks the
-    # loop.
-    printf '%s\n' "{
-  \"decision\": \"block\",
-  \"reason\": \"MCL: Spec eksik bölüm — ${_PS_MISSING_CSV}. Re-emit per phase2-spec.md template.\"
-}"
-    exit 0
+    mcl_audit_log "spec-format-warn" "stop" "missing=${_PS_MISSING_CSV}"
+    mcl_debug_log "stop" "spec-format-warn" "missing=$(printf '%s' "$PARTIAL_MISSING" | tr '\n' '|')"
+    # No decision:block — let the turn continue. Advisory text appears
+    # via session-context bridge on the next activate prompt.
     ;;
   1)
     if [ "$PARTIAL_STATE" = "true" ]; then
@@ -349,23 +340,17 @@ case "$PARTIAL_RC" in
     fi
     ;;
   3)
-    # 9.2.1: model emitted spec-LIKE text without 📋 prefix (e.g. bare
-    # "Spec:" or "## Spec" heading). Force re-emit with canonical
-    # template — same enforcement discipline as rc=0 (missing headers).
+    # 9.3.0: spec without 📋 prefix → advisory only. Audit + continue.
     _PS_OFFENDER="$(printf '%s' "$PARTIAL_MISSING" | head -c 80)"
-    mcl_audit_log "spec-no-emoji-block" "stop" "offender=${_PS_OFFENDER}"
-    mcl_debug_log "stop" "spec-no-emoji-block" "offender=${_PS_OFFENDER}"
-    printf '%s\n' "{
-  \"decision\": \"block\",
-  \"reason\": \"MCL: Spec format invalid (${_PS_OFFENDER}) — needs literal '📋 Spec:' prefix + 7 H2 sections per phase2-spec.md. Re-emit.\"
-}"
-    exit 0
+    mcl_audit_log "spec-format-warn" "stop" "offender=${_PS_OFFENDER} reason=missing-emoji"
+    mcl_debug_log "stop" "spec-format-warn" "offender=${_PS_OFFENDER}"
+    # 9.3.0: advisory only — no decision:block, no exit 0.
     ;;
   *)
     :
     ;;
 esac
-fi  # 9.1.2: end of `if spec_approved != true` guard around partial-spec
+fi  # end partial-spec advisory block (9.3.0: minimal-core skip only)
 
 # --- AskUserQuestion approval scanner (shared lib since 6.5.6) ---
 # The scanner lives at hooks/lib/mcl-askq-scanner.py. Stop and PreToolUse
@@ -1103,6 +1088,36 @@ print("\\n".join(lines))
       fi # end Perf gate (MCL_MINIMAL_CORE guard)
       # ---- end Perf gate ----
 
+      # ---- Phase 4.5 architectural drift + intent violation (since 9.3.0) ----
+      # Advisory only — emits audit entries but does not block. Helps
+      # /mcl-finish + Phase 6 surface scope-creep and intent-mismatch.
+      if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
+        _DRIFT_LIB="$_MCL_HOOK_DIR/lib/mcl-drift-scan.py"
+        if [ -f "$_DRIFT_LIB" ] && command -v python3 >/dev/null 2>&1 \
+           && [ -n "${MCL_STATE_DIR:-}" ] && [ -n "${TRANSCRIPT_PATH:-}" ]; then
+          _DRIFT_JSON="$(_mcl_timeout 30 python3 "$_DRIFT_LIB" \
+            --state-dir "$MCL_STATE_DIR" \
+            --project-dir "${CLAUDE_PROJECT_DIR:-$PWD}" \
+            --transcript "$TRANSCRIPT_PATH" \
+            --lang "${MCL_USER_LANG:-tr}" 2>/dev/null || echo '{}')"
+          _DRIFT_COUNT="$(printf '%s' "$_DRIFT_JSON" | python3 -c \
+            'import json,sys; r=json.loads(sys.stdin.read() or "{}"); print(len(r.get("drift_findings",[])))' 2>/dev/null || echo 0)"
+          _IV_COUNT="$(printf '%s' "$_DRIFT_JSON" | python3 -c \
+            'import json,sys; r=json.loads(sys.stdin.read() or "{}"); print(len(r.get("intent_violations",[])))' 2>/dev/null || echo 0)"
+          if [ "$_DRIFT_COUNT" -gt 0 ] 2>/dev/null; then
+            _DRIFT_FILES="$(printf '%s' "$_DRIFT_JSON" | python3 -c \
+              'import json,sys; r=json.loads(sys.stdin.read() or "{}"); print(",".join(f.get("file","?") for f in r.get("drift_findings",[])[:5]))' 2>/dev/null)"
+            mcl_audit_log "phase4-5-drift" "mcl-stop" "count=${_DRIFT_COUNT} files=${_DRIFT_FILES}"
+          fi
+          if [ "$_IV_COUNT" -gt 0 ] 2>/dev/null; then
+            _IV_RULES="$(printf '%s' "$_DRIFT_JSON" | python3 -c \
+              'import json,sys; r=json.loads(sys.stdin.read() or "{}"); print(",".join(f.get("rule_id","?") for f in r.get("intent_violations",[])[:5]))' 2>/dev/null)"
+            mcl_audit_log "phase4-5-intent-violation" "mcl-stop" "count=${_IV_COUNT} rules=${_IV_RULES}"
+          fi
+        fi
+      fi
+      # ---- end drift + intent violation scan ----
+
       # ---- Phase 4.5 START test-coverage lens (since 8.19.0) ----
       _TEST_MEDIUM_PROSE=""
       if [ "${MCL_MINIMAL_CORE:-0}" != "1" ]; then
@@ -1466,80 +1481,51 @@ fi
 CURRENT_HASH="$(mcl_state_get spec_hash)"
 SPEC_APPROVED="$(mcl_state_get spec_approved)"
 
-# --- Spec-hash transitions (when a fresh spec is in this turn) ---
+# --- Spec emission as Phase 4 documentation artifact (since 9.3.0) ---
+# Phase model simplified in 9.3.0: spec is documentation, not a state
+# gate. Phase 1→4 transition fires on summary-confirm askq approval
+# (handled below). Spec emission only:
+#   - records spec_hash for reference
+#   - extracts scope_paths (used by Phase 4 path guard)
+#   - triggers spec-save (.mcl/specs/NNNN.md)
+# Format invalid (partial-spec rc=0 / rc=3) is handled at the top of
+# the hook with a decision:block — that's the spec-format guard.
 if [ -n "$SPEC_HASH" ]; then
   case "$CURRENT_PHASE" in
     1)
-      # 9.2.1: spec emit + format valid (partial-spec rc=1 verified) →
-      # AUTO-ADVANCE directly to Phase 4 + spec_approved=true. No
-      # AskUserQuestion required — Phase 1 (intent) and Phase 1.7
-      # (precision-audit GATEs) already gave the developer control.
-      mcl_state_set current_phase 4
-      mcl_state_set phase_name '"EXECUTE"'
-      mcl_state_set spec_approved true
+      # Spec emitted while still in Phase 1 — store the hash for
+      # reference but do NOT auto-advance. Phase 1→4 is summary-confirm-
+      # driven only. This is rare (model usually emits spec after
+      # summary-confirm) but we accept it as a no-op state tag.
       mcl_state_set spec_hash "\"$SPEC_HASH\""
-      mcl_state_set phase1_turn_count 0 >/dev/null 2>&1 || true
-      CURRENT_PHASE=4
-      CURRENT_HASH="$SPEC_HASH"
-      SPEC_APPROVED="true"
-      _AUTO_ADVANCED=1
-
-      # UI flow intent scan (since 6.5.4 — bootstrap UI detection).
-      UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
-      SPEC_INTENT_SCANNER="$_MCL_HOOK_DIR/lib/mcl-spec-ui-intent.py"
-      if [ "$UI_FLOW_ON" != "true" ] && [ -f "$SPEC_INTENT_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
-        UI_INTENT="$(python3 "$SPEC_INTENT_SCANNER" "$TRANSCRIPT_PATH" 2>/dev/null)"
-        if [ "$UI_INTENT" = "true" ]; then
-          mcl_state_set ui_flow_active true
-          UI_FLOW_ON="true"
-          mcl_audit_log "ui-flow-spec-intent" "stop" "hash=${CURRENT_HASH:0:12}"
-          command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_flow_spec_intent "${CURRENT_HASH:0:12}"
-        fi
-      fi
-      if [ "$UI_FLOW_ON" = "true" ]; then
-        mcl_state_set ui_sub_phase '"BUILD_UI"'
-        mcl_audit_log "ui-flow-enter-build" "stop" "hash=${CURRENT_HASH:0:12}"
-      fi
-
-      mcl_audit_log "auto-approve-spec" "stop" "hash=${CURRENT_HASH:0:12} phase=1->4 ui_flow=${UI_FLOW_ON}"
-      mcl_debug_log "stop" "auto-approve-spec" "hash=${CURRENT_HASH:0:12} phase=1->4"
-      command -v mcl_trace_append >/dev/null 2>&1 && {
-        mcl_trace_append spec_emit "hash=${CURRENT_HASH:0:12}"
-        mcl_trace_append spec_approved "${CURRENT_HASH:0:12}"
-        mcl_trace_append phase_transition 1 4
-        [ "$UI_FLOW_ON" = "true" ] && mcl_trace_append ui_flow_enabled
-      }
-      command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Spec algılandı + format geçerli. Faz 1 → 4 (auto-approve)."
-      bash "$_MCL_HOOK_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
-
-      # Rollback checkpoint — record HEAD SHA before any Phase 4 writes.
-      _ROLLBACK_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
-      if [ -n "$_ROLLBACK_SHA" ]; then
-        mcl_state_set rollback_sha "\"${_ROLLBACK_SHA}\"" >/dev/null 2>&1 || true
-        mcl_audit_log "rollback-checkpoint" "stop" "sha=${_ROLLBACK_SHA:0:12}"
-        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append rollback_checkpoint "${_ROLLBACK_SHA:0:12}"
-      fi
-      ;;
-    2|3)
-      if [ "$CURRENT_HASH" != "$SPEC_HASH" ]; then
-        mcl_state_set spec_hash "\"$SPEC_HASH\""
-        mcl_debug_log "stop" "hash-update-pre-approval" "old=${CURRENT_HASH:0:12} new=${SPEC_HASH:0:12}"
-      else
-        mcl_debug_log "stop" "idempotent-noop" "hash=${SPEC_HASH:0:12}"
-      fi
+      mcl_debug_log "stop" "spec-emit-phase1-noop" "hash=${SPEC_HASH:0:12}"
       ;;
     4|5)
-      mcl_debug_log "stop" "post-approval-noop" "phase=${CURRENT_PHASE} hash=${SPEC_HASH:0:12}"
+      # First spec emit on Phase 4 entry — record hash, extract scope,
+      # save spec file. Subsequent emits (revisions) update the hash.
+      if [ "$CURRENT_HASH" != "$SPEC_HASH" ]; then
+        mcl_state_set spec_hash "\"$SPEC_HASH\""
+        mcl_audit_log "spec-emit" "stop" "hash=${SPEC_HASH:0:12} phase=${CURRENT_PHASE}"
+        command -v mcl_trace_append >/dev/null 2>&1 && \
+          mcl_trace_append spec_emit "hash=${SPEC_HASH:0:12}"
+        bash "$_MCL_HOOK_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$SPEC_HASH" 2>/dev/null || true
+        CURRENT_HASH="$SPEC_HASH"
+        # Trigger scope_paths + pattern_scan extraction below (gated on
+        # _SPEC_FRESHLY_EMITTED flag).
+        _SPEC_FRESHLY_EMITTED=1
+      else
+        mcl_debug_log "stop" "spec-emit-idempotent" "hash=${SPEC_HASH:0:12}"
+      fi
       ;;
   esac
 fi
 
-# --- AskUserQuestion approval transition (replaces marker branch) ---
-# 9.2.1: AskUserQuestion-driven spec approval is REMOVED. The
-# auto-approve path in `case 1` above already wrote phase=4 and
-# spec_approved=true. We still run scope-paths + pattern-scan side
-# effects here, gated on _AUTO_ADVANCED=1 (set in the case 1 block).
-if [ "${_AUTO_ADVANCED:-0}" = "1" ]; then
+# --- Spec-emit side effects: scope-paths + pattern-scan (since 9.3.0) ---
+# Trigger: a fresh spec was emitted on a Phase 4 turn (_SPEC_FRESHLY_EMITTED=1
+# from the case 4|5 block above). Extract spec scope paths and run the
+# pattern-matching cascade. Phase 1→4 transition is summary-confirm-
+# driven (see Phase 1 summary-confirm branch ~250 lines below).
+if [ "${_SPEC_FRESHLY_EMITTED:-0}" = "1" ]; then
     # Scope Guard — extract file-path tokens from the spec body and store
     # in state.scope_paths so mcl-pre-tool.sh can block Phase 4 writes
     # that land outside the declared scope. Empty array = no restriction.
@@ -1598,9 +1584,14 @@ PYEXTRACT
       _SCOPE_VALID="$(printf '%s' "${_SCOPE_JSON:-[]}" | python3 -c \
         'import json,sys; a=json.loads(sys.stdin.read()); print(json.dumps(a)) if isinstance(a,list) else print("[]")' \
         2>/dev/null || echo '[]')"
-      mcl_state_set scope_paths "${_SCOPE_VALID}" >/dev/null 2>&1 || true
       _SCOPE_COUNT="$(printf '%s' "$_SCOPE_VALID" | python3 -c \
         'import json,sys; print(len(json.loads(sys.stdin.read())))' 2>/dev/null || echo 0)"
+      # 9.3.0: only overwrite scope_paths when extraction found something.
+      # Empty extraction (parser failed / spec lacks paths) preserves any
+      # existing scope_paths the developer / earlier turn set.
+      if [ "$_SCOPE_COUNT" -gt 0 ] 2>/dev/null; then
+        mcl_state_set scope_paths "${_SCOPE_VALID}" >/dev/null 2>&1 || true
+      fi
       mcl_audit_log "scope-paths-set" "stop" "count=${_SCOPE_COUNT} hash=${CURRENT_HASH:0:12}"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_init "${_SCOPE_COUNT}"
     fi
@@ -1679,16 +1670,47 @@ else:
     fi
 fi # end auto-advance side effects (9.2.1)
 
-# --- Phase 1 summary-confirm ---
-# Since 6.5.2 ui_flow_active is owned by mcl-activate.sh (stack
-# heuristic). The summary-confirm askq is a plain 3-option form
-# (approve / edit / cancel) with NO UI opt-out. This branch only
-# logs the approve/non-approve decision for auditability.
+# --- Phase 1 summary-confirm → Phase 1→4 transition (since 9.3.0) ---
+# Phase model simplified in 9.3.0: spec_approved removed, Phase 2/3
+# (SPEC_REVIEW / USER_VERIFY) gone. The Phase 1 summary-confirm askq
+# IS the gate — once the developer approves the Phase 1 summary,
+# state advances directly to Phase 4 (EXECUTE). The 📋 Spec: block
+# emitted in Phase 4's first turn is documentation, not a transition
+# trigger.
 if [ "$ASKQ_INTENT" = "summary-confirm" ]; then
   if _mcl_is_approve_option "$ASKQ_SELECTED"; then
-    mcl_audit_log "summary-confirm-approve" "stop" "selected=${ASKQ_SELECTED}"
+    _SC_CUR_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+    mcl_audit_log "summary-confirm-approve" "stop" "selected=${ASKQ_SELECTED} phase=${_SC_CUR_PHASE}"
     mcl_debug_log "stop" "summary-confirm-approve" "selected=${ASKQ_SELECTED}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append summary_confirmed approved
+    if [ "$_SC_CUR_PHASE" = "1" ]; then
+      mcl_state_set current_phase 4
+      mcl_state_set phase_name '"EXECUTE"'
+      # Backward-compat: spec_approved still settable for older readers.
+      mcl_state_set spec_approved true >/dev/null 2>&1 || true
+      mcl_state_set phase1_turn_count 0 >/dev/null 2>&1 || true
+      mcl_audit_log "phase-transition-to-execute" "stop" "1->4 source=summary-confirm"
+      command -v mcl_trace_append >/dev/null 2>&1 && {
+        mcl_trace_append phase_transition 1 4
+        mcl_trace_append summary_confirm_advance "1->4"
+      }
+      command -v mcl_log_append >/dev/null 2>&1 && \
+        mcl_log_append "Faz 1 özeti onaylandı. Faz 1 → 4 (EXECUTE) geçişi."
+      # UI flow check — if active, enter BUILD_UI sub-phase.
+      _SC_UI_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
+      if [ "$_SC_UI_ON" = "true" ]; then
+        mcl_state_set ui_sub_phase '"BUILD_UI"'
+        mcl_audit_log "ui-flow-enter-build" "stop" "source=summary-confirm"
+      fi
+      # Rollback checkpoint — record HEAD SHA before any Phase 4 writes.
+      _SC_ROLLBACK_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
+      if [ -n "$_SC_ROLLBACK_SHA" ]; then
+        mcl_state_set rollback_sha "\"${_SC_ROLLBACK_SHA}\"" >/dev/null 2>&1 || true
+        mcl_audit_log "rollback-checkpoint" "stop" "sha=${_SC_ROLLBACK_SHA:0:12}"
+        command -v mcl_trace_append >/dev/null 2>&1 && \
+          mcl_trace_append rollback_checkpoint "${_SC_ROLLBACK_SHA:0:12}"
+      fi
+    fi
   else
     mcl_debug_log "stop" "summary-confirm-non-approve" "selected=${ASKQ_SELECTED}"
   fi
