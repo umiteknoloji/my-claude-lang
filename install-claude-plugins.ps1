@@ -57,7 +57,6 @@ if (-not ($hasWinget -or $hasScoop -or $hasChoco)) {
 
 Log-Step "1. Marketplace'ler"
 claude plugin marketplace add anthropics/claude-plugins-official
-claude plugin marketplace add obra/superpowers-marketplace
 
 Log-Step "2. Proje Başlangıcı & Kurulum"
 claude plugin install claude-code-setup@claude-plugins-official
@@ -82,9 +81,8 @@ claude plugin install commit-commands@claude-plugins-official
 claude plugin install pr-review-toolkit@claude-plugins-official
 claude plugin install code-review@claude-plugins-official
 
-Log-Step "7. İteratif İyileştirme + Superpowers"
+Log-Step "7. İteratif İyileştirme"
 claude plugin install ralph-loop@claude-plugins-official
-claude plugin install superpowers@superpowers-marketplace
 
 # ============================================================================
 # BÖLÜM 2: LSP Plugin'leri + Binary'leri

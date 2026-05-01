@@ -2,8 +2,6 @@
 
 # Phase 4c: BACKEND_INTEGRATION — Wire Real Data
 
-**`superpowers` (tier-A, ambient):** active throughout this phase.
-
 ## Entry Condition
 
 Phase 4c starts automatically when:

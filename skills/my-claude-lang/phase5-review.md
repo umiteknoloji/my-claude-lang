@@ -2,8 +2,6 @@
 
 # Phase 5: Verification Report
 
-**`superpowers` (tier-A, ambient):** active throughout this phase — no explicit dispatch point; its methodology layer applies as a behavioral prior.
-
 Phase 5 is NOT just a review translation. It is a comprehensive verification
 that gives the developer confidence that the AI did the right thing.
 

@@ -2,8 +2,6 @@
 
 # Phase 2: Generate English Spec
 
-**`superpowers` (tier-A, ambient):** active throughout this phase — no explicit dispatch point; its methodology layer applies as a behavioral prior.
-
 Called automatically when Phase 1 parameters are complete and confirmed.
 
 ## Purpose

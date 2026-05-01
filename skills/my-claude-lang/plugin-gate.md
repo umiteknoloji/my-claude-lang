@@ -14,8 +14,8 @@ hard stop, not a friendly reminder.
 The `mcl-activate.sh` hook runs the gate check exactly once per session
 — on the FIRST `UserPromptSubmit` of that session. It:
 
-1. Computes the required set: curated tier-A (`superpowers`,
-   `security-guidance`) plus one LSP plugin per stack tag returned by
+1. Computes the required set: curated tier-A (`security-guidance`)
+   plus one LSP plugin per stack tag returned by
    `mcl-stack-detect.sh` (e.g. `typescript-lsp`, `pyright-lsp`,
    `gopls-lsp`).
 2. Reads `~/.claude/plugins/installed_plugins.json` and verifies a key

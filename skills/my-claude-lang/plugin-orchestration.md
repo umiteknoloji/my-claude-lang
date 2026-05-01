@@ -24,7 +24,6 @@ without the developer asking, as a required part of every session.
 
 | Plugin               | Tier                           | Trigger                                                                            | MCL phase alignment                                                    |
 | -------------------- | ------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `superpowers`        | tier-A (always-on)             | Every session                                                                      | Ambient methodology layer — present across all phases                  |
 | `feature-dev`        | tier-B (classifier-gated)      | Request-type classifier returns `feature`                                          | code-explorer → Phase 1; code-architect → Phase 4; code-reviewer → Phase 4.5; FD-7 → Phase 5 |
 | `code-review`        | tier-A (diff-gated)            | Meaningful diff exists in current git working tree                                 | Findings merge into Phase 4.5 dialog                                   |
 | `pr-review-toolkit`  | tier-A + selective             | Always-on for high-signal agents; selective sub-agents fire on code-shape triggers | Selective findings merge into Phase 4.5 dialog                         |
@@ -169,20 +168,17 @@ Excluding MCP wholesale is the only auditable rule.
 
 ## Phase dispatch map
 
-Alignment points between plugin sub-agents and MCL phases. The
-`superpowers` row makes the always-on ambient layer explicit rather
-than burying it in a footer note — it has no single dispatch point
-but its methodology is present across every row below.
+Alignment points between plugin sub-agents and MCL phases.
 
-| MCL phase                    | Plugins dispatched (when applicable)                                                                                            | Ambient                  |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| Phase 1 (gather)             | `feature-dev/code-explorer` (if classifier=feature) — findings feed MCL's Phase 1 question pool                                 | `superpowers` (tier-A)   |
-| Phase 2 (spec)               | No plugin dispatch — MCL-native                                                                                                  | `superpowers` (tier-A)   |
-| Phase 3 (verify)             | No plugin dispatch — MCL-native                                                                                                  | `superpowers` (tier-A)   |
-| Phase 4 (execute)            | `feature-dev/code-architect` (if classifier=feature) — architecture options localized + presented alongside MCL's own analysis   | `superpowers` (tier-A) + `security-guidance` (PreToolUse hook) |
-| Phase 4.5 (risk review)      | `feature-dev/code-reviewer`; `code-review` 4-agent suite; `pr-review-toolkit` selective agents; Semgrep (Spec-1 SAST)             | `superpowers` (tier-A)   |
-| Phase 4.6 (impact analysis)  | No plugin dispatch — MCL-native                                                                                                  | `superpowers` (tier-A)   |
-| Phase 5 (verification)       | `feature-dev` FD-7 summary merged into MCL's Verification Report                                                                 | `superpowers` (tier-A)   |
+| MCL phase                    | Plugins dispatched (when applicable)                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 1 (gather)             | `feature-dev/code-explorer` (if classifier=feature) — findings feed MCL's Phase 1 question pool                                 |
+| Phase 2 (spec)               | No plugin dispatch — MCL-native                                                                                                  |
+| Phase 3 (verify)             | No plugin dispatch — MCL-native                                                                                                  |
+| Phase 4 (execute)            | `feature-dev/code-architect` (if classifier=feature) — architecture options localized + presented alongside MCL's own analysis; `security-guidance` (PreToolUse hook) |
+| Phase 4.5 (risk review)      | `feature-dev/code-reviewer`; `code-review` 4-agent suite; `pr-review-toolkit` selective agents; Semgrep (Spec-1 SAST)             |
+| Phase 4.6 (impact analysis)  | No plugin dispatch — MCL-native                                                                                                  |
+| Phase 5 (verification)       | `feature-dev` FD-7 summary merged into MCL's Verification Report                                                                 |
 
 ## Request-type classifier (tier-B gate)
 
@@ -221,7 +217,6 @@ consolidated block** in the developer's language — not a sequence of
 per-plugin nags:
 
 > *"MCL orkestrasyon seti için şu plugin'ler eksik:*
-> *`/plugin install superpowers@claude-plugins-official`*
 > *`/plugin install feature-dev@claude-plugins-official`*
 > *`/plugin install code-review@claude-plugins-official`*
 > *`/plugin install pr-review-toolkit@claude-plugins-official`*
@@ -253,9 +248,8 @@ per-session only.
 The full `claude-plugins-official` marketplace (145 plugins, the same
 list Claude Code's `/plugin` Discover tab surfaces) was walked against
 the tier-2 criteria: no `.mcp.json` (Rule C), natural alignment with
-a single MCL phase, no role overlap with the curated 5 unless Rule B
-different-angle value is clear, and non-ambient (not duplicating
-`superpowers`' methodology role).
+a single MCL phase, and no role overlap with the curated set unless
+Rule B different-angle value is clear.
 
 **Result: 0 additions to the curated set.** The pool partitioned as:
 
@@ -292,8 +286,6 @@ this survey's partitioning.
 - Custom (developer-authored) plugins. MCL's curated set is
   authoritative; a developer's own plugins run via the
   `plugin-integration.md` slash-command path if invoked explicitly.
-- Rearranging `superpowers`' methodology layer into discrete phase
-  checkpoints. `superpowers` is ambient by design.
 
 ## Dispatch Audit (since 7.9.5)
 
@@ -306,7 +298,7 @@ turn where `phase_review_state=running`.
 
 | Dispatch type | Required plugin | Detection |
 |---|---|---|
-| Task sub-agent | `pr-review-toolkit:*` or `code-review:*` or `superpowers:code-reviewer` | `plugin_dispatched` event in `trace.log` after last `phase_review_pending` |
+| Task sub-agent | `pr-review-toolkit:*` or `code-review:*` | `plugin_dispatched` event in `trace.log` after last `phase_review_pending` |
 | Bash tool | semgrep scan | `semgrep_ran` event in `trace.log` after last `phase_review_pending` |
 
 Semgrep is only required when the binary is available and the project stack

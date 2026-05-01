@@ -3,10 +3,9 @@
 #
 # Phase 4.5 mandatory dispatches:
 #   (a) Code-review sub-agent: any plugin_dispatched event whose subagent_type
-#       starts with "pr-review-toolkit", "code-review", or equals
-#       "superpowers:code-reviewer" — must appear AFTER the last
-#       phase_review_pending event in trace.log (i.e., after Phase 4 code
-#       was written and Phase 4.5 started).
+#       starts with "pr-review-toolkit" or "code-review" — must appear AFTER
+#       the last phase_review_pending event in trace.log (i.e., after Phase 4
+#       code was written and Phase 4.5 started).
 #   (b) Semgrep scan: a semgrep_ran event in trace.log after phase_review_pending,
 #       unless semgrep is known to be unavailable (skip flag).
 #
@@ -57,7 +56,7 @@ if last_pending_idx == -1:
 code_review_found = False
 semgrep_found     = False
 
-code_review_prefixes = ("pr-review-toolkit", "code-review", "superpowers:code-reviewer")
+code_review_prefixes = ("pr-review-toolkit", "code-review")
 
 for line in lines[last_pending_idx + 1:]:
     parts = line.split(" | ", 2)

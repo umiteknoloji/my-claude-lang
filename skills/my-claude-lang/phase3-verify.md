@@ -2,8 +2,6 @@
 
 # Phase 3: Claude Code Understanding Verification
 
-**`superpowers` (tier-A, ambient):** active throughout this phase — no explicit dispatch point; its methodology layer applies as a behavioral prior.
-
 Called automatically when spec is generated.
 
 1. Claude Code must summarize its understanding in English

@@ -2,8 +2,6 @@
 
 # Phase 1: Gather Parameters — Detailed Rules
 
-**`superpowers` (tier-A, ambient):** active throughout this phase — no explicit dispatch point; its methodology layer applies as a behavioral prior.
-
 ## Pre-Flow: LSP Plugin Check (first developer message only)
 
 Before Step 1 below, on the **first** developer message of a conversation:

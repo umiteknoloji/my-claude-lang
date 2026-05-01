@@ -2,8 +2,6 @@
 
 # Phase 4 TDD: incremental red-green-refactor
 
-**`superpowers` (tier-A, ambient):** active throughout this overlay — no explicit dispatch point; its methodology layer applies as a behavioral prior.
-
 Phase 4 normally writes production code immediately after the spec
 is approved. This overlay turns that into an **incremental TDD cycle**:
 for each Acceptance Criterion, one test → RED → minimum code → GREEN

@@ -2,8 +2,6 @@
 
 # Phase 4b: UI_REVIEW — Developer-Verified Before Backend
 
-**`superpowers` (tier-A, ambient):** active throughout this phase.
-
 ## Entry Condition
 
 Phase 4b is **deferred** since 6.5.0. Phase 4a now auto-starts the dev

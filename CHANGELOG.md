@@ -7,6 +7,41 @@
 
 ## [Unreleased]
 
+## [8.4.3] - 2026-05-01
+
+### Kaldırıldı — `superpowers` plugin tamamen MCL'den çıkarıldı
+
+`superpowers` plugin'i MCL'in curated required setinde olduğu için, kurulu değilken MCL kendini kilitliyordu (mutating tool'lar bloke). Artık `superpowers` MCL'in herhangi bir parçası değil — required listesinde yok, dispatch path'lerinde yok, hook block'larında yok, dokümantasyonda yok.
+
+#### Hook'lar
+- `hooks/lib/mcl-plugin-gate.sh` — `mcl_plugin_gate_required_plugins()` artık `superpowers` döndürmüyor. Curated tier-A required = sadece `security-guidance` + stack-detected LSP plugin'leri.
+- `hooks/mcl-pre-tool.sh` — `superpowers:brainstorming` Skill bloğu kaldırıldı. TodoWrite Phase 1-3 bloğunun reason metni "superpowers:brainstorming interference" referansından arındırıldı.
+- `hooks/lib/mcl-dispatch-audit.sh` — Phase 4.5 code-review prefix tuple'ından `superpowers:code-reviewer` çıkarıldı. Artık sadece `pr-review-toolkit` ve `code-review` aranıyor.
+- `hooks/mcl-activate.sh` STATIC_CONTEXT — `<mcl_constraint name="superpowers-scope">` bloğu tamamen silindi; sub-agent-phase-discipline ve dispatch-audit constraint'lerinden `superpowers` örnekleri çıkarıldı.
+
+#### Skill'ler
+- `skills/my-claude-lang/plugin-orchestration.md` — curated set tablosundan `superpowers` satırı silindi; phase dispatch tablosundan "Ambient" sütunu kaldırıldı; install-suggestion bloğundan ve tier-2 outcome notundan `superpowers` referansları çıkarıldı; "Out of scope" listesinden ambient methodology maddesi silindi; Phase 4.5 manifest tablosundan `superpowers:code-reviewer` çıkarıldı.
+- `skills/my-claude-lang/plugin-gate.md` — curated tier-A enumeration `(security-guidance)` olarak kısaltıldı.
+- `skills/my-claude-lang/plugin-suggestions.md` — orchestration-set listesinden `superpowers` çıkarıldı.
+- `skills/my-claude-lang.md` — curated plugin listesinden ve "always-on ambient methodology layer" paragrafından `superpowers` referansları çıkarıldı.
+- 12 phase skill dosyası (`phase1-rules`, `phase2-spec`, `phase3-verify`, `phase4-execute`, `phase4-tdd`, `phase4-5-risk-review`, `phase4-6-impact-review`, `phase4a-ui-build`, `phase4b-ui-review`, `phase4c-backend`, `phase5-review`) — her birindeki `**\`superpowers\` (tier-A, ambient):**` bullet'ı silindi.
+
+#### Dokümanlar
+- `README.md`, `README.tr.md` — Step 1 kurulum metninden `superpowers` ve `obra/superpowers-marketplace` çıkarıldı.
+- `FEATURES.md` — Hook Dominance tablosundan ve listesinden `superpowers:brainstorming` satırı silindi.
+- `CLAUDE.md` (proje) — devtime plan critique notundan `superpowers:code-reviewer` parantezli açıklaması çıkarıldı.
+- `install-claude-plugins.sh`, `install-claude-plugins.ps1` — `obra/superpowers-marketplace` marketplace ekleme satırı ve `superpowers` install komutu kaldırıldı.
+
+#### Test
+- `tests/cases/test-plugin-gate-no-superpowers.sh` — regression: `mcl_plugin_gate_required_plugins` çıktısının `superpowers` içermediğini ve `security-guidance`'ın hâlâ listede olduğunu assert eder.
+
+#### Banner
+- Tüm `MCL 8.4.2` referansları (`🌐` banner ve `AskUserQuestion` prefix'leri) `MCL 8.4.3` olarak güncellendi.
+
+### Geriye dönük uyumluluk
+
+Bu kaldırma kırıcı bir değişiklik değildir — `superpowers` MCL tarafından zaten zorunlu kılınıyordu, çıkarılması mevcut MCL kullanıcıları için yalnızca bir kilit kaldırma anlamına geliyor. `superpowers`'ı manuel olarak yüklemiş olanlar için davranış değişmiyor: MCL artık onu hiçbir şekilde dispatch etmiyor veya gate'lemiyor.
+
 ## [8.4.2] - 2026-04-29
 
 ### Düzeltildi — Real-use test'in açtığı 3 kalibrasyon sapması

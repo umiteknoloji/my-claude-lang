@@ -117,7 +117,7 @@ Every closed-ended gate (Phase 1 summary, Phase 3 spec approval, each
 Phase 4.5 risk, each Phase 4.6 impact, plugin consent, git-init consent,
 drift resolution, `/mcl-update` / `/mcl-finish` / pasted-CLI confirmation)
 now arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 8.1.3 | `. You pick an option in the UI — no typing
+question prefix `MCL 8.4.3 | `. You pick an option in the UI — no typing
 "yes" or "✅ MCL APPROVED" required. Open-ended Phase 1 gathering stays
 as a plain-text conversation.
 
@@ -126,7 +126,7 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 8.1.3` so you always know the bridge is active.
+Every response starts with `🌐 MCL 8.4.3` so you always know the bridge is active.
 
 ### UI Build / Review Sub-Phases (since 6.2.0)
 
@@ -224,9 +224,9 @@ MCL makes disambiguation **mandatory, not optional**:
 
 ### Step 1 — Install the required Claude Code plugins (BEFORE MCL)
 
-Since 6.1.0, MCL hard-gates itself until the curated orchestration plugins
-(`superpowers`, `security-guidance`) and every stack-detected LSP plugin
-are installed. Run the installer for your platform first:
+Since 6.1.0, MCL hard-gates itself until the curated orchestration plugin
+(`security-guidance`) and every stack-detected LSP plugin are installed.
+Run the installer for your platform first:
 
 ```bash
 # macOS / Linux
@@ -239,11 +239,10 @@ chmod +x install-claude-plugins.sh
 .\install-claude-plugins.ps1
 ```
 
-The scripts register the official `claude-plugins-official` marketplace
-plus the community `obra/superpowers-marketplace`, then install the
-curated orchestration set and every LSP plugin Claude Code ships. Both
-scripts are idempotent — safe to re-run. The `claude` CLI must be on
-your PATH.
+The scripts register the official `claude-plugins-official` marketplace,
+then install the curated orchestration set and every LSP plugin Claude
+Code ships. Both scripts are idempotent — safe to re-run. The `claude`
+CLI must be on your PATH.
 
 > **Why this comes first:** if you skip it, MCL's PreToolUse hook will
 > deny `Write` / `Edit` / `MultiEdit` / `NotebookEdit` and writer-Bash

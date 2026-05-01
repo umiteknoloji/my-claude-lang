@@ -182,42 +182,14 @@ print(json.dumps({
   fi
 fi
 
-# -------- Branch: block superpowers:brainstorming when MCL is active --------
-# superpowers:using-superpowers has a hard "ABSOLUTELY MUST" instruction to
-# invoke brainstorming before any response. This creates a parallel workflow
-# that conflicts with MCL Phase 1-3. Block at hook level — behavioral rules
-# in STATIC_CONTEXT are not strong enough to override it.
-if [ "$TOOL_NAME" = "Skill" ] && command -v python3 >/dev/null 2>&1; then
-  _SKILL_NAME="$(printf '%s' "$RAW_INPUT" | python3 -c '
-import json, sys
-try:
-    obj = json.loads(sys.stdin.read())
-    print((obj.get("tool_input") or {}).get("skill","") or "")
-except Exception:
-    pass
-' 2>/dev/null)"
-  case "$_SKILL_NAME" in
-    superpowers:brainstorming|superpowers:brainstorm)
-      mcl_audit_log "block-skill" "pre-tool" "skill=${_SKILL_NAME} reason=mcl-active"
-      python3 -c '
-import json, sys
-print(json.dumps({
-    "decision": "block",
-    "reason": "MCL ACTIVE — superpowers:brainstorming is suppressed. MCL Phase 1 (parameter gathering), Phase 2 (spec), and Phase 3 (verify) already fulfill the brainstorming role. Invoking superpowers:brainstorming would create a conflicting parallel workflow. Skip this skill call and proceed directly to MCL Phase 1."
-}))
-' 2>/dev/null
-      exit 0
-      ;;
-  esac
-fi
-# Non-brainstorming Skill calls pass through — allow.
+# -------- Skill calls pass through --------
 if [ "$TOOL_NAME" = "Skill" ]; then
   exit 0
 fi
 
 # -------- Branch: block TodoWrite in Phase 1-3 --------
-# TodoWrite in Phase 1-3 is always superpowers:brainstorming interference —
-# MCL manages phase state via state.json, not todo checklists.
+# MCL manages phase state via state.json, not todo checklists. Todo checklists
+# during Phase 1-3 duplicate and conflict with MCL phase logic.
 # Phase 4+ TodoWrite is allowed (legitimate task tracking during code execution).
 if [ "$TOOL_NAME" = "TodoWrite" ] && command -v python3 >/dev/null 2>&1; then
   _TW_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
@@ -231,7 +203,7 @@ if [ "$TOOL_NAME" = "TodoWrite" ] && command -v python3 >/dev/null 2>&1; then
 import json, sys
 print(json.dumps({
     "decision": "block",
-    "reason": "MCL ACTIVE (Phase 1-3) — TodoWrite is blocked. MCL manages phase state via state.json. Todo checklists during Phase 1-3 are a sign of superpowers:brainstorming interference — they duplicate and conflict with MCL phase logic. Proceed directly with MCL Phase 1 parameter gathering."
+    "reason": "MCL ACTIVE (Phase 1-3) — TodoWrite is blocked. MCL manages phase state via state.json. Todo checklists during Phase 1-3 duplicate and conflict with MCL phase logic. Proceed directly with MCL Phase 1 parameter gathering."
 }))
 ' 2>/dev/null
     exit 0

@@ -89,7 +89,6 @@ _mcl_plugin_gate_has_any_source_files() {
 
 mcl_plugin_gate_required_plugins() {
   # Curated tier-A always required, regardless of stack.
-  echo "superpowers"
   echo "security-guidance"
 
   local dir="${1:-$(pwd)}"
