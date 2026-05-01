@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+## 10.0.2 — 2026-05-01
+
+### Fixed
+- `bash install.sh` failed with `error: Your local changes to the
+  following files would be overwritten by merge: hooks/lib/__pycache__/
+  *.pyc` because Python regenerates bytecode at runtime and previous
+  releases tracked `__pycache__/` files in git.
+- `.gitignore` now excludes `__pycache__/`, `*.pyc`, `*.pyo`.
+- All previously-tracked `hooks/lib/__pycache__/*.pyc` files removed
+  from version control.
+- `install.sh` proactively deletes any `__pycache__/` directories under
+  the install location before `git pull --ff-only` so pre-10.0.2
+  installs upgrade cleanly.
+
+---
+
 ## 10.0.1 — 2026-05-01
 
 ### Removed

@@ -31,6 +31,11 @@ if [ -d "$LIB/.git" ]; then
   # `git pull --ff-only` doesn't trip on locally-modified tracked files.
   # The substitutions are re-applied below after pull lands the new VERSION.
   git -C "$LIB" checkout -- skills/ 2>/dev/null || true
+  # Python regenerates .pyc files at runtime; if a previous release
+  # tracked them they would collide on pull. Untrack + remove any
+  # pycache directories before pulling so the repo gitignore (now
+  # excluding __pycache__) can land cleanly.
+  find "$LIB" -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
   git -C "$LIB" pull --ff-only
 else
   if [ -e "$LIB" ]; then
