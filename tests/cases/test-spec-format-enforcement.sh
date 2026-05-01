@@ -60,7 +60,7 @@ assert_equals "bare 'Spec:' → partial-spec rc=3" "$_SF_LAST_RC" "3"
 _sf_out1="$(_sf_run_stop "$_sf_t1")"
 assert_contains "bare 'Spec:' → stop emits decision:block" "$_sf_out1" '"decision": "block"'
 assert_contains "bare 'Spec:' → reason mentions 📋 Spec:" "$_sf_out1" "📋 Spec:"
-assert_contains "bare 'Spec:' → reason mentions MCL SPEC FORMAT" "$_sf_out1" "MCL SPEC FORMAT"
+assert_contains "bare 'Spec:' → reason flags MCL: format invalid" "$_sf_out1" "format invalid"
 if grep -q "spec-no-emoji-block" "$_sf_proj/.mcl/audit.log" 2>/dev/null; then
   PASS=$((PASS+1))
   printf '  PASS: bare Spec: → spec-no-emoji-block audit captured\n'
@@ -86,7 +86,7 @@ _sf_run_partial_check "$_sf_t3"
 assert_equals "## Faz N — Spec heading → partial-spec rc=3" "$_SF_LAST_RC" "3"
 
 _sf_out3="$(_sf_run_stop "$_sf_t3")"
-assert_contains "Faz heading → reason has canonical template" "$_sf_out3" "## [Feature/Change Title]"
+assert_contains "Faz heading → reason points to phase2-spec.md" "$_sf_out3" "phase2-spec.md"
 
 # ---- Case 4: canonical complete spec → rc=1, no block ----
 _sf_init_state
@@ -105,8 +105,9 @@ _sf_run_partial_check "$_sf_t5"
 assert_equals "missing sections → partial-spec rc=0" "$_SF_LAST_RC" "0"
 
 _sf_out5="$(_sf_run_stop "$_sf_t5")"
-assert_contains "missing sections → MCL SPEC RECOVERY block" "$_sf_out5" "MCL SPEC RECOVERY"
+assert_contains "missing sections → decision:block" "$_sf_out5" '"decision": "block"'
 assert_contains "missing sections → cites Edge Cases" "$_sf_out5" "Edge Cases"
+assert_contains "missing sections → points to phase2-spec.md" "$_sf_out5" "phase2-spec.md"
 
 # ---- Case 6: empty transcript → rc=2 ----
 _sf_init_state

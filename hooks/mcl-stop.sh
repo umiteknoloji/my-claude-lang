@@ -336,7 +336,7 @@ case "$PARTIAL_RC" in
     # loop.
     printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL SPEC RECOVERY (mandatory)\n\nThe previous \`📋 Spec:\` block is missing exactly these required sections: \`${_PS_MISSING_CSV}\`.\n\nIn THIS same response, emit ONE COMPLETE \`📋 Spec:\` block. The new block fully replaces the prior one — do NOT write a delta or a partial fix. Required headers (verbatim, in this order):\n\n  ## [Title]\n  ## Objective\n  ## MUST\n  ## SHOULD\n  ## Acceptance Criteria\n  ## Edge Cases\n  ## Technical Approach\n  ## Out of Scope\n\nIf a section is genuinely empty for this task, write the header followed by \`- (none)\`. Never omit a header.\n\nDo NOT debug hook files (cat / grep / find under \`~/.mcl/\` or \`~/.claude/hooks/\`). The pipeline is healthy; the only required action is re-emitting the spec in this same response. Do NOT call AskUserQuestion for spec approval in this recovery turn — the developer approves the re-emitted spec on the NEXT turn.\"
+  \"reason\": \"MCL: Spec eksik bölüm — ${_PS_MISSING_CSV}. Re-emit per phase2-spec.md template.\"
 }"
     exit 0
     ;;
@@ -357,7 +357,7 @@ case "$PARTIAL_RC" in
     mcl_debug_log "stop" "spec-no-emoji-block" "offender=${_PS_OFFENDER}"
     printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL SPEC FORMAT (mandatory)\n\nYou wrote spec-like text (\`${_PS_OFFENDER}\`) but the required \`📋 Spec:\` line-anchored prefix is MISSING. The hook scanner only recognizes specs whose first non-blank line is literally \`📋 Spec:\` (clipboard emoji + space + Spec + colon, NOT inside a code block).\n\nIn THIS same response, re-emit the spec using the EXACT canonical format:\n\n📋 Spec:\n\n## [Feature/Change Title]\n\n## Objective\n[one precise sentence]\n\n## MUST\n- [non-negotiable requirement]\n\n## SHOULD\n- [expected behavior]\n\n## Acceptance Criteria\n- [ ] [observable, testable]\n\n## Edge Cases\n- [empty/null/invalid input]\n\n## Technical Approach\n- [files to modify]\n\n## Out of Scope\n- [explicitly excluded]\n\nForbidden formats: \`## Spec\` heading, \`Spec:\` without 📋 prefix, spec wrapped in triple-backticks. Do NOT call AskUserQuestion for spec approval in this recovery turn — the developer approves the re-emitted spec on the NEXT turn.\"
+  \"reason\": \"MCL: Spec format invalid (${_PS_OFFENDER}) — needs literal '📋 Spec:' prefix + 7 H2 sections per phase2-spec.md. Re-emit.\"
 }"
     exit 0
     ;;

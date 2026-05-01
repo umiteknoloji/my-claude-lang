@@ -111,19 +111,19 @@ a Pass condition, and a Skip condition.
 
 ---
 
-### STEP-22: spec-approval
-**Phase:** 3 | **Description:** After presenting the translated spec summary, Claude runs a Technical Challenge Pass: silently checks for concrete technical problems (scale issues, race conditions, N+1, missing auth, cascading failures). If a concrete problem is found, one localized `⚠️ Teknik not:` line is added BEFORE the AskUserQuestion call — not a gate, but visible to the developer. Then Claude calls AskUserQuestion with prefix `MCL X.Y.Z | ` and options Approve/Edit/Cancel. On approval, mcl-stop.sh transitions to Phase 4: `spec_approved=true`, `current_phase=4`.
-**Signal:** trace.log contains `spec_approved | <hash12>` and `phase_transition | 2 | 4` (or `3 | 4`). audit.log contains `approve-via-askuserquestion | stop`. state.json `spec_approved=true`, `current_phase=4`.
-**Pass:** trace.log has both `spec_approved` and `phase_transition` to 4. state.json `spec_approved=true`. Technical Challenge Pass ran (silently if no issues found).
-**Skip:** Never skipped — explicit approval is mandatory before Phase 4.
+### STEP-22: spec-auto-approve (since 9.2.1)
+**Phase:** 2→4 (spec emit turn) | **Description:** After presenting the translated spec summary, Claude runs a Technical Challenge Pass: silently checks for concrete technical problems (scale issues, race conditions, N+1, missing auth, cascading failures). If a concrete problem is found, one localized `⚠️ Teknik not:` line is added BEFORE the spec block — advisory only, the spec auto-approves regardless. Claude then emits the `📋 Spec:` block (📋 prefix + 7 H2 sections) and STOPS. **No AskUserQuestion call — do NOT ask "Onayla?", "Doğru mu?", "Faz 4'e geçelim mi?" or any equivalent.** mcl-stop.sh detects the format-valid spec and auto-transitions: `spec_approved=true`, `current_phase=4`. To reject, the developer types `/mcl-restart`.
+**Signal:** trace.log contains `spec_emit | hash=<h>`, `spec_approved | <h>`, `phase_transition | 1 | 4`. audit.log `auto-approve-spec | stop | hash=<h> phase=1->4`. state.json `spec_approved=true`, `current_phase=4`.
+**Pass:** trace.log has `spec_emit` + `spec_approved` + `phase_transition`. state.json shows phase=4. NO `approve-via-askuserquestion` audit (that's the dead 9.2.0 path).
+**Skip:** Never skipped — every spec auto-approves on emit when format is valid.
 
 ---
 
 ### STEP-23: spec-saved
-**Phase:** 3→4 | **Description:** mcl-spec-save.sh writes the approved spec body to `.mcl/specs/NNNN-slug.md` with YAML frontmatter (spec_id, approved_at, spec_hash, branch, head_at_approval).
+**Phase:** 2→4 | **Description:** mcl-spec-save.sh writes the approved spec body to `.mcl/specs/NNNN-slug.md` with YAML frontmatter (spec_id, approved_at, spec_hash, branch, head_at_approval). Triggered by the auto-approve transition in mcl-stop.sh.
 **Signal:** `.mcl/specs/` directory contains at least one `*.md` file. audit.log contains `spec-saved | mcl-spec-save.sh`.
 **Pass:** `.mcl/specs/` contains at least one spec file per approved spec in this session.
-**Skip:** Never skipped — spec save is automatic on every AskUserQuestion approval transition.
+**Skip:** Never skipped — spec save is automatic on every auto-approve transition.
 
 ---
 

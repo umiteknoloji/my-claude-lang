@@ -71,7 +71,7 @@ Stack: React + FastAPI'
 _aqi_out1="$(_aqi_run "$_aqi_short_spec")"
 assert_contains "Phase 1 + short spec → permissionDecision deny" "$_aqi_out1" '"permissionDecision": "deny"'
 assert_contains "Phase 1 + short spec → cites missing sections" "$_aqi_out1" "Objective,MUST"
-assert_contains "Phase 1 + short spec → reason has 7-header template" "$_aqi_out1" "## Out of Scope"
+assert_contains "Phase 1 + short spec → reason cites missing+points to template" "$_aqi_out1" "Re-emit"
 
 # ---- Test 2: complete 7-section spec + Phase 1 → ALLOW ----
 _aqi_init_state 1

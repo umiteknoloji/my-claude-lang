@@ -125,7 +125,8 @@ open(os.environ["PSP_STATE"], "w").write(json.dumps(o))
 PY
 
 _psp_out_pre="$(_psp_run_stop || true)"
-if printf '%s' "$_psp_out_pre" | grep -q "MCL SPEC RECOVERY"; then
+if printf '%s' "$_psp_out_pre" | grep -q '"decision": "block"' && \
+   printf '%s' "$_psp_out_pre" | grep -qE "Spec eksik|spec.*missing|phase2-spec.md"; then
   PASS=$((PASS+1))
   printf '  PASS: pre-approval — partial-spec detector still fires legitimately\n'
 else

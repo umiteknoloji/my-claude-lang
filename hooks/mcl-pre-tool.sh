@@ -592,7 +592,7 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": "MCL ASKQ BLOCKED — the `📋 Spec:` block emitted in this turn is missing required sections: `" + missing + "`. Cannot ask for spec approval on a half-spec. Re-emit ONE COMPLETE `📋 Spec:` block FIRST with all seven canonical headers in order:\n\n  ## [Title]\n  ## Objective\n  ## MUST\n  ## SHOULD\n  ## Acceptance Criteria\n  ## Edge Cases\n  ## Technical Approach\n  ## Out of Scope\n\nGenuinely empty section → header + `- (none)`. Never omit a header. After the complete spec, call AskUserQuestion again with the spec-approval prompt."
+        "permissionDecisionReason": "MCL: Spec eksik bölüm — " + missing + ". Re-emit complete spec; auto-approve fires on next Stop (no askq needed since 9.2.1)."
     }
 }))
 ' "$_AQI_MISSING_CSV" 2>/dev/null
@@ -886,7 +886,7 @@ except Exception:
 import json, sys
 print(json.dumps({
     "decision": "block",
-    "reason": "MCL STATE PROTECTION — Direct writes to .mcl/state.json via Bash are forbidden. State transitions are owned exclusively by the hook system (mcl-stop.sh, mcl-state.sh). If spec approval is not advancing phase, it means the AskUserQuestion tool_result was not processed yet — do NOT manually patch state. Wait for the stop hook to run, or ask the developer to re-send their approval."
+    "reason": "MCL: Direct state.json writes forbidden. Transitions are hook-owned. To advance phase, emit a format-valid 📋 Spec: block — auto-approve fires on next Stop."
 }))
 ' 2>/dev/null
     exit 0
@@ -1342,7 +1342,7 @@ fi
 
 REASON=""
 if [ "$SPEC_APPROVED" != "true" ]; then
-  REASON="MCL LOCK — spec_approved=false (phase=${CURRENT_PHASE}). Mutating tool \`${TOOL_NAME}\` is blocked until you emit a format-valid \`📋 Spec:\` block (📋 prefix + 7 H2 sections: Title, Objective, MUST, SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope). The Stop hook auto-approves on next turn."
+  REASON="MCL: ${TOOL_NAME} blocked. phase=${CURRENT_PHASE} spec_approved=false. Emit format-valid 📋 Spec: block first — auto-approves on next Stop."
 fi
 
 # -------- Branch: UI flow path-exception (Phase 4a BUILD_UI / 4b REVIEW) --------

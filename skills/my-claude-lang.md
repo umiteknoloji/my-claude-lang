@@ -61,13 +61,22 @@ that MCL is active. No exceptions — if MCL is running, the indicator is shown.
 
 For full AskUserQuestion rules, read `my-claude-lang/askuserquestion-protocol.md`
 
-Every closed-ended MCL interaction — spec approval, summary confirmation,
-risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
-partial-spec recovery, mcl-update, mcl-finish, pasted-CLI
-passthrough — uses Claude Code's native `AskUserQuestion` tool with
-`question` prefixed `MCL {{MCL_VERSION}} | `. The Stop hook parses tool_use/tool_result
-pairs to advance MCL state. The legacy `✅ MCL APPROVED` text marker is
-DEAD in 6.0.0 — Claude must never emit it; it carries no state effect.
+Every closed-ended MCL interaction — Phase 1 clarifying questions,
+Phase 1.7 GATE questions, summary confirmation, Phase 4.5 risk
+walkthrough, Phase 4.6 impact walkthrough, Phase 4b UI review, plugin
+consent, git-init consent, stack fallback, mcl-update, mcl-finish,
+pasted-CLI passthrough — uses Claude Code's native `AskUserQuestion`
+tool with `question` prefixed `MCL {{MCL_VERSION}} | `. The Stop hook
+parses tool_use/tool_result pairs to advance MCL state.
+
+**SPEC APPROVAL DOES NOT USE AskUserQuestion (since 9.2.1).** The hook
+auto-approves on spec emit when format is valid. Do NOT call
+`AskUserQuestion` after the spec block. Do NOT ask "Is this spec
+correct?", "Onaylıyor musun?", "Faz 4'e geçelim mi?", or any
+equivalent. The spec block itself IS the approval signal — proceed
+silently, the next turn opens with state already at Phase 4.
+
+The legacy `✅ MCL APPROVED` text marker is DEAD in 6.0.0 — never emit it.
 
 ## MCL Tag Schema
 

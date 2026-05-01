@@ -7,6 +7,76 @@
 
 ## [Unreleased]
 
+## [9.2.2] - 2026-05-01 — UX hardening: prose cleanup + minimal hook messages
+
+Real-session UX feedback after 9.2.1 ship surfaced three issues:
+
+### 1. Skill prose still instructed model to ask for spec approval
+
+`askuserquestion-protocol.md` listed "Phase 3 spec approval" as moment
+#2 with a full Onayla/Approve label table. `all-mcl.md` STEP-22
+described the canonical flow as `AskUserQuestion → approve-via-askuserquestion`.
+Main `my-claude-lang.md` listed "spec approval" as a closed-ended
+askq interaction.
+
+The model — reading skill prose at session start — saw both the new
+auto-approve flow AND the old askq flow. It picked the more familiar
+askq path and asked "Bu spec doğru mu? Onaylarsak Faz 4'e geçiyorum",
+hung waiting for a tool_result that the user didn't see.
+
+**Fix (9.2.2):**
+- `askuserquestion-protocol.md`: removed "Phase 3 spec approval" from
+  the canonical 11-moment list. Added explicit REMOVED section
+  documenting which two askq moments are gone (spec approval, partial-
+  spec recovery askq). Renumbered remaining moments 1-12.
+- `all-mcl.md` STEP-22: rewritten as `spec-auto-approve` with explicit
+  "do NOT ask Onayla / Doğru mu / Faz 4'e geçelim mi" prohibition.
+  Audit signal updated: `auto-approve-spec` (not `approve-via-askuserquestion`).
+- `my-claude-lang.md`: rewrote the "every closed-ended interaction"
+  paragraph with a hard-banned **SPEC APPROVAL DOES NOT USE AskUserQuestion**
+  block listing forbidden phrases.
+
+### 2. Hook block reasons too verbose for user-facing display
+
+When `decision:block` fires, the `reason` text appears as a wall of
+text in the user's chat. The 9.2.1 messages contained the entire
+canonical 7-section template, recovery instructions, and "do NOT debug
+hook files" warnings — all useful for the model, but visually
+overwhelming for the developer.
+
+**Fix (9.2.2):** message-shape redesign — single line, points to skill
+prose for full template:
+- `MCL: Spec eksik bölüm — <missing>. Re-emit per phase2-spec.md template.`
+- `MCL: Spec format invalid (<offender>) — needs literal '📋 Spec:' prefix + 7 H2 sections per phase2-spec.md. Re-emit.`
+- `MCL: Spec eksik bölüm — <missing>. Re-emit complete spec; auto-approve fires on next Stop (no askq needed since 9.2.1).`
+- `MCL: <ToolName> blocked. phase=<N> spec_approved=false. Emit format-valid 📋 Spec: block first — auto-approves on next Stop.`
+- `MCL: Direct state.json writes forbidden. Transitions are hook-owned. To advance phase, emit a format-valid 📋 Spec: block — auto-approve fires on next Stop.`
+
+The model already has the full template in skill prose; the brief
+reason directs it back without re-stating. User sees a single line
+instead of a paragraph.
+
+### 3. Phase 1 questions verified to use AskUserQuestion (not regressed)
+
+Confirmed `phase1-rules.md` rule 4 still mandates `AskUserQuestion` for
+the Phase 1 summary-confirm and rule 41 for clarifying multi-choice
+questions. `askuserquestion-protocol.md` table now lists Phase 1
+clarifying + summary-confirm + Phase 1.7 GATE as canonical askq moments.
+Phase 1 UX (clickable options) is preserved.
+
+### Test updates
+
+Tests that asserted on the verbose 9.2.1 reason text now match the
+9.2.2 minimal format (`format invalid`, `phase2-spec.md` reference,
+`Spec eksik` / `decision:block` etc).
+
+### Test results
+
+- Default mode: unit **167/0/4**, e2e **54/0/0**
+- MCL_MINIMAL_CORE=1: unit **131/0/3**, e2e **54/0/0**
+
+**Total: 406 passing assertions across both modes, both suites. Zero failures.**
+
 ## [9.2.1] - 2026-05-01 — Spec auto-approve, AskUserQuestion approval removed
 
 ### Breaking: AskUserQuestion-based spec approval is GONE
