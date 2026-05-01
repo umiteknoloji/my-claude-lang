@@ -1,5 +1,0 @@
-{
-  "name": "my-claude-lang",
-  "version": "8.5.0",
-  "description": "MCL phase pipeline — lifts non-English developers to senior English developer output quality. Loaded per-session via `mcl-claude` wrapper (--plugin-dir)."
-}
