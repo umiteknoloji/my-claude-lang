@@ -1,13 +1,31 @@
 #!/bin/bash
 # MCL PreToolUse Hook — mechanical gate that blocks mutating tools
-# until the spec has been emitted AND approved by the developer.
+# according to the 10.0.0 phase model.
 #
-# V1 block list (mutating tools):
-#   Write, Edit, MultiEdit, NotebookEdit
+# Block list (mutating tools): Write, Edit, MultiEdit, NotebookEdit
 #
-# Allow conditions (all must hold for a mutating tool to pass):
-#   current_phase >= 4
-#   spec_approved == true
+# Allow matrix (current_phase, is_ui_project, design_approved):
+#   phase=1                                       → BLOCK (all paths)
+#   phase=2 + is_ui_project=true                  → frontend paths only
+#                                                   (backend / api / db
+#                                                   denied with
+#                                                   DESIGN_REVIEW LOCK
+#                                                   reason; frontend
+#                                                   pages/components/
+#                                                   styles allowed)
+#   phase>=3                                      → unlocked (all paths)
+#
+# Phase 2 → 3 transition fires when the developer approves the design
+# askq ("Tasarımı onaylıyor musun?" / "Approve this design?"), setting
+# design_approved=true and current_phase=3. For non-UI projects the
+# Phase 1 summary-confirm askq advances directly 1→3.
+#
+# Additional guards on Phase 3+:
+#   - Pattern scan (one-turn read of sibling files before first writes)
+#   - Scope guard (block out-of-scope writes when scope_paths is set)
+#   - Intent violation (HIGH severity blocks for "no backend" / "no DB"
+#     / "no auth" intent + matching path)
+#   - Severity scans (security / db / ui — HIGH blocks Write)
 #
 
 # Everything else (Read, Glob, Grep, WebFetch, WebSearch, TodoWrite,

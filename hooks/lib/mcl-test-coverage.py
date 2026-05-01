@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """MCL test-coverage detector (since 8.19.0).
 
-Phase 4.5 Lens (g) — surfaces missing test categories as MEDIUM/LOW
+Phase 4 Lens (g) — surfaces missing test categories as MEDIUM/LOW
 findings inserted into the sequential dialog.
 
 Detection layers:

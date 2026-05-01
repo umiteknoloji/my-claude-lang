@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCL Phase 4.5 architectural drift + intent violation scanner (9.3.0).
+"""MCL Phase 4 architectural drift + intent violation scanner (9.3.0).
 
 Compares Phase 4 code writes against:
   (a) state.scope_paths — file paths declared in spec's Technical Approach.
@@ -185,7 +185,7 @@ def detect_drift(scope_set: set[str], writes: list[dict],
                 f"{sorted(scope_set)[:3]} ; this write: {rel}. "
                 f"Either expand the spec's Technical Approach paths or move the file."
             ),
-            "category": "phase4-5-drift",
+            "category": "phase4-drift",
         })
     return findings
 
@@ -232,7 +232,7 @@ def detect_intent_violations(intent_text: str, constraints_text: str,
                         f"Reconcile: either revise Phase 1 declaration or "
                         f"remove this dependency."
                     ),
-                    "category": "phase4-5-intent-violation",
+                    "category": "phase4-intent-violation",
                 })
     return findings
 

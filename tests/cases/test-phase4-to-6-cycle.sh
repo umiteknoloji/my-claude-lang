@@ -138,7 +138,7 @@ if printf '%s' "$_pc_out" | grep -q "MCL PHASE 6"; then
   PASS=$((PASS+1))
   printf '  PASS: Phase 6 fires on iteration-2 regression\n'
 else
-  # The block may also be a Phase 4.5 START re-block (gate ran first); check
+  # The block may also be a Phase 4 START re-block (gate ran first); check
   # both possibilities. The KEY assertion is that phase6_double_check_done
   # stayed false (regression unfixed).
   SKIP=$((SKIP+1))

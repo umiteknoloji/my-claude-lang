@@ -1,5 +1,5 @@
 #!/bin/bash
-# MCL Finish — aggregate Phase 4.6 impacts accumulated since the last
+# MCL Finish — aggregate Phase 4 impact-lens entries accumulated since the last
 # checkpoint and emit conventions the `mcl-finish` slash-command uses.
 #
 # Design: this helper owns filesystem conventions only. The actual
@@ -9,7 +9,7 @@
 # extend the helper without touching the prompt layer.
 #
 # Directory layout (per MCL project):
-#   .mcl/impact/NNNN.md        — one file per Phase 4.6 impact
+#   .mcl/impact/NNNN.md        — one file per Phase 4 impact-lens
 #   .mcl/finish/NNNN-YYYY-MM-DD.md — one file per mcl-finish checkpoint
 #
 # CLI:
@@ -33,7 +33,7 @@
 #
 # Exits 0 on success, non-zero only on unrecoverable internal error.
 # Missing dirs are treated as "no entries", not an error — they only
-# exist once Phase 4.6 or mcl-finish has written into them.
+# exist once Phase 4 (impact lens) or mcl-finish has written into them.
 
 set -u
 

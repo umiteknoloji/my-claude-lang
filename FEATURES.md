@@ -178,7 +178,7 @@ Phase 1 onayında `git rev-parse HEAD` → `state.rollback_sha`. Her turda SHA v
 
 ### Phase 4 — RISK_GATE
 
-Eski Phase 4.5'in yerine — tek faz, sıralı diyalog. Phase 3'ten sonra ve Phase 5'ten önce çalışır.
+Tek faz, sıralı diyalog. Phase 3'ten sonra ve Phase 5'ten önce çalışır.
 
 **Sıralı Diyalog**
 Tüm riskler birer birer AskUserQuestion ile sunulur. Her risk için: `apply-fix / override` (skip kaldırıldı). Override reason zorunlu — `<mcl_state_emit kind="phase4-override">{rule_id, severity, category, reason}</mcl_state_emit>` marker'ı ile audit + Phase 5 raporu'na akar.
@@ -233,7 +233,7 @@ Phase 4 yarıda kesilebilir. `.mcl/risk-session.md` her karar sonrası güncelle
 **Plugin Dispatch Audit**
 Phase 4 çalışırken her turda `trace.log` kontrol edilir. `pr-review-toolkit:*` veya `code-review:*` sub-agent dispatch'i + `semgrep_ran` trace eventi yoksa `PLUGIN_MISS_NOTICE` enjekte edilir, Phase 5'e geçiş engellenir.
 
-**Impact Analysis (eski Phase 4.6, Phase 4 kuyruğunda)**
+**Impact Analysis (Phase 4 impact lens)**
 Yeni yazılan kodun başka bölümlere etkileri: Import eden dosyalar, shared utility davranış değişikliği, API/contract kırılması, schema/migration etkileri, build/toolchain/dependency değişimleri.
 
 **Plugin Çatışması — Provenance-First**
@@ -389,7 +389,7 @@ Hook sistemi tarafından yönetilir — doğrudan Bash yazımı bloke edilir. Sc
 - İlk activate'te otomatik
 - Backup: `.mcl/state.json.backup.pre-v3`
 - Audit event: `state-migrated-10.0.0`
-- Migration kuralları: phase 2/3/4 → 3, phase 4.5 → 4, `spec_approved` → `design_approved` (true preserved), `phase4_5_*` → `phase4_*`, drop `precision_audit_*` ve `phase_review_state`
+- Migration kuralları: phase 2/3/4 → 3, phase 4.5 → 4 (legacy schema migration), `spec_approved` → `design_approved` (true preserved), `phase4_5_*` → `phase4_*`, drop `precision_audit_*` ve `phase_review_state`
 
 **`mcl_get_active_phase()`**
 Tüm state field'larını okuyup tek bir effective phase string döndürür: `"1"`, `"2"`, `"3"`, `"4"`, `"5"`, `"6"`, `"?"`.

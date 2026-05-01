@@ -1,4 +1,4 @@
-<mcl_constraint name="phase4a-ui-build-fixtures">
+<mcl_constraint name="phase2-design-review-fixtures">
 
 # Phase 4a — Dummy Data & Fixtures
 
@@ -12,7 +12,7 @@
   `user-profiles.fixtures.ts`).
 - Backend-paterni yollar (`src/api/**`, `src/services/**`, `src/lib/db/**`,
   `prisma/**`, vb.) deny-listed. Tam yol-yönlendirme tablosu için
-  ana skill'e bak: `phase4a-ui-build.md` → "Backend-Sounding Paths".
+  ana skill'e bak: `phase2-design-review.md` → "Backend-Sounding Paths".
 
 ## What is FORBIDDEN in a Phase 4a fixture
 

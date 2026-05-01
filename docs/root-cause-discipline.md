@@ -1,7 +1,7 @@
 # Root Cause Discipline — Kararlar
 
 MCL'de kök sebep bulma ve müdahale ile ilgili tüm kararların özeti.
-Bu doküman hem CLAUDE.md (devtime) hem Phase 4.5 Root Cause Chain
+Bu doküman hem CLAUDE.md (devtime) hem Phase 4 Root Cause Chain
 (runtime) için referanstır.
 
 ---
@@ -13,7 +13,7 @@ Cevap geldiğinde tekrar sor: "Peki bu neden böyle?" En derine kadar git.
 Bazen en alttaki sebebi çözmek tüm ağı çözer.
 
 Bu hem geliştirme sırasında (sen + Claude Code), hem MCL kullanıcısının
-projelerinde (Phase 4.5 Root Cause Chain) uygulanır. Atlanması yasak —
+projelerinde (Phase 4 Root Cause Chain) uygulanır. Atlanması yasak —
 anti-sycophancy seviyesinde temel mekanizma.
 
 ---
@@ -86,7 +86,7 @@ Sıkıntı çıkarsa şeffaflık yeterli.
 
 Zincir sonunda kök sebep bulunduğunda, **hemen değiştirme**.
 
-Önce müdahalenin tüm etkilerini tahmin et — Phase 4.6 mantığıyla:
+Önce müdahalenin tüm etkilerini tahmin et — Phase 4 (impact lens) mantığıyla:
 - Bu sebebi import eden dosyalar
 - Shared utility davranış değişikliği
 - API/contract kırılması
@@ -107,7 +107,7 @@ Temiz iş bu olur.
 
 Bir işi yaparken diğerine etki etmemek gerekiyor. Kök sebep her zaman
 doğru müdahale noktası değil — en alttaki sebebi düzeltmek tüm sistemi
-kıracak yan etkilere yol açabilir. Phase 4.6'nın felsefesi (yan etki
+kıracak yan etkilere yol açabilir. Phase 4 (impact lens)'nın felsefesi (yan etki
 tahmini) kök sebep zincirine de uygulanıyor; ikisi aynı disiplin.
 
 ---
@@ -121,7 +121,7 @@ anladım" der ama düzeltme yapılmaz.
 Çözüm ayrı bir doğrulama gerektirir: "bu çözüm uygulanırsa kök sebep
 ortadan kalkar mı?" — yes/no kontrolü.
 
-Phase 4.5 risk item'ı olarak ikisi birlikte sunulur:
+Phase 4 risk item'ı olarak ikisi birlikte sunulur:
 - Yüzeysel semptom değil, en derin yapısal sebep (veya seçilen müdahale
   halkası)
 - Önerilen çözüm
@@ -132,7 +132,7 @@ Phase 4.5 risk item'ı olarak ikisi birlikte sunulur:
 ## 8. Kapsam
 
 Hem **devtime** (sen + Claude Code arası MCL geliştirme), hem **runtime**
-(Phase 4.5 Root Cause Chain — MCL kullanıcısının projelerinde) bu
+(Phase 4 Root Cause Chain — MCL kullanıcısının projelerinde) bu
 disiplin uygulanır.
 
 Atlanması yasak. Anti-sycophancy ile aynı seviyede temel mekanizma.

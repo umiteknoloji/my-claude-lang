@@ -229,11 +229,12 @@ catches it before Phase 5 sign-off. See
 
 ## Phase 3 Scope Changes Callout (Companion Check)
 
-When this audit emits `upgraded=true`, Phase 3 spec verification adds a
-"Scope Changes" section in the developer's language listing every
-upgrade made. The developer sees what was added beyond their literal
-prompt and can correct via the edit option. See
-`my-claude-lang/phase3-verify.md` "Scope Changes Callout" for the
-required format.
+When this audit emits `upgraded=true`, the Phase 3 implementation spec
+adds a "Scope Changes" section in the developer's language listing
+every upgrade made. The developer sees what was added beyond their
+literal prompt and can correct via the design askq (Phase 2, UI
+projects) or by responding to the implementation in Phase 3. See
+`my-claude-lang/phase3-implementation.md` "Scope Changes Callout" for
+the required format.
 
 </mcl_phase>

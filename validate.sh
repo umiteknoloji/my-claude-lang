@@ -46,12 +46,12 @@ check_json_path "mcl-activate.sh (mcl-update path)" \
 SANDBOX="$(mktemp -d -t mcl-validate-XXXXXX)"
 mkdir -p "$SANDBOX/.mcl"
 
-printf '%s\n' '{"schema_version":1,"current_phase":1,"phase_name":"COLLECT","spec_approved":false,"spec_hash":null,"last_update":0}' \
+printf '%s\n' '{"schema_version":3,"current_phase":1,"phase_name":"INTENT","is_ui_project":false,"design_approved":false,"spec_hash":null,"last_update":0}' \
   > "$SANDBOX/.mcl/state.json"
 check_json_path "mcl-pre-tool.sh (phase-lock deny)" \
   "MCL_STATE_DIR='$SANDBOX/.mcl' bash -c \"echo '{\\\"tool_name\\\":\\\"Edit\\\"}' | bash '$HOOK_DIR/mcl-pre-tool.sh'\""
 
-printf '%s\n' '{"schema_version":1,"current_phase":4,"phase_name":"EXECUTE","spec_approved":true,"spec_hash":"a","last_update":0,"drift_detected":true,"drift_hash":"b"}' \
+printf '%s\n' '{"schema_version":3,"current_phase":3,"phase_name":"IMPLEMENTATION","is_ui_project":false,"design_approved":true,"spec_hash":"a","last_update":0,"drift_detected":true,"drift_hash":"b"}' \
   > "$SANDBOX/.mcl/state.json"
 check_json_path "mcl-pre-tool.sh (drift deny)" \
   "MCL_STATE_DIR='$SANDBOX/.mcl' bash -c \"echo '{\\\"tool_name\\\":\\\"Edit\\\"}' | bash '$HOOK_DIR/mcl-pre-tool.sh'\""

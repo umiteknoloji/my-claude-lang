@@ -109,7 +109,7 @@ if [ -n "$MSG" ] && command -v mcl_log_append >/dev/null 2>&1; then
 fi
 
 # Regression guard clearance: when Claude runs tests via mcl-test-runner.sh
-# and they pass (GREEN), clear regression_block_active so Phase 4.5 unblocks.
+# and they pass (GREEN), clear regression_block_active so Phase 4 unblocks.
 TOOL_NAME_POST="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json,sys
 try: print(json.loads(sys.stdin.read()).get("tool_name",""))

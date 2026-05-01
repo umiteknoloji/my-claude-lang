@@ -43,9 +43,11 @@ NOT localized (stays English):
    (engineering requirements) stays in English — it was authored in English
    and is referenced by hooks. Only the surrounding prose is localized.
 2. Verdict words use the developer's language equivalents from the
-   canonical approve/edit/cancel table in `phase3-verify.md` where
-   applicable. For test verdicts (PASS/FAIL/SKIP), use the developer's
-   natural equivalents — not literal letter-for-letter translations.
+   canonical approve/edit/cancel table in `phase2-design-review.md`
+   (UI projects' design askq) and `askuserquestion-protocol.md`
+   (general askq vocabulary). For test verdicts (PASS/FAIL/SKIP), use
+   the developer's natural equivalents — not literal letter-for-letter
+   translations.
 3. Do NOT translate error messages from tool output, stack traces,
    or test runner output — these are technical artifacts, not MCL prose.
 4. Preserve all formatting (bold, bullet, numbered list, code fence).

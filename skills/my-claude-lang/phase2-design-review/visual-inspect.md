@@ -1,4 +1,4 @@
-<mcl_constraint name="phase4b-visual-inspect">
+<mcl_constraint name="phase2-design-review-visual-inspect">
 
 # Phase 4b — Visual Inspect (opt-in)
 
@@ -144,7 +144,7 @@ Rules for the "What I see" list:
 
 Screenshots include whatever the dummy fixtures contain. Since Phase
 4a forbids real PII in fixtures (see
-`phase4a-ui-build/fixtures.md`), this pipeline should never capture
+`phase2-design-review/fixtures.md`), this pipeline should never capture
 real user data. If the developer somehow seeded real data, that is
 a Phase 4a violation caught here — surface it and refuse to write
 snapshots.

@@ -3,13 +3,17 @@
 # `📋 Spec:` block, compute sha256 over a normalized body, and update
 # `.mcl/state.json` accordingly.
 #
-# Transitions driven here:
-#   - phase 1 → 2 (SPEC_REVIEW)      : first time a spec block appears
-#   - phase 2/3 → 4 (EXECUTE)        : AskUserQuestion spec-approval call
-#                                      returned an "Approve" family option
-
-# Never regresses phase. Never overwrites an approved spec's hash
-# without an explicit new AskUserQuestion approval.
+# Transitions driven here (10.0.0):
+#   - phase 1 → 2 (DESIGN_REVIEW)    : Phase 1 summary-confirm askq
+#                                      approved AND is_ui_project=true
+#   - phase 1 → 3 (IMPLEMENTATION)   : Phase 1 summary-confirm askq
+#                                      approved AND is_ui_project=false
+#   - phase 2 → 3 (IMPLEMENTATION)   : Phase 2 design askq approved
+#                                      (sets design_approved=true)
+#
+# Never regresses phase. Spec emission is documentation only — format
+# violations emit `spec-format-warn` audits (advisory, no block) and
+# increment spec_format_warn_count for Phase 6 LOW soft-fail detection.
 #
 # Stop hook input: JSON on stdin with `transcript_path` (Claude Code's
 # jsonl transcript for the current session).
@@ -309,14 +313,12 @@ fi
 # spec emit gets cut mid-section, mcl-stop sees an incomplete `📋
 # Spec:` block and forces re-emit before any approval can stick.
 #
-# 9.1.2 guard: only run during the pre-approval window. Once the
-# developer has approved a spec (spec_approved=true), retroactive
-# recovery is wrong — the spec was accepted, work has likely
-# advanced, and a recovery block at this point lands as a confusing
-# "MCL SPEC RECOVERY" error AFTER the build already passed. Same
-# transcript scan can match a quoted spec snippet from earlier
-# turns or a short ad-hoc spec the model emitted in Phase 4 prose
-# (project/pages/stack notes, etc.) and mistake it for truncation.
+# 10.0.0: spec format violations are advisory regardless of phase.
+# Detection still runs to surface format issues via `spec-format-warn`
+# audit, but emits NO decision:block — Phase 1 summary-confirm is the
+# canonical developer-control gate, not spec format. The detector is
+# also gated by MCL_MINIMAL_CORE=1 (skip entirely) so very lean
+# deployments stay quiet.
 _PS_PHASE_PRE="$(mcl_state_get current_phase 2>/dev/null)"
 if [ "${MCL_MINIMAL_CORE:-0}" = "1" ]; then
   : # minimal-core — spec format detection skipped

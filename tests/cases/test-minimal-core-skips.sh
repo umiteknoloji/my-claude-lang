@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test: MCL_MINIMAL_CORE=1 actually skips the listed non-essential systems.
 #
-# 9.2.0 introduced MCL_MINIMAL_CORE=1 to disable Phase 4.5 ops/perf/test
+# 9.2.0 introduced MCL_MINIMAL_CORE=1 to disable Phase 4 ops/perf/test
 # coverage gates, Phase 6, hook-debug blocks, partial-spec recovery,
 # and per-write severity enforcement. Code stays in place; runtime
 # guards short-circuit.

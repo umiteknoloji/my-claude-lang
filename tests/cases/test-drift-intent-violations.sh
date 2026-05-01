@@ -113,7 +113,7 @@ else
   printf '  FAIL: [1] drift not detected. output: %s\n' "$(printf '%s' "$_dr_out1" | head -c 200)"
 fi
 
-# Hook integration: stop hook should emit phase4-5-drift audit.
+# Hook integration: stop hook should emit phase4-drift audit.
 _dr_run_stop "$_dr_t1"
 if grep -q "phase4-drift" "$_dr_proj/.mcl/audit.log" 2>/dev/null; then
   PASS=$((PASS+1))
@@ -129,7 +129,7 @@ _dr_stop_out="$(printf '%s' "{\"transcript_path\":\"$_dr_t1\",\"session_id\":\"d
   | CLAUDE_PROJECT_DIR="$_dr_proj" MCL_STATE_DIR="$_dr_proj/.mcl" \
     MCL_REPO_PATH="$REPO_ROOT" \
     bash "$REPO_ROOT/hooks/mcl-stop.sh" 2>/dev/null)"
-# decision:block may still come from Phase 4.5 START reminder (legitimate).
+# decision:block may still come from Phase 4 START reminder (legitimate).
 # But the drift itself should NOT cause a block message about drift.
 if printf '%s' "$_dr_stop_out" | grep -q "drift.*BLOCKED\|drift.*deny"; then
   FAIL=$((FAIL+1))

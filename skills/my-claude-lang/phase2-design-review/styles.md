@@ -1,4 +1,4 @@
-<mcl_constraint name="phase4a-ui-build-styles">
+<mcl_constraint name="phase2-design-review-styles">
 
 # Phase 4a — Styling Guidance
 
@@ -72,7 +72,7 @@ Always include, even in mock:
 
 These survive into Phase 4c without rework. Deeper a11y audit
 (keyboard traversal, focus order, contrast ratios) is out of Phase
-4a scope — surface in Phase 4.5 only if the spec called a11y out
+4a scope — surface in Phase 4 only if the spec called a11y out
 as a MUST.
 
 </mcl_constraint>

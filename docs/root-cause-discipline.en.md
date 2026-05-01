@@ -1,7 +1,7 @@
 # Root Cause Discipline — Decisions
 
 Summary of all decisions related to root cause identification and intervention in MCL.
-This document is the reference for both CLAUDE.md (devtime) and Phase 4.5 Root Cause Chain (runtime).
+This document is the reference for both CLAUDE.md (devtime) and Phase 4 Root Cause Chain (runtime).
 
 ---
 
@@ -13,7 +13,7 @@ is not sufficient, look for its root cause. Go all the way down.
 Sometimes fixing the deepest cause resolves the entire network.
 
 This applies both during development (you + Claude Code) and in the developer's
-projects (Phase 4.5 Root Cause Chain). Skipping it is forbidden — same standing
+projects (Phase 4 Root Cause Chain). Skipping it is forbidden — same standing
 as anti-sycophancy.
 
 ---
@@ -86,7 +86,7 @@ When stuck, transparency is sufficient.
 
 When the root cause is found at the end of the chain, **do not change it immediately**.
 
-First estimate all effects of the intervention — following Phase 4.6 logic:
+First estimate all effects of the intervention — following Phase 4 (impact lens) logic:
 - Files that import the changed cause
 - Shared utility behavior changes
 - API/contract breakage
@@ -108,7 +108,7 @@ zero side effects. That is the clean place to work.
 
 One piece of work must not affect another. The root cause is not always
 the correct intervention point — fixing the deepest cause can produce
-system-breaking side effects. Phase 4.6's philosophy (side-effect estimation)
+system-breaking side effects. Phase 4 (impact lens)'s philosophy (side-effect estimation)
 applies to the root cause chain as well; they are the same discipline.
 
 ---
@@ -122,7 +122,7 @@ the developer says "understood" but no correction is applied.
 The fix requires a separate verification: "If this fix is applied, does
 the root cause disappear?" — a yes/no check.
 
-Both are presented together as a Phase 4.5 risk item:
+Both are presented together as a Phase 4 risk item:
 - Not the surface symptom, but the deepest structural cause (or the selected
   intervention ring)
 - The proposed fix
@@ -133,7 +133,7 @@ Both are presented together as a Phase 4.5 risk item:
 ## 8. Scope
 
 Both **devtime** (MCL development between you and Claude Code) and **runtime**
-(Phase 4.5 Root Cause Chain — in the developer's projects) apply this discipline.
+(Phase 4 Root Cause Chain — in the developer's projects) apply this discipline.
 
 Skipping it is forbidden. Same standing as anti-sycophancy as a core mechanism.
 

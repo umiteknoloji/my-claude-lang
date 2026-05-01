@@ -1,4 +1,4 @@
-<mcl_constraint name="phase4a-ui-build-frameworks">
+<mcl_constraint name="phase2-design-review-frameworks">
 
 # Phase 4a — Framework-Specific Syntax
 
@@ -76,7 +76,7 @@ scaffold a bundler silently.
   when the backend integration needs them. Phase 4a works with
   whatever is already installed.
 - `tsconfig.json`, `vite.config.*`, `next.config.*`, `nuxt.config.*`
-  — all deny-listed by `mcl-pre-tool.sh` during BUILD_UI.
+  — all deny-listed by `mcl-pre-tool.sh` during Phase 2 DESIGN_REVIEW.
 - Bundler build output (`dist/`, `.next/`, `.svelte-kit/`) — those
   are generated, not hand-written.
 
