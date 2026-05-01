@@ -42,7 +42,18 @@ When the developer describes what they want:
    Do NOT present intermediate summaries during question gathering.
    Do NOT summarize twice. There is exactly ONE summary — when all
    parameters are ready. No partial summaries, no "here's what I
-   have so far" — just questions until done, then one final summary:
+   have so far" — just questions until done, then one final summary.
+
+   **Plain-text approval is NOT accepted (since 10.0.6).** A finite
+   TR+EN whitelist of approve words ("onayla, evet, tamam, ...")
+   cannot capture every natural-language confirmation the developer
+   might use ("doğru", "uygundur", "tabii", "iyidir", "olur", ...),
+   and silently failing on an unlisted token is a worse UX than
+   asking explicitly. The Stop hook detects a Phase 1 summary
+   without a same-turn `AskUserQuestion` call and sets
+   `state.summary_askq_skipped=true`; the next `UserPromptSubmit`
+   injects a mandatory re-emission instruction. The summary +
+   `AskUserQuestion` MUST land in the SAME turn:
 
 ```
 [DEVELOPER'S LANGUAGE]

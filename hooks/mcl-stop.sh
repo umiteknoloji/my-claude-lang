@@ -411,43 +411,38 @@ mcl_audit_log "askq-scanner-result" "mcl-stop" \
 # was detected AND current_phase=2 AND spec_hash is set, scan the most
 # recent USER message for approve-family text. If found, synthesize a
 # spec-approve intent so the phase-advance branch below fires.
-# 10.0.3 (Bug 2 fix): Plain-text approval fallback for Phase 1
-# summary-confirm. Real Claude Code sessions rarely emit clarifying
-# questions through the AskUserQuestion tool — instead the model asks
-# in plain prose. The askq-scanner sees no AskUserQuestion and the
-# Phase 1 → 2/3 transition never fires.
+# 10.0.6: Phase 1 summary AskUserQuestion enforcement.
+# The 10.0.3 plain-text approve fallback was removed: a finite
+# whitelist of TR+EN approve words ("onayla, evet, tamam, ...")
+# can't cover the open space of natural-language confirmations
+# ("doğru", "uygundur", "tabii", "olabilir", "iyidir", ...) and
+# silently failing on an unlisted token is a worse UX than asking
+# the developer explicitly. Phase 1 → 2/3 transition now requires
+# a real AskUserQuestion(summary-confirm) tool call.
 #
-# Fallback rule (current_phase=1):
-#   - Last assistant text contains a summary marker
-#     (Özet:/Summary:/Brief:/intent:/MUST:/SHOULD:)
-#   - Last user message is a clean approve token (one of the
-#     TR + EN approve words, optionally with trailing punctuation)
-#   - No AskUserQuestion already detected this turn
-# → synthesize ASKQ_INTENT="summary-confirm" + ASKQ_SELECTED="<text>"
-# so the existing Phase 1 transition branch fires.
-_PLAINTEXT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+# Enforcement: when current_phase=1 AND the last assistant text
+# contains a summary marker AND no AskUserQuestion fired this
+# turn → set state.summary_askq_skipped=true + audit. The next
+# UserPromptSubmit (mcl-activate.sh) reads the flag, injects an
+# enforcement message into the assistant's context, and clears
+# the flag.
+_SAS_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
 if [ -z "$ASKQ_INTENT" ] && \
-   [ "$_PLAINTEXT_PHASE" = "1" ] && \
+   [ "$_SAS_PHASE" = "1" ] && \
    [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] && \
    command -v python3 >/dev/null 2>&1; then
-  _PT_RESULT="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
+  _SAS_HAS_SUMMARY="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
 import json, re, sys
 
 path = sys.argv[1]
-# 10.0.1 policy: TR + EN only.
-APPROVE_WORDS = {
-    "onayla", "onaylıyorum", "onayliyorum", "evet", "kabul", "tamam", "olur", "ok'le",
-    "approve", "yes", "confirm", "ok", "okay", "proceed", "accept",
-}
 SUMMARY_RE = re.compile(
     r"(?:^|\n)\s*(?:[#*-]+\s*)?(?:📋\s*)?"
     r"(?:Özet|Brief|Summary|Engineering Brief|İntent|Intent|MUST|SHOULD|"
     r"Acceptance Criteria|Kabul Kriterleri|Edge Cases|Sınır Durumlar)",
     re.MULTILINE,
 )
-SUMMARY_FENCE_RE = re.compile(r"━+|─+|─{3,}")
+SUMMARY_FENCE_RE = re.compile(r"━+|─{3,}")
 
-last_user_text = None
 last_assistant_text = None
 try:
     with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -472,51 +467,31 @@ try:
                 text = "\n".join(p for p in parts if p).strip()
             if not text:
                 continue
-            if role == "user":
-                last_user_text = text
-            elif role == "assistant":
+            if role == "assistant":
                 last_assistant_text = text
 except Exception:
     pass
 
-if not last_user_text or not last_assistant_text:
+if not last_assistant_text:
     sys.exit(0)
-
-# Approve check on user message — must be a *clean* approve token, not
-# a sentence that happens to contain "evet". Allow trailing
-# punctuation but no other content.
-norm = last_user_text.lower().strip(" .,!?\n\t")
-if not norm:
-    sys.exit(0)
-if len(norm) > 30:
-    sys.exit(0)
-if norm not in APPROVE_WORDS:
-    sys.exit(0)
-
-# Summary check on the immediately-preceding assistant turn — must
-# contain at least one summary section marker OR a fenced-summary
-# block (━━━ / ─── style), so a plain "yes" answer to a clarifying
-# question never fires this fallback.
-if not (SUMMARY_RE.search(last_assistant_text) or SUMMARY_FENCE_RE.search(last_assistant_text)):
-    sys.exit(0)
-
-print(f"approve|{last_user_text}")
+if SUMMARY_RE.search(last_assistant_text) or SUMMARY_FENCE_RE.search(last_assistant_text):
+    print("yes")
 PYEOF
 )"
-  if [ -n "$_PT_RESULT" ]; then
-    ASKQ_INTENT="summary-confirm"
-    ASKQ_SELECTED="${_PT_RESULT#*|}"
-    mcl_audit_log "plaintext-summary-confirm-detected" "stop" "text=${ASKQ_SELECTED}"
-    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append plaintext_summary_confirm "${ASKQ_SELECTED}"
+  if [ "$_SAS_HAS_SUMMARY" = "yes" ]; then
+    mcl_state_set summary_askq_skipped true >/dev/null 2>&1 || true
+    mcl_audit_log "summary-askq-skipped" "stop" "phase=1 summary-marker-present askq-empty"
+    mcl_debug_log "stop" "summary-askq-skipped" "phase=1"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append summary_askq_skipped phase1
   fi
 fi
 
 # Helper: is $1 an "approve family" option string?
 # 10.0.1: TR + EN only (the two languages MCL officially supports).
 # 10.0.4: glob *pattern* tightened to exact-match (lead/trail
-# whitespace+punct stripped). Plaintext fallback path is upstream-
-# guarded in the Python block; this is defense-in-depth for the
-# AskUserQuestion tool-result path.
+# whitespace+punct stripped). 10.0.6: plain-text approve fallback
+# removed; this helper now runs only on AskUserQuestion tool-result
+# option strings (which are deterministic, not open natural language).
 _mcl_is_approve_option() {
   local raw="$1"
   [ -z "$raw" ] && return 1
@@ -1595,13 +1570,14 @@ if [ -z "$SPEC_HASH" ] && [ -z "$ASKQ_INTENT" ]; then
 fi
 CURRENT_HASH="$(mcl_state_get spec_hash)"
 
-# 10.0.3 (Bug 2/3 fix): Early Phase 1 → 2/3 transition.
-# When summary-confirm approval (askq OR plaintext) is detected this
-# turn AND current_phase=1, advance the phase BEFORE the spec-emit
-# branch evaluates so the spec processes under the correct phase. This
-# fixes the real-session pattern where the model emits the spec in the
-# same turn as the approval response — without this, spec-emit ran
-# under phase=1 and silently no-op'd.
+# 10.0.3 (Bug 3 fix): Early Phase 1 → 2/3 transition.
+# When summary-confirm approval is detected this turn (via
+# AskUserQuestion only, since 10.0.6) AND current_phase=1, advance
+# the phase BEFORE the spec-emit branch evaluates so the spec
+# processes under the correct phase. This fixes the real-session
+# pattern where the model emits the spec in the same turn as the
+# approval response — without this, spec-emit ran under phase=1
+# and silently no-op'd.
 if [ "$ASKQ_INTENT" = "summary-confirm" ] && [ "$CURRENT_PHASE" = "1" ] \
    && command -v _mcl_is_approve_option >/dev/null 2>&1 \
    && _mcl_is_approve_option "$ASKQ_SELECTED"; then

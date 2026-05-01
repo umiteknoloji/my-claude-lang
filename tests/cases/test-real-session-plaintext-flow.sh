@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test: 10.0.3 regression — real-session plaintext approval flow.
+# Test: real-session plaintext flow — Bug 1/3/4 (10.0.3) + Bug 2 (10.0.6 enforcement).
 #
 # Reproduces the EXACT scenario from `cd /tmp/test && claude → backoffice yap`
 # that revealed 4 critical bugs in 10.0.2:
@@ -9,16 +9,23 @@
 #   Bug 3: 📋 Spec block emitted while state.current_phase=1.
 #   Bug 4: Hook block reasons did not surface /mcl-restart escape hatch.
 #
+# 10.0.3 fixed Bug 2 with a plain-text approve fallback (whitelist of
+# TR+EN approve words synthesizing ASKQ_INTENT=summary-confirm). 10.0.6
+# REMOVED that fallback — a finite whitelist can't cover natural-
+# language approvals ("doğru", "uygundur", "tabii", ...) and silent
+# rejection is a worse UX than asking explicitly. Plain-text "evet"
+# now sets state.summary_askq_skipped=true and triggers a context
+# injection on the next UserPromptSubmit demanding AskUserQuestion.
+#
 # Acceptance criteria — when this test is GREEN, the regressed session
 # walks through cleanly:
 #   1. Initial prompt with state at phase=1, is_ui_project=true.
 #   2. Synthetic transcript: assistant emits 3 plain-text clarifying
 #      questions, the developer answers each, the assistant emits a
 #      brief summary (Özet section), and the developer responds "evet".
-#   3. Stop hook detects plaintext summary-confirm via the 10.0.3
-#      fallback → advances current_phase 1 → 2 (UI project).
-#   4. Pre-tool Write attempt at frontend path passes (Phase 2 unlocks
-#      frontend).
+#   3. (10.0.6) Stop hook sets summary_askq_skipped=true; current_phase
+#      stays at 1 (no plaintext fallback, no transition).
+#   4. Pre-tool Write attempt at frontend path stays blocked (phase=1).
 #   5. Self-project guard early-exit JSON includes hookEventName.
 
 echo "--- test-real-session-plaintext-flow ---"
@@ -109,35 +116,49 @@ with open(sys.argv[1], "w") as fh:
         fh.write(json.dumps(t) + "\n")
 PY
 
-# ---- Bug 2 regression: drive Stop hook → Phase 1 → 2 transition ----
+# ---- Bug 2 (10.0.6 update): plain-text fallback removed ----
+# 10.0.3 added a plain-text approve fallback so "evet" advanced the
+# Phase 1 → 2/3 transition without an AskUserQuestion call. 10.0.6
+# removed the fallback (a finite TR+EN whitelist can't cover natural-
+# language approvals like "doğru", "uygundur", "tabii"). Plain-text
+# "evet" now triggers the summary-askq-skipped enforcement flag
+# instead, so the next UserPromptSubmit prompts the model to re-emit
+# the summary via AskUserQuestion.
 _rs_stop_out="$(printf '%s' "{\"transcript_path\":\"${_rs_t}\",\"session_id\":\"rs2\",\"cwd\":\"${_rs_proj}\"}" \
   | CLAUDE_PROJECT_DIR="$_rs_proj" \
     MCL_STATE_DIR="$_rs_proj/.mcl" \
     MCL_REPO_PATH="$REPO_ROOT" \
     bash "$REPO_ROOT/hooks/mcl-stop.sh" 2>/dev/null)"
 
-# State should now be phase=2 (UI project), phase_name=DESIGN_REVIEW
 _rs_phase_after="$(python3 -c "import json; print(json.load(open('$_rs_state')).get('current_phase'))")"
-_rs_pname_after="$(python3 -c "import json; print(json.load(open('$_rs_state')).get('phase_name'))")"
-assert_equals "[Bug 2] plaintext 'evet' advances phase 1→2 (UI project)" \
-  "$_rs_phase_after" "2"
-assert_equals "[Bug 2] phase_name=DESIGN_REVIEW after plaintext approval" \
-  "$_rs_pname_after" "DESIGN_REVIEW"
+_rs_flag_after="$(python3 -c "import json; print(json.load(open('$_rs_state')).get('summary_askq_skipped'))")"
+assert_equals "[Bug 2] plaintext 'evet' no longer advances phase (stays 1)" \
+  "$_rs_phase_after" "1"
+assert_equals "[Bug 2] summary_askq_skipped flag set true" \
+  "$_rs_flag_after" "True"
 
-if grep -q "plaintext-summary-confirm-detected" "$_rs_proj/.mcl/audit.log" 2>/dev/null; then
+if grep -q "summary-askq-skipped" "$_rs_proj/.mcl/audit.log" 2>/dev/null; then
   PASS=$((PASS+1))
-  printf '  PASS: [Bug 2] plaintext-summary-confirm-detected audit captured\n'
+  printf '  PASS: [Bug 2] summary-askq-skipped enforcement audit captured\n'
 else
   FAIL=$((FAIL+1))
-  printf '  FAIL: [Bug 2] plaintext-summary-confirm-detected audit missing\n'
+  printf '  FAIL: [Bug 2] summary-askq-skipped audit missing\n'
+fi
+
+if grep -q "plaintext-summary-confirm-detected" "$_rs_proj/.mcl/audit.log" 2>/dev/null; then
+  FAIL=$((FAIL+1))
+  printf '  FAIL: [Bug 2] removed plaintext-fallback audit still firing (regression)\n'
+else
+  PASS=$((PASS+1))
+  printf '  PASS: [Bug 2] plaintext-fallback audit absent (10.0.3 fallback fully removed)\n'
 fi
 
 if grep -qE "phase-transition-to-(design-review|implementation)" "$_rs_proj/.mcl/audit.log" 2>/dev/null; then
-  PASS=$((PASS+1))
-  printf '  PASS: [Bug 2] phase-transition audit captured\n'
-else
   FAIL=$((FAIL+1))
-  printf '  FAIL: [Bug 2] phase-transition audit missing\n'
+  printf '  FAIL: [Bug 2] phase-transition fired without AskUserQuestion (regression)\n'
+else
+  PASS=$((PASS+1))
+  printf '  PASS: [Bug 2] no phase-transition audit (askq required)\n'
 fi
 
 # ---- Bug 3 regression: spec emission at phase=1 must block ----
@@ -224,9 +245,10 @@ else
   printf '        output: %s\n' "$(printf '%s' "$_rs_b4_out" | head -c 250)"
 fi
 
-# ---- Acceptance: Bug 2 fix unlocks Phase 2 frontend Write ----
-# After the plaintext approval advanced state to phase=2, a frontend
-# Write must succeed (Phase 2 DESIGN_REVIEW frontend-only).
+# ---- Acceptance (10.0.6 update): Phase 1 Write stays blocked ----
+# Plain-text approval no longer transitions Phase 1 → 2. State remains
+# phase=1, so Write stays blocked until the model re-emits the summary
+# via AskUserQuestion and the developer's tool_result lands.
 mkdir -p "$_rs_proj/src/components"
 _rs_w_payload="$(python3 -c "
 import json
@@ -242,12 +264,12 @@ _rs_w_out="$(printf '%s' "$_rs_w_payload" \
     MCL_STATE_DIR="$_rs_proj/.mcl" \
     MCL_REPO_PATH="$REPO_ROOT" \
     bash "$REPO_ROOT/hooks/mcl-pre-tool.sh" 2>/dev/null)"
-if [ -z "$_rs_w_out" ] || ! printf '%s' "$_rs_w_out" | grep -q '"permissionDecision": "deny"'; then
+if printf '%s' "$_rs_w_out" | grep -q '"permissionDecision": "deny"'; then
   PASS=$((PASS+1))
-  printf '  PASS: [Acceptance] Phase 2 frontend Write allowed after plaintext approval\n'
+  printf '  PASS: [Acceptance] Phase 1 Write stays blocked (askq required for transition)\n'
 else
   FAIL=$((FAIL+1))
-  printf '  FAIL: [Acceptance] Phase 2 frontend Write blocked (regression)\n'
+  printf '  FAIL: [Acceptance] Phase 1 Write allowed without AskUserQuestion (regression)\n'
   printf '        output: %s\n' "$(printf '%s' "$_rs_w_out" | head -c 250)"
 fi
 

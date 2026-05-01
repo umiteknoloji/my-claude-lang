@@ -815,6 +815,27 @@ except Exception:
   unset _P1_DATA _P1_CP _P1_REST _P1_TC _P1_PAC
 fi
 
+# Summary AskUserQuestion enforcement notice (since 10.0.6). When the
+# Stop hook set summary_askq_skipped=true (assistant emitted a Phase 1
+# intent summary but did NOT call AskUserQuestion this turn), inject a
+# mandatory instruction so the next assistant turn surfaces the
+# summary via AskUserQuestion(summary-confirm). Plain-text approval is
+# no longer accepted: a finite whitelist of TR+EN approve words
+# ("onayla, evet, tamam, ...") cannot capture the open space of
+# natural-language confirmations ("doğru", "uygundur", "tabii",
+# "iyidir", ...), and silent rejection is a worse UX than asking
+# explicitly. The flag is cleared once read so the notice fires
+# exactly once per skip.
+SUMMARY_ASKQ_NOTICE=""
+if [ -f "$STATE_FILE" ] && command -v python3 >/dev/null 2>&1; then
+  _SAS_FLAG="$(mcl_state_get summary_askq_skipped 2>/dev/null)"
+  if [ "$_SAS_FLAG" = "true" ]; then
+    SUMMARY_ASKQ_NOTICE="<mcl_audit name=\\\"summary-askq-mandatory\\\">\\nPHASE 1 SUMMARY APPROVAL — the previous turn emitted a Phase 1 intent summary but did NOT call AskUserQuestion. Plain-text approval is no longer accepted (since 10.0.6): a finite TR+EN whitelist cannot capture every natural-language confirmation (${_BT}doğru${_BT}, ${_BT}uygundur${_BT}, ${_BT}tabii${_BT}, ${_BT}iyidir${_BT}, ...), and silent rejection is a worse UX than asking explicitly. THIS TURN: re-emit the same summary AS-IS (do not regenerate or rephrase, just repeat), then immediately call AskUserQuestion (prefix ${_BT}MCL ${INSTALLED_VERSION} | ${_BT}) with the canonical summary-confirm options in the developer's detected language: ${_BT}Onayla / Düzelt / İptal${_BT} (TR) or ${_BT}Approve / Revise / Cancel${_BT} (EN). Do NOT proceed to Phase 2/3 work, do NOT write files, do NOT emit a spec until the developer's tool_result lands.\\n</mcl_audit>\\n\\n"
+    mcl_state_set summary_askq_skipped false >/dev/null 2>&1 || true
+    mcl_audit_log "summary-askq-mandatory-injected" "mcl-activate.sh" "shown"
+  fi
+fi
+
 # Phase review enforcement notice (since 7.1.8). When the Stop hook set
 # phase_review_state=pending (code was written without Phase 4 starting),
 # inject a mandatory block instruction on the developer's next message.
@@ -1463,7 +1484,7 @@ print(json.dumps(sys.stdin.read().strip())[1:-1])
   fi
 fi
 
-FULL_CONTEXT="${UPDATE_NOTICE}${SESSION_CONTEXT_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PHASE1_STUCK_NOTICE}${PRECISION_ESCAPE_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
+FULL_CONTEXT="${UPDATE_NOTICE}${SESSION_CONTEXT_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${SUMMARY_ASKQ_NOTICE}${PHASE1_STUCK_NOTICE}${PRECISION_ESCAPE_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
 
 # Log MCL injection size for cost accounting (mcl-doctor)
 if command -v python3 >/dev/null 2>&1; then

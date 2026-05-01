@@ -91,6 +91,7 @@ _mcl_state_default() {
   "phase6_double_check_done": false,
   "phase4_batch_decision": null,
   "phase1_turn_count": 0,
+  "summary_askq_skipped": false,
   "phase1_intent": null,
   "phase1_constraints": null,
   "paused_on_error": {"active": false},

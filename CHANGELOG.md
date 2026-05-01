@@ -7,6 +7,93 @@
 
 ## [Unreleased]
 
+## 10.0.6 — 2026-05-01
+
+### Changed (Phase 1 summary approval — AskUserQuestion mandatory)
+
+**The 10.0.3 plain-text approve fallback is removed.** A finite TR+EN
+whitelist of approve words (`onayla, evet, tamam, kabul, ...`) cannot
+capture the open space of natural-language confirmations a developer
+might use (`doğru, uygundur, tabii, iyidir, olur, ...`). Real-session
+example: developer typed `doğru` after the assistant's Phase 1
+summary, the whitelist did not match, the hook silently failed,
+state stayed at phase=1, Write/Edit remained blocked, and the
+developer hit a wall with no diagnostic. Silent rejection is a
+strictly worse UX than asking explicitly.
+
+**New behavior:** Phase 1 → 2/3 transition requires a real
+`AskUserQuestion(summary-confirm)` tool call. When the assistant
+emits a Phase 1 summary marker (Özet:/Summary:/MUST:/SHOULD:/
+Acceptance Criteria/Edge Cases/━━━ fence) but skips AskUserQuestion
+this turn, the Stop hook sets `state.summary_askq_skipped=true` and
+audits `summary-askq-skipped`. The next `UserPromptSubmit` reads the
+flag, injects a mandatory `<mcl_audit name="summary-askq-mandatory">`
+notice telling the assistant to re-emit the same summary AS-IS and
+call AskUserQuestion with the canonical `Onayla / Düzelt / İptal`
+(TR) or `Approve / Revise / Cancel` (EN) options. The flag clears
+once read, so the notice fires exactly once per skip.
+
+Meaning-comprehension cannot be delegated to a regex whitelist —
+the assistant must either understand the developer's reply (via
+AskUserQuestion's deterministic option result) or ask explicitly.
+
+### Removed
+- `mcl-stop.sh:414-512` plain-text approve fallback block (was
+  10.0.3 Bug 2 fix). The `_mcl_is_approve_option` helper stays —
+  it now runs only on AskUserQuestion tool-result option strings.
+
+### Added
+- `state.summary_askq_skipped` boolean field (default `false`). Set
+  by `mcl-stop.sh` on summary-marker-without-askq detection;
+  cleared by `mcl-activate.sh` on next `UserPromptSubmit` after
+  injection.
+- `mcl-activate.sh` `SUMMARY_ASKQ_NOTICE` injection — adds the
+  enforcement audit block to `FULL_CONTEXT` when the flag is set.
+- `tests/cases/test-summary-askq-enforcement.sh` — 4 cases:
+    1. Phase 1 + summary marker + plain `doğru` → flag set, no
+       transition, `summary-askq-skipped` audit captured.
+    2. Phase 1 + non-summary text + plain `evet` → flag NOT set
+       (false-positive guard for clarifying-question replies).
+    3. Phase 2 + summary marker → flag NOT set (enforcement
+       scoped to Phase 1).
+    4. Phase 1 + summary marker + plain `evet` (formerly accepted
+       by the 10.0.3 fallback) → flag IS set, no transition.
+       Confirms the fallback is fully gone.
+
+### Updated
+- `tests/cases/test-real-session-plaintext-flow.sh` — Bug 2 section
+  rewritten to match 10.0.6 enforcement. Bug 1 (hookEventName),
+  Bug 3 (premature spec block), Bug 4 (state Read allowed)
+  sections unchanged. Acceptance section updated: Phase 1 Write
+  stays blocked on plain-text `evet` (askq required for
+  transition).
+- `skills/my-claude-lang/phase1-rules.md` — Main Flow step 4
+  hardened: "Plain-text approval is NOT accepted (since 10.0.6)"
+  with the whitelist-vs-natural-language reasoning in plain prose
+  so the model knows WHY the rule exists rather than treating it
+  as arbitrary.
+
+### Test posture
+- 237 passed / 0 failed / 4 skipped (full `tests/run-tests.sh`).
+
+### Notes
+- README.md / README.tr.md unchanged: no user-visible feature
+  added or removed. AskUserQuestion approval was already the
+  documented Phase 1 contract; only an internal bypass was
+  deleted. Per the version-independent README rule, READMEs
+  describe features, not implementation enforcement details.
+- The cancel-path branch added in 10.0.5 (Phase 2/3 → 1
+  plain-text rollback) is unaffected — cancel intent is a
+  different category from approve intent (cancel returns to a
+  known-safe phase, no binding gate). The `iptal, cancel, geri
+  al, vazgeç, undo, revert, abort` whitelist stays plain-text
+  triggerable.
+- Self-project guard still blocks MCL pipeline activation in
+  `my-claude-lang` itself; dogfood verification must run from a
+  separate project directory.
+
+---
+
 ## 10.0.5 — 2026-05-01
 
 ### Fixed (cancel-path reachability)
