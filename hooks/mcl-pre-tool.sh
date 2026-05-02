@@ -608,7 +608,7 @@ except Exception:
       else
         mcl_state_set spec_hash "\"$JIT_SPEC_HASH\""
         mcl_state_set spec_approved true
-        mcl_state_set current_phase 4
+        mcl_state_set current_phase 7
         mcl_state_set phase_name '"EXECUTE"'
         # UI intent scan mirrors stop.sh: bootstrap projects whose
         # file-system UI signals fired `false` at session start still
@@ -628,11 +628,11 @@ except Exception:
           mcl_state_set ui_sub_phase '"BUILD_UI"'
           mcl_audit_log "ui-flow-enter-build" "pre-tool" "hash=${JIT_SPEC_HASH:0:12}"
         fi
-        mcl_audit_log "askq-advance-jit" "pre-tool" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->4 ui_flow=${UI_FLOW_ON}"
-        mcl_debug_log "pre-tool" "askq-advance-jit" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->4"
+        mcl_audit_log "askq-advance-jit" "pre-tool" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->7 ui_flow=${UI_FLOW_ON}"
+        mcl_debug_log "pre-tool" "askq-advance-jit" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->7"
         command -v mcl_trace_append >/dev/null 2>&1 && {
           mcl_trace_append spec_approved "${JIT_SPEC_HASH:0:12}"
-          mcl_trace_append phase_transition "$CURRENT_PHASE" 4
+          mcl_trace_append phase_transition "$CURRENT_PHASE" 7
           [ "$UI_FLOW_ON" = "true" ] && mcl_trace_append ui_flow_enabled
           mcl_trace_append askq_advance_jit "${JIT_SPEC_HASH:0:12}"
         }
@@ -647,13 +647,13 @@ except Exception:
          && [ "$CURRENT_PHASE" = "1" ]; then
       # Phase-1 → Phase-2 advance. Does NOT unlock mutating tools
       # (still phase<4) but keeps audit/trace parity with Stop.
-      mcl_state_set current_phase 2
+      mcl_state_set current_phase 4
       mcl_state_set phase_name '"SPEC_REVIEW"'
       mcl_audit_log "askq-advance-jit" "pre-tool" "summary-confirm phase=1->2"
       mcl_debug_log "pre-tool" "askq-advance-jit" "summary-confirm phase=1->2"
       command -v mcl_trace_append >/dev/null 2>&1 && {
         mcl_trace_append summary_confirmed approved
-        mcl_trace_append phase_transition 1 2
+        mcl_trace_append phase_transition 1 4
       }
       CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
       PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"

@@ -948,11 +948,11 @@ PYEOF
         fi
       fi
 
-      mcl_state_set current_phase 2
+      mcl_state_set current_phase 4
       mcl_state_set phase_name '"SPEC_REVIEW"'
       mcl_state_set spec_hash "\"$SPEC_HASH\""
       mcl_debug_log "stop" "transition-1-to-2" "hash=${SPEC_HASH:0:12}"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 1 2
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 1 4
       command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Faz 1 → 2 geçişi (spec algılandı)."
       ;;
     2|3)
@@ -988,7 +988,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     mcl_debug_log "stop" "askq-ignored-no-spec" "phase=${CURRENT_PHASE}"
   elif [ "$CURRENT_PHASE" = "4" ] || [ "$CURRENT_PHASE" = "3" ]; then
     mcl_state_set spec_approved true
-    mcl_state_set current_phase 4
+    mcl_state_set current_phase 7
     mcl_state_set phase_name '"EXECUTE"'
     UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
     # Spec-body UI intent detection (since 6.5.4). Bootstrap / scaffold
@@ -1014,11 +1014,11 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
       mcl_state_set ui_sub_phase '"BUILD_UI"'
       mcl_audit_log "ui-flow-enter-build" "stop" "hash=${CURRENT_HASH:0:12}"
     fi
-    mcl_audit_log "approve-via-askuserquestion" "stop" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4 ui_flow=${UI_FLOW_ON}"
-    mcl_debug_log "stop" "approve-via-askuserquestion" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->4"
+    mcl_audit_log "approve-via-askuserquestion" "stop" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->7 ui_flow=${UI_FLOW_ON}"
+    mcl_debug_log "stop" "approve-via-askuserquestion" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->7"
     command -v mcl_trace_append >/dev/null 2>&1 && {
       mcl_trace_append spec_approved "${CURRENT_HASH:0:12}"
-      mcl_trace_append phase_transition "$CURRENT_PHASE" 4
+      mcl_trace_append phase_transition "$CURRENT_PHASE" 7
       [ "$UI_FLOW_ON" = "true" ] && mcl_trace_append ui_flow_enabled
     }
     command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Spec onaylandı. Faz ${CURRENT_PHASE} → 4 geçişi."
