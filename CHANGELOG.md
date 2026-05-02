@@ -7,6 +7,69 @@
 
 ## [Unreleased]
 
+## [10.1.2] - 2026-05-02
+
+### MEDIUM/HIGH must-resolve invariant
+
+Closing the security gap loop: v10.1.0 hard-enforced Aşama 8 + 9
+ran; v10.1.1 added the explicit MUST checklist; v10.1.2 ensures
+no Aşama 11 advance while ANY HIGH or MEDIUM finding is still
+unresolved.
+
+#### Implementation
+
+- **`hooks/lib/mcl-state.sh`** — new default field
+  `open_severity_count: 0`.
+- **`hooks/mcl-stop.sh`** — new `_mcl_open_severity_count()` helper:
+  scans audit.log within current session boundary
+  (`session_start` in trace.log) for `asama-9-4-ambiguous` events
+  matched against `asama-9-4-resolved` events. The set difference
+  is the open count. Helper updates state every Stop pass:
+  `mcl_state_set open_severity_count <n>`.
+- **Stop hook block:** when `quality_review_state="complete"` AND
+  `open_severity_count > 0`, emit `decision:block` with the
+  must-resolve reason text — Aşama 11 cannot fire until the count
+  hits 0. The model resolves each finding by:
+  1. Running it through Aşama 8 risk-dialog (developer decides via
+     AskUserQuestion: apply fix / accept with rule-capture / cancel)
+  2. Writing `mcl_audit_log "asama-9-4-resolved" "stop" "rule=<id>
+     file=<f>:<l> status=fixed|accepted"` to mark it resolved.
+- **Loop-breaker:** 3 consecutive `open-severity-block` events →
+  `open-severity-loop-broken` audit + fail-open. Preserves the
+  v9.0.1 fail-open contract.
+
+#### Aşama 11 Verify Report — new "Açık Yüksek/Orta Bulgular" section
+
+If the loop-breaker fired (fail-open path), Aşama 11 emits an
+explicit "Açık Yüksek/Orta Bulgular" section listing every still-
+open finding from the audit log. Even when MCL gives up enforcing
+(loop-broken), the developer sees what was left unresolved.
+
+#### Combined v10.1.0–v10.1.2 effect on real-use audit gaps
+
+| Gap | Caught by |
+|---|---|
+| Brute-force protection missing | Aşama 8 §2b auth checklist [HIGH] |
+| `localStorage` token storage | Aşama 8 §2b frontend [HIGH] |
+| JWT revocation missing | Aşama 8 §2b backend [HIGH] |
+| Default admin creds | Aşama 8 §2b auth [HIGH] |
+| helmet missing | Aşama 8 §2b backend [HIGH] |
+| **CSP missing** | Aşama 8 §2b frontend [HIGH] |
+| Password policy weak | Aşama 8 §2b auth [HIGH] |
+| bcrypt cost = 10 | Aşama 8 §2b backend [MEDIUM] |
+| CORS regex too broad | Aşama 8 §2b backend [MEDIUM] |
+| RBAC missing | Aşama 8 §2b auth [MEDIUM] |
+| Audit log missing | Aşama 8 §2b backend [MEDIUM] |
+| Aşamalar 8/9 hiç çalışmamış | v10.1.0 hard-enforcement |
+| Açık M/H bulgular ile Aşama 11 fire | v10.1.2 must-resolve invariant |
+
+#### Tests
+
+94 passing (8 new in `test-v10-1-2-must-resolve.sh`: 4 counter
+scenarios + hook contract checks + state schema check).
+
+Banner: MCL 10.1.1 → MCL 10.1.2.
+
 ## [10.1.1] - 2026-05-02
 
 ### Stack-aware security MUST checklist (CSP, JWT, RBAC, audit, etc.)

@@ -730,6 +730,76 @@ PYEOF
   fi
 fi
 
+# --- MEDIUM/HIGH must-resolve invariant (since v10.1.2) ---
+# Compute the count of open HIGH/MEDIUM findings in the current
+# session. A finding is "open" when an `asama-9-4-ambiguous` audit
+# event exists for it AND no matching `asama-9-4-resolved` event
+# exists. The count is stored in state.open_severity_count for
+# downstream gates (Aşama 9 complete / Aşama 11 fire) to consult.
+_mcl_open_severity_count() {
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo 0; return; fi
+  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo 0
+import os, re, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+ambiguous, resolved = set(), set()
+def _key(detail):
+    m = re.search(r"rule=(\S+)\s+file=(\S+)", detail or "")
+    return m.group(0) if m else None
+try:
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        if "| asama-9-4-ambiguous |" not in line and "| asama-9-4-resolved |" not in line:
+            continue
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        parts = line.split("|", 3)
+        detail = parts[3].strip() if len(parts) > 3 else ""
+        k = _key(detail)
+        if not k:
+            continue
+        if "asama-9-4-ambiguous" in line:
+            ambiguous.add(k)
+        elif "asama-9-4-resolved" in line:
+            resolved.add(k)
+except Exception:
+    pass
+print(len(ambiguous - resolved))
+PYEOF
+}
+
+_OS_OPEN_COUNT="$(_mcl_open_severity_count 2>/dev/null || echo 0)"
+mcl_state_set open_severity_count "${_OS_OPEN_COUNT:-0}" >/dev/null 2>&1 || true
+
+# Block Aşama 11 / quality-complete advance when open M/H findings
+# exist. Loop-breaker: 3 strikes → fail-open + force resolved (every
+# open finding marked resolved with `loop-broken` reason in audit).
+_QR_FOR_OS="$(mcl_state_get quality_review_state 2>/dev/null)"
+if [ "$_QR_FOR_OS" = "complete" ] && [ "${_OS_OPEN_COUNT:-0}" -gt 0 ]; then
+  _OS_BLOCK_COUNT="$(_mcl_loop_breaker_count "open-severity-block" 2>/dev/null || echo 0)"
+  if [ "${_OS_BLOCK_COUNT:-0}" -ge 3 ]; then
+    mcl_audit_log "open-severity-loop-broken" "stop" "count=${_OS_BLOCK_COUNT} open=${_OS_OPEN_COUNT} fail-open"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append open_severity_loop_broken "${_OS_BLOCK_COUNT}"
+  else
+    mcl_audit_log "open-severity-block" "stop" "count=${_OS_BLOCK_COUNT} open=${_OS_OPEN_COUNT}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append open_severity_block "${_OS_BLOCK_COUNT}"
+    printf '%s\n' "{
+  \"decision\": \"block\",
+  \"reason\": \"⚠️ MCL MEDIUM/HIGH MUST-RESOLVE INVARIANT — Aşama 9 quality_review_state=complete olarak işaretlendi AMA hâlâ ${_OS_OPEN_COUNT} adet HIGH/MEDIUM seviyeli açık bulgu var (asama-9-4-ambiguous emit edilmiş ama asama-9-4-resolved yazılmamış).\n\nAşama 11'e geçmeden önce her açık bulgu çözülmeli:\n1. Aşama 8 risk-dialog'ina geri dön (her açık bulgu için bir AskUserQuestion turu).\n2. Geliştirici karar verir — apply specific fix / accept with rule-capture justification / cancel.\n3. Her resolution için ${_BT}bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-9-4-resolved stop \\\"rule=<id> file=<f>:<l> status=fixed|accepted\\\"'${_BT} yaz.\n4. open_severity_count 0 olunca block kalkar, Aşama 11 fire eder.\n\nLoop-breaker: 3 üst üste skip → fail-open. Şu anki sayı: ${_OS_BLOCK_COUNT}/3.\"
+}"
+    exit 0
+  fi
+fi
+
 # --- Aşama 9 quality+tests hard-enforcement (since v10.1.0) ---
 # When Aşama 8 risk dialog completed (risk_review_state=complete) AND
 # Aşama 9 quality pipeline did NOT complete (quality_review_state ≠

@@ -60,6 +60,7 @@ _mcl_state_default() {
   "precision_audit_done": false,
   "risk_review_state": null,
   "quality_review_state": null,
+  "open_severity_count": 0,
   "rollback_sha": null,
   "rollback_notice_shown": false,
   "tdd_last_green": null,
