@@ -117,7 +117,7 @@ Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 3 spec onayı, her Aşama 4.5
 risk, her Aşama 4.6 etki, plugin onayı, git-init onayı, drift çözümü,
 `/mcl-update` / `/mcl-finish` / yapıştırılan-CLI onayı) artık yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 8.4.4 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+`MCL 8.4.5 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
 "evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
 açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
 kalıyor.
@@ -127,7 +127,7 @@ Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
 bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
 onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
-Her yanıt `🌐 MCL 8.4.4` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 8.4.5` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ### UI Build / Review Alt-Fazları (6.2.0'dan itibaren)
 
@@ -269,14 +269,6 @@ Yeni bir Claude Code oturumu aç ve kendi dilinde yazmaya başla. Hepsi bu.
 ---
 
 ## Güncelleme
-
-MCL, pasif bir güncelleme kontrolü ve tek kelimeyle self-update özelliğiyle gelir.
-
-Hook, 24 saatte bir arka planda repodaki `VERSION` dosyasını çeker. Yeni sürüm varsa, her yanıttaki banner'ın yanında senin dilinde lokalize bir uyarı belirir, örneğin:
-
-```
-🌐 MCL 5.4.1 (⚠️ 5.4.2 mevcut — mcl-update yaz)
-```
 
 Güncellemek için mesaj olarak sadece `/mcl-update` yaz. MCL normal akışı (spec, fazlar) tamamen atlar ve şu komutu çalıştırır:
 

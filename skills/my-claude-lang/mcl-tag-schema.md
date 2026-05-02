@@ -70,8 +70,7 @@ Analyze the following developer prompt for language and ambiguity:
 
 ### `<mcl_audit>`
 
-- Hook `UPDATE_NOTICE` prefix (update-available side-channel)
-- Future diagnostic messages injected by MCL tooling
+- Diagnostic messages injected by MCL tooling
 
 ## Wrapping rules
 

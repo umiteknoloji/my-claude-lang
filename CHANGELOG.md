@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+## [8.4.5] - 2026-05-02
+
+### Kaldırıldı — Pasif "yeni sürüm mevcut" bildirimi
+
+`mcl-activate.sh` her turda banner'a `(⚠️ <latest> mevcut — mcl-update yaz)` lokalize uyarısını ekleyen UPDATE_NOTICE bloğunu enjekte ediyordu. Bu bildirim kaldırıldı; banner artık sadece `🌐 MCL <version>` formatında.
+
+#### Hook
+- `hooks/mcl-activate.sh` — `UPDATE_AVAILABLE` semver karşılaştırması, `UPDATE_NOTICE` enjeksiyon bloğu ve FULL_CONTEXT'teki `${UPDATE_NOTICE}` referansı silindi. LATEST_VERSION fetch + 24h cache mekanizması korundu — `/mcl-update` keyword'ünün upstream-latest raporlaması için hâlâ kullanılıyor.
+
+#### Dokümanlar
+- `README.md`, `README.tr.md` — "Updating" / "Güncelleme" bölümünden pasif kontrol paragrafı ve örnek banner çıkarıldı; `/mcl-update` self-update talimatı korundu.
+- `skills/my-claude-lang/mcl-tag-schema.md` — `<mcl_audit>` kullanım örneğinden "Hook UPDATE_NOTICE prefix" maddesi silindi.
+
+### Değişmedi
+- `/mcl-update` keyword'ü tamamen aynen çalışıyor: blocking fetch ile upstream sürümü raporluyor, `git pull --ff-only && bash setup.sh` çalıştırıyor.
+
 ## [8.4.4] - 2026-05-02
 
 ### Kaldırıldı — `current_phase < 4` mutating tool bloğu
