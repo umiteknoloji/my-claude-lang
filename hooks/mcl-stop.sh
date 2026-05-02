@@ -766,8 +766,13 @@ try:
             prod_writes.append(ts)
 except Exception:
     pass
-# Of each prod_write, count those preceded by at least one test_write
-preceded = sum(1 for p in prod_writes if any(t < p for t in test_writes))
+# Of each prod_write, count those preceded by at least one test_write.
+# `<=` (not `<`) handles same-second ties: when test+prod fire in the
+# same wall-clock second (date granularity), the test still counts as
+# "preceding" — second-level granularity is too coarse to call this a
+# TDD violation. Real-use timing has multiple seconds between events;
+# the tie case appears in fast tests and rare Multi-Edit pairs.
+preceded = sum(1 for p in prod_writes if any(t <= p for t in test_writes))
 total_prod = len(prod_writes)
 score = round((preceded / total_prod) * 100) if total_prod else (100 if test_writes else 0)
 print(f"{score}|{preceded}|{total_prod}")
