@@ -52,22 +52,93 @@ def _entry_epoch(obj):
 PREFIX_RE = re.compile(r"^MCL\s+[0-9]+\.[0-9]+\.[0-9]+\s*\|\s*(.+)$", re.DOTALL)
 
 SPEC_APPROVE_TOKENS = [
+    # English (spec / specification)
     "approve this spec", "approve the spec",
+    "approve this specification", "approve the specification",
+    # Turkish — both "spec" loanword AND native "şartname"
     "spec\u0027i onayl",
     "spec\u2019i onayl",
     "spec onay",
+    "şartname\u0027yi onayl",
+    "şartname\u2019yi onayl",
+    "şartnameyi onayl",
+    "şartnameyi onay",
+    "şartname onay",
+    # Spanish
     "aprobar esta spec", "aprueba este spec",
+    "aprobar esta especificaci", "aprueba esta especificaci",
+    # French
     "approuver ce spec", "approuver cette sp",
+    "approuver cette spécification",
+    # German
     "genehmigen sie diese spec",
+    "diese spezifikation genehmig",
+    # Japanese — スペック + 仕様 (specification)
     "\u3053\u306e\u30b9\u30da\u30c3\u30af\u3092\u627f\u8a8d",
+    "\u4ed5\u69d8\u3092\u627f\u8a8d",
+    # Korean
     "\uc2a4\ud399\uc744 \uc2b9\uc778",
+    "\uba85\uc138\uc11c\ub97c \uc2b9\uc778",
+    # Chinese
     "\u6279\u51c6\u6b64\u89c4\u8303",
+    "\u6279\u51c6\u8fd9\u4e2a\u89c4\u8303",
+    # Arabic
     "\u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0645\u0648\u0627\u0635\u0641\u0627\u062a",
+    # Hebrew
     "\u05d0\u05e9\u05e8 \u05d0\u05ea \u05d4\u05de\u05e4\u05e8\u05d8",
+    # Hindi
     "\u0907\u0938 \u0938\u094d\u092a\u0947\u0915 \u0915\u094b \u0938\u094d\u0935\u0940\u0915\u093e\u0930",
-    "setujui spec ini",
-    "aprovar este spec",
+    # Indonesian
+    "setujui spec ini", "setujui spesifikasi",
+    # Portuguese
+    "aprovar este spec", "aprovar esta especifica",
+    # Russian
     "\u043e\u0434\u043e\u0431\u0440\u0438\u0442\u044c \u044d\u0442\u043e\u0442 \u0441\u043f\u0435\u043a",
+    "\u043e\u0434\u043e\u0431\u0440\u0438\u0442\u044c \u044d\u0442\u0443 \u0441\u043f\u0435\u0446\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u044e",
+]
+
+# Approve-family verbs across 14 supported languages. Used by the
+# fallback heuristic when the strict SPEC_APPROVE_TOKENS list misses
+# a wording variant (e.g., model writes "Bunu onaylıyor musun?"
+# without the literal "spec/şartname" keyword) but a spec block
+# exists in the transcript and an approve-family option label was
+# selected.
+APPROVE_VERBS = [
+    # English
+    "approve", "confirm", "accept", "proceed",
+    # Turkish
+    "onayla", "onayl\u0131",
+    "evet", "kabul", "tamam",
+    # Spanish
+    "aprueb", "confirmar", "aceptar",
+    # French
+    "approuv", "confirmer",
+    # German
+    "genehmig", "best\u00e4tig",
+    # Japanese
+    "\u627f\u8a8d", "\u4e86\u89e3", "\u78ba\u8a8d",
+    "\u306f\u3044",
+    # Korean
+    "\uc2b9\uc778", "\ud655\uc778", "\uc608",
+    "\ub124",
+    # Chinese
+    "\u6279\u51c6", "\u786e\u8ba4", "\u662f",
+    "\u540c\u610f",
+    # Arabic
+    "\u0645\u0648\u0627\u0641\u0642", "\u0646\u0639\u0645",
+    "\u062a\u0623\u0643\u064a\u062f",
+    # Hebrew
+    "\u05d0\u05e9\u05e8", "\u05db\u05df", "\u05d0\u05d9\u05e9\u05d5\u05e8",
+    # Hindi
+    "\u0938\u094d\u0935\u0940\u0915\u093e\u0930",
+    "\u0939\u093e\u0901", "\u0939\u093e\u0902",
+    # Indonesian
+    "setuju", "konfirmasi",
+    # Portuguese
+    "aprovar", "sim",
+    # Russian
+    "\u043e\u0434\u043e\u0431\u0440", "\u0434\u0430",
+    "\u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434",
 ]
 
 SUMMARY_CONFIRM_TOKENS = [
@@ -174,16 +245,60 @@ def _extract_text(msg):
     return None
 
 
-def _classify_intent(question_body_lower):
+def _has_approve_signal(text_lower):
+    """True when text contains any 14-language approve verb."""
+    if not text_lower:
+        return False
+    for verb in APPROVE_VERBS:
+        if verb in text_lower:
+            return True
+    return False
+
+
+def _classify_intent(question_body_lower, options_lower=None,
+                     selected_lower="", has_spec=False):
+    """Classify the askq intent.
+
+    Order:
+      1. Strict UI review tokens.
+      2. Strict spec approve tokens (english/turkish/etc).
+      3. Strict summary confirm tokens.
+      4. FALLBACK heuristic — when none of the strict token lists match
+         AND a \U0001F4CB Spec block exists in the transcript AND an
+         approve-family verb appears in either the question body or a
+         user-selected option, classify as `spec-approve`. This catches
+         model wording variants like "Şartname yukarıdaki gibi.
+         Onaylıyor musun?" that don't carry the literal "spec"
+         keyword but are structurally a spec-approve question following
+         a spec emit.
+      5. FALLBACK for summary-confirm — if no spec exists and an approve
+         verb appears, classify as `summary-confirm`.
+      6. Else `other`.
+    """
+    options_lower = options_lower or []
+
+    for tok in UI_REVIEW_TOKENS:
+        if tok in question_body_lower:
+            return "ui-review"
     for tok in SPEC_APPROVE_TOKENS:
         if tok in question_body_lower:
             return "spec-approve"
     for tok in SUMMARY_CONFIRM_TOKENS:
         if tok in question_body_lower:
             return "summary-confirm"
-    for tok in UI_REVIEW_TOKENS:
-        if tok in question_body_lower:
-            return "ui-review"
+
+    # Fallback heuristic: structural rather than vocabulary-based.
+    approve_in_question = _has_approve_signal(question_body_lower)
+    approve_in_selected = _has_approve_signal(selected_lower)
+    approve_in_any_option = any(_has_approve_signal(o) for o in options_lower)
+    has_approve_signal = approve_in_question or approve_in_selected or approve_in_any_option
+
+    if has_approve_signal and has_spec:
+        return "spec-approve"
+    if has_approve_signal:
+        # No spec emitted yet — likely Aşama 1 summary confirm.
+        return "summary-confirm"
+
     return "other"
 
 
@@ -313,23 +428,32 @@ def scan(path, min_ts_epoch=0.0):
 
     intent = ""
     selected = ""
+    has_spec = last_spec_text is not None
     for tid in reversed(order):
         use = tool_uses.get(tid)
         res = tool_results.get(tid)
         if not use or not res:
             continue
+        # PREFIX_RE strict match; if model dropped the prefix, fall back
+        # to the raw question text (lowercased). The fallback heuristic
+        # in _classify_intent still requires an approve signal + spec
+        # context to promote, so this stays safe.
         m = PREFIX_RE.match(use["question"].strip())
-        if not m:
-            continue
-        body_lower = m.group(1).lower()
-        intent = _classify_intent(body_lower)
+        body_lower = (m.group(1) if m else use["question"]).lower()
         res_norm = res.strip()
+        # Selected option resolution (must come before classification so
+        # selected-text approve signal feeds the fallback heuristic).
         for opt in use.get("options", []):
             if opt and opt in res_norm:
                 selected = opt
                 break
         if not selected:
             selected = res_norm.splitlines()[0].strip() if res_norm else ""
+        options_lower = [o.lower() for o in use.get("options", []) if isinstance(o, str)]
+        intent = _classify_intent(body_lower,
+                                  options_lower=options_lower,
+                                  selected_lower=selected.lower(),
+                                  has_spec=has_spec)
         break
 
     spec_hash = _compute_spec_hash(last_spec_text)

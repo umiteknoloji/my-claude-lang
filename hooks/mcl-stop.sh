@@ -152,6 +152,47 @@ PYEOF
 }
 trap _mcl_session_context_write EXIT
 
+# --- Loop-breaker helper (since v9.0.0) ---
+# Counts how many times a given audit event fired in the current session.
+# Used by hard-enforcement blocks (Aşama 2 precision-audit, Aşama 8
+# risk-review) to fail-open after 3 consecutive same-cause blocks so a
+# stuck model cannot trap the developer in an infinite spec-emit loop.
+# Session boundary is the most recent `session_start` event in trace.log.
+_mcl_loop_breaker_count() {
+  local event="$1"
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo 0; return; fi
+  python3 - "$audit_file" "$trace_file" "$event" 2>/dev/null <<'PYEOF' || echo 0
+import os, sys
+audit_path, trace_path, event = sys.argv[1], sys.argv[2], sys.argv[3]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        with open(trace_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if "| session_start |" in line:
+                    parts = line.split("|", 1)
+                    if parts:
+                        session_ts = parts[0].strip()
+except Exception:
+    pass
+count = 0
+needle = f"| {event} |"
+try:
+    with open(audit_path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if needle not in line:
+                continue
+            ts = line.split("|", 1)[0].strip()
+            if not session_ts or ts >= session_ts:
+                count += 1
+except Exception:
+    pass
+print(count)
+PYEOF
+}
+
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
 TRANSCRIPT_PATH="$(printf '%s' "$RAW_INPUT" | python3 -c '
@@ -577,12 +618,25 @@ PYEOF
         fi
       fi
 
+      # Loop-breaker (since v9.0.0): if this enforcement already fired
+      # 3+ times in the current session, fail-open. Repeated stickies
+      # without a Aşama 8 dialog mean the model can't recover; further
+      # blocks would just trap the developer.
+      _PR_BLOCK_COUNT="$(_mcl_loop_breaker_count "phase-review-pending" 2>/dev/null || echo 0)"
+      if [ "${_PR_BLOCK_COUNT:-0}" -ge 3 ]; then
+        mcl_audit_log "phase-review-loop-broken" "stop" "count=${_PR_BLOCK_COUNT} fail-open"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append risk_review_loop_broken "${_PR_BLOCK_COUNT}"
+        # Mark risk review complete so downstream phases (Aşama 9/10/11)
+        # can proceed. Aşama 8 was effectively skipped this session.
+        mcl_state_set risk_review_state '"complete"' >/dev/null 2>&1 || true
+      else
       # Return decision:block so Claude is forced to continue.
       printf '%s\n' "{
   \"decision\": \"block\",
   \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nAşama 7 code was written but Aşama 8 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Aşama 6c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Aşama 8 starts.\n\n(B) IF ALL Aşama 7 code is NOW complete:\n    Start Aşama 8 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Aşama 8 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Aşama 8 risks are resolved → run Aşama 10 Impact Review.\n    4. After Aşama 10 → run Aşama 11 Verification Report.\n\nAşama 8 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.\"
 }"
       exit 0
+      fi
     fi
   fi
 fi
@@ -889,8 +943,8 @@ SPEC_APPROVED="$(mcl_state_get spec_approved)"
 if [ -n "$SPEC_HASH" ]; then
   case "$CURRENT_PHASE" in
     1)
-      # --- Aşama 2 precision-audit skip detection (since 8.3.0) ---
-      # Aşama 1 → 2 transition: Aşama 2 should have emitted a precision-audit
+      # --- Aşama 2 precision-audit skip detection (since v9.0.0) ---
+      # Aşama 1 → 4 transition: Aşama 2 should have emitted a precision-audit
       # entry before the spec block was written. Scan audit.log for the entry,
       # scoped to current session via last `session_start` in trace.log. If
       # missing → write `precision-audit-skipped-warn`. Audit-only, non-blocking.
@@ -938,13 +992,27 @@ PYEOF
           # `precision-audit | ... skipped=true` (handled in skill file)
           # which counts as `hit` above and bypasses this block — the
           # implicit safety valve for English source.
-          mcl_audit_log "precision-audit-block" "mcl-stop.sh" "summary-confirmed-but-no-audit; transition-rewind"
-          command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_block
+          # Loop-breaker (since v9.0.0): if this block already fired 3+
+          # times in the current session, fail-open. The model couldn't
+          # recover after 3 attempts; further blocks would just trap
+          # the developer. Audit the loop-broken decision so it's
+          # visible in `/mcl-checkup`.
+          _PA_BLOCK_COUNT="$(_mcl_loop_breaker_count "precision-audit-block" 2>/dev/null || echo 0)"
+          if [ "${_PA_BLOCK_COUNT:-0}" -ge 3 ]; then
+            mcl_audit_log "precision-audit-loop-broken" "mcl-stop.sh" "count=${_PA_BLOCK_COUNT} fail-open"
+            command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_loop_broken "${_PA_BLOCK_COUNT}"
+            # Allow the Aşama 1→4 transition to proceed (the spec is
+            # accepted as-is; precision_audit was missed).
+            mcl_state_set precision_audit_done false >/dev/null 2>&1 || true
+          else
+          mcl_audit_log "precision-audit-block" "mcl-stop.sh" "summary-confirmed-but-no-audit; transition-rewind count=${_PA_BLOCK_COUNT}"
+          command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_block "count=${_PA_BLOCK_COUNT}"
           printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL PHASE 1.7 PRECISION AUDIT ENFORCEMENT (mandatory, non-skippable)\n\nA Aşama 4 spec block was emitted but Aşama 2 Precision Audit has NOT been run. The Aşama 1→2 transition is blocked. In this SAME response, before the turn closes:\n\n1. Read ~/.claude/skills/my-claude-lang/asama2-precision-audit.md for the dimension list and classification rules.\n2. Walk the 7 core dimensions (permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry) plus any matching stack add-ons returned by: bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect \\\"\$(pwd)\\\"\n3. Classify each dimension: SILENT-ASSUME (mark [assumed: X]), SKIP-MARK (mark [unspecified: X] — currently only Performance SLA), or GATE (architectural impact → ask one question via AskUserQuestion).\n4. Emit the audit entry via: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log precision-audit phase1-7 \\\"core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<tags> skipped=false\\\"' (substitute counts and tags).\n5. Re-emit the spec block with precision-enriched parameters. The prior spec is discarded — replaced, not duplicated.\n\nIf detected language is English, emit the audit with skipped=true (Aşama 1 already in English; behavioral prior assumed sufficient) and the block clears immediately on the next turn.\n\nRecovery: if you believe this block fired in error (e.g., audit emit failed silently), type /mcl-restart to clear phase state.\"
+  \"reason\": \"⚠️ MCL AŞAMA 2 PRECISION AUDIT ENFORCEMENT (mandatory, non-skippable)\n\nA Aşama 4 spec block was emitted but Aşama 2 Precision Audit has NOT been run. The Aşama 1→4 transition is blocked. NOTE: even an all-SILENT-ASSUME pass with zero GATE questions still requires the audit entry — "no GATEs" does NOT mean "skip the audit". In this SAME response, before the turn closes:\n\n1. Read ~/.claude/skills/my-claude-lang/asama2-precision-audit.md for the dimension list and classification rules.\n2. Walk the 7 core dimensions (permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry) plus any matching stack add-ons returned by: bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect \\\"\$(pwd)\\\"\n3. Classify each dimension: SILENT-ASSUME (mark [assumed: X]), SKIP-MARK (mark [unspecified: X] — currently only Performance SLA), or GATE (architectural impact → ask one question via AskUserQuestion).\n4. Emit the audit entry via: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log precision-audit asama2 \\\"core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<tags> skipped=false\\\"' (substitute counts and tags).\n5. Re-emit the spec block with precision-enriched parameters. The prior spec is discarded — replaced, not duplicated.\n\nIf detected language is English, emit the audit with skipped=true (Aşama 1 already in English; behavioral prior assumed sufficient — same single-line `mcl_audit_log` call, just with skipped=true) and the block clears immediately on the next turn.\n\nRecovery: if you believe this block fired in error (e.g., audit emit failed silently), type /mcl-restart to clear phase state.\"
 }"
           exit 0
+          fi
         fi
       fi
 

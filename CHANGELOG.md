@@ -7,6 +7,91 @@
 
 ## [Unreleased]
 
+## [9.0.1] - 2026-05-02
+
+### Real-use bug fixes — JIT advance, scanner classifier, loop-breakers
+
+Real-use test10 prototype-backoffice session exposed three failure
+modes that combined into an infinite "MCL LOCK — spec_approved=false"
+loop. v9.0.1 closes all three layers.
+
+#### A. Scanner classifier expansion (`mcl-askq-scanner.py`)
+
+The model emitted spec-approve questions using Turkish "Şartname"
+(specification) instead of "Spec":
+`MCL 9.0.0 | Şartname yukarıdaki gibi. Onaylıyor musun?`. The strict
+`SPEC_APPROVE_TOKENS` list only knew "spec'i onayl"/"spec onay" and
+returned `intent="other"` → JIT askq advance skipped → state stuck at
+phase=1 → Write blocked.
+
+Fixes:
+- `SPEC_APPROVE_TOKENS` expanded across 14 languages (English
+  spec/specification, Turkish şartname variants, Spanish
+  especificación, Japanese 仕様, Korean 명세서, Chinese 规范, etc.).
+- New `APPROVE_VERBS` list — generic approve-family verbs in 14
+  languages (onayla, evet, kabul, aprueb, approuv, genehmig, 承認,
+  승인, 批准, موافق, אשר, स्वीकार, setuju, aprovar, одобр, ...).
+- `_classify_intent` now accepts question body, options list,
+  selected option, and `has_spec` flag. Fallback heuristic: if no
+  strict token matches but a `📋 Spec:` block exists in the
+  transcript AND an approve-family verb appears in question body OR
+  any option label OR the selected option, classify as
+  `spec-approve`. Decouples classification from exact wording.
+- PREFIX_RE strict match relaxed to fallback: when the model drops
+  the `MCL X.Y.Z | ` prefix, scanner falls back to raw question
+  text. Combined with the approve+spec heuristic, false positives
+  are still ruled out by the spec presence requirement.
+
+#### B. STATIC_CONTEXT hardening (`mcl-activate.sh` + `mcl-stop.sh`)
+
+The model conflated "no GATE questions to ask" with "skip the
+Aşama 2 audit emit step". Spec emitted without audit → Stop hook
+hard-block → recovery loop.
+
+Fixes:
+- Aşama 2 instruction text in STATIC_CONTEXT made explicit: "emit one
+  audit entry UNCONDITIONALLY ... THIS AUDIT EMIT IS MANDATORY EVEN
+  WHEN ALL DIMENSIONS CLASSIFY AS SILENT-ASSUME — 'no GATE questions
+  to ask' does NOT mean 'skip the audit'."
+- Stop hook block reason text updated with the same clarification +
+  audit emit example uses `asama2` caller (was `phase1-7` legacy
+  string) + transition target text "Aşama 1→4" (was 1→2).
+
+#### C. Loop-breakers (`mcl-stop.sh`)
+
+When A and B both fail (e.g., model uses an unrecognized wording AND
+fails to emit the audit), the user was trapped in an infinite block
+loop. v9.0.1 adds a session-scoped 3-strike counter:
+
+- New `_mcl_loop_breaker_count <event>` helper counts how many times
+  the named audit event fired AFTER the most recent `session_start`
+  in trace.log.
+- Aşama 2 (`precision-audit-block`): on the 4th attempt, fail-open
+  with `precision-audit-loop-broken` audit + `precision_audit_done`
+  stays false (visible in `/mcl-checkup`).
+- Aşama 8 (`phase-review-pending`): on the 4th sticky-pending turn,
+  fail-open with `phase-review-loop-broken` audit + mark
+  `risk_review_state=complete` so downstream Aşama 9/10/11 can
+  proceed.
+
+Trade-off: trades hard contract for soft contract on the
+4th-attempt-onwards. The model gets 3 chances to recover (matching
+the model's typical recovery latency); after that, the developer
+is unblocked rather than trapped.
+
+#### Tests
+
+5 new synthetic tests (68 total, 0 failed):
+- `test-v9-classifier-fallback.sh` — 5 scenarios: Şartname-fallback,
+  explicit token, no-spec→summary-confirm, no-spec generic approve,
+  Japanese 仕様 spec-approve.
+- `test-v9-loop-breaker.sh` — 5 counter scenarios: zero baseline,
+  under-threshold, threshold, session boundary, different event name.
+
+#### Banner
+
+- `🌐 MCL 9.0.0` → `🌐 MCL 9.0.1` everywhere.
+
 ## [9.0.0] - 2026-05-02
 
 ### Major rewrite — flat 12-stage pipeline (BREAKING)
