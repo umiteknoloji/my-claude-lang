@@ -85,10 +85,12 @@ Aşama 6: When a UI surface is detected (default ON), Aşama 6 splits:
                            Only runs after UI approval.
   │
   ▼
-Aşama 7: Code gets written. Incremental TDD runs inside this
-         phase — for each acceptance criterion: one failing test
-         (RED), minimum code to pass it (GREEN), then refactor.
-         Cycle repeats per criterion; full suite re-checked at end.
+Aşama 7: Test-first development (TDD). For each acceptance
+         criterion: write the failing test FIRST (RED), then the
+         minimum production code to make it pass (GREEN), then
+         refactor. The cycle repeats per criterion; full suite
+         re-checked at end. Test always precedes production code —
+         this is what differentiates TDD from "test after the fact".
   │
   ▼
 Aşama 8 (Risk Review): MCL verifies that the security and
@@ -132,7 +134,7 @@ Every closed-ended gate (Aşama 1 summary, Aşama 4 spec approval, each
 Aşama 8 risk, each Aşama 10 impact, plugin consent, git-init consent,
 drift resolution, `/mcl-update` / `/mcl-finish` / pasted-CLI confirmation)
 arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 10.1.2 | `. You pick an option in the UI — no typing
+question prefix `MCL 10.1.3 | `. You pick an option in the UI — no typing
 "yes" or "✅ MCL APPROVED" required. Open-ended Aşama 1 gathering stays
 as a plain-text conversation.
 
@@ -141,7 +143,7 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 10.1.2` so you always know the bridge is active.
+Every response starts with `🌐 MCL 10.1.3` so you always know the bridge is active.
 
 ### UI Build / Review Sub-Phases (since 6.2.0)
 

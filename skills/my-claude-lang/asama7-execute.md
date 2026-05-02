@@ -1,8 +1,14 @@
 <mcl_phase name="asama7-execute">
 
-# Aşama 7: Execution with Live Translation
+# Aşama 7: Test-First Development (TDD) with Live Translation
 
 Called automatically when Aşama 4 is confirmed.
+
+**Naming clarification:** Aşama 7 is colloquially "the code-writing
+stage", but its discipline is strict TDD: the **test is written
+first** (RED), then production code (GREEN), then refactor. Reading
+the title as "code first" would be the opposite of TDD. See
+`asama7-tdd.md` for the per-criterion cycle.
 
 ## Flow Split (since MCL 6.2.0)
 

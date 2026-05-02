@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+## [10.1.3] - 2026-05-02
+
+### Aşama 7 başlığı düzeltildi — TDD test-first vurgusu
+
+Real-use feedback: Aşama 7 başlığı *"Kod yazılıyor"* ("Code gets
+written") TDD prensibinin tersini ima ediyor — TDD'de önce test
+yazılır, sonra kod. Body doğru tarif ediyordu (RED→GREEN→refactor)
+ama başlık yanıltıcıydı.
+
+#### Fix
+
+- `README.md` Aşama 7 paragrafı yeniden yazıldı: *"Test-first
+  development (TDD). For each acceptance criterion: write the
+  failing test FIRST (RED), then the minimum production code to
+  make it pass (GREEN), then refactor."*
+- `README.tr.md` Aşama 7 paragrafı yeniden yazıldı: *"Test-first
+  geliştirme (TDD). Her kabul kriteri için ÖNCE failing test
+  yazılıyor (RED), SONRA onu geçecek minimum production kod
+  (GREEN), ardından refactor. Test her zaman production kodun
+  önünde gelir — 'kod yaz sonra test ekle' değil, gerçek TDD."*
+- `skills/my-claude-lang/asama7-execute.md` başlık + naming
+  clarification eklendi.
+
+Banner: MCL 10.1.2 → MCL 10.1.3.
+
 ## [10.1.2] - 2026-05-02
 
 ### MEDIUM/HIGH must-resolve invariant
