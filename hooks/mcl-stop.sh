@@ -202,7 +202,7 @@ def extract_text(msg):
         return "\n".join(parts) if parts else None
     return None
 
-spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:", re.MULTILINE)
+spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:", re.MULTILINE)
 
 last_spec_text = None
 try:
@@ -1041,7 +1041,7 @@ import json, re, sys, subprocess
 
 transcript_path, paths_lib = sys.argv[1], sys.argv[2]
 spec_line_re = re.compile(
-    r'^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:', re.MULTILINE)
+    r'^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:', re.MULTILINE)
 
 spec_body = ''
 try:

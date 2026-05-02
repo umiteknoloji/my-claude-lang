@@ -40,7 +40,7 @@ def extract_text(msg):
 
 
 SPEC_MARKER_RE = re.compile(
-    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:",
+    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:",
     re.MULTILINE,
 )
 
@@ -71,7 +71,7 @@ def last_assistant_spec_text(path):
 
 
 def extract_spec_body(text):
-    spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec:")
+    spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:")
     lines = text.splitlines()
     start = None
     for i, ln in enumerate(lines):
