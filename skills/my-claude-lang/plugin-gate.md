@@ -66,7 +66,7 @@ the gate notice IS the entire response. Claude must:
      install pyright`, `cargo install rust-analyzer`, etc.)
 3. State plainly that MCL stays gated until every missing item is
    resolved AND a new MCL session is started.
-4. Do NOT run Phase 1 intent gathering. Do NOT call `AskUserQuestion`.
+4. Do NOT run Aşama 1 intent gathering. Do NOT call `AskUserQuestion`.
    Do NOT emit a spec. The gate listing is the entire response.
 
 The gate repeats on EVERY turn until resolved — the `warn-once-then-

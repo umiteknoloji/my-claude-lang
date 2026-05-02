@@ -42,7 +42,7 @@ Before presenting Claude Code's response to the developer:
   1. **Why this is being asked** — one sentence: what Claude needs to decide
   2. **What each answer changes** — brief: "If you say X → this happens.
      If you say Y → that happens."
-  This does NOT apply to MCL's own questions (Phase 1 parameter gathering) —
+  This does NOT apply to MCL's own questions (Aşama 1 parameter gathering) —
   those are already in the developer's language and MCL knows the context.
   This ONLY applies to questions originating from Claude Code's execution.
 - **EXECUTION PLAN RULE (since MCL 5.3.2 — deletion-only):** By default
@@ -62,7 +62,7 @@ Before presenting Claude Code's response to the developer:
   these appear as system prompts the developer must answer immediately
   (e.g., "Do you want to create X? 1. Yes / 2. Yes, allow all").
   MCL CANNOT intercept these — they happen at the harness level.
-  At the END of Phase 4 (after all code is written), MCL MUST include
+  At the END of Aşama 7 (after all code is written), MCL MUST include
   a permission summary section listing EACH harness permission
   INDIVIDUALLY — not grouped, not summarized with a generic sentence.
   For EACH permission, on its own line or block:

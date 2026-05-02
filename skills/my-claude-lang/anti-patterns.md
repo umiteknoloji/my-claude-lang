@@ -21,26 +21,26 @@
 - ❌ Word-for-word translation instead of meaning translation
 - ❌ Translating code, variable names, or file paths
 - ❌ Assuming the developer knows English technical jargon
-- ❌ Skipping Phase 3 because "it's obvious"
+- ❌ Skipping Aşama 4 because "it's obvious"
 - ❌ Translating Claude Code's questions without explaining WHY it's asking and WHAT each answer changes — the developer must make informed decisions, not guess
 - ❌ Calling a shell `rm` or `rmdir` command (including `rm -r`, `rm -rf`, or chained bash containing them) without first presenting an Execution Plan — file/directory deletion is the ONLY action class that still requires the plan (since MCL 5.3.2). All other tool calls proceed silently. `git rm` is a git subcommand, not shell `rm`, and does NOT require the plan
 - ❌ Starting a deletion after presenting the Execution Plan without waiting for the developer's confirmation — the plan requires explicit approval just like the spec
 - ❌ Emitting an Execution Plan for non-deletion tool calls (Edit, Write, git push, npm install, etc.) — since MCL 5.3.2 the plan is deletion-scoped; adding it for reversible or harness-gated actions is pure noise
-- ❌ Ending Phase 4 with "done", "all steps completed", or a changes summary WITHOUT running Phase 4.5 (Post-Code Risk Review) and then Phase 5 (Verification Report) — both are MANDATORY, code completion is NOT the end
-- ❌ Presenting Missed Risks inside Phase 5 — since MCL 5.3.0, Missed Risks is its own **Phase 4.5 (Post-Code Risk Review)** that runs BEFORE the Verification Report. Never embed risks in the Phase 5 report
-- ❌ Presenting Phase 4.5 risks as a one-shot bulleted list — Phase 4.5 is a sequential interactive dialog: ONE risk per turn, wait for developer reply, then next risk. Wall-of-text risk lists are forbidden
-- ❌ Running Phase 5 (Verification Report) before Phase 4.5 AND Phase 4.6 are fully resolved — the report's must-test items must reflect the developer's Phase 4.5 (risk) and Phase 4.6 (impact) decisions (skip / apply fix / make general rule). Emitting the report early produces a stale report
-- ❌ Presenting Phase 4.6 impacts as a one-shot bulleted list — since MCL 5.4.0, Phase 4.6 (Post-Risk Impact Review) is a sequential interactive dialog: ONE impact per turn, wait for developer reply, then next impact. Wall-of-text impact lists are forbidden
-- ❌ Surfacing meta-changelog as an impact — "we updated file X", "next session will use the new behavior", restatement of the task's own deliverables, or version/setup notes are NOT impacts. An impact is a real downstream effect on OTHER parts of the project (consuming imports, shared utilities, API contracts, shared state/cache, schema, configuration). If the only candidates are meta-changelog, the impact list is empty and Phase 4.6 is omitted entirely
-- ❌ Fabricating Phase 4.6 impacts to make the section look thorough — only surface impacts from an honest scan. If the code is self-contained, OMIT Phase 4.6 entirely from the response (no header, no placeholder sentence). The scan still happens; only the output is suppressed when clean. Proceed silently to Phase 5
-- ❌ Re-surfacing in Phase 4.6 an item already handled in Phase 4.5 — the impact review is for items NOT yet addressed, not a second pass over risks the developer already decided
-- ❌ Emitting Phase 5 before Phase 4.6 is fully resolved, OR including an "Impact Analysis" section inside Phase 5 — since MCL 5.4.0 Impact Analysis is its own Phase 4.6. Phase 5 has at most 2 sections (Spec Compliance mismatches-only, must-test)
-- ❌ Moving to the next Phase 4.5 risk without waiting for the developer's reply — each risk gets its own turn; continuing in the same response is a STOP RULE violation
-- ❌ Fabricating Phase 4.5 risks to make the section look thorough — only surface risks from an honest scan. If the code is clean, OMIT Phase 4.5 entirely from the response (no header, no "No additional risks identified." sentence, no placeholder of any kind). The scan still happens; only the output is suppressed when clean. Proceed silently to Phase 5
-- ❌ Re-surfacing Phase 4.5 risks that were already decided in Phase 1 or Phase 3 — the risk review is for issues that appeared during implementation, not a second-guess of confirmed requirements
-- ❌ Listing ✅-compliant items in the Phase 5 Spec Compliance section — Spec Compliance shows ONLY mismatches (⚠️/❌). If every MUST/SHOULD item is satisfied, OMIT Section 1 entirely (no header, no "All MUST/SHOULD items comply." sentence, no placeholder). The absence of Section 1 IS the all-clear signal. Do NOT enumerate the satisfied items and do NOT emit a consolation sentence
-- ❌ Using the old "Test Checklist" label in Phase 5 — the must-test section is now titled `!!! <LOCALIZED-PHRASE> !!!` in the developer's language (e.g., `!!! MUTLAKA TEST ETMENİZ GEREKENLER !!!` in Turkish). The emphatic wrapping and localization are not optional
-- ❌ Including a Permission Summary section in Phase 5 — removed in MCL 5.2.0. The developer already saw and approved each permission at the harness prompt; restating adds no value. Phase 5 is up to 2 sections (Spec Compliance mismatches-only — omitted when empty, must-test), never more — Impact Analysis was extracted into Phase 4.6 in MCL 5.4.0
+- ❌ Ending Aşama 7 with "done", "all steps completed", or a changes summary WITHOUT running Aşama 8 (Post-Code Risk Review) and then Aşama 11 (Verification Report) — both are MANDATORY, code completion is NOT the end
+- ❌ Presenting Missed Risks inside Aşama 11 — since MCL 5.3.0, Missed Risks is its own **Aşama 8 (Post-Code Risk Review)** that runs BEFORE the Verification Report. Never embed risks in the Aşama 11 report
+- ❌ Presenting Aşama 8 risks as a one-shot bulleted list — Aşama 8 is a sequential interactive dialog: ONE risk per turn, wait for developer reply, then next risk. Wall-of-text risk lists are forbidden
+- ❌ Running Aşama 11 (Verification Report) before Aşama 8 AND Aşama 10 are fully resolved — the report's must-test items must reflect the developer's Aşama 8 (risk) and Aşama 10 (impact) decisions (skip / apply fix / make general rule). Emitting the report early produces a stale report
+- ❌ Presenting Aşama 10 impacts as a one-shot bulleted list — since MCL 5.4.0, Aşama 10 (Post-Risk Impact Review) is a sequential interactive dialog: ONE impact per turn, wait for developer reply, then next impact. Wall-of-text impact lists are forbidden
+- ❌ Surfacing meta-changelog as an impact — "we updated file X", "next session will use the new behavior", restatement of the task's own deliverables, or version/setup notes are NOT impacts. An impact is a real downstream effect on OTHER parts of the project (consuming imports, shared utilities, API contracts, shared state/cache, schema, configuration). If the only candidates are meta-changelog, the impact list is empty and Aşama 10 is omitted entirely
+- ❌ Fabricating Aşama 10 impacts to make the section look thorough — only surface impacts from an honest scan. If the code is self-contained, OMIT Aşama 10 entirely from the response (no header, no placeholder sentence). The scan still happens; only the output is suppressed when clean. Proceed silently to Aşama 11
+- ❌ Re-surfacing in Aşama 10 an item already handled in Aşama 8 — the impact review is for items NOT yet addressed, not a second pass over risks the developer already decided
+- ❌ Emitting Aşama 11 before Aşama 10 is fully resolved, OR including an "Impact Analysis" section inside Aşama 11 — since MCL 5.4.0 Impact Analysis is its own Aşama 10. Aşama 11 has at most 2 sections (Spec Compliance mismatches-only, must-test)
+- ❌ Moving to the next Aşama 8 risk without waiting for the developer's reply — each risk gets its own turn; continuing in the same response is a STOP RULE violation
+- ❌ Fabricating Aşama 8 risks to make the section look thorough — only surface risks from an honest scan. If the code is clean, OMIT Aşama 8 entirely from the response (no header, no "No additional risks identified." sentence, no placeholder of any kind). The scan still happens; only the output is suppressed when clean. Proceed silently to Aşama 11
+- ❌ Re-surfacing Aşama 8 risks that were already decided in Aşama 1 or Aşama 4 — the risk review is for issues that appeared during implementation, not a second-guess of confirmed requirements
+- ❌ Listing ✅-compliant items in the Aşama 11 Spec Compliance section — Spec Compliance shows ONLY mismatches (⚠️/❌). If every MUST/SHOULD item is satisfied, OMIT Section 1 entirely (no header, no "All MUST/SHOULD items comply." sentence, no placeholder). The absence of Section 1 IS the all-clear signal. Do NOT enumerate the satisfied items and do NOT emit a consolation sentence
+- ❌ Using the old "Test Checklist" label in Aşama 11 — the must-test section is now titled `!!! <LOCALIZED-PHRASE> !!!` in the developer's language (e.g., `!!! MUTLAKA TEST ETMENİZ GEREKENLER !!!` in Turkish). The emphatic wrapping and localization are not optional
+- ❌ Including a Permission Summary section in Aşama 11 — removed in MCL 5.2.0. The developer already saw and approved each permission at the harness prompt; restating adds no value. Aşama 11 is up to 2 sections (Spec Compliance mismatches-only — omitted when empty, must-test), never more — Impact Analysis was extracted into Aşama 10 in MCL 5.4.0
 - ❌ Emitting a placeholder sentence ("No risks identified", "All items comply", "Nothing to report", or any localized equivalent) when a phase section has no content — any empty phase section is omitted entirely (no header, no sentence, no whitespace filler). This applies uniformly to every phase, current and future. The review/analysis still happens internally; only the output is suppressed when clean. "No news = good news" is the user-facing contract
 - ❌ Writing to `CLAUDE.md` (project or user-global) without showing the exact proposed rule text first — both the English directive AND the developer-language translation must be previewed and explicitly approved. Silent appends to CLAUDE.md are forbidden
 - ❌ Bypassing the scope sanity check — when the developer picks a scope that looks inappropriate for the rule (framework-specific rule tagged "all projects", universal rule tagged "this project"), MCL must challenge exactly once with the specific reason. Skipping this challenge, OR nagging more than once, both violate the rule
@@ -51,7 +51,7 @@
 - ❌ Translating error messages literally — explain what they MEAN
 - ❌ Long paragraphs — use short, clear sentences
 - ❌ Mixing languages mid-sentence (except for technical terms in parentheses)
-- ❌ Presenting the Phase 1 summary and then continuing to read files or write the spec in the same response — the summary MUST end with "Is this correct?" and NOTHING else follows
+- ❌ Presenting the Aşama 1 summary and then continuing to read files or write the spec in the same response — the summary MUST end with "Is this correct?" and NOTHING else follows
 - ❌ Asking "Is this correct?" when there are still missing parameters
 - ❌ Accepting "yes but..." as a clean "yes"
 - ❌ Ignoring logical contradictions in requirements
@@ -61,7 +61,7 @@
 - ❌ Assuming the developer understood just because they didn't object
 - ❌ Asking multiple questions at once instead of one at a time
 - ❌ Continuing to work after asking a question — if you asked a question, your response ENDS there. No file reading, no exploring, no tool calls, no summaries after the question
-- ❌ Presenting multiple summaries — there is exactly ONE summary at the end of Phase 1 when all parameters are ready. No intermediate summaries, no "here's what I have so far", no partial recaps during question gathering
+- ❌ Presenting multiple summaries — there is exactly ONE summary at the end of Aşama 1 when all parameters are ready. No intermediate summaries, no "here's what I have so far", no partial recaps during question gathering
 - ❌ Presenting a long summary before resolving uncertainties
 - ❌ Presenting options as a list (a/b/c) under a single question — ask open-ended instead
 - ❌ Adding preamble like "let me ask a few things", "I need to clarify a few things:", "let me understand better:" before asking — just ask the question directly. No introduction. No framing. The question IS the response.
@@ -77,11 +77,11 @@
 
 ## Integration with Other Skills
 
-- **With Superpowers brainstorming**: Run Phase 1-3 BEFORE brainstorming starts.
+- **With Superpowers brainstorming**: Run Aşama 1-4 BEFORE brainstorming starts.
   Brainstorming questions go through the translation bridge.
-- **With Superpowers planning**: The English spec from Phase 2 feeds directly into
-  the planning skill. Plan review goes through Phase 5.
-- **With code review skills**: Review results go through Phase 5.
+- **With Superpowers planning**: The English spec from Aşama 4 feeds directly into
+  the planning skill. Plan review goes through Aşama 11.
+- **With code review skills**: Review results go through Aşama 11.
 - **With any skill that asks questions**: ALL questions route through this bridge.
 
 ## Red Flags — Stop and Re-verify

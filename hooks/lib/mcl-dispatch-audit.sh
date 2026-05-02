@@ -1,12 +1,12 @@
 #!/bin/bash
-# MCL Dispatch Audit — verifies required plugins were dispatched during Phase 4.5.
+# MCL Dispatch Audit — verifies required plugins were dispatched during Aşama 8.
 #
-# Phase 4.5 mandatory dispatches:
+# Aşama 8 mandatory dispatches:
 #   (a) Code-review sub-agent: any plugin_dispatched event whose subagent_type
 #       starts with "pr-review-toolkit" or "code-review" — must appear AFTER
-#       the last phase_review_pending event in trace.log (i.e., after Phase 4
-#       code was written and Phase 4.5 started).
-#   (b) Semgrep scan: a semgrep_ran event in trace.log after phase_review_pending,
+#       the last risk_review_pending event in trace.log (i.e., after Aşama 7
+#       code was written and Aşama 8 started).
+#   (b) Semgrep scan: a semgrep_ran event in trace.log after risk_review_pending,
 #       unless semgrep is known to be unavailable (skip flag).
 #
 # Usage (sourced):
@@ -30,7 +30,7 @@ import sys, json
 trace_log  = sys.argv[1]
 skip_sgrep = sys.argv[2].lower() == "true"
 
-# Read all lines, find the last phase_review_pending event index,
+# Read all lines, find the last risk_review_pending event index,
 # then scan for dispatches after that index.
 lines = []
 try:
@@ -40,14 +40,14 @@ except Exception:
     print("")
     sys.exit(0)
 
-# Find the last phase_review_pending line (anchor for Phase 4.5 start).
+# Find the last risk_review_pending line (anchor for Aşama 8 start).
 last_pending_idx = -1
 for i, line in enumerate(lines):
     parts = line.split(" | ", 2)
-    if len(parts) >= 2 and parts[1].strip() == "phase_review_pending":
+    if len(parts) >= 2 and parts[1].strip() == "risk_review_pending":
         last_pending_idx = i
 
-# If no pending event, Phase 4.5 hasn't started yet — nothing to audit.
+# If no pending event, Aşama 8 hasn't started yet — nothing to audit.
 if last_pending_idx == -1:
     print("")
     sys.exit(0)

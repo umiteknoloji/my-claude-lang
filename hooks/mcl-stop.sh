@@ -94,7 +94,7 @@ phase = state.get("current_phase") or 1
 phase_name = state.get("phase_name") or ""
 spec_hash = (state.get("spec_hash") or "")[:8]
 spec_approved = state.get("spec_approved") is True
-phase_review_state = state.get("phase_review_state") or ""
+risk_review_state = state.get("risk_review_state") or ""
 pattern_scan_due = state.get("pattern_scan_due") is True
 plan_critique_done = state.get("plan_critique_done") is True
 plan_files = []
@@ -107,20 +107,20 @@ if spec_hash:
 else:
     active = f"Phase {phase} ({phase_name})"
 def resolve_next():
-    if phase_review_state == "pending":
-        return "Phase 4.5 risk review başlat"
-    if phase_review_state == "running":
-        return "Phase 4.5/4.6 dialog'u devam ettir"
+    if risk_review_state == "pending":
+        return "Aşama 8 risk review başlat"
+    if risk_review_state == "running":
+        return "Aşama 8/10 dialog'u devam ettir"
     if pattern_scan_due:
-        return "Phase 3.5 pattern scan"
+        return "Aşama 5 pattern scan"
     if plan_files and not plan_critique_done:
         return "Plan critique subagent çalıştır (Sonnet 4.6)"
     if phase == 1:
-        return "Phase 1 parametre toplama"
+        return "Aşama 1 parametre toplama"
     if phase in (2, 3) and not spec_approved:
         return "Spec onayı bekleniyor"
     if phase >= 4 and spec_approved:
-        return "Phase 4 execute (kod yazımı)"
+        return "Aşama 7 execute (kod yazımı)"
     return "Belirsiz — state'e bak"
 next_step = resolve_next()
 lines = [
@@ -136,8 +136,8 @@ if git_sha:
 lines.append(f"**Sıradaki adım:** {next_step}")
 if plan_files and not plan_critique_done:
     lines.append(f"**Yarım plan:** {os.path.relpath(plan_files[0], project_dir)} — critique pending")
-elif phase_review_state == "pending":
-    lines.append("**Yarım iş:** Phase 4.5 başlatılmadı")
+elif risk_review_state == "pending":
+    lines.append("**Yarım iş:** Aşama 8 başlatılmadı")
 body = "\n".join(lines) + "\n"
 tmp = sc_path + ".tmp"
 try:
@@ -303,9 +303,9 @@ esac
 # fields {intent, selected, spec_hash}; stop consumes intent + selected
 # (spec_hash is computed separately above as SPEC_HASH for compatibility
 # with the existing post-approval branches). Intent is one of:
-#   spec-approve      — Phase 3 spec approval
-#   summary-confirm   — Phase 1 summary confirmation (audit-only here)
-#   ui-review         — Phase 4b UI review approval
+#   spec-approve      — Aşama 4 spec approval
+#   summary-confirm   — Aşama 1 summary confirmation (audit-only here)
+#   ui-review         — Aşama 6b UI review approval
 #   other             — recognized MCL question but not state-transitioning
 ASKQ_SCANNER="$_MCL_HOOK_DIR/lib/mcl-askq-scanner.py"
 if [ -f "$ASKQ_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
@@ -339,7 +339,7 @@ fi
 # Plain-text approval fallback (since 7.9.8):
 # Developers sometimes type approval words in the chat input instead of
 # clicking the AskUserQuestion button. When no tool-based spec-approve
-# was detected AND current_phase=2 AND spec_hash is set, scan the most
+# was detected AND current_phase=4 AND spec_hash is set, scan the most
 # recent USER message for approve-family text. If found, synthesize a
 # spec-approve intent so the phase-advance branch below fires.
 _PLAINTEXT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
@@ -433,7 +433,7 @@ _mcl_is_approve_option() {
   return 1
 }
 
-# Helper: does the selected option on the Phase 4b ui-review askq ask
+# Helper: does the selected option on the Aşama 6b ui-review askq ask
 # MCL to visually inspect the built UI itself (opt-in vision loop)?
 # Returns 0 when the developer picks the "see and report back yourself"
 # option. 14-language substring match via direct UTF-8 characters.
@@ -466,21 +466,21 @@ _mcl_is_vision_request_option() {
 mcl_state_init
 CURRENT_PHASE="$(mcl_state_get current_phase)"
 
-# --- Phase 4.5 / 4.6 / 5 review enforcement (since 7.1.3) ---
+# --- Aşama 8 / 4.6 / 5 review enforcement (since 7.1.3) ---
 #
-# Core invariant: after Phase 4 code is written, Claude MUST run Phase 4.5
-# Risk Review, Phase 4.6 Impact Review, and Phase 5 Verification Report before
+# Core invariant: after Aşama 7 code is written, Claude MUST run Aşama 8
+# Risk Review, Aşama 10 Impact Review, and Aşama 11 Verification Report before
 # the session can end. This is enforced via `decision: block` — Claude Code
-# refuses to close the turn until Claude starts Phase 4.5.
+# refuses to close the turn until Claude starts Aşama 8.
 #
-# State machine (stored in phase_review_state):
-#   null / absent — Phase 4 hasn't written code yet (no enforcement needed)
-#   "pending"     — code was written, Phase 4.5 not yet started → BLOCK
-#   "running"     — Phase 4.5/4.6 dialog is in progress → allow through
+# State machine (stored in risk_review_state):
+#   null / absent — Aşama 7 hasn't written code yet (no enforcement needed)
+#   "pending"     — code was written, Aşama 8 not yet started → BLOCK
+#   "running"     — Aşama 8/10 dialog is in progress → allow through
 #
 # Transitions:
 #   code_written=true AND askuq=false         → pending  (block)
-#   code_written=true AND askuq=true          → running  (Phase 4.5 fix + next-risk)
+#   code_written=true AND askuq=true          → running  (Aşama 8 fix + next-risk)
 #   code_written=false AND askuq=true         → running  (pure dialog turn)
 #   pending AND code_written=false AND askuq=false → pending  (sticky — re-block)
 #   Session boundary resets state to null (mcl-activate.sh).
@@ -492,9 +492,9 @@ _PR_GUARD="$_MCL_HOOK_DIR/lib/mcl-phase-review-guard.py"
 if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   _PR_ACTIVE_PHASE="$(mcl_get_active_phase 2>/dev/null)"
-  _PR_REVIEW_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
+  _PR_REVIEW_STATE="$(mcl_state_get risk_review_state 2>/dev/null)"
 
-  # Phase 4+ means approved and executing (4, 4a, 4b, 4c, 4.5, 3.5 all qualify)
+  # Aşama 7+ means approved and executing (4, 4a, 4b, 4c, 4.5, 3.5 all qualify)
   if echo "$_PR_ACTIVE_PHASE" | grep -qE '^(4|4a|4b|4c|3\.5)$'; then
     _PR_JSON="$(python3 "$_PR_GUARD" "$TRANSCRIPT_PATH" 2>/dev/null)"
     _PR_CODE="$(printf '%s' "$_PR_JSON" | python3 -c \
@@ -503,22 +503,22 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
       'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("askuq_present") else "false")' 2>/dev/null)"
 
     if [ "$_PR_ASKUQ" = "true" ]; then
-      # Phase 4.5/4.6 dialog is running this turn — transition to "running"
+      # Aşama 8/10 dialog is running this turn — transition to "running"
       # regardless of whether code was also written (risk-fix + next-risk turn).
       if [ "$_PR_REVIEW_STATE" != "running" ]; then
-        mcl_state_set phase_review_state '"running"' >/dev/null 2>&1 || true
+        mcl_state_set risk_review_state '"running"' >/dev/null 2>&1 || true
         mcl_audit_log "phase-review-running" "stop" "prev=${_PR_REVIEW_STATE}"
         command -v mcl_trace_append >/dev/null 2>&1 && \
-          mcl_trace_append phase_review_running "${_PR_REVIEW_STATE:-null}"
+          mcl_trace_append risk_review_running "${_PR_REVIEW_STATE:-null}"
       fi
     elif [ "$_PR_CODE" = "true" ] || [ "$_PR_REVIEW_STATE" = "pending" ]; then
       # Code written this turn, OR pending state persists from a prior turn
       # (sticky enforcement — Bash-only/text-only turns cannot escape the gate).
-      mcl_state_set phase_review_state '"pending"' >/dev/null 2>&1 || true
+      mcl_state_set risk_review_state '"pending"' >/dev/null 2>&1 || true
       mcl_audit_log "phase-review-pending" "stop" \
         "prev=${_PR_REVIEW_STATE} phase=${_PR_PHASE} code=${_PR_CODE}"
       command -v mcl_trace_append >/dev/null 2>&1 && \
-        mcl_trace_append phase_review_pending "${_PR_REVIEW_STATE:-null}"
+        mcl_trace_append risk_review_pending "${_PR_REVIEW_STATE:-null}"
 
       # Regression guard — run full test suite on FIRST transition to pending.
       # Sticky re-triggers (already pending) skip re-run to avoid slowdown.
@@ -580,23 +580,23 @@ PYEOF
       # Return decision:block so Claude is forced to continue.
       printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nPhase 4 code was written but Phase 4.5 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Phase 4c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Phase 4.5 starts.\n\n(B) IF ALL Phase 4 code is NOW complete:\n    Start Phase 4.5 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Phase 4.5 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Phase 4.5 risks are resolved → run Phase 4.6 Impact Review.\n    4. After Phase 4.6 → run Phase 5 Verification Report.\n\nPhase 4.5 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.\"
+  \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nAşama 7 code was written but Aşama 8 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Aşama 6c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Aşama 8 starts.\n\n(B) IF ALL Aşama 7 code is NOW complete:\n    Start Aşama 8 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Aşama 8 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Aşama 8 risks are resolved → run Aşama 10 Impact Review.\n    4. After Aşama 10 → run Aşama 11 Verification Report.\n\nAşama 8 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.\"
 }"
       exit 0
     fi
   fi
 fi
 
-# --- Phase 5 skip detection (since 8.2.7) ---
-# When phase_review_state="running" persists at stop AND no MCL-prefixed
-# AskUserQuestion ran this turn (ASKQ_INTENT empty), the Phase 4.5/4.6 dialog
-# has ended but Phase 5 Verification Report did not clear the state — Phase 5
+# --- Aşama 11 skip detection (since 8.2.7) ---
+# When risk_review_state="running" persists at stop AND no MCL-prefixed
+# AskUserQuestion ran this turn (ASKQ_INTENT empty), the Aşama 8/10 dialog
+# has ended but Aşama 11 Verification Report did not clear the state — Aşama 11
 # was skipped. Audit-only (non-blocking); mcl-activate.sh injects the warn
 # next turn as PHASE5_SKIP_NOTICE. Detection is state-driven (no transcript
 # scan) so abnormal session exits still surface the skip.
-_PR_FINAL_STATE="$(mcl_state_get phase_review_state 2>/dev/null)"
+_PR_FINAL_STATE="$(mcl_state_get risk_review_state 2>/dev/null)"
 if [ "$_PR_FINAL_STATE" = "running" ] && [ -z "$ASKQ_INTENT" ]; then
-  mcl_audit_log "phase5-skipped-warn" "mcl-stop.sh" "phase_review_state=running"
+  mcl_audit_log "phase5-skipped-warn" "mcl-stop.sh" "risk_review_state=running"
   command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase5_skipped_warn
 fi
 
@@ -830,8 +830,8 @@ PYEOF
   fi
 fi
 
-# --- Phase 3.5 pattern-scan clearance (runs before early exit) ---
-# Must run before the spec/askq gate below because the Phase 3.5 turn has
+# --- Aşama 5 pattern-scan clearance (runs before early exit) ---
+# Must run before the spec/askq gate below because the Aşama 5 turn has
 # no spec block and no AskUQ — the early exit would skip this otherwise.
 _PS_DUE_EARLY="$(mcl_state_get pattern_scan_due 2>/dev/null)"
 _PS_ACTIVE_PHASE_EARLY="$(mcl_get_active_phase 2>/dev/null)"
@@ -889,8 +889,8 @@ SPEC_APPROVED="$(mcl_state_get spec_approved)"
 if [ -n "$SPEC_HASH" ]; then
   case "$CURRENT_PHASE" in
     1)
-      # --- Phase 1.7 precision-audit skip detection (since 8.3.0) ---
-      # Phase 1 → 2 transition: Phase 1.7 should have emitted a precision-audit
+      # --- Aşama 2 precision-audit skip detection (since 8.3.0) ---
+      # Aşama 1 → 2 transition: Aşama 2 should have emitted a precision-audit
       # entry before the spec block was written. Scan audit.log for the entry,
       # scoped to current session via last `session_start` in trace.log. If
       # missing → write `precision-audit-skipped-warn`. Audit-only, non-blocking.
@@ -931,9 +931,9 @@ PYEOF
           mcl_audit_log "precision-audit-skipped-warn" "mcl-stop.sh" "summary-confirmed-but-no-audit"
           command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_skipped_warn
 
-          # 8.3.2: hard block — Phase 4.5-tier enforcement. State stays
+          # 8.3.2: hard block — Aşama 8-tier enforcement. State stays
           # at phase=1; the spec is treated as not-yet-final; Claude must
-          # complete Phase 1.7 in this same response before re-emitting
+          # complete Aşama 2 in this same response before re-emitting
           # the precision-enriched spec. English-language sessions emit
           # `precision-audit | ... skipped=true` (handled in skill file)
           # which counts as `hit` above and bypasses this block — the
@@ -942,7 +942,7 @@ PYEOF
           command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append precision_audit_block
           printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL PHASE 1.7 PRECISION AUDIT ENFORCEMENT (mandatory, non-skippable)\n\nA Phase 2 spec block was emitted but Phase 1.7 Precision Audit has NOT been run. The Phase 1→2 transition is blocked. In this SAME response, before the turn closes:\n\n1. Read ~/.claude/skills/my-claude-lang/phase1-7-precision-audit.md for the dimension list and classification rules.\n2. Walk the 7 core dimensions (permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry) plus any matching stack add-ons returned by: bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect \\\"\$(pwd)\\\"\n3. Classify each dimension: SILENT-ASSUME (mark [assumed: X]), SKIP-MARK (mark [unspecified: X] — currently only Performance SLA), or GATE (architectural impact → ask one question via AskUserQuestion).\n4. Emit the audit entry via: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log precision-audit phase1-7 \\\"core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<tags> skipped=false\\\"' (substitute counts and tags).\n5. Re-emit the spec block with precision-enriched parameters. The prior spec is discarded — replaced, not duplicated.\n\nIf detected language is English, emit the audit with skipped=true (Phase 1 already in English; behavioral prior assumed sufficient) and the block clears immediately on the next turn.\n\nRecovery: if you believe this block fired in error (e.g., audit emit failed silently), type /mcl-restart to clear phase state.\"
+  \"reason\": \"⚠️ MCL PHASE 1.7 PRECISION AUDIT ENFORCEMENT (mandatory, non-skippable)\n\nA Aşama 4 spec block was emitted but Aşama 2 Precision Audit has NOT been run. The Aşama 1→2 transition is blocked. In this SAME response, before the turn closes:\n\n1. Read ~/.claude/skills/my-claude-lang/asama2-precision-audit.md for the dimension list and classification rules.\n2. Walk the 7 core dimensions (permission/access, algorithmic failure modes, out-of-scope boundaries, PII handling, audit/observability, performance SLA, idempotency/retry) plus any matching stack add-ons returned by: bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect \\\"\$(pwd)\\\"\n3. Classify each dimension: SILENT-ASSUME (mark [assumed: X]), SKIP-MARK (mark [unspecified: X] — currently only Performance SLA), or GATE (architectural impact → ask one question via AskUserQuestion).\n4. Emit the audit entry via: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log precision-audit phase1-7 \\\"core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<tags> skipped=false\\\"' (substitute counts and tags).\n5. Re-emit the spec block with precision-enriched parameters. The prior spec is discarded — replaced, not duplicated.\n\nIf detected language is English, emit the audit with skipped=true (Aşama 1 already in English; behavioral prior assumed sufficient) and the block clears immediately on the next turn.\n\nRecovery: if you believe this block fired in error (e.g., audit emit failed silently), type /mcl-restart to clear phase state.\"
 }"
           exit 0
         fi
@@ -981,12 +981,12 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
   elif ! _mcl_is_approve_option "$ASKQ_SELECTED"; then
     mcl_audit_log "askq-non-approve" "stop" "phase=${CURRENT_PHASE} selected=${ASKQ_SELECTED}"
     mcl_debug_log "stop" "askq-non-approve" "phase=${CURRENT_PHASE} selected=${ASKQ_SELECTED}"
-  elif [ "$SPEC_APPROVED" = "true" ] || [ "$CURRENT_PHASE" -ge 4 ] 2>/dev/null; then
+  elif [ "$SPEC_APPROVED" = "true" ] || [ "$CURRENT_PHASE" -ge 7 ] 2>/dev/null; then
     mcl_debug_log "stop" "askq-idempotent" "phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
   elif [ -z "$CURRENT_HASH" ]; then
     mcl_audit_log "askq-ignored-no-spec" "stop" "phase=${CURRENT_PHASE}"
     mcl_debug_log "stop" "askq-ignored-no-spec" "phase=${CURRENT_PHASE}"
-  elif [ "$CURRENT_PHASE" = "2" ] || [ "$CURRENT_PHASE" = "3" ]; then
+  elif [ "$CURRENT_PHASE" = "4" ] || [ "$CURRENT_PHASE" = "3" ]; then
     mcl_state_set spec_approved true
     mcl_state_set current_phase 4
     mcl_state_set phase_name '"EXECUTE"'
@@ -996,7 +996,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     # activate-hook heuristic sets ui_flow_active=false. If the approved
     # spec body contains strong UI-framework markers (Next.js, React,
     # TSX, Tailwind, shadcn, components/ui, etc.), we flip the flag here
-    # so Phase 4a BUILD_UI engages and mcl-pre-tool.sh path-exception
+    # so Aşama 6a BUILD_UI engages and mcl-pre-tool.sh path-exception
     # locks backend paths until the developer reviews the UI.
     SPEC_INTENT_SCANNER="$_MCL_HOOK_DIR/lib/mcl-spec-ui-intent.py"
     if [ "$UI_FLOW_ON" != "true" ] && [ -f "$SPEC_INTENT_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
@@ -1008,7 +1008,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
         command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_flow_spec_intent "${CURRENT_HASH:0:12}"
       fi
     fi
-    # If UI flow is on (from Phase 1 heuristic OR spec-intent scan above),
+    # If UI flow is on (from Aşama 1 heuristic OR spec-intent scan above),
     # enter BUILD_UI sub-phase. Otherwise stay in the classic phase-4 path.
     if [ "$UI_FLOW_ON" = "true" ]; then
       mcl_state_set ui_sub_phase '"BUILD_UI"'
@@ -1023,7 +1023,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     }
     command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Spec onaylandı. Faz ${CURRENT_PHASE} → 4 geçişi."
     bash "$_MCL_HOOK_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
-    # Rollback checkpoint — record HEAD SHA before any Phase 4 writes.
+    # Rollback checkpoint — record HEAD SHA before any Aşama 7 writes.
     # Stored once; never overwritten on subsequent turns in the same session.
     _ROLLBACK_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
     if [ -n "$_ROLLBACK_SHA" ]; then
@@ -1032,7 +1032,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append rollback_checkpoint "${_ROLLBACK_SHA:0:12}"
     fi
     # Scope Guard — extract file-path tokens from the spec body and store
-    # in state.scope_paths so mcl-pre-tool.sh can block Phase 4 writes
+    # in state.scope_paths so mcl-pre-tool.sh can block Aşama 7 writes
     # that land outside the declared scope. Empty array = no restriction.
     _SCOPE_PATHS_LIB="$_MCL_HOOK_DIR/lib/mcl-spec-paths.py"
     if [ -f "$_SCOPE_PATHS_LIB" ] && command -v python3 >/dev/null 2>&1; then
@@ -1095,9 +1095,9 @@ PYEXTRACT
       mcl_audit_log "scope-paths-set" "stop" "count=${_SCOPE_COUNT} hash=${CURRENT_HASH:0:12}"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_init "${_SCOPE_COUNT}"
     fi
-    # Pattern Matching — Phase 3.5. Cascade: Level 1 (siblings) → Level 2
+    # Pattern Matching — Aşama 5. Cascade: Level 1 (siblings) → Level 2
     # (project-wide recent) → Level 3 (ecosystem default) → Level 4 (ask user).
-    # pattern_scan_due=true blocks writes in pre-tool until first Phase 4
+    # pattern_scan_due=true blocks writes in pre-tool until first Aşama 7
     # turn completes (stop hook clears it below).
     _PATSCAN_LIB="$_MCL_HOOK_DIR/lib/mcl-pattern-scan.py"
     if [ -f "$_PATSCAN_LIB" ] && command -v python3 >/dev/null 2>&1; then
@@ -1173,7 +1173,7 @@ else:
   fi
 fi
 
-# --- Phase 1 summary-confirm ---
+# --- Aşama 1 summary-confirm ---
 # Since 6.5.2 ui_flow_active is owned by mcl-activate.sh (stack
 # heuristic). The summary-confirm askq is a plain 3-option form
 # (approve / edit / cancel) with NO UI opt-out. This branch only
@@ -1188,7 +1188,7 @@ if [ "$ASKQ_INTENT" = "summary-confirm" ]; then
   fi
 fi
 
-# --- Phase 4b ui-review dispatch ---
+# --- Aşama 6b ui-review dispatch ---
 # Emitted when the developer selects an option on the UI review askq.
 # - approve-family: advance ui_sub_phase to BACKEND, unlock backend paths
 # - vision-request: noop here. The skill tells Claude to run the
@@ -1217,7 +1217,7 @@ if [ "$ASKQ_INTENT" = "ui-review" ]; then
   fi
 fi
 
-# --- Phase 3.5 pattern-scan clearance (late fallback for code-write turns) ---
+# --- Aşama 5 pattern-scan clearance (late fallback for code-write turns) ---
 # Handles the case where pattern_scan_due=true but a Write call happened in the
 # same turn — the early block above ran, so this is now a no-op guard.
 _PS_DUE="$(mcl_state_get pattern_scan_due 2>/dev/null)"

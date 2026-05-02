@@ -20,11 +20,11 @@ goes through the bridge.
 
 ## What "bridge applies" means concretely
 
-- Clarifying questions asked by `/feature-dev` Phase 3 → rendered in
+- Clarifying questions asked by `/feature-dev` Aşama 4 → rendered in
   the developer's language, with MCL's standard "WHY it's asking +
   WHAT each answer changes" context layer.
 - Architecture-option summaries and recommendations from
-  `/feature-dev` Phase 4 → section headers, verdicts, trade-off
+  `/feature-dev` Aşama 7 → section headers, verdicts, trade-off
   labels all localized per the `MCL-captured rules` on header
   localization.
 - Code-review findings from `/pr-review` or `/code-review` → severity
@@ -58,7 +58,7 @@ are in MCL's own output.
 
 ## Out of scope (this file)
 
-- **Workflow ownership conflicts.** If MCL is mid-Phase 1
+- **Workflow ownership conflicts.** If MCL is mid-Aşama 1
   (clarifying-question dialog) and the developer types
   `/feature-dev ...`, who owns the workflow from that turn forward?
   That question is not answered here. Default assumption: the
@@ -79,7 +79,7 @@ Turkish developer types:
 
 > `/feature-dev login sayfası ekle`
 
-feature-dev's command prompt activates and runs its Phase 1
+feature-dev's command prompt activates and runs its Aşama 1
 (Discovery). MCL's bridge intercepts every developer-facing emission:
 
 - feature-dev's "What problem are you solving?" →

@@ -1,34 +1,34 @@
-<mcl_phase name="phase5-5-localize-report">
+<mcl_phase name="asama12-localize-report">
 
-# Phase 5.5: Localize Report
+# Aşama 12: Localize Report
 
-Called automatically after Phase 5 (Verification Report) is produced.
+Called automatically after Aşama 11 (Verification Report) is produced.
 
 ## Purpose
 
-Phase 5 generates the Verification Report in English (spec compliance,
-impact analysis, test results). Phase 5.5 localizes the report — every
+Aşama 11 generates the Verification Report in English (spec compliance,
+impact analysis, test results). Aşama 12 localizes the report — every
 section header, verdict word, and prose line is rendered in the developer's
 detected language before it reaches the developer.
 
-This is NOT retranslation after the fact. Phase 5.5 is the final rendering
+This is NOT retranslation after the fact. Aşama 12 is the final rendering
 gate: the English report is the internal artifact, the localized output
 is what the developer sees.
 
-## When Phase 5.5 Runs
+## When Aşama 12 Runs
 
-Immediately after Phase 5 content is generated, before the response
+Immediately after Aşama 11 content is generated, before the response
 is emitted to the developer.
 
 Skipped when: the developer's detected language is English. In that case
-Phase 5 output is shown as-is.
+Aşama 11 output is shown as-is.
 
 ## What Gets Localized
 
 ALL developer-facing text:
 - Section headers: "Spec Compliance" → "Spec Uyumluluğu" (TR), etc.
 - Verdict words: "PASS" → "GEÇTİ", "FAIL" → "KALDI", "SKIP" → "ATILDI"
-- Phase labels: "Phase 5 — Verification Report" → "Faz 5 — Doğrulama Raporu"
+- Phase labels: "Aşama 11 — Verification Report" → "Faz 5 — Doğrulama Raporu"
 - Prose explanations and bullet points
 
 NOT localized (stays English):
@@ -43,7 +43,7 @@ NOT localized (stays English):
    (engineering requirements) stays in English — it was authored in English
    and is referenced by hooks. Only the surrounding prose is localized.
 2. Verdict words use the developer's language equivalents from the
-   canonical approve/edit/cancel table in `phase3-verify.md` where
+   canonical approve/edit/cancel table in `asama4-spec.md` where
    applicable. For test verdicts (PASS/FAIL/SKIP), use the developer's
    natural equivalents — not literal letter-for-letter translations.
 3. Do NOT translate error messages from tool output, stack traces,
@@ -52,13 +52,13 @@ NOT localized (stays English):
 
 ## Audit
 
-Every Phase 5.5 execution emits an audit entry:
+Every Aşama 12 execution emits an audit entry:
 ```
-localize-report | phase5-5 | lang=<detected> skipped=<true|false>
+localize-report | asama12 | lang=<detected> skipped=<true|false>
 ```
 
 `skipped=true` when source language is English. `skipped=false` otherwise.
-This is the detection control: the audit confirms Phase 5.5 was evaluated
+This is the detection control: the audit confirms Aşama 12 was evaluated
 even when it is a no-op.
 
 </mcl_phase>

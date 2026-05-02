@@ -1,0 +1,182 @@
+<mcl_phase name="asama8-risk-review">
+
+> ⚠️ SYNC NOTE: The active Aşama 8 rule lives in `mcl-activate.sh` STATIC_CONTEXT
+> (the `<mcl_phase name="asama8-risk-review">` block). This file is the extended
+> reference. When updating Aşama 8 behavior, BOTH must be updated together.
+
+# Aşama 8: Post-Code Risk Review (interactive dialog)
+
+Aşama 8 is a **mandatory, sequential, interactive dialog** that runs
+AFTER Aşama 7 (code is written) and BEFORE Aşama 9 (Quality + Tests
+auto-fix pipeline). It surfaces risks the developer must decide on —
+spec compliance gaps, missed edge cases, regression surfaces, scope
+drift — one at a time via AskUserQuestion.
+
+The deeper code-quality lenses (code review, simplify, performance,
+security) and comprehensive test coverage (unit, integration, E2E,
+load) are NOT in Aşama 8 — they live in Aşama 9 (auto-fix, no dialog).
+
+## When Aşama 8 Runs
+
+Immediately after Aşama 7 finishes writing code. Aşama 7 does NOT end
+with "done" or a changes summary — it hands off to Aşama 8.
+
+## The Dialog Structure
+
+Aşama 8 is NOT a one-shot list. It is a **sequential, one-risk-per-turn
+conversation**. For each risk:
+
+1. MCL presents **one** risk as plain text with a short explanation of
+   why it matters (security gap / data integrity / regression / UX /
+   etc.)
+2. MCL immediately calls AskUserQuestion:
+   ```
+   AskUserQuestion({
+     question: "MCL <version> | <localized risk decision prompt>",
+     options: [
+       "<apply-fix-in-language>",   # MCL implements the fix
+       "<skip-in-language>",        # accept the risk as-is
+       "<make-rule-in-language>"    # triggers Rule Capture
+     ]
+   })
+   ```
+3. MCL STOPS and waits for the tool_result **in the next message**.
+4. On tool_result: execute the chosen action, then present the next risk.
+5. Repeat until all risks are resolved.
+
+⛔ STOP RULE: After presenting a risk and calling `AskUserQuestion`,
+STOP. Do NOT list the next risk in the same response. Do NOT proceed
+to Aşama 9. Wait for the tool_result.
+
+## What Aşama 8 Reviews
+
+### 1. Spec Compliance Pre-Check
+
+Verify every MUST and SHOULD requirement from the approved `📋 Spec:`
+body was implemented in Aşama 7. Particular focus on the **security
+and performance decisions** the spec made (e.g., "MUST: rate-limit
+endpoints to 60 req/min", "SHOULD: cursor-paginate with default 50
+per page") — these are the spec's promised invariants, and Aşama 8's
+first job is verifying they actually shipped.
+
+How:
+1. Retrieve the approved spec from conversation context (the `📋 Spec:`
+   block approved in Aşama 4). If unrecoverable, skip this step
+   silently and proceed to missed-risk scan.
+2. Walk every MUST, then every SHOULD requirement.
+3. For each: inspect Aşama 7 code to determine fully implemented,
+   partially, or absent.
+4. **Fully implemented** → silent pass.
+5. **Partially or absent** → surface as an Aşama 8 risk in the
+   sequential dialog (cite spec verbatim, explain gap, three options).
+
+If every MUST/SHOULD is fully implemented, skip this step silently.
+
+### 2. Missed-Risk Scan
+
+After spec compliance, scan for risks the spec didn't explicitly call
+out but the code shape suggests. Categories:
+
+- **Data integrity**: race conditions, stale cache, transaction
+  boundaries
+- **Error handling**: unhandled rejections, missing try/catch where
+  needed, swallowed errors
+- **Regression**: imports of modified files, shared utilities changed,
+  API contract shifts
+- **UX**: accessibility, loading states, error states, edge-case UI
+  breaks
+- **Concurrency**: shared mutable state, event-listener leaks
+- **Observability**: missing logs/metrics for new code paths
+- **Edge cases**: empty input, null, overflow, off-by-one
+
+Each finding becomes one risk-dialog turn (one AskUserQuestion).
+
+### 3. Brief-Aşama-1 Scope Drift (since 8.4.0, preserved in v9.0.0)
+
+Aşama 3 (UPGRADE-TRANSLATOR) transforms vague verbs into surgical
+English and may add `[default: X, changeable]` markers. This lens
+guards against **hallucinated scope** — invented features that lack
+both Aşama 1 traceability AND a `[default]` marker.
+
+**When it runs:** mandatory when the session's `engineering-brief`
+audit shows `upgraded=true`. Skipped silently when `upgraded=false`.
+
+**Procedure per implementation element:**
+1. Walk Aşama 7 code: each function, route, schema field, dependency
+   added in this session.
+2. For each element ask:
+   - Is it traceable to an Aşama 1 confirmed parameter?
+   - If not, is it carried by a `[default: X, changeable]` marker in
+     the brief or spec?
+   - If neither: surface as a Brief-Drift risk.
+3. Surface format (one risk per drift):
+   ```
+   [Brief-Drift] Implementation includes <X> (file:line). User did
+   not mention <X> in Aşama 1; brief/spec has no [default: X,
+   changeable] marker for it. Likely Aşama 3 upgrade-translator
+   hallucination.
+
+   Options:
+     (a) Remove from spec + Aşama 7 code (revert to user intent)
+     (b) Mark as [default: <X>, changeable] in spec
+     (c) Rule-capture: developer wants this default for similar
+         specs (writes to CLAUDE.md / .mcl/project.md)
+   ```
+4. Wait for developer reply before next risk.
+
+## Risk Session Tracking (HEAD-based dedup)
+
+At Aşama 8 start, check `.mcl/risk-session.md`. Run
+`git log --oneline -1 | awk '{print $1}'` to get current HEAD.
+
+If the file exists AND `phase4_head` matches current HEAD: read the
+'Reviewed' entries; for each risk you generate, if its first 80
+characters closely match a 'Reviewed' entry's text, skip it silently.
+
+If the file is missing OR `phase4_head` differs: create/reset the
+file with current HEAD and an empty Reviewed list. After EACH risk is
+resolved: append `- <decision> | <first 80 chars of risk text>` under
+`## Reviewed`. When Aşama 8 completes fully: delete the file.
+
+This dedup is HEAD-based — when Aşama 7 produces new code (HEAD
+advances), the dedup resets so post-fix risks are evaluated fresh.
+
+## When There Are No Risks
+
+If after honest review MCL finds no risks worth surfacing, OMIT Aşama
+8 entirely from the response — no header, no placeholder, no filler —
+and proceed silently to Aşama 9. The review still *happens*; only its
+output is suppressed when clean. "No news = good news."
+
+Never fabricate risks. Never present risks already handled in Aşama 1
+or 4. Never emit a "No risks identified." sentence.
+
+## TDD Re-Verify
+
+After every Aşama 8 risk is resolved (skipped, fixed, or rule-captured),
+run a TDD re-verify before handing off to Aşama 9 — provided
+`test_command` is configured.
+
+How:
+1. Run `bash ~/.claude/hooks/lib/mcl-test-runner.sh green-verify`.
+2. **GREEN** → proceed to Aşama 9.
+3. **RED** → a fix introduced a regression. Surface the failing
+   test(s) as a new Aşama 8 risk in the sequential dialog. Repeat
+   until GREEN.
+4. **TIMEOUT** → log audit line, proceed to Aşama 9 without blocking.
+
+Skip the re-verify ONLY when Aşama 8 was omitted entirely.
+
+## Hard Enforcement
+
+Stop hook blocks session-end after Aşama 7 code if `risk_review_state`
+is not `complete`. After 3 consecutive same-reason blocks → fail-open
++ audit warn (loop-breaker).
+
+## Handoff to Aşama 9
+
+After every risk is resolved and TDD re-verify passes, proceed to
+Aşama 9 (Quality + Tests auto-fix pipeline). Aşama 9 runs without
+AskUserQuestion — its findings are auto-fixed, not user-decided.
+
+</mcl_phase>

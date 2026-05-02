@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find existing pattern reference files for Phase 3.5.
+"""Find existing pattern reference files for Aşama 5.
 
 Cascade search — returns the first level that yields results:
   Level 1 (sibling): files in the same directory as scope_paths

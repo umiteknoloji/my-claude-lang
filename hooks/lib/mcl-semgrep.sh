@@ -1,5 +1,5 @@
 #!/bin/bash
-# MCL Semgrep — local SAST bridge for Phase 4.5.
+# MCL Semgrep — local SAST bridge for Aşama 8.
 #
 # Three responsibilities:
 #   1. Preflight — verify `semgrep` binary presence + project-stack
@@ -7,7 +7,7 @@
 #      session start.
 #   2. Scan — run semgrep on a given file list (delta scope), emit
 #      findings as JSON on stdout classified by severity (HIGH /
-#      MEDIUM / LOW). Called from Phase 4.5 branch of `mcl-stop.sh`.
+#      MEDIUM / LOW). Called from Aşama 8 branch of `mcl-stop.sh`.
 #   3. Refresh cache — fetch latest rule pack from
 #      registry.semgrep.dev via `--config=auto`, cache under
 #      `~/.mcl/semgrep-cache/`, stamp a version marker. Called on
@@ -225,7 +225,7 @@ mcl_semgrep_scan() {
   #     "scanned_files": N,
   #     "errors": [ ... ]
   #   }
-  # LOW findings are included in the JSON (caller filters for Phase 4.5
+  # LOW findings are included in the JSON (caller filters for Aşama 8
   # presentation). Returns 0 on scan completion (even with findings),
   # non-zero only on helper-level failure.
   if [ "$#" -eq 0 ]; then

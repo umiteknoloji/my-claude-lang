@@ -3,8 +3,8 @@
 
 Inspect the LAST assistant turn in a JSONL transcript and report whether:
   - code-mutating tools (Write, Edit, MultiEdit, NotebookEdit, Bash)
-    were used — meaning Phase 4 code was written this turn.
-  - AskUserQuestion was used — meaning Phase 4.5/4.6 review dialog
+    were used — meaning Aşama 7 code was written this turn.
+  - AskUserQuestion was used — meaning Aşama 8/10 review dialog
     was started OR is continuing this turn.
 
 stdout: JSON {"code_written": bool, "askuq_present": bool}

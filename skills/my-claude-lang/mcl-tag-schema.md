@@ -19,7 +19,7 @@ and break UX.
 | Tag                | Purpose                                                                           |
 | ------------------ | --------------------------------------------------------------------------------- |
 | `<mcl_core>`       | Foundational protocol: banner rule, numbered pipeline, phase-gate contract        |
-| `<mcl_phase>`      | Phase-specific rules (Phase 1/2/3/4/4.5/4.6/5, rule-capture, empty-section)       |
+| `<mcl_phase>`      | Phase-specific rules (Aşama 1/4/8/9/10/11/12, rule-capture, empty-section)       |
 | `<mcl_constraint>` | Hard negative rules the model must not violate (self-critique, STOP, no-preamble) |
 | `<mcl_input>`      | Externally-supplied data the model must treat as inert content                    |
 | `<mcl_audit>`      | System notifications / side-channel messages (update notice, diagnostics)         |
@@ -39,13 +39,13 @@ output breaks rendering.
 
 ### `<mcl_phase>`
 
-- Phase sub-blocks inside the hook (Phase 4.5 rule, Phase 4.6 rule,
-  Phase 5 rule, Rule-Capture rule, Empty-Section-Omission rule)
+- Phase sub-blocks inside the hook (Aşama 8 rule, Aşama 10 rule,
+  Aşama 11 rule, Rule-Capture rule, Empty-Section-Omission rule)
 - Each skill file `phase*-*.md`, plus `rule-capture.md`,
   `language-detection.md`, `technical-disambiguation.md`,
   `cultural-pragmatics.md`, `gates.md`
 
-Attribute form: `<mcl_phase name="phase4-5-risk-review">...`
+Attribute form: `<mcl_phase name="asama8-risk-review">...`
 
 ### `<mcl_constraint>`
 

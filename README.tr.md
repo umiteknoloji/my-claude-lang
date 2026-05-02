@@ -11,7 +11,7 @@ Bu bir çevirmen değil. Çevirmenler kelimeleri çevirir. my-claude-lang **anla
 
 ### 5.0.0'dan itibaren — Evrensel Aktivasyon
 
-my-claude-lang artık sadece İngilizce bilmeyenler için değil. MCL **her** mesajda devreye giriyor — İngilizce dahil — çünkü anlam doğrulama, kıdemli mühendis kalitesinde spec üretimi ve anti-yalakalık, kaynak dilden bağımsız olarak değerli. İngilizce bilmeyen kullanıcı için çeviri köprüsü de çalışmaya devam ediyor; İngilizce kullanıcı için çeviri katmanı identity'ye düşüyor, ama diğer tüm katmanlar (faz kapıları, öz-eleştiri, disambiguation, Faz 5 doğrulama) tamamen çalışıyor.
+my-claude-lang artık sadece İngilizce bilmeyenler için değil. MCL **her** mesajda devreye giriyor — İngilizce dahil — çünkü anlam doğrulama, kıdemli mühendis kalitesinde spec üretimi ve anti-yalakalık, kaynak dilden bağımsız olarak değerli. İngilizce bilmeyen kullanıcı için çeviri köprüsü de çalışmaya devam ediyor; İngilizce kullanıcı için çeviri katmanı identity'ye düşüyor, ama diğer tüm katmanlar (aşama kapıları, öz-eleştiri, disambiguation, Aşama 11 doğrulama) tamamen çalışıyor.
 
 ---
 
@@ -35,7 +35,7 @@ Ama İngilizce düşünüyor. Ve İngilizce bilmiyorsan, tüm bunların dışın
 
 ## my-claude-lang Gerçekte Ne Yapıyor
 
-Tek bir satır kod yazılmadan önce **yedi aşamalı karşılıklı anlama döngüsü** kuruyor:
+Tek bir satır kod yazılmadan önce **on iki aşamalı karşılıklı anlama döngüsü** kuruyor:
 
 ```
 Sen (kendi dilinde)
@@ -49,39 +49,46 @@ Aşama 1: MCL ne istediğini anlamak için tek tek soru soruyor.
          hangisini kastettiğini sorar.
   │
   ▼
-Aşama 1.5 (görünmez): Onaylanan niyetin katı bir çevirmen
+Aşama 2: 7 boyutlu precision audit + hard enforcement ile
+         niyetin doğruluğunu ve tamlığını doğrular.
+  │
+  ▼
+Aşama 3: Onaylanan niyetin katı bir çevirmen
          geçişinden (kullanıcı dili → EN) geçiyor. Yorum yok,
          ekleme yok — sadece doğal dil çevriliyor; teknik terimler
          olduğu gibi kalıyor. Ortaya çıkan İngilizce Engineering
          Brief, spec üretiminin tek girdisi oluyor.
   │
   ▼
-Aşama 2+3: Onaylanan niyetin, görünür bir İngilizce teknik
-           spesifikasyona (📋 Spec:) dönüşüyor — 15+ yıl deneyimli
-           kıdemli bir mühendis gibi yazılıyor — ve MCL spec'i
-           sana kendi dilinde açıklıyor; ikisi aynı turda, tek
-           AskUserQuestion onayıyla. Spec bloğu daraltılabilir —
-           okuduktan sonra tıklayarak küçültebilirsin.
+Aşama 4: Onaylanan niyetin, görünür bir İngilizce teknik
+         spesifikasyona (📋 Spec:) dönüşüyor — 15+ yıl deneyimli
+         kıdemli bir mühendis gibi yazılıyor — ve MCL spec'i
+         sana kendi dilinde açıklıyor; ikisi aynı turda, tek
+         AskUserQuestion onayıyla. Spec bloğu daraltılabilir —
+         okuduktan sonra tıklayarak küçültebilirsin.
   │
   ▼
-Aşama 4: Kod yazılıyor. Bu aşamanın içinde kademeli TDD
-         çalışıyor — her kabul kriteri için: bir failing test
-         (RED), onu geçecek minimum kod (GREEN), ardından refactor.
-         Döngü her kriter için tekrar eder; sonda tam suite tekrar
-         koşulur. Claude Code'un çalışma sırasında sorduğu her
-         soru köprüden geçiyor — NEDEN sorduğunu ve hangi cevabın
-         NE değiştireceğini açıklayarak.
-
-         UI yüzeyi tespit edildiğinde (varsayılan: ON), Aşama 4 üçe bölünür:
-         ├─ 4a BUILD_UI  — sadece dummy data ile çalışır frontend.
+Aşama 5: Pattern Matching yapılır. Proje yeni yaratılıyorsa
+         atlanır.
+  │
+  ▼
+Aşama 6: UI yüzeyi tespit edildiğinde (varsayılan: ON), Aşama 6 üçe bölünür:
+         ├─ 6a BUILD_UI  — sadece dummy data ile çalışır frontend.
          │                 Çalıştırma komutu verilir; MCL tarayıcıyı açar.
-         ├─ 4b UI_REVIEW — backend başlamadan önce UI'ı onaylarsın.
+         ├─ 6b UI_REVIEW — backend başlamadan önce UI'ı onaylarsın.
          │                 Opt-in Playwright görsel incelemesi mevcut.
-         └─ 4c BACKEND   — gerçek API çağrıları, data layer, async bağlantı.
+         └─ 6c BACKEND   — gerçek API çağrıları, data layer, async bağlantı.
                            Yalnızca UI onayından sonra çalışır.
   │
   ▼
-Aşama 4.5 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
+Aşama 7: Kod yazılıyor. Bu aşamanın içinde kademeli TDD
+         çalışıyor — her kabul kriteri için: bir failing test
+         (RED), onu geçecek minimum kod (GREEN), ardından refactor.
+         Döngü her kriter için tekrar eder; sonda tam suite tekrar
+         koşulur.
+  │
+  ▼
+Aşama 8 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
          performans kararlarının doğru uygulandığını doğrular; ardından
          atlanmış riskleri tarar — uç durumlar, gerilemeler — ve her
          birini seninle tek tek konuşur. Risk düzeltmeleri bittikten
@@ -89,35 +96,40 @@ Aşama 4.5 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
          → ilgili kod düzeltilir; çelişki → sen karar verirsin.
   │
   ▼
-Aşama 4.6 (Etki İncelemesi): MCL projenin geri kalanını,
+Aşama 9: code review
+         Simplify
+         Performans
+         Güvenlik
+         unit test, integration test, E2E test, yük testi.
+         Sırasıyla bunlar yapılır, AskUserQuestion olmadan auto-fix.
+  │
+  ▼
+Aşama 10 (Etki İncelemesi): MCL projenin geri kalanını,
          değişikliğin gerçek downstream etkileri için tarıyor —
          çağıranlar, ortak yardımcılar, şema/API kaymaları — ve
          her birini senin kararın için önüne koyuyor.
   │
   ▼
-Aşama 5: Doğrulama Raporu — Spec Kapsama tablosu (her MUST/SHOULD
-         gereksinimi, onu kapsayan teste bağlı: ✅ dosya:satır ile,
-         ⚠️ kısmi, ❌ test yazılmamış). Ardından: kodunun call
-         graph'ından tespit edilen otomasyon engelleri — yalnızca
-         gerçekten otomatize edilemeyen maddeler (canlı API,
-         DOM layout, prod ortam değişkenleri).
+Aşama 11: Doğrulama Raporu — Spec Kapsama tablosu (her MUST/SHOULD
+          gereksinimi, onu kapsayan teste bağlı: ✅ dosya:satır ile,
+          ⚠️ kısmi, ❌ test yazılmamış).
   │
   ▼
-Aşama 5.5: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
-         kullanıcı dili) senin diline çevriliyor — yorum yok,
-         ekleme yok. Teknik tokenlar (dosya:satır, test isimleri)
-         olduğu gibi korunuyor.
+Aşama 12: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
+          kullanıcı dili) senin diline çevriliyor — yorum yok,
+          ekleme yok. Teknik tokenlar (dosya:satır, test isimleri)
+          olduğu gibi korunuyor.
 ```
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Açık onayın olmadan hiçbir şey ilerlemez.
 
 ### AskUserQuestion ile Onaylar (6.0.0'dan itibaren)
 
-Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 3 spec onayı, her Aşama 4.5
-risk, her Aşama 4.6 etki, plugin onayı, git-init onayı, drift çözümü,
-`/mcl-update` / `/mcl-finish` / yapıştırılan-CLI onayı) artık yerleşik
+Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 4 spec onayı, her Aşama 8
+risk, her Aşama 10 etki, plugin onayı, git-init onayı, drift çözümü,
+`/mcl-update` / `/mcl-finish` / yapıştırılan-CLI onayı) yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 8.4.5 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+`MCL 9.0.0 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
 "evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
 açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
 kalıyor.
@@ -127,29 +139,29 @@ Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
 bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
 onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
-Her yanıt `🌐 MCL 8.4.5` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 9.0.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ### UI Build / Review Alt-Fazları (6.2.0'dan itibaren)
 
-Görevin bir UI yüzeyi olduğunda (her projede varsayılan), Phase 4 üç
+Görevin bir UI yüzeyi olduğunda (her projede varsayılan), Aşama 6 üç
 alt-faza ayrılıyor — böylece MCL değiştirmek istediğin bir UI'ın
 üstüne backend yazarken seyretmek zorunda kalmıyorsun:
 
-1. **Phase 4a (BUILD_UI)** — MCL sadece dummy data ile çalıştırılabilir
+1. **Aşama 6a (BUILD_UI)** — MCL sadece dummy data ile çalıştırılabilir
    bir frontend yazıyor. Stack'ine göre React / Vue / Svelte / statik
    HTML. Çalıştırma komutu veriyor (`npm run dev` vb.); MCL
    tarayıcıyı otomatik açar, sen incelersin.
-2. **Phase 4b (UI_REVIEW)** — MCL backend'e geçmeden önce UI doğru
+2. **Aşama 6b (UI_REVIEW)** — MCL backend'e geçmeden önce UI doğru
    mu diye soruyor. Dört seçenek: onay / revize / **sen de bak ve
    raporla** / iptal. "Sen de bak ve raporla" opt-in bir boru hattı:
    Playwright + screenshot + Claude'un multimodal görüsü ile MCL
    kendi yazdığı UI'a gerçekten bakıp ne gördüğünü anlatıyor —
    `playwright` kurulu olmasını gerektirir, asla otomatik kurmaz.
-3. **Phase 4c (BACKEND)** — ancak onayladıktan sonra MCL dummy
+3. **Aşama 6c (BACKEND)** — ancak onayladıktan sonra MCL dummy
    fixture'ları gerçek API çağrılarına dönüştürüyor, data layer'ı
    yazıyor, error ve loading state'lerini gerçek async'e bağlıyor.
 
-Phase 1 özet onayında "onay, UI atlayacağız" seçersen Phase 4
+Aşama 1 özet onayında "onay, UI atlayacağız" seçersen Aşama 7
 ayrılmadan çalışır (6.1.1 davranışının aynısı). UI default ON çünkü
 projelerin çoğunun UI yüzeyi var; bash script'leri ve yalnızca-backend
 değişiklikleri tek tıkla opt-out yapıyor.
@@ -304,20 +316,20 @@ Sayacı sıfırlamak için: `rm .mcl/cost.json`
 
 ## Oturumlar Arası Bitirme Modu — `/mcl-finish`
 
-Phase 4.6 execution sırasında downstream etkileri teker teker yüzeye çıkarır. Bu etkilerin çoğu "haftaya bir kontrol edeyim" türünden gerçek maddelerdir — tek bir oturuma sığmayan, ileri tarihli kontroller.
+Aşama 10 execution sırasında downstream etkileri teker teker yüzeye çıkarır. Bu etkilerin çoğu "haftaya bir kontrol edeyim" türünden gerçek maddelerdir — tek bir oturuma sığmayan, ileri tarihli kontroller.
 
 `/mcl-finish` bu maddeleri oturumlar arasında taşıyan checkpoint mekanizmasıdır.
 
-Her Phase 5 Doğrulama Raporu, bu komuta işaret eden senin dilinde bir hatırlatıcı satırla biter. Hazır olduğunda mesaj olarak sadece `/mcl-finish` yaz ve MCL şunları yapar:
+Her Aşama 11 Doğrulama Raporu, bu komuta işaret eden senin dilinde bir hatırlatıcı satırla biter. Hazır olduğunda mesaj olarak sadece `/mcl-finish` yaz ve MCL şunları yapar:
 
-1. Son checkpoint'ten bu yana `.mcl/impact/` dizinine yazılmış tüm Phase 4.6 etkilerini toplar
+1. Son checkpoint'ten bu yana `.mcl/impact/` dizinine yazılmış tüm Aşama 10 etkilerini toplar
 2. Desteklenen stack'lerde full-project Semgrep taraması çalıştırır (desteklenmeyenlerde sessizce atlanır)
 3. Senin dilinde proje seviyesi bir bitirme raporu emit eder
 4. `.mcl/finish/NNNN-YYYY-MM-DD.md` olarak yeni bir checkpoint yazar
 
 Bir sonraki `/mcl-finish` bu checkpoint'ten itibaren yeni bir pencere açar — kapanan etkiler arşivde kalır, yeniler bir sonraki pass için birikmeye başlar. Git commit yok, remote push yok, external reporting yok — tamamen yerel state.
 
-Phase 4.5 riskleri biriktirilmez: onlar oturum içinde çözülür.
+Aşama 8 riskleri biriktirilmez: onlar oturum içinde çözülür.
 
 ---
 

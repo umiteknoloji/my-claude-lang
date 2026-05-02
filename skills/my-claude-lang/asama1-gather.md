@@ -1,6 +1,6 @@
-<mcl_phase name="phase1-rules">
+<mcl_phase name="asama1-gather">
 
-# Phase 1: Gather Parameters — Detailed Rules
+# Aşama 1: Gather Parameters — Detailed Rules
 
 ## Pre-Flow: LSP Plugin Check (first developer message only)
 
@@ -20,12 +20,12 @@ Before Step 1 below, on the **first** developer message of a conversation:
    install hint. See `my-claude-lang/plugin-suggestions.md` for the full
    stack→plugin→binary table.
 4. The developer may accept, decline, or ignore. Either way, proceed to
-   Main Flow Step 1 immediately — the suggestion does not gate Phase 1.
+   Main Flow Step 1 immediately — the suggestion does not gate Aşama 1.
    If the developer declines, do not re-ask in this conversation.
 
 Skip this pre-flow entirely when:
 - Not the first developer message in the conversation.
-- Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) is in progress.
+- Mid-phase execution (Aşama 7 / 4.5 / 4.6 / 5) is in progress.
 - Every detected tag already has its plugin installed.
 
 ## Main Flow
@@ -80,10 +80,10 @@ heuristic returns true when the project has a UI surface
 (package.json + templates/, `src/components/**`, Django + templates/,
 Rails `app/views/`, root `index.html`, etc.) and false otherwise.
 The developer is never prompted about UI skip — if there is no UI
-surface, Phase 4a is silently bypassed and standard Phase 4 runs.
+surface, Aşama 6a is silently bypassed and standard Aşama 7 runs.
 
 Reference approve/edit/cancel label triples (full 14-language set
-pinned in `phase3-verify.md` Label Discipline section):
+pinned in `asama4-spec.md` Label Discipline section):
 
 | Locale | Approve    | Edit        | Cancel     |
 | ------ | ---------- | ----------- | ---------- |
@@ -110,7 +110,7 @@ the spec now." STOP and wait for the tool_result.
 5. If the tool_result is non-approve-family (edit/cancel/etc.) → ask
    "What did I get wrong?" and re-run gathering.
 6. Only after the tool_result returns an approve-family option → call
-   Phase 2. `ui_flow_active` is already set by activation; stop hook
+   Aşama 4. `ui_flow_active` is already set by activation; stop hook
    does NOT touch it on summary-confirm.
 
 ## Disambiguation Triage
@@ -150,7 +150,7 @@ Ask only when writing the spec is impossible without the answer:
 - Yes → assume silently, mark it.
 - No → ask.
 
-**Safety net:** Phase 3 spec review shows all assumptions. If an assumption
+**Safety net:** Aşama 4 spec review shows all assumptions. If an assumption
 was wrong, the developer corrects it there — before any code is written.
 This means a wrong silent assumption has zero implementation cost.
 
@@ -187,7 +187,7 @@ If the developer's confirmation contains additional scope or modifications
   - If contradiction → flag it: "This conflicts with [existing parameter].
     Which one should I keep?"
   - If no contradiction → accept the new parameter, add it to the existing ones
-- Run Phase 1-3 ONLY for the new addition — do NOT re-confirm already
+- Run Aşama 1-4 ONLY for the new addition — do NOT re-confirm already
   confirmed parameters. They are done.
 - Previous work stays. New work gets added on top.
 
@@ -195,7 +195,7 @@ If the developer's confirmation contains additional scope or modifications
 
 ### Logical Parameter Contradictions
 
-Before advancing from Phase 1 to Phase 2, check all parameters for
+Before advancing from Aşama 1 to Aşama 4, check all parameters for
 logical contradictions. Examples:
 
 - "offline AND always show real-time data" → contradictory
@@ -278,7 +278,7 @@ MCL response pattern:
 - Identify the likely sub-components
 - Ask: "This contains several parts. I see: [list sub-components].
   Should I handle all of these, or is there a specific subset you want?"
-- Run Phase 1-3 for the confirmed sub-components
+- Run Aşama 1-4 for the confirmed sub-components
 - If the developer says "all of them" → prioritize order together
 
 ## Multi-Rule Collision
@@ -306,7 +306,7 @@ If the developer requests multiple distinct tasks in one message:
 - Identify each separate task
 - Inform the developer: "I see [N] separate tasks. I'll handle each one
   individually to make sure nothing gets lost."
-- Run Phase 1-3 separately for each task
+- Run Aşama 1-4 separately for each task
 - Execute tasks in the agreed order
 
 </mcl_phase>

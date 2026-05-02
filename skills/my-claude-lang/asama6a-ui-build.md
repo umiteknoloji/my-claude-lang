@@ -1,19 +1,19 @@
-<mcl_phase name="phase4a-ui-build">
+<mcl_phase name="asama6a-ui-build">
 
-# Phase 4a: BUILD_UI — Runnable Frontend with Dummy Data
+# Aşama 6a: BUILD_UI — Runnable Frontend with Dummy Data
 
 ## Entry Condition
 
-Phase 4a starts automatically when ALL of these hold after spec approval:
+Aşama 6a starts automatically when ALL of these hold after spec approval:
 
 - `current_phase = 4`
 - `spec_approved = true`
-- `ui_flow_active = true` (set by Phase 1 summary-confirm)
+- `ui_flow_active = true` (set by Aşama 1 summary-confirm)
 - `ui_reviewed = false`
 - `ui_sub_phase = "BUILD_UI"` (set by stop hook on spec-approve)
 
 When `ui_flow_active = false` (developer picked "Onay, UI atlayacağız" at
-Phase 1) — Phase 4a is SKIPPED. Jump straight to `phase4-execute.md`.
+Aşama 1) — Aşama 6a is SKIPPED. Jump straight to `asama7-execute.md`.
 
 ## Core Intent
 
@@ -26,13 +26,13 @@ is no separate preview artifact.
 
 For dummy-data fixture conventions (inline constants, `__fixtures__/`
 directory, loading/error/success toggles), read
-`my-claude-lang/phase4a-ui-build/fixtures.md`.
+`my-claude-lang/asama6a-ui-build/fixtures.md`.
 
 For framework-specific component syntax (React, Vue, Svelte, static
-HTML), read `my-claude-lang/phase4a-ui-build/frameworks.md`.
+HTML), read `my-claude-lang/asama6a-ui-build/frameworks.md`.
 
 For styling fallbacks (when no design system is configured) and
-neutrality rules, read `my-claude-lang/phase4a-ui-build/styles.md`.
+neutrality rules, read `my-claude-lang/asama6a-ui-build/styles.md`.
 
 ## Path Discipline (enforced by mcl-pre-tool.sh)
 
@@ -51,22 +51,22 @@ While `ui_sub_phase = "BUILD_UI"`, the pre-tool hook:
 
 Build tool configs (`vite.config.*`, `next.config.*`, `nuxt.config.*`,
 `tailwind.config.*`, `tsconfig*`, `postcss.config.*`) are **explicitly
-allowed** — they are needed to run `npm run dev` in Phase 4a. Writing
-them in Phase 4a is correct and required.
+allowed** — they are needed to run `npm run dev` in Aşama 6a. Writing
+them in Aşama 6a is correct and required.
 
 If Claude attempts to write a true backend path, the DENY reason says:
-> MCL UI-BUILD LOCK — backend is unlocked in Phase 4c after the UI
+> MCL UI-BUILD LOCK — backend is unlocked in Aşama 6c after the UI
 > is approved. Keep dummy fixtures in the component for now.
 
 ## Curated Plugin Dispatch
 
-Auto-dispatch `frontend-design` plugin silently when Phase 4a starts
+Auto-dispatch `frontend-design` plugin silently when Aşama 6a starts
 (Rule B — multi-angle validation). Merge its suggestions into the
 component code / prose. Never expose the raw plugin output as a tool
 call to the developer. See `my-claude-lang/plugin-suggestions.md` for
 promotion details.
 
-## Phase 4a Procedure
+## Aşama 6a Procedure
 
 1. Read the approved spec.
 2. Detect framework from `mcl-stack-detect.sh` tags:
@@ -76,7 +76,7 @@ promotion details.
    `vite.config.ts`, `tsconfig.json`, `tailwind.config.js`,
    `postcss.config.js`, or equivalent for the detected framework.
    These files are required for `npm run dev` to work. Without them
-   the developer cannot see the UI. Do NOT defer them to Phase 4c.
+   the developer cannot see the UI. Do NOT defer them to Aşama 6c.
 4. Write the component(s) under appropriate frontend path(s). Use
    dummy data ONLY — inline constants or `__fixtures__/*.ts`. No
    `fetch` / `axios` / database call / env read.
@@ -145,18 +145,18 @@ promotion details.
 
 6. **STOP.** Do not call `AskUserQuestion` now. The developer needs
    room to inspect the UI in their browser without a modal dialog
-   blocking the terminal. Phase 4b takes over on the developer's
+   blocking the terminal. Aşama 6b takes over on the developer's
    NEXT turn, after they return with free-form feedback (see
-   `my-claude-lang/phase4b-ui-review.md`).
+   `my-claude-lang/asama6b-ui-review.md`).
 
-## What Does NOT Happen in Phase 4a
+## What Does NOT Happen in Aşama 6a
 
 - No backend code. No API routes. No database schema. No `.env`
   changes. No server-side config.
 - No production mock server (MSW, json-server) — plain inline
   fixtures are enough for visual verification.
 - No automated UI tests (Playwright / Cypress). Those land in
-  Phase 5 based on the Phase 5 `test_command`.
+  Aşama 11 based on the Aşama 11 `test_command`.
 - No manual translations of UI copy into every MCL-supported
   language — the component uses the developer's chosen default
   locale. i18n scaffolding is only written if the spec MUST
@@ -164,10 +164,10 @@ promotion details.
 
 ## Revise Loop (4a ↔ 4b)
 
-When the developer picks "Revize" in Phase 4b, Phase 4a re-enters
+When the developer picks "Revize" in Aşama 6b, Aşama 6a re-enters
 with free-text feedback ("buttons to the right, bigger header").
 Edit the frontend files in place, emit a fresh "run it" snippet,
-re-call the Phase 4b askq. The loop is unbounded — exit only on
-approve or cancel from Phase 4b.
+re-call the Aşama 6b askq. The loop is unbounded — exit only on
+approve or cancel from Aşama 6b.
 
 </mcl_phase>

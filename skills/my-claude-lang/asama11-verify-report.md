@@ -1,25 +1,25 @@
-<mcl_phase name="phase5-review">
+<mcl_phase name="asama11-verify-report">
 
-# Phase 5: Verification Report
+# Aşama 11: Verification Report
 
-Phase 5 is NOT just a review translation. It is a comprehensive verification
+Aşama 11 is NOT just a review translation. It is a comprehensive verification
 that gives the developer confidence that the AI did the right thing.
 
-## When Phase 5 Runs
+## When Aşama 11 Runs
 
-After **Phase 4.6 (Post-Risk Impact Review)** is fully resolved — i.e.
+After **Aşama 10 (Post-Risk Impact Review)** is fully resolved — i.e.
 every impact MCL surfaced has been answered by the developer (skip /
-apply fix / make general rule), and Phase 4.5 before it is also
+apply fix / make general rule), and Aşama 8 before it is also
 resolved — MCL MUST produce the Verification Report. This is NOT
-optional. Phase 4.6 is NOT the last step.
+optional. Aşama 10 is NOT the last step.
 
-If you wrote code and stopped without running Phase 4.5, Phase 4.6
+If you wrote code and stopped without running Aşama 8, Aşama 10
 AND emitting this report, you skipped phases — go back and produce
 all of them.
 
-⛔ STOP RULE: Phase 4 does NOT end with "done" or a summary of changes.
-Phase 4 hands off to Phase 4.5; Phase 4.5 hands off to Phase 4.6;
-Phase 4.6 hands off to Phase 5. Phase 5 is the last step. If you find
+⛔ STOP RULE: Aşama 7 does NOT end with "done" or a summary of changes.
+Aşama 7 hands off to Aşama 8; Aşama 8 hands off to Aşama 10;
+Aşama 10 hands off to Aşama 11. Aşama 11 is the last step. If you find
 yourself writing "all steps completed" without any of the sections
 below, you are violating this rule.
 
@@ -29,7 +29,7 @@ below, you are violating this rule.
 
 When the developer has opted in by declaring a non-empty `test_command`
 in `$(pwd)/.mcl/config.json`, MCL MUST invoke the test runner during
-Phase 5 **before** emitting Section 1 of the Verification Report.
+Aşama 11 **before** emitting Section 1 of the Verification Report.
 
 How:
 1. Check config via `bash ~/.claude/hooks/lib/mcl-config.sh get test_command`.
@@ -54,30 +54,30 @@ phase file.
 
 ### TDD mode — skip re-invocation
 
-When `tdd=true` (see `phase4-tdd.md`) AND Phase 4 **or Phase 4.5**
+When `tdd=true` (see `asama7-tdd.md`) AND Aşama 7 **or Aşama 8**
 has already emitted a `🟢 GREEN verify` block in this session, DO NOT
-invoke the runner again here. Phase 5 starts instead with a localized
+invoke the runner again here. Aşama 11 starts instead with a localized
 TDD-cycle summary line. Examples:
 
-- Phase 4 GREEN only (no Phase 4.5 re-verify):
+- Aşama 7 GREEN only (no Aşama 8 re-verify):
   - Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama tamamlandı`
   - English: `✅ TDD cycle: RED baseline → GREEN verify complete`
-- Phase 4 GREEN + Phase 4.5 re-verify GREEN:
-  - Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama → Phase 4.5 re-doğrulama tamamlandı`
-  - English: `✅ TDD cycle: RED baseline → GREEN verify → Phase 4.5 re-verify complete`
+- Aşama 7 GREEN + Aşama 8 re-verify GREEN:
+  - Turkish: `✅ TDD döngüsü: RED taban → GREEN doğrulama → Aşama 8 re-doğrulama tamamlandı`
+  - English: `✅ TDD cycle: RED baseline → GREEN verify → Aşama 8 re-verify complete`
 
 Then proceed to Section 1. A double (or triple) runner invocation
 would be noise — the earlier GREEN blocks already carry the diagnostic
 information. This skip applies ONLY when a GREEN verify has happened;
 if TDD mode was enabled but fell through due to missing `test_command`,
-the normal Phase 5 runner invocation above still applies.
+the normal Aşama 11 runner invocation above still applies.
 
 The TDD-cycle summary line is MANDATORY whenever a GREEN verify
-happened in Phase 4 or Phase 4.5 — even when Phase 4.5 and Phase 4.6
+happened in Aşama 7 or Aşama 8 — even when Aşama 8 and Aşama 10
 both emitted nothing (their "omit entirely" rule does not extend to
 this line). The summary is the single most compact proof to the
-developer that the runner blocks were the ground truth Phase 5 is
-standing on; without it, Phase 5 opens with nothing tying back to
+developer that the runner blocks were the ground truth Aşama 11 is
+standing on; without it, Aşama 11 opens with nothing tying back to
 the TDD cycle.
 
 </mcl_constraint>
@@ -88,14 +88,14 @@ entirely** (no header, no placeholder sentence, no filler). Section 1 in
 particular is omitted when every MUST/SHOULD is satisfied — the
 absence of the section IS the all-clear signal.
 (Prior to MCL 5.4.0 the report had a third section, Impact Analysis,
-which was extracted into its own Phase 4.6 interactive dialog;
+which was extracted into its own Aşama 10 interactive dialog;
 prior to MCL 5.3.0 the report had 4 sections with Missed Risks
 embedded; prior to MCL 5.2.0 it had 5 with a Permission Summary.
 All are removed.)
 
 ## Section 1: Spec Compliance — Mismatches Only
 
-Walk every MUST and SHOULD requirement from the Phase 2 spec, but
+Walk every MUST and SHOULD requirement from the Aşama 4 spec, but
 **only report items that did NOT fully comply**. Use ⚠️ for partial
 compliance and ❌ for missing/failed items.
 
@@ -119,8 +119,8 @@ placeholder telling them there is nothing to read.
 ## Section 2: `!!! <LOCALIZED-MUST-TEST-PHRASE> !!!`
 
 Items the developer MUST verify in a running environment — because the
-sandboxed Claude cannot. This list must reflect both Phase 4.5 and
-Phase 4.6 decisions (tests for applied fixes; acceptance smoke for
+sandboxed Claude cannot. This list must reflect both Aşama 8 and
+Aşama 10 decisions (tests for applied fixes; acceptance smoke for
 skipped risks; regression coverage for impacted consumers).
 
 The section title MUST be wrapped in `!!! ... !!!` and rendered in the
@@ -150,17 +150,17 @@ Content format:
 !!! MUTLAKA TEST ETMENİZ GEREKENLER !!!
 - [ ] [Step 1: specific action → expected result]
 - [ ] [Step 2: specific action → expected result]
-- [ ] [Edge case test from Phase 2 spec]
-- [ ] [Regression test for consumers surfaced in Phase 4.6]
-- [ ] [Smoke test for any risk the developer skipped in Phase 4.5]
+- [ ] [Edge case test from Aşama 4 spec]
+- [ ] [Regression test for consumers surfaced in Aşama 10]
+- [ ] [Smoke test for any risk the developer skipped in Aşama 8]
 ```
 
 Tests must be:
 - Specific (not "test the feature" but "click X button, expect Y")
 - Cover the golden path (happy case)
 - Cover edge cases from the spec
-- Cover regression for consumers surfaced in Phase 4.6
-- Cover residual exposure from Phase 4.5 skipped risks
+- Cover regression for consumers surfaced in Aşama 10
+- Cover residual exposure from Aşama 8 skipped risks
 
 ## Section 3: Process Trace (MCL 6.3.0+)
 
@@ -168,7 +168,7 @@ A one-line-per-step localized rendering of `.mcl/trace.log` so the
 developer can verify that MCL actually ran every phase, dispatched
 the plugins it claimed to, and advanced state on approval — not just
 claimed it in prose. The trace is written by the hooks (deterministic,
-not model-compliance-dependent); Phase 5 reads and renders it.
+not model-compliance-dependent); Aşama 11 reads and renders it.
 
 How:
 
@@ -176,7 +176,7 @@ How:
    exist or is empty, OMIT Section 3 entirely — no header, no
    placeholder. (The file is created by `hooks/lib/mcl-trace.sh` on
    the first event of a session; its absence means no MCL-driven
-   events fired, which is itself diagnostic but not a Phase 5
+   events fired, which is itself diagnostic but not a Aşama 11
    rendering concern.)
 2. Parse each line as `<ISO-8601 UTC> | <event_key> | <csv-args>`.
 3. Emit a localized section header, then ONE bullet per event
@@ -252,8 +252,8 @@ Rules:
 
 - ALL sections are in the developer's language
 - Code snippets and file names stay in English
-- Do NOT include a Missed Risks section — Phase 4.5 handled that
-- Do NOT include an Impact Analysis section — Phase 4.6 handled that
+- Do NOT include a Missed Risks section — Aşama 8 handled that
+- Do NOT include an Impact Analysis section — Aşama 10 handled that
 - Do NOT include a Permission Summary section — removed in MCL 5.2.0
 - Do NOT list ✅-compliant items in Section 1 — mismatches only
 - After the full report, ask: "Do you understand everything? (yes / no)"
@@ -262,11 +262,11 @@ Rules:
 
 ## Tail Reminder — `mcl-finish` (MCL 5.14.0+)
 
-Every Phase 5 Verification Report MUST end with a single localized
+Every Aşama 11 Verification Report MUST end with a single localized
 reminder line pointing at the `mcl-finish` slash-command. The line
 sits AFTER Section 2 (the must-test checklist) as the final
 user-facing line of the report. Its purpose is to keep the
-session-local developer aware that Phase 4.6 impacts are
+session-local developer aware that Aşama 10 impacts are
 accumulating on disk and a cross-session finish pass is one
 keyword away.
 
@@ -289,10 +289,10 @@ Localized forms:
 
 Rules:
 
-- The reminder is MANDATORY on every Phase 5 report — even when
+- The reminder is MANDATORY on every Aşama 11 report — even when
   Section 1 is omitted and Section 2 is the only visible section.
 - The reminder is NOT subject to the empty-section-omission rule.
-  Unlike Phase 4.5 / 4.6 / Section 1 — which can vanish when
+  Unlike Aşama 8 / 4.6 / Section 1 — which can vanish when
   empty — this line always renders.
 - The reminder is a single line. Do NOT wrap it in a named section
   header. Do NOT add surrounding prose explaining what
@@ -301,7 +301,7 @@ Rules:
   a fixed technical token per the language rule).
 - This reminder does NOT fire inside an `mcl-finish` run itself —
   `mcl-finish` has its own output format and is not followed by a
-  Phase 5 report.
+  Aşama 11 report.
 
 ## Legacy: Code Review and Test Results
 

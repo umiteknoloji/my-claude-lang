@@ -46,7 +46,7 @@ mcl_stack_detect() {
     fi
 
     # Frontend framework markers (MVP: react/vue/svelte). Tags the
-    # dominant framework so Phase 4a picks the right component syntax.
+    # dominant framework so Aşama 6a picks the right component syntax.
     # Multiple can match (Nx monorepo, stale deps) — MCL prose reconciles.
     if grep -q '"react"' "$dir/package.json" 2>/dev/null; then
       _mcl_stack_add react-frontend
@@ -60,7 +60,7 @@ mcl_stack_detect() {
   fi
 
   # Static HTML (no JS framework detected): top-level index.html or *.html
-  # in the absence of package.json. Lets Phase 4a emit plain HTML+JS.
+  # in the absence of package.json. Lets Aşama 6a emit plain HTML+JS.
   if [ ! -f "$dir/package.json" ]; then
     if [ -f "$dir/index.html" ] || compgen -G "$dir/*.html" >/dev/null; then
       _mcl_stack_add html-static
@@ -124,8 +124,8 @@ mcl_stack_detect() {
 
   # ---- Domain-shape tags (since 8.4.1) ----
   # These are NOT language tags — they classify the project's domain
-  # shape so Phase 1.7 can pick the right stack add-on. False positives
-  # are accepted (Phase 1.7 dimensions are general enough to misfire
+  # shape so Aşama 2 can pick the right stack add-on. False positives
+  # are accepted (Aşama 2 dimensions are general enough to misfire
   # without breaking the spec).
 
   # CLI — bin entries in language manifests, bin/ dir, or cmd/ Go convention.

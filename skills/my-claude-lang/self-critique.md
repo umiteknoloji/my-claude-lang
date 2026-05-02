@@ -16,10 +16,10 @@ The loop triggers at TWO transition points:
 2. **MCL → Claude Code**: Before MCL passes ANY translated/processed
    content to Claude Code
 
-This covers everything — clarifying questions (Phase 1), specs (Phase 2),
-verification prompts (Phase 3), execution plans (Phase 4), every risk
-turn in the Post-Code Risk Review (Phase 4.5), verification reports
-(Phase 5), and every intermediate message.
+This covers everything — clarifying questions (Aşama 1), specs (Aşama 4),
+verification prompts (Aşama 4), execution plans (Aşama 7), every risk
+turn in the Post-Code Risk Review (Aşama 8), verification reports
+(Aşama 11), and every intermediate message.
 
 ## The Four Questions
 

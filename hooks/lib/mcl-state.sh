@@ -2,39 +2,27 @@
 # MCL State — .mcl/state.json schema + atomic helpers.
 #
 # Sourceable library AND CLI. All reads survive corruption by falling
-# back to a default Phase-1 state and logging to stderr. All writes use
+# back to a default Aşama-1 state and logging to stderr. All writes use
 # tmp-file + mv (atomic rename) so a crash mid-write cannot leave the
 # state file half-serialized.
 #
 # State file lives at `<project>/.mcl/state.json` — one file per working
-# directory. Stale-state garbage collection is NOT in v1 (YAGNI).
+# directory.
 #
-# Schema v2 (since MCL 6.2.0):
-#   {
-#     "schema_version":      2,
-#     "current_phase":       1,           // 1..5
-#     "phase_name":          "COLLECT",   // COLLECT|SPEC_REVIEW|USER_VERIFY|EXECUTE|DELIVER
-#     "spec_approved":       false,
-#     "spec_hash":           null,        // sha256 of approved spec body
-#     "plugin_gate_active":  false,
-#     "plugin_gate_missing": [],
-#     "ui_flow_active":      false,       // set by Phase 1 confirm (opt-out path)
-#     "ui_sub_phase":        null,        // "BUILD_UI" | "REVIEW" | "BACKEND" | null
-#     "ui_build_hash":       null,        // sha256 of last frontend build output
-#     "ui_reviewed":         false,       // set by Phase 4b approve intent
-#     "last_update":         1713456789   // unix epoch seconds
-#   }
+# Schema v3 (since MCL 9.0.0):
+#   current_phase: 1, 4, 7, 11 (coarse buckets — Aşama 1=GATHER,
+#                  4=SPEC_REVIEW, 7=EXECUTE, 11=DELIVER)
+#   Sub-states refine within Aşama 7: pattern_scan_due, ui_sub_phase,
+#   risk_review_state, quality_review_state.
 #
-# v1 files (schema_version=1) are auto-migrated to v2 on next hook run.
-# v1→v2 migration adds the four UI fields with default values and
-# preserves a backup at `.mcl/state.json.backup.v1`.
+# Schema v3 is INCOMPATIBLE with prior versions. On schema mismatch the
+# state file is reset to v3 default — no migration. v9.0.0 is a major
+# rewrite; in-progress task state from older MCL is discarded.
 #
 # CLI usage:
 #   mcl-state.sh init                          # create default if missing
 #   mcl-state.sh get <field>                   # print one field
-#   mcl-state.sh set <field> <value>           # set one field, update last_update
 #   mcl-state.sh dump                          # print full JSON
-#   mcl-state.sh reset                         # overwrite with default
 #
 # Sourced usage:
 #   source hooks/lib/mcl-state.sh
@@ -43,7 +31,7 @@
 
 set -u
 
-MCL_STATE_SCHEMA_VERSION=2
+MCL_STATE_SCHEMA_VERSION=3
 MCL_STATE_DIR="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}"
 MCL_STATE_FILE="${MCL_STATE_FILE:-$MCL_STATE_DIR/state.json}"
 
@@ -54,7 +42,7 @@ _mcl_state_default() {
 {
   "schema_version": ${MCL_STATE_SCHEMA_VERSION},
   "current_phase": 1,
-  "phase_name": "COLLECT",
+  "phase_name": "GATHER",
   "spec_approved": false,
   "spec_hash": null,
   "plugin_gate_active": false,
@@ -66,13 +54,16 @@ _mcl_state_default() {
   "scope_paths": [],
   "pattern_scan_due": false,
   "pattern_files": [],
-  "rollback_sha": null,
-  "rollback_notice_shown": false,
   "pattern_summary": null,
-  "tdd_last_green": null,
-  "last_write_ts": null,
   "pattern_level": null,
   "pattern_ask_pending": false,
+  "precision_audit_done": false,
+  "risk_review_state": null,
+  "quality_review_state": null,
+  "rollback_sha": null,
+  "rollback_notice_shown": false,
+  "tdd_last_green": null,
+  "last_write_ts": null,
   "plan_critique_done": false,
   "restart_turn_ts": null,
   "last_update": ${now}
@@ -102,48 +93,20 @@ _mcl_state_auth_check() {
 }
 
 _mcl_state_valid() {
-  # Return 0 if stdin is parseable JSON with schema_version 1 or 2.
-  # v1 files are accepted so mcl_state_init can migrate them in-place
-  # instead of corrupt-copying + replacing with default.
-  # Uses `python3 -c` (not heredoc) so the piped body isn't shadowed.
+  # Return 0 if stdin is parseable JSON with v3 schema. Older schemas
+  # are rejected so mcl_state_init can reset them to v3 default — no
+  # backward-compat migration in v9.0.0.
   python3 -c '
 import json, sys
 try:
     obj = json.loads(sys.stdin.read())
     assert isinstance(obj, dict)
-    assert obj.get("schema_version") in (1, 2)
+    assert obj.get("schema_version") == 3
     assert isinstance(obj.get("current_phase"), int)
-    assert 1 <= obj["current_phase"] <= 5
+    assert 1 <= obj["current_phase"] <= 11
 except Exception:
     sys.exit(1)
 ' 2>/dev/null
-}
-
-_mcl_state_migrate_v1_to_v2() {
-  # Read the current file, add missing v2 fields with defaults, rewrite
-  # atomically. Backup the v1 body at `.mcl/state.json.backup.v1` so the
-  # migration is reversible by hand if anything goes wrong. Emits an
-  # audit event so the migration is always visible after the fact.
-  [ -f "$MCL_STATE_FILE" ] || return 0
-  local body migrated
-  body="$(cat "$MCL_STATE_FILE" 2>/dev/null)" || return 1
-  cp "$MCL_STATE_FILE" "${MCL_STATE_FILE}.backup.v1" 2>/dev/null || true
-  migrated="$(printf '%s' "$body" | python3 -c '
-import json, sys, time
-obj = json.loads(sys.stdin.read())
-obj["schema_version"] = 2
-obj.setdefault("plugin_gate_active", False)
-obj.setdefault("plugin_gate_missing", [])
-obj.setdefault("ui_flow_active", False)
-obj.setdefault("ui_sub_phase", None)
-obj.setdefault("ui_build_hash", None)
-obj.setdefault("ui_reviewed", False)
-obj["last_update"] = int(time.time())
-print(json.dumps(obj, indent=2))
-' 2>/dev/null)"
-  [ -n "$migrated" ] || return 1
-  _mcl_state_write_raw "$migrated" || return 1
-  mcl_audit_log "migrate-v1-to-v2" "$(basename "${0:-unknown}")" "backup=${MCL_STATE_FILE}.backup.v1"
 }
 
 mcl_state_init() {
@@ -152,7 +115,7 @@ mcl_state_init() {
     _mcl_state_write_raw "$(_mcl_state_default)"
     return 0
   fi
-  # File exists — check if it needs v1→v2 migration.
+  # File exists — check schema version. On mismatch, reset (no migration).
   local current_version
   current_version="$(python3 -c '
 import json, sys
@@ -162,8 +125,10 @@ try:
 except Exception:
     print(0)
 ' "$MCL_STATE_FILE" 2>/dev/null)"
-  if [ "$current_version" = "1" ]; then
-    _mcl_state_migrate_v1_to_v2
+  if [ "$current_version" != "3" ]; then
+    cp "$MCL_STATE_FILE" "${MCL_STATE_FILE}.pre-v9-backup" 2>/dev/null || true
+    _mcl_state_write_raw "$(_mcl_state_default)"
+    mcl_audit_log "schema-reset-to-v3" "$(basename "${0:-unknown}")" "old_version=${current_version} backup=${MCL_STATE_FILE}.pre-v9-backup"
   fi
 }
 
@@ -182,7 +147,7 @@ mcl_state_read() {
     return 0
   fi
   if ! printf '%s' "$body" | _mcl_state_valid; then
-    echo "mcl-state: corrupt state file, returning default (keeping corrupt copy at ${MCL_STATE_FILE}.corrupt)" >&2
+    echo "mcl-state: corrupt or wrong-schema state file, returning default (keeping copy at ${MCL_STATE_FILE}.corrupt)" >&2
     cp "$MCL_STATE_FILE" "${MCL_STATE_FILE}.corrupt" 2>/dev/null || true
     _mcl_state_default
     return 0
@@ -295,24 +260,20 @@ mcl_audit_log() {
 }
 
 mcl_get_active_phase() {
-  # Returns a single effective phase string from the combination of
-  # current_phase, spec_approved, phase_review_state, ui_sub_phase,
-  # pattern_scan_due, and spec_hash (Phase 3 detection).
+  # Returns the active aşama string (1..12) from state.
   #
-  # Effective phase values:
-  #   "1"    Phase 1 — gathering parameters
-  #   "2"    Phase 2 — spec being written (spec block not yet emitted)
-  #   "3"    Phase 3 — spec emitted, awaiting developer approval
-  #   "3.5"  Phase 3.5 — pattern scan turn (first Phase 4 turn, writes blocked)
-  #   "4"    Phase 4 — executing (no UI flow, or UI complete)
-  #   "4a"   Phase 4a — UI BUILD (writing frontend with dummy data)
-  #   "4b"   Phase 4b — UI REVIEW (awaiting developer approval of UI)
-  #   "4c"   Phase 4c — BACKEND (wiring real data, UI approved)
-  #   "4.5"  Phase 4.5 — post-code risk review dialog
-  #   "4.6"  Phase 4.6 — post-risk impact review dialog
-  #   "5"    Phase 5 — verification report
-  #   "5.5"  Phase 5.5 — localize report (non-English sessions)
-  #   "?"    indeterminate (state inconsistent or unreadable)
+  # Mapping rules:
+  #   current_phase == 1  AND precision_audit_done == false → "1" (gather)
+  #   current_phase == 1  AND precision_audit_done == true  → "2" (audit just done; brief is transient)
+  #                                                            (Aşama 3 translator is single-turn, never persisted)
+  #   current_phase == 7  AND spec_hash set, spec_approved == false → "4" (spec review)
+  #   current_phase == 7  AND pattern_scan_due == true  → "5" (pattern matching)
+  #   current_phase == 7  AND ui_flow_active == true    → "6a"|"6b"|"6c" by ui_sub_phase
+  #   current_phase == 7  AND risk_review_state == running    → "8"
+  #   current_phase == 7  AND quality_review_state == running → "9"
+  #   current_phase == 7  AND otherwise → "7" (code+TDD)
+  #   current_phase == 11 → "11" (verify report)
+  #   (Aşama 10 impact + Aşama 12 translation are transient single-turn states)
   #
   # Optional arg: path to state.json (default: $MCL_STATE_FILE)
   local state_file="${1:-${MCL_STATE_FILE}}"
@@ -328,57 +289,37 @@ except Exception:
 
 phase       = int(obj.get("current_phase") or 1)
 approved    = obj.get("spec_approved") is True
-pr_state    = obj.get("phase_review_state") or ""   # null/"pending"/"running"
+spec_hash   = obj.get("spec_hash")
+precision_done = obj.get("precision_audit_done") is True
 ui_active   = obj.get("ui_flow_active") is True
-ui_sub      = obj.get("ui_sub_phase") or ""         # BUILD_UI/REVIEW/BACKEND
-spec_hash   = obj.get("spec_hash")                  # set when spec block emitted
+ui_sub      = obj.get("ui_sub_phase") or ""
 scan_due    = obj.get("pattern_scan_due") is True
+risk_state  = obj.get("risk_review_state") or ""
+qual_state  = obj.get("quality_review_state") or ""
 
-# Phase 1: collecting parameters
 if phase <= 1:
-    print("1"); sys.exit(0)
+    print("2" if precision_done else "1"); sys.exit(0)
 
-# Phase 2/3: spec being written or awaiting approval
-if phase == 2:
-    # Phase 3: spec block was emitted (spec_hash set) but not yet approved
-    if spec_hash:
-        print("3")
-    else:
-        print("2")
-    sys.exit(0)
-
-# phase >= 4: spec approved, executing or reviewing
-if not approved:
-    # Shouldn't happen (phase=4 requires approved=true), but guard it
-    print("?"); sys.exit(0)
-
-# Phase 4.5 / 4.6 — review dialog
-if pr_state == "running":
-    # Distinguish 4.5 vs 4.6: 4.6 is pure-dialog (no code written this turn)
-    # We can't distinguish 4.5 from 4.6 from state alone without
-    # transcript analysis — return "4.5" as the coarser bucket.
-    # Callers that need 4.6 precision should check additional signals.
-    print("4.5"); sys.exit(0)
-
-if pr_state == "pending":
-    # Code written, review not yet started — still in Phase 4 (blocked)
-    if ui_active:
-        sub_map = {"BUILD_UI": "4a", "REVIEW": "4b", "BACKEND": "4c"}
-        print(sub_map.get(ui_sub, "4")); sys.exit(0)
-    if scan_due:
-        print("3.5"); sys.exit(0)
+if phase == 4:
     print("4"); sys.exit(0)
 
-# pr_state is null — Phase 4 not yet written code, or post-review
-if ui_active:
-    sub_map = {"BUILD_UI": "4a", "REVIEW": "4b", "BACKEND": "4c"}
-    if ui_sub in sub_map:
-        print(sub_map[ui_sub]); sys.exit(0)
+if phase == 7:
+    if scan_due:
+        print("5"); sys.exit(0)
+    if ui_active:
+        sub_map = {"BUILD_UI": "6a", "REVIEW": "6b", "BACKEND": "6c"}
+        if ui_sub in sub_map:
+            print(sub_map[ui_sub]); sys.exit(0)
+    if risk_state == "running":
+        print("8"); sys.exit(0)
+    if qual_state == "running":
+        print("9"); sys.exit(0)
+    print("7"); sys.exit(0)
 
-if scan_due:
-    print("3.5"); sys.exit(0)
+if phase == 11:
+    print("11"); sys.exit(0)
 
-print("4")
+print("?")
 PYEOF
 }
 

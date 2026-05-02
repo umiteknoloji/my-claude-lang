@@ -71,35 +71,35 @@ on separate lines) — recommend the plugin for each.
 
 `frontend-design` has TWO roles since MCL 6.2.0:
 
-1. **Install-suggest at Phase 1** (unchanged). When the stack is
+1. **Install-suggest at Aşama 1** (unchanged). When the stack is
    `typescript`/`javascript` and the plugin is missing, suggest it
    once per conversation with the install command above.
 
-2. **Auto-dispatch in Phase 4a (BUILD_UI)** — when the UI flow is
+2. **Auto-dispatch in Aşama 6a (BUILD_UI)** — when the UI flow is
    active (`ui_flow_active = true`) AND the plugin is installed, MCL
-   silently dispatches `frontend-design` at the start of Phase 4a
+   silently dispatches `frontend-design` at the start of Aşama 6a
    under Rule B (multi-angle validation). The plugin's suggestions
-   are merged into the component code / Phase 4a prose; raw plugin
+   are merged into the component code / Aşama 6a prose; raw plugin
    tool calls are not exposed to the developer. If the plugin is NOT
-   installed when Phase 4a starts, MCL proceeds without it — Phase
+   installed when Aşama 6a starts, MCL proceeds without it — Phase
    4a is never blocked on an absent plugin.
 
 `frontend-design` is still NOT part of the curated REQUIRED set
 (`plugin-gate.md`). It is stack-conditional: required-quality when
 the stack matches AND UI flow is on; otherwise passive. Outside
-Phase 4a it runs only via its own explicit slash-command invocations
+Aşama 6a it runs only via its own explicit slash-command invocations
 after install.
 
 Framework markers (`react-frontend`, `vue-frontend`,
 `svelte-frontend`, `html-static`) emitted by
-`mcl-stack-detect.sh` sharpen Phase 4a's dispatch — MCL passes the
+`mcl-stack-detect.sh` sharpen Aşama 6a's dispatch — MCL passes the
 detected framework as context to the plugin so its suggestions match
 the actual component syntax.
 
 ## Detection Protocol
 
 At the start of a new conversation in a project (first developer
-message), before asking Phase 1 questions:
+message), before asking Aşama 1 questions:
 
 1. Run `bash ~/.claude/hooks/lib/mcl-stack-detect.sh detect "$(pwd)"`.
    Empty output → no recognizable stack → skip this protocol entirely.
@@ -119,8 +119,8 @@ message), before asking Phase 1 questions:
 
 - Plugin already installed for every detected tag.
 - Developer declined earlier in this conversation — do not re-ask.
-- Mid-phase execution (Phase 4 / 4.5 / 4.6 / 5) — do not interrupt
-  ongoing work. Suggestion is a Phase 1 concern only.
+- Mid-phase execution (Aşama 7 / 4.5 / 4.6 / 5) — do not interrupt
+  ongoing work. Suggestion is a Aşama 1 concern only.
 - No stack markers (docs-only repo, empty project).
 
 ## What MCL does NOT do

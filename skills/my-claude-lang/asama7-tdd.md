@@ -1,15 +1,15 @@
-<mcl_phase name="phase4-tdd">
+<mcl_phase name="asama7-tdd">
 
-# Phase 4 TDD: incremental red-green-refactor
+# Aşama 7 TDD: incremental red-green-refactor
 
-Phase 4 normally writes production code immediately after the spec
+Aşama 7 normally writes production code immediately after the spec
 is approved. This overlay turns that into an **incremental TDD cycle**:
 for each Acceptance Criterion, one test → RED → minimum code → GREEN
 → refactor — then move to the next criterion. The full cycle happens
-entirely inside Phase 4; Phase 4.5, Phase 4.6, and Phase 5 run
+entirely inside Aşama 7; Aşama 8, Aşama 10, and Aşama 11 run
 afterward as usual.
 
-TDD is **mandatory** — it runs on every Phase 4 execution. There
+TDD is **mandatory** — it runs on every Aşama 7 execution. There
 is no opt-in flag. The only path that skips TDD is when the test
 command cannot be resolved even after auto-detection and the
 developer explicitly declines to provide one (see Step 1).
@@ -18,7 +18,7 @@ developer explicitly declines to provide one (see Step 1).
 
 ## Step 1 — Resolve the test command
 
-Before writing any production code in Phase 4, resolve the test
+Before writing any production code in Aşama 7, resolve the test
 command in this order:
 
 1. **Explicit config** — read `test_command` from `.mcl/config.json`:
@@ -48,10 +48,10 @@ command in this order:
    fall through to `test_command` config if the developer wants a
    composed runner.
 
-3. **Developer prompt** — normally this case never hits in Phase 4
-   because `phase1-rules.md`'s Test-Command Resolution pre-flow
+3. **Developer prompt** — normally this case never hits in Aşama 7
+   because `asama1-gather.md`'s Test-Command Resolution pre-flow
    already resolved it on the first developer message. This option
-   is a defensive fallback for sessions where Phase 1 pre-flow was
+   is a defensive fallback for sessions where Aşama 1 pre-flow was
    skipped. Ask the developer ONE question in their language:
 
    > Turkish: *Testler hangi komutla koşuyor? ('yok' dersen TDD
@@ -62,13 +62,13 @@ command in this order:
 
    - Non-empty answer → use it for this session; offer to persist
      to `.mcl/config.json` as `test_command`.
-   - `none` / equivalent → fall through to non-TDD Phase 4 with
+   - `none` / equivalent → fall through to non-TDD Aşama 7 with
      the warning in Step 2. This is the ONLY path that skips TDD.
 
 ## Step 2 — Precondition warning (only when Step 1 returned 'none')
 
 If Step 1 could not resolve a command AND the developer explicitly
-declined, warn in their language then proceed with normal Phase 4
+declined, warn in their language then proceed with normal Aşama 7
 (no RED/GREEN cycle):
 
 > Turkish: *TDD bu session için atlanıyor — koşulabilir bir test
@@ -84,7 +84,7 @@ developer prompt) TDD continues with Step 3.
 
 ## Step 3 — Incremental TDD loop (repeat per Acceptance Criterion)
 
-Work through each Acceptance Criterion from the Phase 2 spec **one
+Work through each Acceptance Criterion from the Aşama 4 spec **one
 at a time**. For each criterion, execute sub-steps A through E
 before moving to the next criterion.
 
@@ -206,17 +206,17 @@ to catch regressions between criteria (label: `green-verify`):
 bash ~/.claude/hooks/lib/mcl-test-runner.sh green-verify
 ```
 
-- GREEN → Phase 4 is complete; proceed to Phase 4.5.
+- GREEN → Aşama 7 is complete; proceed to Aşama 8.
 - RED → a criterion's code broke another criterion's tests.
-  Surface the failing test as a Phase 4.5 risk (do not iterate
+  Surface the failing test as a Aşama 8 risk (do not iterate
   silently — the developer must see the regression).
 
 ## Phase transition
 
-After a final GREEN verify, Phase 4 is complete. Phase 4.5 (Risk
-Review) and Phase 4.6 (Impact Review) run as usual. The Phase 5
-Verification Report cites the Phase 4 GREEN verify instead of
-re-invoking the runner — see `phase5-review.md` for the exact
+After a final GREEN verify, Aşama 7 is complete. Aşama 8 (Risk
+Review) and Aşama 10 (Impact Review) run as usual. The Aşama 11
+Verification Report cites the Aşama 7 GREEN verify instead of
+re-invoking the runner — see `asama11-verify-report.md` for the exact
 summary-line format.
 
 ## Audit trail

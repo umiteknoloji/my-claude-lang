@@ -1,14 +1,14 @@
-<mcl_phase name="phase4-6-impact-review">
+<mcl_phase name="asama10-impact-review">
 
-# Phase 4.6: Post-Risk Impact Review
+# Aşama 10: Post-Risk Impact Review
 
-Phase 4.6 is a **mandatory, sequential, interactive dialog** that runs
-AFTER Phase 4.5 (risk review is resolved) and BEFORE Phase 5
+Aşama 10 is a **mandatory, sequential, interactive dialog** that runs
+AFTER Aşama 8 (risk review is resolved) and BEFORE Aşama 11
 (Verification Report). Introduced in MCL 5.4.0.
 
-## Why Phase 4.6 Exists
+## Why Aşama 10 Exists
 
-Before 5.4.0, "Impact Analysis" was Section 2 of the Phase 5
+Before 5.4.0, "Impact Analysis" was Section 2 of the Aşama 11
 Verification Report — a static, one-shot paragraph the developer read
 passively. In practice this led to two failures:
 
@@ -19,18 +19,18 @@ passively. In practice this led to two failures:
    consumer was about to break, the report was already emitted and the
    session effectively closed.
 
-Phase 4.6 fixes both: the impact scan is *narrowed* to real downstream
+Aşama 10 fixes both: the impact scan is *narrowed* to real downstream
 effects only (no meta-changelog), and each impact is presented in an
-interactive loop identical to Phase 4.5, letting the developer patch
-consumers before Phase 5.
+interactive loop identical to Aşama 8, letting the developer patch
+consumers before Aşama 11.
 
-## When Phase 4.6 Runs
+## When Aşama 10 Runs
 
-Immediately after Phase 4.5 is fully resolved — i.e. every risk
-surfaced in Phase 4.5 has been answered (skip / apply fix / capture
+Immediately after Aşama 8 is fully resolved — i.e. every risk
+surfaced in Aşama 8 has been answered (skip / apply fix / capture
 rule) or the scan produced no risks.
 
-Phase 4.5 → Phase 4.6 → Phase 5.
+Aşama 8 → Aşama 10 → Aşama 11.
 
 ## What Counts as an Impact
 
@@ -61,16 +61,16 @@ The following are NOT impacts and MUST NOT be surfaced:
 - Self-reference to the task's own deliverables
 - Version / setup / install notes
 - Generic reminders ("remember to run tests") — those belong in
-  the must-test section (Phase 5)
-- Anything already surfaced and resolved in Phase 4.5
+  the must-test section (Aşama 11)
+- Anything already surfaced and resolved in Aşama 8
 
 If after an honest scan the only candidates you have are
 meta-changelog or self-reference, the impact list is empty — and
-Phase 4.6 is omitted entirely (see "When There Are No Impacts").
+Aşama 10 is omitted entirely (see "When There Are No Impacts").
 
 ## The Dialog Structure
 
-Phase 4.6 is NOT a one-shot list. It is a **sequential,
+Aşama 10 is NOT a one-shot list. It is a **sequential,
 one-impact-per-turn conversation**. For each impact MCL surfaces:
 
 1. MCL presents **one** impact as plain text with a short explanation:
@@ -93,29 +93,29 @@ one-impact-per-turn conversation**. For each impact MCL surfaces:
 4. On tool_result: execute the chosen action, then present the next
    impact.
    - **"Apply fix"** means MCL edits the affected downstream file directly
-     within Phase 4.6 — not a return to Phase 4. The spec is already
+     within Aşama 10 — not a return to Aşama 7. The spec is already
      approved; `scope_paths` and `phase_review_state=running` remain active
-     throughout. There is no "go back to Phase 4" mechanism. If the required
+     throughout. There is no "go back to Aşama 7" mechanism. If the required
      fix is too large for an in-place patch (e.g. requires architectural
-     changes to the original Phase 4 deliverable), surface it as a new task
+     changes to the original Aşama 7 deliverable), surface it as a new task
      for the next session instead of attempting it here.
 5. Repeat until all impacts are resolved.
 
 ⛔ STOP RULE: After presenting an impact and calling `AskUserQuestion`,
 STOP. Do NOT list the next impact in the same response. Do NOT proceed
-to Phase 5. Wait for the tool_result.
+to Aşama 11. Wait for the tool_result.
 
 ## When There Are No Impacts
 
 If after an honest scan MCL finds no real downstream impacts, OMIT
-Phase 4.6 entirely from the response — no header, no placeholder
-sentence, no whitespace filler — and proceed silently to Phase 5.
+Aşama 10 entirely from the response — no header, no placeholder
+sentence, no whitespace filler — and proceed silently to Aşama 11.
 The scan still *happens*; only its output is suppressed when clean.
 "No news = good news" is the user-facing contract.
 
 Never fabricate impacts to fill the section. Never surface
 self-referential changelog items. Never re-surface items already
-handled in Phase 4.5.
+handled in Aşama 8.
 
 ## Impact Persistence — `.mcl/impact/NNNN.md`
 
@@ -155,9 +155,9 @@ Writing rules:
 - Do NOT rewrite or delete existing `.mcl/impact/` files. The
   `mcl-finish` checkpoint model treats the dir as append-only.
 - Create the `.mcl/impact/` dir on demand (`mkdir -p`); never fail a
-  Phase 4.6 resolution because the dir was missing.
+  Aşama 10 resolution because the dir was missing.
 
-The impact dir is NOT the risks dir. Phase 4.5 risks are resolved
+The impact dir is NOT the risks dir. Aşama 8 risks are resolved
 in-session and are NOT persisted — per the captured rule that
 unambiguous risks auto-fix silently and surfaced ones get an
 immediate skip/fix/rule decision. Only impacts cross the
@@ -166,7 +166,7 @@ check this next week" items. Risks cannot.
 
 ## Anti-Patterns
 
-For Phase 4.6 anti-patterns, see `my-claude-lang/anti-patterns.md` —
+For Aşama 10 anti-patterns, see `my-claude-lang/anti-patterns.md` —
 anti-patterns live in a single file to avoid drift.
 
 </mcl_phase>

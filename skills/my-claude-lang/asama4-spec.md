@@ -1,8 +1,8 @@
-<mcl_phase name="phase2-spec">
+<mcl_phase name="asama4-spec">
 
-# Phase 2: Generate English Spec
+# Aşama 4: Generate English Spec
 
-Called automatically when Phase 1 parameters are complete and confirmed.
+Called automatically when Aşama 1 parameters are complete and confirmed.
 
 ## Purpose
 
@@ -21,7 +21,7 @@ a senior English-speaking engineer wrote the requirements themselves.
    prompt>", options: ["<approve-family>", "<edit>", "<cancel>"]})` —
    since 6.0.0 this REPLACES the text-based "yes / no" prompt. Do NOT
    emit the legacy `✅ MCL APPROVED` marker; it is dead.
-6. Do NOT proceed to Phase 4 until the tool_result returns an
+6. Do NOT proceed to Aşama 7 until the tool_result returns an
    approve-family option (Stop hook audit: `approve-via-askuserquestion`).
 
 ## Spec Quality Standard
@@ -124,7 +124,7 @@ When the spec is visible:
 - It becomes the contract between developer intent and code output
 
 ## This spec is the SINGLE SOURCE OF TRUTH for all subsequent work.
-All code in Phase 4 must satisfy the spec. If implementation reveals
-the spec is incomplete, return to Phase 2 and update — do not improvise.
+All code in Aşama 7 must satisfy the spec. If implementation reveals
+the spec is incomplete, return to Aşama 4 and update — do not improvise.
 
 </mcl_phase>

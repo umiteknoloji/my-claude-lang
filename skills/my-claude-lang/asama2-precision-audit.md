@@ -1,9 +1,9 @@
-<mcl_phase name="phase1-7-precision-audit">
+<mcl_phase name="asama2-precision-audit">
 
-# Phase 1.7: Precision Audit
+# Aşama 2: Precision Audit
 
-Called automatically after Phase 1 AskUserQuestion returns an approve-family
-tool_result, before Phase 1.5 (Engineering Brief).
+Called automatically after Aşama 1 AskUserQuestion returns an approve-family
+tool_result, before Aşama 3 (Engineering Brief).
 
 ## Scope and Extensibility
 
@@ -21,20 +21,20 @@ coverage grows.
 
 ## Purpose
 
-Phase 1 ensures the developer's parameters are **complete** (all fields gathered).
-Phase 1.7 ensures they are **precise** (each dimension classified — silent default,
+Aşama 1 ensures the developer's parameters are **complete** (all fields gathered).
+Aşama 2 ensures they are **precise** (each dimension classified — silent default,
 explicit no-default, or asked).
 
 A senior English-speaking engineer does not ship a spec where dimensions like
-permission model, idempotency, or PII handling are silently absent. Phase 1.7
+permission model, idempotency, or PII handling are silently absent. Aşama 2
 walks a fixed checklist of dimensions and forces an explicit decision for each
-one. The output is a precision-enriched parameter set that Phase 1.5 translates
-to English and Phase 2 expands into the spec body.
+one. The output is a precision-enriched parameter set that Aşama 3 translates
+to English and Aşama 4 expands into the spec body.
 
-## When Phase 1.7 Runs
+## When Aşama 2 Runs
 
-After the Phase 1 summary `AskUserQuestion` tool_result returns approve-family.
-Before Phase 1.5 brief generation. Skipped silently when the developer's
+After the Aşama 1 summary `AskUserQuestion` tool_result returns approve-family.
+Before Aşama 3 brief generation. Skipped silently when the developer's
 detected language is English — the behavioral prior of a Claude session in
 English already biases toward precision; running 1.7 would be redundant and
 add latency.
@@ -49,12 +49,12 @@ For each dimension on the checklist, classify the developer's input as one of:
 ### SILENT-ASSUME
 Industry default exists, the choice is reversible, and proceeding with the
 default carries near-zero implementation cost. Mark in the spec as
-`[assumed: X]` so Phase 3 review can correct if wrong.
+`[assumed: X]` so Aşama 4 review can correct if wrong.
 
 ### SKIP-MARK (since 8.3.0)
 Dimension applies but **no industry-default assumption is safe**. Recording
 silence as a default would be wrong — instead, mark explicitly that the
-dimension is unspecified. Phase 4.5 risk review can lens these markers and
+dimension is unspecified. Aşama 8 risk review can lens these markers and
 surface them as risks if the dimension turns out to matter at execution time.
 Spec marker: `[unspecified: <reason>]` (e.g., `[unspecified: no SLA stated]`).
 
@@ -85,7 +85,7 @@ Algorithmic and integration failure handling: empty input, network/dependency er
 ### 3. Out-of-Scope Boundaries
 What this task explicitly does NOT include.
 - **SILENT-ASSUME default:** auto-derive from confirmed parameters (anything not mentioned is out of scope).
-- **GATE triggers:** request contains hidden sub-tasks (existing Phase 1 pattern) or analogy-based scope ("X gibi yap"); explicit confirmation needed on what is excluded.
+- **GATE triggers:** request contains hidden sub-tasks (existing Aşama 1 pattern) or analogy-based scope ("X gibi yap"); explicit confirmation needed on what is excluded.
 - **Sample question (TR):** "[X], [Y], [Z] bu task'in dışında — ayrı ticket'lar olarak mı işlenecek?"
 
 ### 4. Data Privacy / PII Handling
@@ -103,7 +103,7 @@ What events emit log entries, what actions require audit trail, what metrics to 
 ### 6. Performance SLA — **SKIP-MARK by default**
 p95/p99 latency, throughput target, resource budget.
 - **SKIP-MARK default:** no SLA stated → `[unspecified: no SLA stated]`. **Do NOT assume an industry default** — performance defaults vary too widely across stacks and contexts to be safely silent.
-- **GATE triggers:** developer used the word "fast", "scale", "high traffic", "low latency", or implied volume ("X requests per second", "Y users", "millions of records") in Phase 1.
+- **GATE triggers:** developer used the word "fast", "scale", "high traffic", "low latency", or implied volume ("X requests per second", "Y users", "millions of records") in Aşama 1.
 - **Sample question (TR):** "'Hızlı' dedin — concrete bir target var mı (örn. p95 < 200ms, throughput 1k req/s)?"
 
 ### 7. Idempotency / Retry
@@ -272,20 +272,20 @@ ML library deps in requirements/pyproject, mlflow/mlruns dirs).
 
 For each dimension in order — core 1→7 first, then matching stack add-ons:
 
-1. Read the confirmed Phase 1 parameters.
+1. Read the confirmed Aşama 1 parameters.
 2. Classify SILENT-ASSUME, SKIP-MARK, or GATE.
 3. If GATE → ask exactly one question (existing one-question-at-a-time rule applies, no introductory sentences, no list of multiple questions).
 4. **Wait for the developer's answer before evaluating the next dimension.** When multiple dimensions classify as GATE in the same audit pass, queue them and ask sequentially across turns — never batch two GATE questions in the same response, even with bullet/numbered formatting. Each GATE answer is confirmed and marked in the parameter set before the next GATE is evaluated.
 5. Continue to the next dimension.
 
-When all dimensions resolve, emit the audit entry, advance to Phase 1.5.
+When all dimensions resolve, emit the audit entry, advance to Aşama 3.
 
 ## Audit
 
-Every Phase 1.7 execution emits one audit entry:
+Every Aşama 2 execution emits one audit entry:
 
 ```
-precision-audit | phase1-7 | core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<comma> skipped=<true|false>
+precision-audit | asama2 | core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<comma> skipped=<true|false>
 ```
 
 - `core_gates`: how many of the 7 core dimensions fired GATE-PRECISION questions
@@ -297,7 +297,7 @@ precision-audit | phase1-7 | core_gates=N stack_gates=M assumes=K skipmarks=L st
 
 If skipped (English source), `skipped=true` and other counters are zero.
 
-`mcl-stop.sh` writes `precision-audit-skipped-warn | mcl-stop.sh | summary-confirmed-but-no-audit` when the Phase 1→2 transition fires (first SPEC_HASH detection while `current_phase=1`) without a `precision-audit` entry recorded earlier in the same session. This is the detection control required by the behavioral→dedicated rule — even when Phase 1.7 is a behavioral pass, the audit confirms it was evaluated.
+`mcl-stop.sh` writes `precision-audit-skipped-warn | mcl-stop.sh | summary-confirmed-but-no-audit` when the Aşama 1→4 transition fires (first SPEC_HASH detection while `current_phase=1`) without a `precision-audit` entry recorded earlier in the same session. This is the detection control required by the behavioral→dedicated rule — even when Aşama 2 is a behavioral pass, the audit confirms it was evaluated.
 
 ## Failure Path
 
@@ -308,20 +308,20 @@ question in their language, then retry. Continue until a consistent run is
 achieved.
 
 A consistent run produces:
-- One `precision-audit | phase1-7 | ...` audit entry
+- One `precision-audit | asama2 | ...` audit entry
 - All core dimensions classified (SILENT-ASSUME / SKIP-MARK / GATE) with the
   appropriate spec marker for SILENT/SKIP and a confirmed answer for GATE
 - All matching stack-add-on dimensions classified
 
 ## Enforcement (since 8.3.2 — hard tier)
 
-Phase 1.7 is enforced at the same tier as Phase 4.5: `mcl-stop.sh` returns
-`{"decision": "block", ...}` when a Phase 2 spec block (`📋 Spec:`) is
+Aşama 2 is enforced at the same tier as Aşama 8: `mcl-stop.sh` returns
+`{"decision": "block", ...}` when a Aşama 4 spec block (`📋 Spec:`) is
 detected in the turn AND no `precision-audit` audit entry was emitted earlier
-in the same session. State stays at `current_phase=1`; the Phase 1→2
+in the same session. State stays at `current_phase=1`; the Aşama 1→4
 transition is rewound until the audit entry appears.
 
-The block reason instructs Claude to walk Phase 1.7 in the same response and
+The block reason instructs Claude to walk Aşama 2 in the same response and
 re-emit the spec with precision-enriched parameters (the prior spec is
 discarded — replaced, not duplicated).
 
@@ -331,11 +331,11 @@ Two events are written when the block fires:
 
 ### English-language safety valve
 
-When the developer's detected language is English, Phase 1.7 is skipped. To
+When the developer's detected language is English, Aşama 2 is skipped. To
 clear the block, emit the audit entry with `skipped=true`:
 
 ```
-bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log "precision-audit" "phase1-7" "core_gates=0 stack_gates=0 assumes=0 skipmarks=0 stack_tags= skipped=true"'
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log "precision-audit" "asama2" "core_gates=0 stack_gates=0 assumes=0 skipmarks=0 stack_tags= skipped=true"'
 ```
 
 The next turn's `mcl-stop.sh` will see the audit entry and allow the

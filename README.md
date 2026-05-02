@@ -11,7 +11,7 @@ This is not a translator. Translators convert words. my-claude-lang converts **m
 
 ### Since 5.0.0 — Universal Activation
 
-my-claude-lang is no longer only for non-English speakers. MCL activates on **every** message — English included — because meaning verification, senior-engineer spec generation, and anti-sycophancy matter regardless of source language. For non-English developers the translation bridge also runs; for English developers it collapses to identity, and every other layer (phase gates, self-critique, disambiguation, Phase 5 verification) still applies in full.
+my-claude-lang is no longer only for non-English speakers. MCL activates on **every** message — English included — because meaning verification, senior-engineer spec generation, and anti-sycophancy matter regardless of source language. For non-English developers the translation bridge also runs; for English developers it collapses to identity, and every other layer (phase gates, self-critique, disambiguation, Aşama 11 verification) still applies in full.
 
 ---
 
@@ -35,13 +35,13 @@ You could use a translator. But here's what happens when you translate your requ
 
 ## What my-claude-lang Actually Does
 
-It runs a **seven-phase mutual understanding loop** before a single line of code is written:
+It runs a **twelve-stage mutual understanding loop** before a single line of code is written:
 
 ```
 You (your language)
   │
   ▼
-Phase 1: MCL gathers what you want — one question at a time.
+Aşama 1: MCL gathers what you want — one question at a time.
          No ambiguity passes. You confirm the summary.
          MCL may also challenge your architectural answers: if you
          say "JWT" but describe a server-side session flow, MCL
@@ -49,39 +49,49 @@ Phase 1: MCL gathers what you want — one question at a time.
          any spec is written.
   │
   ▼
-Phase 1.5 (invisible): Your confirmed intent passes through a strict
-         translator pass (user_lang → EN). No interpretation, no
-         additions — only natural language is translated; technical
+Aşama 2: 7-dimension precision audit + hard enforcement —
+         MCL walks permission, failure modes, scope boundaries,
+         PII, observability, performance SLA, idempotency, plus
+         stack-specific dimensions. Each gets a [assumed: X] /
+         [unspecified: X] / GATE classification. Verifies the
+         intent's correctness and completeness before any spec.
+  │
+  ▼
+Aşama 3 (invisible): Your confirmed, audited intent passes through
+         a strict translator pass (user_lang → EN). No interpretation,
+         no additions — only natural language is translated; technical
          terms stay intact. The resulting English Engineering Brief
          is the sole input for spec generation.
   │
   ▼
-Phase 2+3: Your confirmed intent becomes a visible English spec
-           (📋 Spec:) written like a senior engineer with 15+ years
-           experience — and MCL explains it back in your language,
-           all in the same turn. One AskUserQuestion, one approval.
-           The spec block is collapsible — click to hide once you've
-           read it.
+Aşama 4: Your confirmed intent becomes a visible English spec
+         (📋 Spec:) written like a senior engineer with 15+ years
+         experience — and MCL explains it back in your language,
+         all in the same turn. One AskUserQuestion, one approval.
+         The spec block is collapsible — click to hide once you've
+         read it.
   │
   ▼
-Phase 4: Code gets written. Incremental TDD runs inside this
-         phase — for each acceptance criterion: one failing test
-         (RED), minimum code to pass it (GREEN), then refactor.
-         Cycle repeats per criterion; full suite re-checked at end.
-         Every question Claude asks during execution goes through
-         the bridge — with context explaining WHY it's asking and
-         WHAT each answer changes.
-
-         When a UI surface is detected (default ON), Phase 4 splits:
-         ├─ 4a BUILD_UI  — runnable frontend with dummy data only.
+Aşama 5: Pattern matching is performed. Skipped if the project
+         is brand new and no stack is detected.
+  │
+  ▼
+Aşama 6: When a UI surface is detected (default ON), Aşama 6 splits:
+         ├─ 6a BUILD_UI  — runnable frontend with dummy data only.
          │                 You get a run command; MCL auto-opens it.
-         ├─ 4b UI_REVIEW — approve the UI before backend starts.
+         ├─ 6b UI_REVIEW — approve the UI before backend starts.
          │                 Opt-in Playwright vision review available.
-         └─ 4c BACKEND   — real API calls, data layer, async wiring.
+         └─ 6c BACKEND   — real API calls, data layer, async wiring.
                            Only runs after UI approval.
   │
   ▼
-Phase 4.5 (Risk Review): MCL verifies that the security and
+Aşama 7: Code gets written. Incremental TDD runs inside this
+         phase — for each acceptance criterion: one failing test
+         (RED), minimum code to pass it (GREEN), then refactor.
+         Cycle repeats per criterion; full suite re-checked at end.
+  │
+  ▼
+Aşama 8 (Risk Review): MCL verifies that the security and
          performance decisions designed in the spec were correctly
          implemented, then scans for any missed risks — edge cases,
          regressions — walking each one with you. After risk fixes,
@@ -89,21 +99,26 @@ Phase 4.5 (Risk Review): MCL verifies that the security and
          MCL / Claude Code conflict → you decide.
   │
   ▼
-Phase 4.6 (Impact Review): MCL scans the rest of the project for
+Aşama 9: code review
+         Simplify
+         Performance
+         Security
+         unit test, integration test, E2E test, load test.
+         These run sequentially, auto-fix without dialog.
+  │
+  ▼
+Aşama 10 (Impact Review): MCL scans the rest of the project for
          real downstream effects of the change — callers, shared
          utilities, schema/API shifts — and surfaces each one for
          your decision.
   │
   ▼
-Phase 5: Verification Report — Spec Coverage traceability table
+Aşama 11: Verification Report — Spec Coverage traceability table
          (each MUST/SHOULD requirement linked to the test that
          covers it: ✅ with file:line, ⚠️ partial, ❌ not tested).
-         Then: automation barriers detected from your code's call
-         graph — only items that genuinely can't be automated
-         (live APIs, DOM layout, production env vars).
   │
   ▼
-Phase 5.5: The full English report is formally translated back to
+Aşama 12: The full English report is formally translated back to
          your language — same strict translator pass, no
          interpretation. Technical tokens (file:line, test names)
          stay verbatim.
@@ -113,12 +128,12 @@ Phase 5.5: The full English report is formally translated back to
 
 ### Approvals via AskUserQuestion (since 6.0.0)
 
-Every closed-ended gate (Phase 1 summary, Phase 3 spec approval, each
-Phase 4.5 risk, each Phase 4.6 impact, plugin consent, git-init consent,
+Every closed-ended gate (Aşama 1 summary, Aşama 4 spec approval, each
+Aşama 8 risk, each Aşama 10 impact, plugin consent, git-init consent,
 drift resolution, `/mcl-update` / `/mcl-finish` / pasted-CLI confirmation)
-now arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 8.4.5 | `. You pick an option in the UI — no typing
-"yes" or "✅ MCL APPROVED" required. Open-ended Phase 1 gathering stays
+arrives as a native Claude Code `AskUserQuestion` prompt with the
+question prefix `MCL 9.0.0 | `. You pick an option in the UI — no typing
+"yes" or "✅ MCL APPROVED" required. Open-ended Aşama 1 gathering stays
 as a plain-text conversation.
 
 Spec drift (approved body no longer matches the current emission) is
@@ -126,30 +141,30 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 8.4.5` so you always know the bridge is active.
+Every response starts with `🌐 MCL 9.0.0` so you always know the bridge is active.
 
 ### UI Build / Review Sub-Phases (since 6.2.0)
 
-When a task has a UI surface (default for every project), Phase 4
+When a task has a UI surface (default for every project), Aşama 6
 splits into three sub-phases so you never watch MCL build the backend
 on top of a UI you wanted to change:
 
-1. **Phase 4a (BUILD_UI)** — MCL writes a runnable frontend with
+1. **Aşama 6a (BUILD_UI)** — MCL writes a runnable frontend with
    dummy data only. React / Vue / Svelte / static HTML depending on
    your stack. You get a run command (`npm run dev` etc.); MCL
    auto-opens it in your browser.
-2. **Phase 4b (UI_REVIEW)** — MCL asks whether the UI is right
+2. **Aşama 6b (UI_REVIEW)** — MCL asks whether the UI is right
    before moving on. Four options: approve / revise / **see it
    yourself and report** / cancel. "See it yourself" is an opt-in
    pipeline that uses Playwright + screenshots + Claude's
    multimodal vision to actually look at the UI it built and
    describe what it sees — requires `playwright` installed, never
    auto-installs.
-3. **Phase 4c (BACKEND)** — only after you approve, MCL swaps dummy
+3. **Aşama 6c (BACKEND)** — only after you approve, MCL swaps dummy
    fixtures for real API calls, writes the data layer, wires error
    and loading states to real async behavior.
 
-At Phase 1's summary confirm, pick "approve, skip UI" to run Phase 4
+At Aşama 1's summary confirm, pick "approve, skip UI" to run Aşama 7
 without the split (same behavior as 6.1.1). UI is default ON because
 most projects have a UI surface; bash scripts and backend-only
 changes opt out in one click.
@@ -304,20 +319,20 @@ To reset the counter: `rm .mcl/cost.json`
 
 ## Cross-Session Finish Mode — `/mcl-finish`
 
-Phase 4.6 surfaces downstream impacts one at a time during execution. Many of those impacts are genuine "I'll verify this next week" items — they belong to a horizon that doesn't fit inside a single session.
+Aşama 10 surfaces downstream impacts one at a time during execution. Many of those impacts are genuine "I'll verify this next week" items — they belong to a horizon that doesn't fit inside a single session.
 
 `/mcl-finish` is the checkpoint that carries them across.
 
-Every Phase 5 Verification Report ends with a localized reminder line pointing at the command. When you're ready, type the literal message `/mcl-finish` and MCL will:
+Every Aşama 11 Verification Report ends with a localized reminder line pointing at the command. When you're ready, type the literal message `/mcl-finish` and MCL will:
 
-1. Aggregate every Phase 4.6 impact written to `.mcl/impact/` since the last checkpoint
+1. Aggregate every Aşama 10 impact written to `.mcl/impact/` since the last checkpoint
 2. Run a full-project Semgrep rescan on supported stacks (silently skipped on unsupported ones)
 3. Emit a project-level finish report in your language
 4. Write a new checkpoint to `.mcl/finish/NNNN-YYYY-MM-DD.md`
 
 The next `/mcl-finish` starts a fresh window from that checkpoint — closed impacts stay in the archive, new ones pile up for the next pass. No git commits, no remote pushes, no external reporting — pure local state.
 
-Phase 4.5 risks are NOT accumulated: they're resolved in-session.
+Aşama 8 risks are NOT accumulated: they're resolved in-session.
 
 ---
 

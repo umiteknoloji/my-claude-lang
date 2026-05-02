@@ -1,5 +1,5 @@
 #!/bin/bash
-# MCL Test Runner — Phase 4 incremental TDD (red-green-refactor) + Phase 5 orchestration.
+# MCL Test Runner — Aşama 7 incremental TDD (red-green-refactor) + Aşama 11 orchestration.
 #
 # Claude invokes this via the Bash tool. Command resolution order:
 #   1. `test_command` from .mcl/config.json (explicit override)

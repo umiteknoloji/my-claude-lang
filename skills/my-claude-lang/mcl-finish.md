@@ -4,23 +4,23 @@
 
 Introduced in MCL 5.14.0.
 
-`mcl-finish` is a slash-command that aggregates Phase 4.6 impacts
+`mcl-finish` is a slash-command that aggregates Aşama 10 impacts
 accumulated since the last checkpoint and emits a project-level
-finish report. It is orthogonal to the Phase 1 → 5 pipeline — typing
+finish report. It is orthogonal to the Aşama 1 → 5 pipeline — typing
 the literal keyword `mcl-finish` bypasses MCL's normal flow (no
-Phase 1 gather, no spec, no Phase 4.5/4.6/5) and runs the finish
+Aşama 1 gather, no spec, no Aşama 8/4.6/5) and runs the finish
 aggregation directly.
 
 ## Why It Exists
 
-Phase 4.6 surfaces one impact at a time in an interactive dialog. The
+Aşama 10 surfaces one impact at a time in an interactive dialog. The
 developer replies `skip / apply fix / rule capture` and the session
 moves on. But many impacts are genuine "I should verify this next
 week" items — they belong to a horizon the developer can't act on
 inside a single session.
 
 Before 5.14.0, MCL had no mechanism to carry impacts across sessions.
-Each session closed with a Phase 5 Verification Report and the impact
+Each session closed with a Aşama 11 Verification Report and the impact
 history vanished with the session transcript.
 
 `mcl-finish` is the checkpoint mechanism that closes that gap —
@@ -33,7 +33,7 @@ remote.
 ```
 .mcl/
 ├── impact/
-│   ├── 0001.md   ← one file per Phase 4.6 impact (append-only)
+│   ├── 0001.md   ← one file per Aşama 10 impact (append-only)
 │   ├── 0002.md
 │   └── …
 └── finish/
@@ -44,7 +44,7 @@ remote.
 Both directories are created on demand (`mkdir -p`). Empty dirs are
 treated as "no entries", never an error.
 
-Impact file format is defined in `phase4-6-impact-review.md` under
+Impact file format is defined in `asama10-impact-review.md` under
 "Impact Persistence".
 
 ## Trigger
@@ -58,9 +58,9 @@ mode and skip the normal phases.
 Two activation sources:
 
 1. **Explicit:** developer types `mcl-finish` on its own.
-2. **Tail reminder prompt:** every Phase 5 Verification Report ends
+2. **Tail reminder prompt:** every Aşama 11 Verification Report ends
    with a localized reminder line pointing at `mcl-finish` (see
-   `phase5-review.md` → "Tail Reminder").
+   `asama11-verify-report.md` → "Tail Reminder").
 
 There is NO automatic execution — the developer is always the trigger.
 
@@ -100,9 +100,9 @@ There is NO automatic execution — the developer is always the trigger.
      ISO8601, `impact_count`, `sast_finding_count`) followed by the
      full report body.
 
-6. End the response. Do NOT emit a Phase 5 Verification Report, a
+6. End the response. Do NOT emit a Aşama 11 Verification Report, a
    must-test list, or a tail reminder — `mcl-finish` is its own
-   output, not a wrapped Phase 5.
+   output, not a wrapped Aşama 11.
 
 ## What `mcl-finish` Does NOT Do (MVP)
 
@@ -110,9 +110,9 @@ There is NO automatic execution — the developer is always the trigger.
   aggregation. Whether an impact is still valid is the developer's
   call. Automated re-check is an explicit non-goal for 5.14.0 and
   may ship in a later iteration.
-- **Re-run Phase 4.5 / 4.6** on current diff. Full-project Semgrep
+- **Re-run Aşama 8 / 4.6** on current diff. Full-project Semgrep
   rescan is the only re-scanning `mcl-finish` performs — and only
-  for SAST, not for the broader Phase 4.5 risk heuristic set.
+  for SAST, not for the broader Aşama 8 risk heuristic set.
 - **Auto-commit, push, branch, tag, or PR.** `mcl-finish` does not
   touch git. The checkpoint file is local state.
 - **External reporting** (Slack, email, issue trackers, CI gates).
@@ -121,7 +121,7 @@ There is NO automatic execution — the developer is always the trigger.
   run writes its own checkpoint id, so the outcomes don't corrupt,
   but impact-to-checkpoint assignment becomes ambiguous. MVP leaves
   this to the developer.
-- **Risk persistence.** `.mcl/risks/` does NOT exist. Phase 4.5
+- **Risk persistence.** `.mcl/risks/` does NOT exist. Aşama 8
   risks are resolved in-session per the captured rule that
   unambiguous ones auto-fix silently and surfaced ones get an
   immediate skip/fix/rule decision.
@@ -129,7 +129,7 @@ There is NO automatic execution — the developer is always the trigger.
 ## Interaction with MCL's Other Self-Commands
 
 `mcl-update` and `mcl-finish` are symmetric in pipeline bypass (both
-skip Phase 1–5) and asymmetric in side-effects (update mutates the
+skip Aşama 1–12) and asymmetric in side-effects (update mutates the
 install; finish mutates only `.mcl/` state). They never co-run —
 the hook's intercept branches on the first-matching literal.
 
@@ -137,8 +137,8 @@ the hook's intercept branches on the first-matching literal.
 
 - `hooks/mcl-activate.sh` — the literal-prompt intercept
 - `hooks/lib/mcl-finish.sh` — filesystem convention helper
-- `skills/my-claude-lang/phase4-6-impact-review.md` — impact
+- `skills/my-claude-lang/asama10-impact-review.md` — impact
   persistence format
-- `skills/my-claude-lang/phase5-review.md` — tail reminder line
+- `skills/my-claude-lang/asama11-verify-report.md` — tail reminder line
 
 </mcl_constraint>

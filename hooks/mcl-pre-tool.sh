@@ -187,13 +187,13 @@ if [ "$TOOL_NAME" = "Skill" ]; then
   exit 0
 fi
 
-# -------- Branch: block TodoWrite in Phase 1-3 --------
+# -------- Branch: block TodoWrite in Aşama 1-3 --------
 # MCL manages phase state via state.json, not todo checklists. Todo checklists
-# during Phase 1-3 duplicate and conflict with MCL phase logic.
-# Phase 4+ TodoWrite is allowed (legitimate task tracking during code execution).
+# during Aşama 1-3 duplicate and conflict with MCL phase logic.
+# Aşama 7+ TodoWrite is allowed (legitimate task tracking during code execution).
 if [ "$TOOL_NAME" = "TodoWrite" ] && command -v python3 >/dev/null 2>&1; then
   _TW_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
-  # Default: block if phase unknown (no state yet = new session = Phase 1).
+  # Default: block if phase unknown (no state yet = new session = Aşama 1).
   # Allow only when phase is explicitly >= 4.
   _TW_ALLOW=0
   [ -n "$_TW_PHASE" ] && [ "$_TW_PHASE" -ge 4 ] 2>/dev/null && _TW_ALLOW=1
@@ -203,20 +203,20 @@ if [ "$TOOL_NAME" = "TodoWrite" ] && command -v python3 >/dev/null 2>&1; then
 import json, sys
 print(json.dumps({
     "decision": "block",
-    "reason": "MCL ACTIVE (Phase 1-3) — TodoWrite is blocked. MCL manages phase state via state.json. Todo checklists during Phase 1-3 duplicate and conflict with MCL phase logic. Proceed directly with MCL Phase 1 parameter gathering."
+    "reason": "MCL ACTIVE (Aşama 1-3) — TodoWrite is blocked. MCL manages phase state via state.json. Todo checklists during Aşama 1-3 duplicate and conflict with MCL phase logic. Proceed directly with MCL Aşama 1 parameter gathering."
 }))
 ' 2>/dev/null
     exit 0
   fi
 fi
-# TodoWrite in Phase 4+ passes through — allow.
+# TodoWrite in Aşama 7+ passes through — allow.
 if [ "$TOOL_NAME" = "TodoWrite" ]; then
   exit 0
 fi
 
-# -------- Branch: block Task dispatch of Phase 4.5/4.6/5 as sub-agent --------
-# sub-agent-phase-discipline: Phase 4.5 (Risk Review), 4.6 (Impact Review),
-# and Phase 5 (Verification Report) MUST run in the main MCL session as
+# -------- Branch: block Task dispatch of Aşama 8/10/5 as sub-agent --------
+# sub-agent-phase-discipline: Aşama 8 (Risk Review), 4.6 (Impact Review),
+# and Aşama 11 (Verification Report) MUST run in the main MCL session as
 # interactive AskUserQuestion dialogs. Sub-agents cannot substitute them.
 if [ "$TOOL_NAME" = "Task" ] && command -v python3 >/dev/null 2>&1; then
   _TASK_DESC="$(printf '%s' "$RAW_INPUT" | python3 -c '
@@ -225,7 +225,7 @@ try:
     obj = json.loads(sys.stdin.read())
     tin = obj.get("tool_input") or {}
     desc = (tin.get("description") or tin.get("prompt") or "").lower()
-    # Check for Phase 4.5/4.6/5 keywords indicating sub-agent substitution
+    # Check for Aşama 8/10/5 keywords indicating sub-agent substitution
     patterns = [
         r"phase\s*4\.5", r"phase\s*4\.6", r"phase\s*5",
         r"risk\s+review", r"impact\s+review", r"verification\s+report",
@@ -246,7 +246,7 @@ print("")
 import json, sys
 print(json.dumps({
     "decision": "block",
-    "reason": "MCL SUB-AGENT DISCIPLINE — Phase 4.5 (Risk Review), Phase 4.6 (Impact Review), and Phase 5 (Verification Report) cannot be dispatched to sub-agents. These phases require the main MCL session to run the interactive AskUserQuestion dialog directly with the developer. Run them in this session after all code sub-agents complete."
+    "reason": "MCL SUB-AGENT DISCIPLINE — Aşama 8 (Risk Review), Aşama 10 (Impact Review), and Aşama 11 (Verification Report) cannot be dispatched to sub-agents. These phases require the main MCL session to run the interactive AskUserQuestion dialog directly with the developer. Run them in this session after all code sub-agents complete."
 }))
 ' 2>/dev/null
     exit 0
@@ -455,7 +455,7 @@ fi
 # -------- Branch: protect .mcl/state.json from direct Bash writes --------
 # MCL's state machine is owned exclusively by the hook system (mcl-state.sh).
 # Direct writes to .mcl/state.json via Bash (cat >, echo >, tee, etc.) bypass
-# phase transitions — e.g. manually setting current_phase=4 skips Phase 4a/4b.
+# phase transitions — e.g. manually setting current_phase=7 skips Aşama 6a/4b.
 if [ "$TOOL_NAME" = "Bash" ] && command -v python3 >/dev/null 2>&1; then
   _STATE_WRITE="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json, re, sys
@@ -496,7 +496,7 @@ case "$TOOL_NAME" in
 esac
 
 # -------- Security: secret / credential scan (all phases) --------
-# Runs before the phase gate so credentials are blocked even in Phase 1-3.
+# Runs before the phase gate so credentials are blocked even in Aşama 1-3.
 # Never blocks on scanner error (fallback = safe).
 _SECRET_SCAN_LIB="$SCRIPT_DIR/lib/mcl-secret-scan.py"
 if [ -f "$_SECRET_SCAN_LIB" ] && command -v python3 >/dev/null 2>&1; then
@@ -562,7 +562,7 @@ _mcl_pre_is_approve_option() {
 }
 
 JIT_SCANNER="$SCRIPT_DIR/lib/mcl-askq-scanner.py"
-if { [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null || [ "$SPEC_APPROVED" != "true" ]; } \
+if { [ "$CURRENT_PHASE" -lt 7 ] 2>/dev/null || [ "$SPEC_APPROVED" != "true" ]; } \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] \
    && [ -f "$JIT_SCANNER" ] && command -v python3 >/dev/null 2>&1; then
   # Pass restart_turn_ts (since 8.2.13) so the scanner drops pre-restart
@@ -602,7 +602,7 @@ except Exception:
        && [ "$PARTIAL_NOW" != "true" ] \
        && _mcl_pre_is_approve_option "$JIT_SELECTED"; then
       # Idempotency: if state already matches this approval, skip.
-      if [ "$SPEC_APPROVED" = "true" ] && [ "$CURRENT_PHASE" -ge 4 ] 2>/dev/null \
+      if [ "$SPEC_APPROVED" = "true" ] && [ "$CURRENT_PHASE" -ge 7 ] 2>/dev/null \
          && [ "$STATE_SPEC_HASH" = "$JIT_SPEC_HASH" ]; then
         mcl_debug_log "pre-tool" "askq-jit-idempotent" "hash=${JIT_SPEC_HASH:0:12}"
       else
@@ -667,7 +667,7 @@ if [ "$SPEC_APPROVED" != "true" ]; then
   REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked until the developer explicitly approves the 📋 Spec: block via AskUserQuestion."
 fi
 
-# -------- Branch: UI flow path-exception (Phase 4a BUILD_UI / 4b REVIEW) --------
+# -------- Branch: UI flow path-exception (Aşama 6a BUILD_UI / 4b REVIEW) --------
 # When UI flow is active AND we're in BUILD_UI or REVIEW sub-phase, only
 # frontend paths + .mcl/ internals are writeable. Backend paths stay
 # locked until the developer approves the UI and MCL advances to the
@@ -723,30 +723,30 @@ print("allow|")
 ' 2>/dev/null)"
     if [ "${UI_PATH_VERDICT%%|*}" = "deny" ]; then
       DENIED_PATH="${UI_PATH_VERDICT#deny|}"
-      REASON="MCL UI-BUILD LOCK — ui_sub_phase=${UI_SUB_PHASE}. Backend path \`${DENIED_PATH}\` is blocked until the developer approves the UI and MCL advances to the BACKEND sub-phase. Frontend code (components, pages, styles, fixtures), \`public/\`, \`.mcl/\` temp files, and framework-neutral files (README, package.json) are allowed. Build the UI with mock/fixture data only; integrate backend in Phase 4c."
+      REASON="MCL UI-BUILD LOCK — ui_sub_phase=${UI_SUB_PHASE}. Backend path \`${DENIED_PATH}\` is blocked until the developer approves the UI and MCL advances to the BACKEND sub-phase. Frontend code (components, pages, styles, fixtures), \`public/\`, \`.mcl/\` temp files, and framework-neutral files (README, package.json) are allowed. Build the UI with mock/fixture data only; integrate backend in Aşama 6c."
     fi
   fi
 fi
 
-# -------- Branch: Pattern Matching guard (Phase 3.5) --------
+# -------- Branch: Pattern Matching guard (Aşama 5) --------
 # When pattern_scan_due=true, Claude must read existing sibling files before
-# writing anything. One-turn grace: after the first Phase 4 turn the stop
+# writing anything. One-turn grace: after the first Aşama 7 turn the stop
 # hook clears the flag and writes are unblocked.
-if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "4" ]; then
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "7" ]; then
   _PS_DUE_PT="$(mcl_state_get pattern_scan_due 2>/dev/null)"
   if [ "$_PS_DUE_PT" = "true" ]; then
     _PAT_FILES_PT="$(mcl_state_get pattern_files 2>/dev/null)"
-    REASON="MCL PHASE 3.5 — Pattern scan pending. Before writing any Phase 4 code, read the existing sibling files listed in the PATTERN_MATCHING_NOTICE to extract naming, error handling, import style, and test structure patterns. Write nothing this turn — use Read tool on each listed file, note the patterns, then end the turn. Writes will unblock automatically on the next turn."
+    REASON="MCL PHASE 3.5 — Pattern scan pending. Before writing any Aşama 7 code, read the existing sibling files listed in the PATTERN_MATCHING_NOTICE to extract naming, error handling, import style, and test structure patterns. Write nothing this turn — use Read tool on each listed file, note the patterns, then end the turn. Writes will unblock automatically on the next turn."
     mcl_audit_log "pattern-scan-block" "pre-tool" "tool=${TOOL_NAME}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_block
   fi
 fi
 
-# -------- Branch: Scope Guard (Phase 4) --------
+# -------- Branch: Scope Guard (Aşama 7) --------
 # When scope_paths is non-empty (spec listed explicit file paths / globs),
 # block writes to paths that don't match any declared pattern.
 # Empty scope_paths = spec had no explicit paths = no restriction.
-if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "4" ] && command -v python3 >/dev/null 2>&1; then
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "7" ] && command -v python3 >/dev/null 2>&1; then
   _SCOPE_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json, fnmatch, os, sys
 
@@ -818,7 +818,7 @@ print("allow")
 ' 2>/dev/null || echo "allow")"
   if [ "${_SCOPE_VERDICT%%|*}" = "deny" ]; then
     _SCOPE_DENIED_PATH="${_SCOPE_VERDICT#deny|}"
-    REASON="MCL SCOPE GUARD (Rule 2 — File Scope) — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. This also likely violates Rule 1 (Spec-Only): if this file needs changes, it should have been in the spec. Options: (A) surface as a Phase 4.5 risk and request scope extension; (B) if genuinely required now, ask the developer via AskUserQuestion BEFORE writing — never silently touch out-of-scope files."
+    REASON="MCL SCOPE GUARD (Rule 2 — File Scope) — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. This also likely violates Rule 1 (Spec-Only): if this file needs changes, it should have been in the spec. Options: (A) surface as a Aşama 8 risk and request scope extension; (B) if genuinely required now, ask the developer via AskUserQuestion BEFORE writing — never silently touch out-of-scope files."
     mcl_audit_log "scope-guard-block" "pre-tool" "path=${_SCOPE_DENIED_PATH} tool=${TOOL_NAME}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_block "${_SCOPE_DENIED_PATH}"
   fi

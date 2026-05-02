@@ -7,6 +7,126 @@
 
 ## [Unreleased]
 
+## [9.0.0] - 2026-05-02
+
+### Major rewrite — flat 12-stage pipeline (BREAKING)
+
+MCL phase numbering migrates from fractional (Phase 1, 1.5, 1.7, 2, 3,
+3.5, 4, 4.5, 4.6, 5, 5.5) to flat 12-stage (Aşama 1–12). State schema
+v3 is incompatible with prior versions; existing `.mcl/state.json` is
+reset to default on first activation under v9.0.0 (no backward-compat
+migration). All skill files, hook code, audit log keys, and docs use
+the new numbering.
+
+#### New 12-stage pipeline
+
+```
+Aşama 1: Parameter gathering (was Phase 1)
+Aşama 2: 7-dimension precision audit + hard enforcement (was Phase 1.7, NOW VISIBLE)
+Aşama 3: Translator (was Phase 1.5; UPGRADE-TRANSLATOR for verb upgrades)
+Aşama 4: Spec emit + your-language explanation + AskUserQuestion approval (was Phase 2+3 fused)
+Aşama 5: Pattern Matching (was Phase 3.5, NOW VISIBLE)
+Aşama 6: UI flow split (conditional, when ui_flow_active=true)
+  Aşama 6a BUILD_UI / 6b UI_REVIEW / 6c BACKEND
+Aşama 7: Code + TDD (was Phase 4)
+Aşama 8: Risk Review — interactive AskUserQuestion dialog (was Phase 4.5 dialog parts)
+Aşama 9: Quality + Tests — sequential auto-fix pipeline (was Phase 4.5 lenses + comprehensive tests)
+  Aşama 9.1 code review / 9.2 simplify / 9.3 performance / 9.4 security
+  Aşama 9.5 unit / 9.6 integration / 9.7 E2E / 9.8 load tests
+  NO AskUserQuestion — auto-detect + auto-fix
+  Soft applicability: not-applicable cases write audit + skip (yumuşak katılık)
+Aşama 10: Impact Review — interactive AskUserQuestion dialog (was Phase 4.6)
+Aşama 11: Verify Report (was Phase 5)
+Aşama 12: Translate report EN → user_lang (was Phase 5.5)
+```
+
+#### State schema v3
+
+- `current_phase` integer remap: `{1→1, 2→4, 4→7, 5→11}`. Validation
+  range: `1 ≤ phase ≤ 11`.
+- `phase_review_state` SPLIT into `risk_review_state` (Aşama 8) +
+  `quality_review_state` (Aşama 9). All hook usages migrated.
+- New flag: `precision_audit_done` (Aşama 2 visibility marker).
+- Trace events renamed: `phase_review_pending` → `risk_review_pending`.
+- Schema version bumped to 3. Old `state.json` → fresh init (no
+  migration). Backup at `.mcl/state.json.pre-v9-backup`.
+
+#### Files
+
+- DELETED: `skills/my-claude-lang/phase3-verify.md` (Phase 3 fused into
+  Aşama 4).
+- RENAMED 11 skill files: `phaseN-*.md` → `asamaN-*.md`. Includes UI
+  flow subdirs `phase4a-ui-build/` → `asama6a-ui-build/`.
+- SPLIT: `phase4-5-risk-review.md` → `asama8-risk-review.md` (dialog) +
+  `asama9-quality-tests.md` (auto-fix pipeline).
+- NEW: `asama5-pattern-matching.md` (extracted from inline activate.sh
+  logic into a dedicated skill artifact).
+
+#### Hooks
+
+- `hooks/lib/mcl-state.sh` — schema v3, validation `1 ≤ phase ≤ 11`,
+  fresh init on schema mismatch, `precision_audit_done` /
+  `risk_review_state` / `quality_review_state` fields, removed v1→v2
+  migration, removed legacy `phase_review_state` field.
+- `hooks/mcl-activate.sh` — STATIC_CONTEXT rewritten for 12-aşama
+  numbering, banner version `MCL 9.0.0`, all phase references migrated.
+- `hooks/mcl-pre-tool.sh` — `current_phase` integer comparisons remapped,
+  JIT askq advance updated, scope guard + pattern guard reference
+  Aşama 5/8.
+- `hooks/mcl-stop.sh` — phase transitions {1→4, 4→7, 7→...},
+  `risk_review_state` replaces `phase_review_state`, Aşama 11 skip
+  detection updated, hard enforcement audit keys aligned to new
+  numbering.
+- `hooks/lib/mcl-askq-scanner.py`, `mcl-dispatch-audit.sh`,
+  `mcl-phase-review-guard.py`, `mcl-spec-paths.py`, etc. — phase number
+  refs remapped.
+
+#### Aşama 9 — new auto-fix behavior (no dialog)
+
+Replaces Phase 4.5 step 2 (lenses) + step 4 (comprehensive test
+coverage). Eight sequential sub-steps run without AskUserQuestion:
+detect issues, apply unambiguous auto-fixes, write audit entries
+(`asama-9-N-start` / `asama-9-N-end findings=N fixes=M`). Soft
+applicability: when a sub-step doesn't apply (E2E for CLI, load test
+for calculator), audit `asama-9-N-not-applicable | reason=<why>` and
+skip silently.
+
+#### Hard enforcements (preserved)
+
+- Aşama 2 (precision audit): Stop hook blocks Aşama 1→4 transition
+  unless audit entry exists in this session.
+- Aşama 8 (risk review): Stop hook blocks session-end after Aşama 7
+  code if `risk_review_state ≠ complete`.
+- Aşama 11 (verify report): Stop hook detects skip and forces
+  Verification Report emission.
+
+Loop-breakers (3-fail fail-open) tracked separately in v9.0.1.
+
+#### Documentation
+
+- `README.md`, `README.tr.md` — pipeline diagram replaced with 12-stage
+  Aşama version, banner refs `MCL 9.0.0`, all Phase X references
+  remapped to Aşama Y.
+- `FEATURES.md` — 12-aşama feature catalog, v9.0.0 sürüm.
+- `CLAUDE.md` (project) — captured rules updated to reference Aşama
+  numbering.
+- All 14 phase skill files internal content rewritten for new
+  numbering.
+
+#### Test
+
+Existing 21 tests pass under v9.0.0.
+
+### Breaking — no backward compatibility
+
+- Old `state.json` (schema v1/v2) is reset to v3 default on first
+  activation under v9.0.0. Backup written to
+  `.mcl/state.json.pre-v9-backup`. In-progress task state from older
+  MCL is discarded.
+- Audit log entries from older MCL retain their original `phase-...`
+  prefixes; new entries use `asama-...` / `risk_review_*` /
+  `quality_review_*`. Mixed history is expected and acceptable.
+
 ## [8.4.5] - 2026-05-02
 
 ### Kaldırıldı — Pasif "yeni sürüm mevcut" bildirimi

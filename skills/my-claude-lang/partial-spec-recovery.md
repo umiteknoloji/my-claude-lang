@@ -4,10 +4,10 @@
 
 Introduced in MCL 5.15.0; adapted to AskUserQuestion in 6.0.0.
 
-A Phase 2 `📋 Spec:` emission can be cut off mid-stream by a
+A Aşama 4 `📋 Spec:` emission can be cut off mid-stream by a
 rate-limit, a network drop, or a process kill. Before 5.15.0, a
 follow-up `yes` from the developer would transition the MCL state
-machine to Phase 4 (EXECUTE) anyway — because the Stop hook's only
+machine to Aşama 7 (EXECUTE) anyway — because the Stop hook's only
 input was a text marker, not the structural completeness of the
 spec body. A truncated spec could therefore be silently promoted to
 an approved spec, and the developer had no recourse short of a
@@ -88,10 +88,10 @@ an `<mcl_audit name="partial-spec-recovery">` block into
 `additionalContext` telling Claude to:
 
 1. Open with ONE localized line acknowledging the interruption.
-2. Re-emit the FULL `📋 Spec:` block from Phase 1 context —
+2. Re-emit the FULL `📋 Spec:` block from Aşama 1 context —
    every required section present.
 3. NOT emit the legacy `✅ MCL APPROVED` text (dead in 6.0.0).
-4. End with a Phase 3 `AskUserQuestion` call (prefix
+4. End with a Aşama 4 `AskUserQuestion` call (prefix
    `MCL 6.0.0 | `) asking for fresh spec approval, then STOP.
    Note: the Stop hook IGNORES the tool_result while
    `partial_spec=true` (emits `askq-ignored-partial-spec`). The
@@ -113,8 +113,8 @@ recovered spec, every turn must carry the recovery instruction.
   sufficient; let the developer judge the content.
 - **Applying to non-spec turns**. The helper exits 2 when no
   `📋 Spec:` marker is present — there is nothing to check.
-- **Broadening to Phase 1 summaries**. This rule covers Phase 2
-  spec emissions only; Phase 1 truncation is handled by MCL's
+- **Broadening to Aşama 1 summaries**. This rule covers Aşama 4
+  spec emissions only; Aşama 1 truncation is handled by MCL's
   normal "ask one question at a time" loop.
 
 </mcl_constraint>

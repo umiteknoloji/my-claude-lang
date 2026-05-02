@@ -1,23 +1,23 @@
-<mcl_phase name="phase4-execute">
+<mcl_phase name="asama7-execute">
 
-# Phase 4: Execution with Live Translation
+# Aşama 7: Execution with Live Translation
 
-Called automatically when Phase 3 is confirmed.
+Called automatically when Aşama 4 is confirmed.
 
 ## Flow Split (since MCL 6.2.0)
 
-Phase 4 forks on `ui_flow_active`:
+Aşama 7 forks on `ui_flow_active`:
 
-- `ui_flow_active = true` (Phase 1 approve with UI included, default):
-  Phase 4 runs as three sub-phases in order:
-  - **Phase 4a BUILD_UI** — read `my-claude-lang/phase4a-ui-build.md`
-  - **Phase 4b UI_REVIEW** — read `my-claude-lang/phase4b-ui-review.md`
-  - **Phase 4c BACKEND** — read `my-claude-lang/phase4c-backend.md`
+- `ui_flow_active = true` (Aşama 1 approve with UI included, default):
+  Aşama 7 runs as three sub-phases in order:
+  - **Aşama 6a BUILD_UI** — read `my-claude-lang/asama6a-ui-build.md`
+  - **Aşama 6b UI_REVIEW** — read `my-claude-lang/asama6b-ui-review.md`
+  - **Aşama 6c BACKEND** — read `my-claude-lang/asama6c-backend.md`
   All rules below still apply inside each sub-phase; they describe
-  the shared Phase 4 behavior. Only Phase 4c reaches Phase 4.5.
-- `ui_flow_active = false` (Phase 1 approve with "skip UI") OR task
+  the shared Aşama 7 behavior. Only Aşama 6c reaches Aşama 8.
+- `ui_flow_active = false` (Aşama 1 approve with "skip UI") OR task
   has no UI by construction: the default flow below runs top-to-bottom
-  and exits directly to Phase 4.5.
+  and exits directly to Aşama 8.
 
 Sub-phases share state (`spec_approved`, `current_phase`, `ui_sub_phase`)
 managed by `hooks/lib/mcl-state.sh`. Never transition sub-phase by
@@ -89,19 +89,19 @@ prose assertion alone — the stop hook is the only authority.
    - MCL translates the prompt into the developer's language with
      context explaining WHY Claude Code is asking and WHAT each
      option does (yes / yes-allow-all / no)
-   - MCL does NOT produce a Permission Summary at the end of Phase 4.
+   - MCL does NOT produce a Permission Summary at the end of Aşama 7.
      The developer already saw and approved each permission at the
      prompt — restating adds no value. (Removed in MCL 5.2.0.)
-8. If the developer introduces a NEW task during Phase 4 execution
+8. If the developer introduces a NEW task during Aşama 7 execution
    (scope creep, "by the way also fix...", "bu arada şunu da..."):
    - Do NOT fold the new task into the current spec
    - Acknowledge it: "I noted this as a separate task."
    - Ask: "Should I finish the current task first, or pause and
      switch to this new one?"
    - If finish first → save the new task, continue current execution
-   - If switch → pause current task at a safe point, run Phase 1-3
+   - If switch → pause current task at a safe point, run Aşama 1-4
      for the new task
-   - Either way, the new task gets its own Phase 1-3 cycle
+   - Either way, the new task gets its own Aşama 1-4 cycle
 
 <mcl_constraint name="spec-history">
 
@@ -114,7 +114,7 @@ frontmatter (spec_id, approved_at, spec_hash, branch, head_at_approval,
 completion_commit=null, status=active). `.mcl/specs/INDEX.md` is
 regenerated as a pipe-table sorted newest-first.
 
-This is a background mechanism — Phase 4 prose flow does NOT change.
+This is a background mechanism — Aşama 7 prose flow does NOT change.
 MCL does NOT need to announce the save in every turn. Mention it only
 when:
 

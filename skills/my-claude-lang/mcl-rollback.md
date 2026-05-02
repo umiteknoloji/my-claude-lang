@@ -20,13 +20,13 @@ When the developer types `/mcl-rollback`, perform these steps in order:
    SHA:      <full sha>
    Short:    <sha[:12]>
 
-   To revert all Phase 4 changes:
+   To revert all Aşama 7 changes:
      git reset --hard <full sha>
 
    ⚠️  This does NOT delete files — it only moves HEAD back.
        Protect current work first with git stash or a commit.
 
-   Atomic commit (after Phase 5):
+   Atomic commit (after Aşama 11):
      git add <scope_paths or ".">
      git commit -m "feat: <spec objective>"
    ```

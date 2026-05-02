@@ -11,7 +11,7 @@
 #   2026-04-23T14:40:12Z | plugin_dispatched | code-reviewer
 #   2026-04-23T14:55:08Z | verification_emitted
 #
-# The log is consumed by Phase 5 (Verification Report) which reads the
+# The log is consumed by Aşama 11 (Verification Report) which reads the
 # file and renders a localized "Process Trace" section. Lines are stored
 # in a stable machine-readable format; localization happens at render time
 # in the skill file — not here. This keeps the hook surface small and the
