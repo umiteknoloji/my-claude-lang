@@ -193,6 +193,72 @@ print(count)
 PYEOF
 }
 
+# --- Aşama 4 spec-presence audit (since v10.0.4) ---
+# Scan the latest assistant message: if it called Edit/Write/MultiEdit/
+# NotebookEdit AND no preceding 📋 Spec: text appears in the same
+# message, write `spec-required-warn` to audit. Stop hook timing is
+# correct (turn complete = transcript flushed), unlike pre-tool which
+# can't see in-progress message text.
+_mcl_spec_presence_audit() {
+  local transcript="${1:-}"
+  [ -n "$transcript" ] && [ -f "$transcript" ] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  python3 - "$transcript" 2>/dev/null <<'PYEOF' || true
+import json, re, sys
+path = sys.argv[1]
+SPEC_RE = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:", re.MULTILINE)
+EDIT_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+last_assistant_blocks = None
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            msg = obj.get("message") or obj
+            if not isinstance(msg, dict):
+                continue
+            if msg.get("role") == "assistant":
+                content = msg.get("content")
+                if isinstance(content, list):
+                    last_assistant_blocks = content
+except Exception:
+    sys.exit(0)
+if not last_assistant_blocks:
+    sys.exit(0)
+text_so_far = ""
+edit_called = False
+spec_seen_before_edit = False
+for block in last_assistant_blocks:
+    if not isinstance(block, dict):
+        continue
+    btype = block.get("type")
+    if btype == "text":
+        t = block.get("text") or ""
+        if isinstance(t, str):
+            text_so_far += "\n" + t
+            if SPEC_RE.search(t) and not edit_called:
+                spec_seen_before_edit = True
+    elif btype == "tool_use":
+        name = block.get("name") or ""
+        if name in EDIT_TOOLS:
+            edit_called = True
+            # Once Edit fires, freeze spec_seen_before_edit
+            break
+print("warn" if (edit_called and not spec_seen_before_edit) else "ok")
+PYEOF
+}
+
+_SP_AUDIT="$(_mcl_spec_presence_audit "$TRANSCRIPT_PATH" 2>/dev/null || echo ok)"
+if [ "$_SP_AUDIT" = "warn" ]; then
+  mcl_audit_log "spec-required-warn" "stop" "edit-without-preceding-spec-in-turn"
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_required_warn
+fi
+
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
 TRANSCRIPT_PATH="$(printf '%s' "$RAW_INPUT" | python3 -c '

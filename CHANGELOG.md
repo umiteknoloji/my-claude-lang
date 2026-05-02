@@ -7,6 +7,67 @@
 
 ## [Unreleased]
 
+## [10.0.4] - 2026-05-02
+
+### Fix v10.0.3 timing bug — spec-presence enforcement moves to Stop hook audit
+
+Real-use feedback (developer's exact diagnosis): *"konuşmaları takip
+etme konusunda bi eksik var bence. MCL herşeyi önceden kaydetmeli
+bence. önceden yazarsa bütün tool'ların baktığı yerler güncel
+olur."* — there's a gap in conversation tracking; MCL should record
+things upfront so all hooks see current state.
+
+#### Root cause
+
+v10.0.3's pre-tool spec-presence block read `transcript.jsonl` at
+PreToolUse fire time and scanned for 📋 Spec: in the current turn's
+assistant text. **The current turn's assistant text is NOT yet
+flushed to transcript when pre-tool fires.** Claude Code persists
+assistant content blocks at message-completion time, not
+incrementally. Result: even when the model DID emit a spec block
+right before its Edit tool call, pre-tool's transcript scan returned
+"no spec found" and blocked the Edit. The block then re-fired
+multiple times because each retry hit the same timing wall.
+
+#### Fix — move enforcement to Stop hook audit
+
+- `hooks/mcl-pre-tool.sh` — REVERT v10.0.3's pre-tool spec-presence
+  block + loop-breaker. Pre-tool no longer enforces spec presence.
+- `hooks/mcl-stop.sh` — NEW `_mcl_spec_presence_audit` helper called
+  at turn end (transcript fully flushed). Scans the latest assistant
+  message: if it contains an Edit/Write/MultiEdit/NotebookEdit
+  tool_use block, walks blocks in order, checks whether a 📋 Spec:
+  text block precedes the first tool_use. If not, writes
+  `spec-required-warn` to audit.log. Visible via `/mcl-checkup`.
+- `STATIC_CONTEXT` no-spec-fast-path constraint updated:
+  hard-block language replaced with audit-warn description.
+- `asama4-spec.md` and `anti-patterns.md` updated to reflect the
+  audit-not-block enforcement model.
+
+#### Trade-off (acknowledged)
+
+- **Lost:** mechanical pre-tool block that prevents Edit/Write
+  without spec. Model can technically still skip the spec — and
+  the audit-warn surfaces it after the fact, not before damage.
+- **Gained:** correctness. v10.0.3's block was firing on legitimate
+  spec emissions because of the transcript timing wall. v10.0.4's
+  audit fires only when the spec is genuinely absent in the
+  completed assistant message.
+
+This is consistent with v10.0.0's advisory-mode philosophy: only
+Aşama 6b retains a hard-block (and that one works because the
+trigger is a state field set at end of prior turn, not in-progress
+text). Spec-presence joins the audit-only enforcement tier.
+
+#### Tests
+
+80 passing (8 new test-v10-spec-required assertions for v10.0.4
+architecture: hook contract checks (stop has audit, pre-tool no
+longer blocks) + 3 detector verdicts (Edit with preceding spec=ok,
+Edit without spec=warn, Edit with post-hoc spec=warn).
+
+Banner: MCL 10.0.3 → MCL 10.0.4.
+
 ## [10.0.3] - 2026-05-02
 
 ### Aşama 4 spec-presence enforcement (MCL-wide rule)

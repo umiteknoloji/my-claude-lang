@@ -4,7 +4,7 @@
 
 Called automatically when Aşama 1 parameters are complete and confirmed.
 
-## NO FAST-PATH RULE (since v10.0.3) — hard-enforced
+## NO FAST-PATH RULE (since v10.0.3, audit-enforced since v10.0.4)
 
 Every Edit / Write / MultiEdit / NotebookEdit tool call requires a
 visible English 📋 Spec: block emitted in the same assistant turn,
@@ -12,12 +12,20 @@ BEFORE the tool call. There is no "too small" exception. Even
 follow-up tweaks ("change button text", "remove this prop") need a
 brief spec describing the change.
 
-`hooks/mcl-pre-tool.sh` enforces this: if the current turn's
-assistant text contains no 📋 Spec: line before an Edit/Write tool
-call, the hook returns `decision:block` with the required-actions
-message. After 3 consecutive `spec-required-block` events in the
-same session the loop-breaker fails open, but every miss writes an
-audit entry visible in `/mcl-checkup`.
+**Enforcement is post-turn audit, not pre-tool block.** v10.0.3 tried
+hard-blocking in `mcl-pre-tool.sh` but Claude Code's transcript
+file does not flush in-progress assistant text before tool calls
+fire — pre-tool can't reliably see whether the model just emitted a
+spec. v10.0.4 moves the check to `mcl-stop.sh`'s
+`_mcl_spec_presence_audit`: at end of turn (transcript fully
+flushed), the helper scans the latest assistant message; if any
+Edit/Write tool_use block appears without a preceding 📋 Spec:
+text block, it writes `spec-required-warn` to audit.log. Visible
+via `/mcl-checkup`.
+
+The model is expected to comply with the rule based on
+STATIC_CONTEXT and this skill file alone. Audit-warn surfaces
+non-compliance retrospectively so the developer can correct.
 
 For brief follow-up specs, this minimal shape is accepted:
 
