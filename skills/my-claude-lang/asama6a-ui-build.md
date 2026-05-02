@@ -6,7 +6,7 @@
 
 Aşama 6a starts automatically when ALL of these hold after spec approval:
 
-- `current_phase = 4`
+- `current_phase = 7`
 - `spec_approved = true`
 - `ui_flow_active = true` (set by Aşama 1 summary-confirm)
 - `ui_reviewed = false`

@@ -7,6 +7,47 @@
 
 ## [Unreleased]
 
+## [10.0.1] - 2026-05-02
+
+### UI flow remap miss + auto-run + 6b AskUserQuestion strengthened
+
+Real-use feedback: model wrote UI files but did NOT auto-run the dev
+server, did NOT auto-open the browser, did NOT call the Aşama 6b
+AskUserQuestion ("did you like it?"). Three causes:
+
+1. **Numbering remap miss** — STATIC_CONTEXT `ui-flow-discipline`
+   said *"Aşama 7 MUST split into 4a/4b/4c"* (still legacy). The
+   `UI_FLOW_NOTICE` advisory injected on every turn said the same.
+   Skill files `asama6a-ui-build.md` and `asama6c-backend.md` had
+   `current_phase = 4` (legacy EXECUTE = old Phase 4). All carried
+   stale numbering from the v9.0.0 mass-sed pass.
+2. **Auto-run + 6b ASKQ underweighted** — instructions buried in
+   one short sentence ("Auto-open the browser. STOP. ... present
+   AskUserQuestion"). With v10.0.0 advisory mode, no hook enforces
+   the sequence; the model treated it as suggestion.
+3. **Imperative weakened** — original phrasing was passive
+   ("Provide the dev-server run command when done"). Real-use
+   showed model interpreted "provide" as "type out the command in
+   prose for the developer to copy" rather than "execute it".
+
+#### Fixes
+
+- `hooks/mcl-activate.sh` STATIC_CONTEXT `ui-flow-discipline` rule
+  rewritten with REQUIRED ACTIONS list (write configs FIRST → write
+  components → npm install → run_in_background dev server → sleep
+  3s → `open`/`xdg-open` browser → emit localized URL prose →
+  STOP). Numbering migrated to 6a/6b/6c. Aşama 6b AskUserQuestion
+  shape spelled out (prefix, options, approve label).
+- `hooks/mcl-activate.sh` `UI_FLOW_NOTICE` (per-turn advisory)
+  rewritten with the same REQUIRED ACTIONS sequence. Numbering
+  migrated to 6a/6b/6c.
+- `skills/my-claude-lang/asama6a-ui-build.md` entry condition
+  `current_phase = 4` → `7`.
+- `skills/my-claude-lang/asama6c-backend.md` entry condition
+  `current_phase = 4` → `7`.
+
+68/68 tests pass.
+
 ## [10.0.0] - 2026-05-02
 
 ### BREAKING — All MCL tool blocks removed (advisory mode)

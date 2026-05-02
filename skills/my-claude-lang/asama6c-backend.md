@@ -6,7 +6,7 @@
 
 Aşama 6c starts automatically when:
 
-- `current_phase = 4`
+- `current_phase = 7`
 - `spec_approved = true`
 - `ui_flow_active = true`
 - `ui_reviewed = true` (set by Aşama 6b approve intent)
