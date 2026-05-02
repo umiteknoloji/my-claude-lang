@@ -7,6 +7,114 @@
 
 ## [Unreleased]
 
+## [10.1.6] - 2026-05-02
+
+### Audit-driven phase progression — full coverage + skip-detection
+
+Continuation of the v10.1.5 PILOT (Aşama 8 + 9). v10.1.6 extends the
+classifier-independent fallback to ALL persisted/transient phases AND
+adds Layer 3 skip-detection that surfaces missing emits as audit
+warnings. Closes the herta-type "frozen at phase 4" scenario observed
+under v10.1.4: state machine no longer depends solely on askq
+classifier intent recognition.
+
+#### Implementation
+
+**`hooks/mcl-stop.sh`** — five new scanners + one skip-detector:
+
+- `_mcl_precision_audit_emitted` — scans for the existing
+  `precision-audit asama2` audit (mandated by skills/asama2-precision-
+  audit.md). Sets `precision_audit_done=true` when found in current
+  session. Previously the field was reset to false on restart but
+  NEVER set to true — the field was effectively dead. Emits
+  `asama-2-progression-from-emit` audit + `phase_transition 1 2`
+  trace.
+- Aşama 4 progression — `_mcl_asama_4_complete_emitted` + force-
+  progression of `spec_approved=true`, `current_phase=7`,
+  `phase_name=EXECUTE`. Emits `asama-4-progression-from-emit`
+  audit + `phase_transition 4 7` trace.
+- `_mcl_audit_emitted_in_session` (generic helper) — scans audit.log
+  for `<event>` in current session with optional idempotency marker
+  to prevent duplicate progression writes when Stop fires multiple
+  times.
+- Aşama 10 — explicit `asama-10-complete` emit detection. Emits
+  `asama-10-progression-from-emit` + `phase_transition 10 11` trace.
+- Aşama 11 — explicit `asama-11-complete` emit detection. Emits
+  `asama-11-progression-from-emit` + `phase_transition 11 12` trace.
+- Aşama 12 — reuses existing `localize-report asama12` audit
+  (mandated by skills/asama12-translate.md). Emits
+  `asama-12-progression-from-emit` + `phase_transition 12 done`
+  trace.
+- `_mcl_skip_detection` (Layer 3) — when `tdd-prod-write` audit
+  events are present in current session but the corresponding
+  `asama-{4,8,9}-complete` emit is missing, write
+  `asama-N-emit-missing | stop | skip-detect prod-write-without-emit`
+  audit + `phase_emit_missing N` trace. Pure visibility, no block,
+  no decision change. Idempotent — re-runs skip phases already
+  flagged.
+
+**Skill instructions added to:**
+- `skills/my-claude-lang/asama4-spec.md` — emit `asama-4-complete`
+  with `spec_hash=<H> approver=user` after AskUserQuestion approve
+  tool_result and BEFORE writing any Aşama 7 code.
+- `skills/my-claude-lang/asama10-impact-review.md` — emit
+  `asama-10-complete` with `impacts=N resolved=R` at end of impact
+  review (or when omitted because no impacts surfaced).
+- `skills/my-claude-lang/asama11-verify-report.md` — emit
+  `asama-11-complete` with `covered=N must_test=K trace_lines=L`
+  after all three Verification Report sections are written.
+
+**No skill changes for Aşama 2 / 12** — both already mandate
+existing audits (`precision-audit`, `localize-report`) that v10.1.6
+reuses as completion markers.
+
+#### Why this is the root-cause fix (not just a patch)
+
+The herta investigation surfaced the architectural root cause: phase
+progression was OPTIMISTIC. State writes only occurred when the
+askq-classifier detected a specific intent in transcript text. Any
+classifier coverage gap (off-language wording, dropped prefix,
+free-form text instead of AskUserQuestion option choice) silently
+froze state at phase 4 even when the model proceeded behaviorally.
+
+Three layers of fix in v10.1.5/v10.1.6:
+
+- **Layer 1 (skill behavior):** every phase emits an explicit
+  `asama-N-complete` Bash audit at end of run.
+- **Layer 2 (hook scanner):** Stop hook scans audit.log per session
+  and force-progresses state independently of classifier output.
+- **Layer 3 (skip-detection):** when activity signals (tdd-prod-write)
+  appear without the matching emit, hook writes
+  `asama-N-emit-missing` so the bypass is visible retroactively in
+  /mcl-checkup.
+
+Layers 1+2 ensure progression DOES happen when the model complies.
+Layer 3 ensures non-compliance is VISIBLE so the developer knows when
+the contract was bypassed. Together they close the herta-type freeze
+without resorting to brittle classifier improvements.
+
+#### Combined v10.1.0–v10.1.6 effect
+
+- v10.1.0: Aşama 8/9 hard-enforced (no fast-path skip)
+- v10.1.1: Stack-aware security MUST checklist
+- v10.1.2: M/H findings must-resolve invariant
+- v10.1.3: Aşama 7 title fix (test-first emphasis)
+- v10.1.4: TDD compliance ratio audit
+- v10.1.5: Audit-driven progression — Aşama 8 + 9 (PILOT)
+- **v10.1.6: Audit-driven progression — full coverage + Layer 3 skip-detection (this release)**
+
+#### Tests
+
+154 passing (24 new across 3 files):
+- `test-v10-1-6-asama-4-progression.sh` — 8 tests (emit detection +
+  state side effects + skill contract)
+- `test-v10-1-6-phase-progressions.sh` — 8 tests (precision-audit /
+  asama-10 / idempotency / asama-12 / hook + skill contracts)
+- `test-v10-1-6-skip-detection.sh` — 8 tests (all-missing / partial /
+  all-present / no-code-no-flag / idempotent / hook contract)
+
+Banner: MCL 10.1.5 → MCL 10.1.6.
+
 ## [10.1.5] - 2026-05-02
 
 ### Audit-driven phase progression (PILOT — Aşama 8 + 9)

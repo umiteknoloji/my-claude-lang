@@ -169,4 +169,22 @@ check this next week" items. Risks cannot.
 For Aşama 10 anti-patterns, see `my-claude-lang/anti-patterns.md` —
 anti-patterns live in a single file to avoid drift.
 
+## Audit Emit on Completion (since v10.1.6)
+
+When all impacts are resolved (or Aşama 10 is omitted because no real
+impacts surfaced), BEFORE handing off to Aşama 11, emit:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-10-complete mcl-stop "impacts=N resolved=R"'
+```
+
+Where N is the count of impacts surfaced (0 when omitted) and R is
+the count of resolved decisions (apply / skip / rule-capture).
+
+Aşama 10 is a TRANSIENT phase (no persisted state field). The emit
+serves trace.log completeness so the developer can prove the impact
+review ran end-to-end. Stop hook scans audit.log and writes
+`phase_transition 10 11` to trace.log.
+
 </mcl_phase>

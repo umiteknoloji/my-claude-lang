@@ -167,4 +167,36 @@ When the spec is visible:
 All code in Aşama 7 must satisfy the spec. If implementation reveals
 the spec is incomplete, return to Aşama 4 and update — do not improvise.
 
+## Audit Emit on Approval (since v10.1.6)
+
+After AskUserQuestion returns an approve-family tool_result for the
+spec approval (selected option matches the approve label in the
+developer's detected language), AND BEFORE writing any Aşama 7 code,
+emit the completion audit via Bash:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-4-complete mcl-stop "spec_hash=<H> approver=user"'
+```
+
+Where `<H>` is the first 12 chars of the SHA256 of the approved spec
+body (same value already stored as `spec_hash` in state.json — useful
+for the audit trail to correlate emit-time with approval-time).
+
+**Why mandatory:** The Stop hook's askq classifier can miss the
+approval intent (off-language wording, dropped prefix, free-form text
+instead of an AskUserQuestion option choice). When that happens,
+`spec_approved` stays `false` and `current_phase` stays `4` even
+though the model proceeds to Aşama 7 behaviorally — this is the
+herta-type freeze (v10.1.4 deployment, May 2026). An explicit audit
+emit is classifier-independent: Stop hook scans audit.log and
+force-progresses `spec_approved=true`, `current_phase=7`,
+`phase_name=EXECUTE`. Audit + trace gain a
+`asama-4-progression-from-emit` record so the bypass is visible.
+
+Fires ONCE per spec approval. If the developer later requests a
+revision (revise option), the model re-emits the spec; on re-approval,
+emit `asama-4-complete` again — Stop hook treats the second emit as a
+no-op when current_phase is already 7.
+
 </mcl_phase>

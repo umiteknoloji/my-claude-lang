@@ -322,4 +322,25 @@ When code review, test results, or completion reports come back
 4. After presenting results, ask: "Do you understand what this means? (yes / no)"
    If "no" → re-explain differently
 
+## Audit Emit on Completion (since v10.1.6)
+
+After all three Verification Report sections are emitted (Spec
+Coverage, MUST-test phrase, Process Trace) and BEFORE proceeding to
+Aşama 12 (Localized Translation), emit:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-11-complete mcl-stop "covered=N must_test=K trace_lines=L"'
+```
+
+Where:
+- N: rows in the Spec Coverage table (one per MUST/SHOULD)
+- K: items in the !!! YOU MUST TEST THESE !!! section (0 if omitted)
+- L: lines rendered from trace.log
+
+Aşama 11 is a TRANSIENT phase (no persisted state field). The emit
+serves trace.log completeness so the developer can prove the
+verification report ran. Stop hook scans audit.log and writes
+`phase_transition 11 12` to trace.log.
+
 </mcl_phase>

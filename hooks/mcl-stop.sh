@@ -787,6 +787,104 @@ if [ "${_TDD_TOTAL:-0}" -gt 0 ]; then
   mcl_state_set tdd_compliance_score "${_TDD_SCORE:-0}" >/dev/null 2>&1 || true
 fi
 
+# --- Audit-driven Aşama 1→2 progression (since v10.1.6) ---
+# When the model emits the existing `precision-audit asama2` audit
+# (mandated by skills/asama2-precision-audit.md), set
+# precision_audit_done=true. Previously this state field was reset
+# to false on restart but never set to true — the field was dead.
+# Reuses the existing audit name (no new emit instruction needed).
+_mcl_precision_audit_emitted() {
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo 0; return; fi
+  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo 0
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+hit = 0
+try:
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        if "| precision-audit |" not in line:
+            continue
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        hit = 1
+        break
+except Exception:
+    pass
+print(hit)
+PYEOF
+}
+
+_PA_EMITTED="$(_mcl_precision_audit_emitted 2>/dev/null || echo 0)"
+if [ "${_PA_EMITTED:-0}" = "1" ]; then
+  _PA_DONE="$(mcl_state_get precision_audit_done 2>/dev/null)"
+  if [ "$_PA_DONE" != "true" ]; then
+    mcl_state_set precision_audit_done true >/dev/null 2>&1 || true
+    mcl_audit_log "asama-2-progression-from-emit" "stop" "prev=${_PA_DONE:-null}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 1 2
+  fi
+fi
+
+# --- Audit-driven Aşama 4 progression (since v10.1.6) ---
+# When the model emits `asama-4-complete` after AskUserQuestion returns
+# an approve-family tool_result for spec approval, force-progress
+# `spec_approved=true` and `current_phase=7`. Catches askq classifier
+# coverage gaps that left the herta project frozen at phase 4 even
+# though the model proceeded to Aşama 7 code-writing behaviorally.
+# State machine becomes resilient to classifier intent-detection misses.
+_mcl_asama_4_complete_emitted() {
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo 0; return; fi
+  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo 0
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+hit = 0
+try:
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        if "| asama-4-complete |" not in line:
+            continue
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        hit = 1
+        break
+except Exception:
+    pass
+print(hit)
+PYEOF
+}
+
+_A4_EMITTED="$(_mcl_asama_4_complete_emitted 2>/dev/null || echo 0)"
+if [ "${_A4_EMITTED:-0}" = "1" ]; then
+  _A4_SA="$(mcl_state_get spec_approved 2>/dev/null)"
+  _A4_PH="$(mcl_state_get current_phase 2>/dev/null)"
+  if [ "$_A4_SA" != "true" ] || [ "$_A4_PH" != "7" ]; then
+    mcl_state_set spec_approved true >/dev/null 2>&1 || true
+    mcl_state_set current_phase 7 >/dev/null 2>&1 || true
+    mcl_state_set phase_name '"EXECUTE"' >/dev/null 2>&1 || true
+    mcl_audit_log "asama-4-progression-from-emit" "stop" "prev_approved=${_A4_SA:-null} prev_phase=${_A4_PH:-null}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 4 7
+  fi
+fi
+
 # --- Audit-driven Aşama 8 progression (since v10.1.5, PILOT) ---
 # When the model emits an explicit `asama-8-complete` audit at the end
 # of risk review, force-progress `risk_review_state` to `complete` even
@@ -882,6 +980,130 @@ if [ "${_A9_EMITTED:-0}" = "1" ]; then
     mcl_audit_log "asama-9-progression-from-emit" "stop" "prev=${_A9_CUR:-null}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 9 10
   fi
+fi
+
+# --- Audit-driven Aşama 10/11/12 transient-phase trace (since v10.1.6) ---
+# These phases are transient (no persisted state field). Each emits a
+# completion audit so trace.log reflects the full pipeline run.
+# Aşama 12 reuses the existing `localize-report asama12` audit
+# (mandated by skills/asama12-translate.md) — no new emit needed.
+# Idempotent: re-runs of Stop in same session skip if progression
+# already traced.
+_mcl_audit_emitted_in_session() {
+  # $1 = event name (audit middle field), $2 = optional skip if this
+  # progression-marker name already present (idempotency).
+  local event_name="$1"
+  local idem_marker="${2:-}"
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo 0; return; fi
+  python3 - "$audit_file" "$trace_file" "$event_name" "$idem_marker" 2>/dev/null <<'PYEOF' || echo 0
+import os, sys
+audit_path, trace_path, event_name, idem = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+emitted = False
+already = False
+try:
+    needle_emit = f"| {event_name} |"
+    needle_idem = f"| {idem} |" if idem else None
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        if needle_emit in line:
+            emitted = True
+        if needle_idem and needle_idem in line:
+            already = True
+except Exception:
+    pass
+print(1 if (emitted and not already) else 0)
+PYEOF
+}
+
+# Aşama 10 — explicit asama-10-complete emit
+_A10_FIRE="$(_mcl_audit_emitted_in_session "asama-10-complete" "asama-10-progression-from-emit" 2>/dev/null || echo 0)"
+if [ "${_A10_FIRE:-0}" = "1" ]; then
+  mcl_audit_log "asama-10-progression-from-emit" "stop" ""
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 10 11
+fi
+
+# Aşama 11 — explicit asama-11-complete emit
+_A11_FIRE="$(_mcl_audit_emitted_in_session "asama-11-complete" "asama-11-progression-from-emit" 2>/dev/null || echo 0)"
+if [ "${_A11_FIRE:-0}" = "1" ]; then
+  mcl_audit_log "asama-11-progression-from-emit" "stop" ""
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 11 12
+fi
+
+# Aşama 12 — reuses existing localize-report audit
+_A12_FIRE="$(_mcl_audit_emitted_in_session "localize-report" "asama-12-progression-from-emit" 2>/dev/null || echo 0)"
+if [ "${_A12_FIRE:-0}" = "1" ]; then
+  mcl_audit_log "asama-12-progression-from-emit" "stop" ""
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 12 done
+fi
+
+# --- Layer 3: Skip-detection (since v10.1.6) ---
+# When code-write activity occurred this session (tdd-prod-write
+# audit emitted by post-tool) but the corresponding asama-N-complete
+# emit is missing for phase N ∈ {4, 8, 9}, write `asama-N-emit-missing`
+# audit. Pure visibility — no block, no decision change. Surfaces in
+# /mcl-checkup so the developer can see when the model bypassed the
+# explicit phase-completion contract.
+_mcl_skip_detection() {
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo ""; return; fi
+  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo ""
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+prod_write = False
+emits = {"4": False, "8": False, "9": False}
+already = {"4": False, "8": False, "9": False}
+try:
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        if "| tdd-prod-write |" in line:
+            prod_write = True
+        for n in ("4", "8", "9"):
+            if f"| asama-{n}-complete |" in line:
+                emits[n] = True
+            if f"| asama-{n}-emit-missing |" in line:
+                already[n] = True
+except Exception:
+    pass
+# Only flag missing emits when there was actual code-write activity.
+# A no-code session (only Read/Grep) is not a violation.
+missing = []
+if prod_write:
+    for n in ("4", "8", "9"):
+        if not emits[n] and not already[n]:
+            missing.append(n)
+print(" ".join(missing))
+PYEOF
+}
+
+_MISSING_EMITS="$(_mcl_skip_detection 2>/dev/null || echo "")"
+if [ -n "$_MISSING_EMITS" ]; then
+  for _ph in $_MISSING_EMITS; do
+    mcl_audit_log "asama-${_ph}-emit-missing" "stop" "skip-detect prod-write-without-emit"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_emit_missing "$_ph"
+  done
 fi
 
 # --- MEDIUM/HIGH must-resolve invariant (since v10.1.2) ---
