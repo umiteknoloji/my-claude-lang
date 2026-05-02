@@ -7,6 +7,62 @@
 
 ## [Unreleased]
 
+## [10.0.0] - 2026-05-02
+
+### BREAKING — All MCL tool blocks removed (advisory mode)
+
+After repeated real-use friction (test10 prototype-backoffice session
+hit the same MCL LOCK loop 4× across v9.0.0 and v9.0.1 — even after
+classifier fallback, regex tolerance, and 3-fail loop-breakers landed),
+the developer ruled the contract too brittle for daily use and asked
+to remove every MCL-side tool lock.
+
+v10.0.0 makes MCL **advisory**:
+
+- `hooks/mcl-pre-tool.sh` — every `decision: "block"` is now
+  `decision: "approve"`, every `permissionDecision: "deny"` is now
+  `permissionDecision: "allow"`. Affected gates: plugin-gate,
+  TodoWrite Aşama 1-3, Task → phase dispatch, plan-critique
+  substance, ExitPlanMode plan-critique, Bash → state.json write,
+  secret-scan, UI-build sub-phase, pattern-scan-pending, scope-guard,
+  spec_approved gate.
+- `hooks/mcl-stop.sh` — every `decision: "block"` is now
+  `decision: "approve"`. Affected enforcements: precision-audit
+  (Aşama 2), phase-review-pending (Aşama 8), Aşama 11 verify-report
+  skip detection.
+- The hooks **still run** — state machine transitions, audit log
+  entries, trace events, JIT askq advance, partial-spec recovery,
+  /mcl-restart, /mcl-update, /mcl-finish, plugin orchestration —
+  everything that was advisory before remains. Only the **tool
+  blocking** is disabled.
+- Banner: `🌐 MCL 9.0.1` → `🌐 MCL 10.0.0`.
+
+### Trade-off (accepted)
+
+- **Lost:** the contract guarantee that the model cannot write code
+  without spec approval, cannot write code without precision audit,
+  cannot ship without risk review, etc. Model behavior priors in
+  STATIC_CONTEXT and skill files still teach the pipeline, but no
+  hook prevents the model from skipping any step.
+- **Gained:** zero MCL-LOCK loop risk. The framework is now purely
+  documentary — it shapes model output through context injection
+  but never blocks tool execution.
+
+### Migration notes
+
+Existing audit log entries with `... | block-* | ...` /
+`... | *-block | ...` / `... | deny-tool | ...` event names remain
+in `.mcl/audit.log` as historical record. New audit entries from
+v10.0.0 use the same names — they record what MCL **would have
+blocked** under the v9.x contract, useful for retrospective
+diagnostics via `/mcl-checkup` even though no actual block fires.
+
+### Tests
+
+68/68 still passing. No test relied on tool-blocking behavior; all
+tests exercise state transitions and audit emission, which v10.0.0
+preserves.
+
 ## [9.0.1] - 2026-05-02
 
 ### Real-use bug fixes — JIT advance, scanner classifier, loop-breakers
