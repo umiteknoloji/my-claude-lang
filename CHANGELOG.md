@@ -7,6 +7,76 @@
 
 ## [Unreleased]
 
+## [10.1.9] - 2026-05-03
+
+### Inline-spec askq fallback hash — classifier coverage fix
+
+Driven by a real-world v10.1.8 deployment where a model embedded
+spec content directly inside the AskUserQuestion question body
+(bullet-form parameters) instead of emitting a preceding `📋 Spec:`
+block. The classifier correctly identified spec-approve intent (the
+`spec onay` token matched the question body) but `_compute_spec_hash`
+returned empty because no `📋 Spec:` line was found in plain assistant
+text. The JIT askq advance condition `-n "$JIT_SPEC_HASH"` then
+refused to fire, blocking writes despite correct intent detection —
+classic developer friction: "I approved, why is it still blocked?"
+
+#### Implementation
+
+**`hooks/lib/mcl-askq-scanner.py`** — added inline-spec fallback at
+the end of `scan()`:
+
+```python
+if intent == "spec-approve" and not spec_hash and last_question_body:
+    spec_hash = "inline-" + hashlib.sha256(
+        last_question_body.encode("utf-8")
+    ).hexdigest()[:12]
+```
+
+The synthetic hash is prefixed with `inline-` so downstream drift
+detection can distinguish it from block-derived hashes. Only fires
+when intent is already classified as `spec-approve` (so generic
+non-spec askq's don't accidentally promote).
+
+#### Why this is safe
+
+- **No false positives**: fallback gated by `intent == "spec-approve"`.
+  Non-spec askq's (color picker, summary confirm, UI review) don't
+  get a synthetic hash.
+- **Drift visibility preserved**: `inline-` prefix marks synthetic.
+  Future drift detection can compare prefix and warn if a fresh
+  block-derived spec emit doesn't match the inline-approved version.
+- **Audit trail intact**: state.spec_hash records what was approved,
+  even if the format was non-canonical.
+- **No behavioral changes for the canonical path**: when model emits
+  `📋 Spec:` block normally, `_compute_spec_hash` returns the
+  block-derived hash and the fallback is skipped.
+
+#### Combined v10.1.0–v10.1.9 effect
+
+- v10.1.0–v10.1.4: enforcement primitives + checklists + audit trails
+- v10.1.5–v10.1.6: audit-driven phase progression (Layer 1/2/3)
+- v10.1.7: spec-approval real block + asama-4-complete escape hatch
+- v10.1.8: Aşama 8/9 skip-block (Layer 3 → hard enforcement)
+- **v10.1.9: classifier inline-spec fallback (this release)**
+
+The protective chain now handles the most common real-world friction
+pattern: model approves the right thing, classifier identifies the
+right intent, but spec format was non-canonical → user no longer
+locked out.
+
+#### Tests
+
+245 passing (+11 in `test-v10-1-9-inline-spec-fallback.sh`):
+- Spec block present → block-derived hash (no fallback, existing
+  behavior preserved)
+- Inline-spec askq → `inline-<12-char-sha>` synthetic hash
+- Non-spec, non-approve askq → no hash (no false positive)
+- summary-confirm intent → no hash (fallback gated to spec-approve)
+- Hook contract: scanner has fallback comment + uses inline- prefix
+
+Banner: MCL 10.1.8 → MCL 10.1.9.
+
 ## [10.1.8] - 2026-05-03
 
 ### Aşama 8/9 skip-block — soft visibility → hard enforcement

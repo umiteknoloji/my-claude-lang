@@ -428,6 +428,7 @@ def scan(path, min_ts_epoch=0.0):
 
     intent = ""
     selected = ""
+    last_question_body = ""
     has_spec = last_spec_text is not None
     for tid in reversed(order):
         use = tool_uses.get(tid)
@@ -439,7 +440,9 @@ def scan(path, min_ts_epoch=0.0):
         # in _classify_intent still requires an approve signal + spec
         # context to promote, so this stays safe.
         m = PREFIX_RE.match(use["question"].strip())
-        body_lower = (m.group(1) if m else use["question"]).lower()
+        question_body = m.group(1) if m else use["question"]
+        body_lower = question_body.lower()
+        last_question_body = question_body
         res_norm = res.strip()
         # Selected option resolution (must come before classification so
         # selected-text approve signal feeds the fallback heuristic).
@@ -457,6 +460,21 @@ def scan(path, min_ts_epoch=0.0):
         break
 
     spec_hash = _compute_spec_hash(last_spec_text)
+
+    # Inline-spec fallback (since v10.1.9). When the classifier reports
+    # spec-approve intent but no `\U0001F4CB Spec:` block was found in
+    # plain assistant text, the model likely embedded spec content
+    # directly inside the askq question body (real-world pattern seen
+    # in v10.1.8 deployment). Without a hash, JIT askq advance refuses
+    # to fire (requires non-empty spec_hash) → user lockout despite
+    # correct intent classification. Fall back to hashing the askq
+    # question body itself, prefixed with "inline-" so downstream drift
+    # detection can distinguish synthetic from block-derived hashes.
+    if intent == "spec-approve" and not spec_hash and last_question_body:
+        spec_hash = "inline-" + hashlib.sha256(
+            last_question_body.encode("utf-8")
+        ).hexdigest()[:12]
+
     return {"intent": intent, "selected": selected, "spec_hash": spec_hash}
 
 
