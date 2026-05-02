@@ -7,6 +7,54 @@
 
 ## [Unreleased]
 
+## [10.0.2] - 2026-05-02
+
+### Aşama 6b hard enforcement (narrow re-introduction)
+
+Real-use feedback (test10 backoffice prototype): even with v10.0.1's
+strengthened STATIC_CONTEXT, the model wrote the entire stack
+(frontend + backend + Prisma + Auth.js) in one turn, started the dev
+server, ran curl checks, emitted Aşama 11 verify report — and never
+asked the developer "do you approve the design?". v10.0.0 advisory
+mode + v10.0.1 imperative prompt strengthening were not enough.
+
+The strictest narrow option (A in the developer's last decision):
+hook-level enforcement on Aşama 6b only. The model literally cannot
+end a turn that wrote UI files in 6a without emitting an
+AskUserQuestion this turn. Loop-breaker after 3 strikes preserves
+the v9.0.1 "fail-open instead of trap" guarantee.
+
+#### Implementation
+
+- `hooks/mcl-stop.sh` — new check after the active-phase regex (which
+  was also remapped from legacy `(4|4a|4b|4c|3.5)` to v9 numbering
+  `(5|6a|6b|6c|7)`):
+  - When `_PR_ACTIVE_PHASE = "6a"` AND `_PR_CODE = "true"` AND
+    `_PR_ASKUQ != "true"`:
+    - Increment `ui-review-skip-block` audit count for this session.
+    - If count < 3 → return `decision: block` with localized reason
+      including the required actions: dev server start, browser
+      auto-open, AskUserQuestion shape (prefix, options, bare-verb
+      approve label), STOP rule.
+    - If count ≥ 3 → fail-open: write `ui-review-loop-broken` audit,
+      force `ui_reviewed=true` and `ui_sub_phase=BACKEND` so
+      downstream phases unblock.
+
+#### Why narrow
+
+This is the ONLY hard-block reintroduced after v10.0.0 advisory mode.
+All other locks (plugin-gate, spec_approved, precision-audit,
+phase-review-pending, scope-guard, etc.) remain advisory. The 6b
+enforcement is the most one-step-recoverable enforcement in MCL —
+the model only needs to call AskUserQuestion ONCE; it cannot fail
+multiple times for unrelated reasons. Narrow scope keeps the test10
+loop risk minimal.
+
+#### Tests
+
+74 passing (4 new test-v10-asama6b-enforcement assertions covering
+loop-breaker counter behavior + hook source contract checks).
+
 ## [10.0.1] - 2026-05-02
 
 ### UI flow remap miss + auto-run + 6b AskUserQuestion strengthened

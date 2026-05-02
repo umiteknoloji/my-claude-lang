@@ -535,13 +535,36 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
   _PR_ACTIVE_PHASE="$(mcl_get_active_phase 2>/dev/null)"
   _PR_REVIEW_STATE="$(mcl_state_get risk_review_state 2>/dev/null)"
 
-  # Aşama 7+ means approved and executing (4, 4a, 4b, 4c, 4.5, 3.5 all qualify)
-  if echo "$_PR_ACTIVE_PHASE" | grep -qE '^(4|4a|4b|4c|3\.5)$'; then
+  # Aşama 5/6a/6b/6c/7 means approved and executing (pattern + UI sub-phases + code).
+  if echo "$_PR_ACTIVE_PHASE" | grep -qE '^(5|6a|6b|6c|7)$'; then
     _PR_JSON="$(python3 "$_PR_GUARD" "$TRANSCRIPT_PATH" 2>/dev/null)"
     _PR_CODE="$(printf '%s' "$_PR_JSON" | python3 -c \
       'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("code_written") else "false")' 2>/dev/null)"
     _PR_ASKUQ="$(printf '%s' "$_PR_JSON" | python3 -c \
       'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("askuq_present") else "false")' 2>/dev/null)"
+
+    # --- Aşama 6b enforcement (since v10.0.2) ---
+    # When in 6a (BUILD_UI): if model wrote UI but did NOT emit
+    # AskUserQuestion this turn, block — designer approval is required
+    # before the turn can end. Loop-breaker after 3 strikes.
+    if [ "$_PR_ACTIVE_PHASE" = "6a" ] && [ "$_PR_CODE" = "true" ] && [ "$_PR_ASKUQ" != "true" ]; then
+      _UR_BLOCK_COUNT="$(_mcl_loop_breaker_count "ui-review-skip-block" 2>/dev/null || echo 0)"
+      if [ "${_UR_BLOCK_COUNT:-0}" -ge 3 ]; then
+        mcl_audit_log "ui-review-loop-broken" "stop" "count=${_UR_BLOCK_COUNT} fail-open"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_review_loop_broken "${_UR_BLOCK_COUNT}"
+        # Force-mark UI as reviewed so downstream phases can proceed.
+        mcl_state_set ui_reviewed true >/dev/null 2>&1 || true
+        mcl_state_set ui_sub_phase '"BACKEND"' >/dev/null 2>&1 || true
+      else
+        mcl_audit_log "ui-review-skip-block" "stop" "count=${_UR_BLOCK_COUNT}"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_review_skip_block "${_UR_BLOCK_COUNT}"
+        printf '%s\n' "{
+  \"decision\": \"block\",
+  \"reason\": \"⚠️ MCL AŞAMA 6b GEREKLİ — UI dosyaları yazıldı ama tasarım onayı sorulmadı.\n\nBu turda eksiksiz şu adımları yap:\n1. (Yapmadıysan) Bash ile dev server: ${_BT}npm install${_BT} → ${_BT}npm run dev${_BT} (run_in_background:true) → sleep 3 → ${_BT}open <url>${_BT} (macOS) / ${_BT}xdg-open <url>${_BT} (Linux). Geliştirici UI'ı tarayıcıda görmeden onay veremez.\n2. AskUserQuestion çağır — prefix ${_BT}MCL ${INSTALLED_VERSION} | ${_BT}, soru (geliştiricinin dilinde): 'Tasarımı onaylıyor musun?'. Options: 'Onayla' / 'Revize' / 'İptal'. Approve label BARE VERB ('Onayla' — açıklama yok; açıklama description'da).\n3. STOP. AskUserQuestion sonrası response BİTER. Geliştiricinin tool_result cevabını bekle.\n\nLoop-breaker: 3 üst üste skip → fail-open (ui_reviewed=true zorla set edilir, downstream açılır). Şu anki sayı: ${_UR_BLOCK_COUNT}/3.\"
+}"
+        exit 0
+      fi
+    fi
 
     if [ "$_PR_ASKUQ" = "true" ]; then
       # Aşama 8/10 dialog is running this turn — transition to "running"
