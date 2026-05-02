@@ -7,6 +7,63 @@
 
 ## [Unreleased]
 
+## [10.1.1] - 2026-05-02
+
+### Stack-aware security MUST checklist (CSP, JWT, RBAC, audit, etc.)
+
+Real-use audit identified 11 specific OWASP gaps. v10.1.0 added
+hard-enforcement for Aşama 8/9 phases; v10.1.1 fills in the
+content — the explicit checklist that those phases scan against.
+
+#### Aşama 8 — `asama8-risk-review.md` §2b Stack-Aware Security MUST Checklist
+
+5 stack-aware MUST groups, each entry tagged HIGH or MEDIUM:
+
+- **Backend** (express/fastify/nest/koa/next-api/django/rails/fastapi):
+  helmet, rate-limit, bcrypt cost ≥ 12, JWT lifecycle (revocation +
+  short-lived access + refresh rotation), cookie flags
+  (httpOnly+Secure+SameSite=strict), CORS whitelist, audit log,
+  logging hygiene, parameterized queries.
+- **Frontend** (react-frontend/vue-frontend/svelte-frontend/html-static):
+  Content-Security-Policy (no unsafe-inline/eval), HSTS,
+  X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
+  Permissions-Policy, Subresource Integrity, Trusted Types, token
+  storage NEVER in localStorage, CSRF tokens, raw-HTML insertion
+  API review.
+- **Auth & Identity:** password schema (zod min(8) + complexity OR
+  zxcvbn≥3), default credentials warning, RBAC matrix even for
+  single-role, IDOR protection, session fixation defense,
+  brute-force lockout.
+- **Data & Secrets:** `.env*` in gitignore, weak `JWT_SECRET`
+  placeholder detection, file-upload validation.
+- **Dependency hygiene:** `npm audit --audit-level=moderate` clean,
+  no abandoned/unmaintained packages.
+
+#### Aşama 9.4 — `asama9-quality-tests.md` Security sub-step rewrite
+
+- **Automatic tooling dispatch** at start of 9.4 (Bash invocation,
+  not model behavior prior):
+  - `bash mcl-semgrep.sh scan <touched-files>`
+  - `npm audit --audit-level=moderate --omit=dev`
+  - Stack-specific security linters (eslint-plugin-security, bandit,
+    gosec, brakeman)
+- **Per-finding disposition:**
+  - HIGH/MEDIUM with unambiguous autofix → apply silently +
+    `state.open_severity_findings.append({status:fixed})`
+  - HIGH/MEDIUM ambiguous → **ESCALATE to Aşama 8 dialog** (no
+    longer skip — prepares v10.1.2 must-resolve invariant)
+  - LOW → suppress
+- **Mirror of §2b checklist** — every MUST verified in code; absent
+  → `open_severity_findings` entry + escalation.
+
+#### Trade-off
+
+Skill content is heavier (richer checklist) but no behavioral
+breakage: existing 86 tests pass. Aşama 9.4 ambiguous-skip path is
+gone (replaced with escalation), aligning with v10.1.2 invariant.
+
+Banner: MCL 10.1.0 → MCL 10.1.1.
+
 ## [10.1.0] - 2026-05-02
 
 ### Aşama 8 + 9 hard-enforcement (real-use security gap fix)

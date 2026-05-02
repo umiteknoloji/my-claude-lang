@@ -91,6 +91,84 @@ out but the code shape suggests. Categories:
 
 Each finding becomes one risk-dialog turn (one AskUserQuestion).
 
+### 2b. Stack-Aware Security MUST Checklist (since v10.1.1)
+
+Walk the following MUST items based on detected stack tags
+(`mcl-stack-detect.sh`). Each absent MUST surfaces as a risk-dialog
+turn with severity tag. ALL HIGH and MEDIUM findings here MUST be
+resolved before Aşama 9 can complete (see "MEDIUM/HIGH must-resolve
+invariant" in v10.1.2).
+
+**Backend MUSTs (express / fastify / nest / koa / next-api / django / rails / fastapi):**
+- helmet (or framework equivalent) → CSP, HSTS, X-Frame-Options,
+  X-Content-Type-Options, Referrer-Policy, Permissions-Policy [HIGH]
+- Login/auth endpoint rate-limit + lockout
+  (`express-rate-limit`, `@nestjs/throttler`, etc.) [HIGH]
+- bcrypt cost ≥ 12 (argon2id preferred for new code) [MEDIUM]
+- JWT revocation list / `jti`, short-lived access (≤15min) +
+  refresh rotation [HIGH]
+- Cookie-based auth: `httpOnly` + `Secure` + `SameSite=strict` [HIGH]
+- CORS explicit whitelist (no `*`, no broad regex in prod) [MEDIUM]
+- Audit log on critical actions (login attempts, mutations,
+  permission changes) [MEDIUM]
+- Logging hygiene: no PII/secrets/tokens in logs; structured
+  logger (pino/winston/structlog) over console [MEDIUM]
+- Parameterized queries (Prisma/SQLAlchemy/TypeORM by default;
+  raw SQL flagged) [HIGH]
+
+**Frontend MUSTs (react-frontend / vue-frontend / svelte-frontend / html-static):**
+- Content-Security-Policy explicit policy, NO `unsafe-inline`, NO
+  `unsafe-eval`, nonce-based for inline scripts [HIGH]
+- Strict-Transport-Security: `max-age ≥ 31536000; includeSubDomains;
+  preload` (when HTTPS deployed) [HIGH]
+- X-Frame-Options: `DENY` (or CSP `frame-ancestors 'none'`) [HIGH]
+- X-Content-Type-Options: `nosniff` [MEDIUM]
+- Referrer-Policy: `strict-origin-when-cross-origin` or stricter [MEDIUM]
+- Permissions-Policy: deny camera/mic/geolocation by default
+  unless spec requires them [MEDIUM]
+- Subresource Integrity (SRI): `integrity` attribute on every
+  `<script src=//cdn>` and `<link href=//cdn>` [MEDIUM]
+- Trusted Types policy (script-injection strict control) [MEDIUM]
+- Token storage: NEVER `localStorage` / `sessionStorage`. Only
+  httpOnly + Secure + SameSite=strict cookie [HIGH]
+- CSRF token on state-mutating endpoints [HIGH]
+- Raw HTML insertion APIs (React `dangerouslySetInnerHTML`, Vue
+  `v-html`, Svelte raw HTML directive): every usage reviewed,
+  flagged if user-supplied content reaches them [HIGH]
+
+**Auth & Identity MUSTs:**
+- Password schema: zod `min(8)` + complexity (upper/lower/digit/
+  symbol) OR `zxcvbn` score ≥ 3 [HIGH]
+- Default credentials in seed: surface as Aşama 8 risk when seed
+  is committed AND values look common (admin/admin*, root/root*,
+  test/test*) [HIGH]
+- RBAC matrix explicit even when one role exists [MEDIUM]
+- IDOR protection: owner/tenant/role check before DB fetch/update/
+  delete on every resource endpoint [HIGH]
+- Session fixation defense: regenerate session id after login [MEDIUM]
+- Brute-force defense: account lockout after N failures (default 5)
+  within window (default 15 min) [HIGH]
+
+**Data & Secrets MUSTs:**
+- `.env` / `.env*.local` in `.gitignore` [HIGH]
+- Default secrets / weak `JWT_SECRET` placeholders in committed
+  files surface [HIGH]
+- File-upload endpoints: type/size/name validation, no path
+  traversal, no exec mime types [HIGH]
+
+**Dependency hygiene MUSTs:**
+- `npm audit --audit-level=moderate` (or pip/cargo/gem equivalent)
+  passing [HIGH]
+- No abandoned/unmaintained packages flagged for security-
+  sensitive surfaces [MEDIUM]
+
+For each absent MUST, surface as one Aşama 8 risk-dialog turn
+with explicit severity tag (HIGH/MEDIUM) so the developer's
+decision record is severity-aware. The MEDIUM/HIGH must-resolve
+invariant (v10.1.2) prevents Aşama 9 → 11 progression while ANY
+HIGH or MEDIUM finding is still `open` in
+`state.open_severity_findings`.
+
 ### 3. Brief-Aşama-1 Scope Drift (since 8.4.0, preserved in v9.0.0)
 
 Aşama 3 (UPGRADE-TRANSLATOR) transforms vague verbs into surgical

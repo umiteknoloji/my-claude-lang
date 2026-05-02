@@ -99,20 +99,61 @@ Auto-fix: convert N+1 to batch query when ORM supports it; add
 explicit bound to user-input loops; convert sync→async where the
 async equivalent is one-line.
 
-### 9.4 Security
+### 9.4 Security (since v10.1.1 — auto-tooling + must-resolve)
 
-Run Semgrep SAST scan (`bash ~/.claude/hooks/lib/mcl-semgrep.sh scan
-<files>`). For each finding:
+**Automatic tooling — invoked at start of 9.4 via Bash, NOT a model
+behavior prior:**
 
-- **HIGH/MEDIUM with unambiguous autofix** → apply silently.
-- **HIGH/MEDIUM ambiguous** → audit `aşama-9-4-ambiguous | rule=<id>
-  file=<f>:<l>`, skip (Aşama 8 should have surfaced).
+1. `bash ~/.claude/hooks/lib/mcl-semgrep.sh scan <touched-files>`
+2. `npm audit --audit-level=moderate --omit=dev` (Node projects;
+   pip-audit / cargo-audit / bundler-audit equivalent for other
+   stacks)
+3. Stack-specific linters with security plugins:
+   - eslint with `eslint-plugin-security` (JS/TS)
+   - bandit (Python)
+   - gosec (Go)
+   - brakeman (Ruby/Rails)
+
+Per-finding handling:
+
+- **HIGH/MEDIUM with unambiguous autofix** → apply silently via
+  Edit/MultiEdit. Record via `mcl_audit_log "asama-9-4-autofix"
+  "stop" "rule=<id> file=<f>:<l>"`. Append to
+  `state.open_severity_findings` with `status=fixed`.
+- **HIGH/MEDIUM ambiguous (no safe autofix)** → ESCALATE to Aşama 8
+  risk-dialog (NOT skip — v10.1.2 must-resolve invariant). Append
+  to `state.open_severity_findings` with `status=open` so the
+  Aşama 9 → 10/11 gate detects unresolved findings. The escalation
+  re-opens Aşama 8 (`risk_review_state="running"`) for the
+  developer to decide via AskUserQuestion (apply specific fix /
+  accept with rule-capture justification / cancel).
 - **LOW** → suppress entirely (too many false positives).
 
-Plus stack-specific checks:
-- Web: missing CSRF on state-mutating routes, unescaped output
-- DB: parameterized query enforcement
-- File I/O: path traversal guards
+**Stack-aware MUST checks (mirror of Aşama 8 §2b checklist):**
+
+For each MUST item that Aşama 8 §2b lists for the detected stack
+tags, verify implementation in code:
+
+- Backend MUSTs: helmet config / rate-limit / bcrypt cost /
+  JWT lifecycle / cookie flags / CORS whitelist / audit log /
+  logging hygiene / parameterized queries
+- Frontend MUSTs: CSP / HSTS / X-Frame-Options / X-Content-Type-
+  Options / Referrer-Policy / Permissions-Policy / SRI / Trusted
+  Types / token storage / CSRF / raw-HTML APIs
+- Auth MUSTs: password schema / default creds warning / RBAC /
+  IDOR / session fixation / brute-force lockout
+- Data MUSTs: `.gitignore` env files / weak secret detection /
+  upload validation
+- Dependency: `npm audit` clean
+
+For each absent or violating MUST → append to
+`state.open_severity_findings` with severity from the checklist.
+Same disposition rules as semgrep findings (autofix / escalate /
+suppress).
+
+Aşama 9.4 cannot mark itself complete (`asama-9-4-end` audit) until
+every MUST item has a verdict (fixed / accepted / not-applicable
+with documented reason).
 
 ### 9.5 Unit Tests
 
