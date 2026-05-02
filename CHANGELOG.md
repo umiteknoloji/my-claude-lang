@@ -7,6 +7,59 @@
 
 ## [Unreleased]
 
+## [10.1.0] - 2026-05-02
+
+### Aşama 8 + 9 hard-enforcement (real-use security gap fix)
+
+Real-use audit (developer's npm-audit + manual review of test10
+backoffice prototype): MCL produced code with multiple OWASP Top 10
+gaps (no rate-limit, localStorage tokens, JWT revocation missing,
+default admin creds, no helmet, weak password policy, bcrypt cost=10,
+no RBAC, no audit log, **no CSP**) that should have been caught by
+Aşama 8 risk dialog and Aşama 9 quality+tests pipeline. Neither phase
+ran. Cause: v10.0.0 advisory mode swapped Aşama 8's
+`phase-review-pending` block from `decision:block` to
+`decision:approve`, and Aşama 9 never had hook enforcement at all.
+
+#### Fixes
+
+1. **Aşama 8 block re-enabled** — `mcl-stop.sh` line 724:
+   `decision: "approve"` → `"block"`. Existing 3-strike loop-breaker
+   (`phase-review-loop-broken`) preserved.
+
+2. **Aşama 9 hard-block added** — new check in `mcl-stop.sh`:
+   when `risk_review_state="complete"` AND
+   `quality_review_state ≠ "complete"`, emit `decision:block` with
+   the 8-sub-step requirements list (9.1 code review, 9.2 simplify,
+   9.3 performance, 9.4 security with auto-semgrep + npm audit,
+   9.5 unit, 9.6 integration, 9.7 E2E, 9.8 load). Each sub-step must
+   write `asama-9-N-start` and `asama-9-N-end` audit entries (skip
+   detection control). 3-strike loop-breaker
+   (`quality-review-loop-broken`).
+
+3. **STATIC_CONTEXT no-fast-path constraint** — new
+   `<mcl_constraint name="asama-8-9-no-fast-path">`:
+   *"Once code has been written in Aşama 7 (or any UI sub-phase),
+   Aşama 8 AND Aşama 9 MUST both run. Skipping is impossible —
+   'task is small', 'prototype only', 'just a UI tweak', 'obvious
+   change' are NOT exceptions. Only when no code was written
+   (Read/Grep/Glob only) are they skipped."*
+
+#### Trade-off
+
+v10.0.0's advisory mode is partially walked back: now 3 hard-blocks
+total (Aşama 6b + 8 + 9). All three follow the same pattern:
+state-flag triggered (timing-safe), 3-strike loop-breaker fail-open
+(no infinite trap). Other gates (plugin-gate, secret-scan,
+spec-presence, scope-guard, etc.) remain advisory.
+
+#### Tests
+
+86 passing (6 new in `test-v10-1-asama8-9-enforcement.sh`: contract
+checks for both phases + STATIC_CONTEXT constraint + counter logic).
+
+Banner: MCL 10.0.4 → MCL 10.1.0.
+
 ## [10.0.4] - 2026-05-02
 
 ### Fix v10.0.3 timing bug — spec-presence enforcement moves to Stop hook audit

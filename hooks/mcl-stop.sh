@@ -721,12 +721,37 @@ PYEOF
       else
       # Return decision:block so Claude is forced to continue.
       printf '%s\n' "{
-  \"decision\": \"approve\",
+  \"decision\": \"block\",
   \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nAşama 7 code was written but Aşama 8 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Aşama 6c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Aşama 8 starts.\n\n(B) IF ALL Aşama 7 code is NOW complete:\n    Start Aşama 8 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Aşama 8 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Aşama 8 risks are resolved → run Aşama 10 Impact Review.\n    4. After Aşama 10 → run Aşama 11 Verification Report.\n\nAşama 8 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.\"
 }"
       exit 0
       fi
     fi
+  fi
+fi
+
+# --- Aşama 9 quality+tests hard-enforcement (since v10.1.0) ---
+# When Aşama 8 risk dialog completed (risk_review_state=complete) AND
+# Aşama 9 quality pipeline did NOT complete (quality_review_state ≠
+# complete) AND code was written this session, block. The 8 sequential
+# sub-steps (9.1-9.8) MUST run before Aşama 10 / Aşama 11 can fire.
+# Loop-breaker after 3 strikes preserves v9.0.1 fail-open guarantee.
+_QR_STATE="$(mcl_state_get quality_review_state 2>/dev/null)"
+_RR_STATE_FOR_QC="$(mcl_state_get risk_review_state 2>/dev/null)"
+if [ "$_RR_STATE_FOR_QC" = "complete" ] && [ "$_QR_STATE" != "complete" ]; then
+  _QR_BLOCK_COUNT="$(_mcl_loop_breaker_count "quality-review-pending" 2>/dev/null || echo 0)"
+  if [ "${_QR_BLOCK_COUNT:-0}" -ge 3 ]; then
+    mcl_audit_log "quality-review-loop-broken" "stop" "count=${_QR_BLOCK_COUNT} fail-open"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append quality_review_loop_broken "${_QR_BLOCK_COUNT}"
+    mcl_state_set quality_review_state '"complete"' >/dev/null 2>&1 || true
+  else
+    mcl_audit_log "quality-review-pending" "stop" "count=${_QR_BLOCK_COUNT} qstate=${_QR_STATE:-null}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append quality_review_pending "${_QR_BLOCK_COUNT}"
+    printf '%s\n' "{
+  \"decision\": \"block\",
+  \"reason\": \"⚠️ MCL AŞAMA 9 ENFORCEMENT — Aşama 8 risk review tamamlandı ama Aşama 9 (quality+tests pipeline) çalışmadı. 8 sıralı sub-step ZORUNLU: 9.1 Code Review → 9.2 Simplify → 9.3 Performance → 9.4 Security (otomatik semgrep + npm audit) → 9.5 Unit tests → 9.6 Integration tests → 9.7 E2E tests → 9.8 Load tests. Her sub-step için audit entry (asama-9-N-start ve asama-9-N-end) yazılmalı. Yumuşak katılık: applicable değilse 'asama-9-N-not-applicable | reason=...' audit yaz + skip silently. NOT applicable iken bile audit emit zorunlu (skip-detection için). Şu anki sayı: ${_QR_BLOCK_COUNT}/3 (loop-breaker)\n\nAşama 9 fast-path YOK — görev küçük olsa, prototip olsa, 'sadece UI tweak' olsa bile çalışır. Tek istisna: hiç kod yazılmadıysa.\"
+}"
+    exit 0
   fi
 fi
 
