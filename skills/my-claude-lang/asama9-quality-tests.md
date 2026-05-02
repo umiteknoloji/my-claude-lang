@@ -232,6 +232,39 @@ mid-pipeline.
 - Heavyweight installs without the project's package manager already
   configured.
 
+## Audit Emit on Completion (since v10.1.5)
+
+After 9.8 finishes (and the open-severity must-resolve invariant from
+v10.1.2 is satisfied), BEFORE handing off to Aşama 10, emit the
+completion audit via Bash:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-9-complete mcl-stop "applied=A skipped=S ambiguous=B na=N"'
+```
+
+Where:
+- A: total fixes applied across 9.1–9.8
+- S: sub-steps skipped silently (no findings)
+- B: ambiguous findings escalated back to Aşama 8 (asama-9-4-ambiguous)
+- N: sub-steps marked not-applicable (e.g., load test on a CLI tool)
+
+**Why mandatory:** Like Aşama 8, the existing transition to
+`quality_review_state="complete"` depends on either a normal completion
+of all 8 sub-steps or a 3-strike loop-breaker. Behavioral skips that
+don't trip either path leave the state at `null`. An explicit audit
+emit makes Stop hook progress the state classifier-independently and
+records `asama-9-progression-from-emit` so the bypass is visible.
+
+This emit is required even when no fixes are applied — emit with
+`applied=0 skipped=8 ambiguous=0 na=0` (or equivalent counts) so the
+state machine knows the phase ran end-to-end.
+
+The MEDIUM/HIGH must-resolve invariant (v10.1.2) still holds: the
+Stop hook continues to block Aşama 11 if `open_severity_count > 0`,
+even after `asama-9-complete` is emitted. Audit-driven progression
+unblocks the state, not the severity gate.
+
 ## Handoff to Aşama 10
 
 After 9.8 completes (or skips with audit), `quality_review_state` is

@@ -787,6 +787,103 @@ if [ "${_TDD_TOTAL:-0}" -gt 0 ]; then
   mcl_state_set tdd_compliance_score "${_TDD_SCORE:-0}" >/dev/null 2>&1 || true
 fi
 
+# --- Audit-driven Aşama 8 progression (since v10.1.5, PILOT) ---
+# When the model emits an explicit `asama-8-complete` audit at the end
+# of risk review, force-progress `risk_review_state` to `complete` even
+# if the askq classifier missed the normal transition. This catches:
+#   - Classifier intent gaps (off-language wording, prefix dropped)
+#   - Sessions where spec_approved=false but Aşama 8 still ran
+#   - Behavioral progression that bypassed AskUserQuestion entirely
+# Pure audit-trail mechanic; emits trace + audit so bypass is visible.
+_mcl_asama_8_complete_emitted() {
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo 0; return; fi
+  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo 0
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+hit = 0
+try:
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        if "| asama-8-complete |" not in line:
+            continue
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        hit = 1
+        break
+except Exception:
+    pass
+print(hit)
+PYEOF
+}
+
+_A8_EMITTED="$(_mcl_asama_8_complete_emitted 2>/dev/null || echo 0)"
+if [ "${_A8_EMITTED:-0}" = "1" ]; then
+  _A8_CUR="$(mcl_state_get risk_review_state 2>/dev/null)"
+  if [ "$_A8_CUR" != "complete" ]; then
+    mcl_state_set risk_review_state '"complete"' >/dev/null 2>&1 || true
+    mcl_audit_log "asama-8-progression-from-emit" "stop" "prev=${_A8_CUR:-null}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 8 9
+  fi
+fi
+
+# --- Audit-driven Aşama 9 progression (since v10.1.5, PILOT) ---
+# Symmetric to the Aşama 8 progression above. When the model emits
+# `asama-9-complete` after 9.1–9.8 sub-steps, force-progress
+# `quality_review_state` to `complete`. Behavioral skips that bypass
+# the normal "all sub-steps end" transition still get tracked.
+# Severity gate (v10.1.2 open_severity_count check) still applies
+# downstream — this only unblocks the state, not the severity invariant.
+_mcl_asama_9_complete_emitted() {
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo 0; return; fi
+  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo 0
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+hit = 0
+try:
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        if "| asama-9-complete |" not in line:
+            continue
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        hit = 1
+        break
+except Exception:
+    pass
+print(hit)
+PYEOF
+}
+
+_A9_EMITTED="$(_mcl_asama_9_complete_emitted 2>/dev/null || echo 0)"
+if [ "${_A9_EMITTED:-0}" = "1" ]; then
+  _A9_CUR="$(mcl_state_get quality_review_state 2>/dev/null)"
+  if [ "$_A9_CUR" != "complete" ]; then
+    mcl_state_set quality_review_state '"complete"' >/dev/null 2>&1 || true
+    mcl_audit_log "asama-9-progression-from-emit" "stop" "prev=${_A9_CUR:-null}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 9 10
+  fi
+fi
+
 # --- MEDIUM/HIGH must-resolve invariant (since v10.1.2) ---
 # Compute the count of open HIGH/MEDIUM findings in the current
 # session. A finding is "open" when an `asama-9-4-ambiguous` audit

@@ -245,6 +245,37 @@ How:
 
 Skip the re-verify ONLY when Aşama 8 was omitted entirely.
 
+## Audit Emit on Completion (since v10.1.5)
+
+When all Aşama 8 risks are resolved and TDD re-verify is GREEN (or
+skipped per the rules above), BEFORE handing off to Aşama 9, emit the
+completion audit via Bash:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-8-complete mcl-stop "h_count=N m_count=M l_count=K resolved=R"'
+```
+
+Where:
+- N: HIGH-severity finding count surfaced this session (from §2b checklist)
+- M: MEDIUM-severity finding count
+- K: LOW-severity finding count
+- R: Total resolved (apply-fix + skip + rule-capture)
+
+**Why mandatory:** The Stop hook's askq-classifier can miss the
+risk-resolution turn (intent recognition gap, off-language wording,
+prefix dropped). When that happens, `risk_review_state` stays `null`
+even though the dialog actually ran end-to-end — the herta project
+under v10.1.4 showed exactly this gap. An explicit audit emit is
+classifier-independent: Stop hook scans audit.log and force-progresses
+`risk_review_state` to `complete`. Audit + trace get a
+`asama-8-progression-from-emit` record so the bypass is visible.
+
+This emit is required even when Aşama 8 was OMITTED (no risks worth
+surfacing) — emit with `h_count=0 m_count=0 l_count=0 resolved=0` so
+the state machine knows the phase ran. "No news" still needs a recorded
+finish-line.
+
 ## Hard Enforcement
 
 Stop hook blocks session-end after Aşama 7 code if `risk_review_state`

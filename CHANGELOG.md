@@ -7,6 +7,74 @@
 
 ## [Unreleased]
 
+## [10.1.5] - 2026-05-02
+
+### Audit-driven phase progression (PILOT — Aşama 8 + 9)
+
+Real-use diagnosis: the herta project completed Aşama 1–12 end-to-end
+yet `state.json` showed `risk_review_state=null`,
+`quality_review_state=null`, `tdd_compliance_score=null`. Phase
+progression depended on the askq-classifier detecting the right
+intent, and any classifier coverage gap (off-language wording, missing
+prefix, dropped tool_result) silently froze state at phase 4 even
+when the full pipeline ran behaviorally.
+
+v10.1.5 introduces a classifier-independent fallback: each phase
+emits an explicit `asama-N-complete` audit at end of run. Stop hook
+scans audit.log per session and force-progresses the corresponding
+state field. Pilot scope: Aşama 8 + 9 only. Remaining phases (1→2,
+4→7, 10/11/12) ship in v10.1.6.
+
+#### Implementation
+
+- **`hooks/mcl-stop.sh`** — two new helpers + scanners:
+  - `_mcl_asama_8_complete_emitted` — scans audit.log since
+    session_start for `asama-8-complete` events. When found AND
+    `risk_review_state != "complete"`, force-progresses state, emits
+    `asama-8-progression-from-emit` audit, writes
+    `phase_transition 8 9` to trace.
+  - `_mcl_asama_9_complete_emitted` — symmetric logic for
+    `quality_review_state`, emits `phase_transition 9 10`.
+- **`skills/my-claude-lang/asama8-risk-review.md`** — new "## Audit
+  Emit on Completion" section. Mandates a Bash audit emit at end of
+  Aşama 8 with severity counts (`h_count=N m_count=M l_count=K
+  resolved=R`), even when Aşama 8 was OMITTED (no risks worth
+  surfacing).
+- **`skills/my-claude-lang/asama9-quality-tests.md`** — new "## Audit
+  Emit on Completion" section. Mandates a Bash audit emit at end of
+  Aşama 9 with sub-step counts (`applied=A skipped=S ambiguous=B
+  na=N`). Notes that the v10.1.2 MEDIUM/HIGH must-resolve invariant
+  remains independent — audit-driven progression unblocks the state
+  field, not the severity gate.
+
+#### Why pilot, not full rollout
+
+Aşama 8 and 9 are the two phases where state-vs-behavior divergence
+hurts most: `risk_review_state` and `quality_review_state` directly
+gate the v10.1.0 hard-enforcement and the v10.1.2 must-resolve
+invariant. Empty values here mean those gates fail open. The remaining
+phase transitions (1→2 precision audit, 4→7 spec approve,
+10/11/12) are less load-bearing for hard-blocks; they ship next once
+the pilot pattern is verified in production use.
+
+#### Combined v10.1.0–v10.1.5 effect
+
+- v10.1.0: Aşama 8/9 hard-enforced (no fast-path skip)
+- v10.1.1: Stack-aware security MUST checklist
+- v10.1.2: M/H findings must-resolve invariant
+- v10.1.3: Aşama 7 title fix (test-first emphasis)
+- v10.1.4: TDD compliance ratio audit
+- **v10.1.5: Audit-driven phase progression — Aşama 8 + 9 (this release)**
+
+#### Tests
+
+130 passing (13 new across `test-v10-1-5-asama-8-progression-pilot.sh`
+and `test-v10-1-5-asama-9-progression-pilot.sh`: 3 emit-detection +
+1 stale-session + 1 substring-confusion + 3 hook-contract checks per
+phase, 3 of which are shared).
+
+Banner: MCL 10.1.4 → MCL 10.1.5.
+
 ## [10.1.4] - 2026-05-02
 
 ### Layer 1 TDD compliance audit (cheapest path)
