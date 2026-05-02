@@ -4,6 +4,38 @@
 
 Called automatically when Aşama 1 parameters are complete and confirmed.
 
+## NO FAST-PATH RULE (since v10.0.3) — hard-enforced
+
+Every Edit / Write / MultiEdit / NotebookEdit tool call requires a
+visible English 📋 Spec: block emitted in the same assistant turn,
+BEFORE the tool call. There is no "too small" exception. Even
+follow-up tweaks ("change button text", "remove this prop") need a
+brief spec describing the change.
+
+`hooks/mcl-pre-tool.sh` enforces this: if the current turn's
+assistant text contains no 📋 Spec: line before an Edit/Write tool
+call, the hook returns `decision:block` with the required-actions
+message. After 3 consecutive `spec-required-block` events in the
+same session the loop-breaker fails open, but every miss writes an
+audit entry visible in `/mcl-checkup`.
+
+For brief follow-up specs, this minimal shape is accepted:
+
+```
+📋 Spec:
+Changes:
+- file:path — what changes and why
+Behavioral contract:
+- the observable invariant the change preserves or introduces
+Out of scope:
+- explicitly excluded behaviors
+```
+
+The original full-form spec template (Objective / MUST / SHOULD /
+Acceptance / Edge Cases / Technical Approach / Out of Scope) still
+applies for the FIRST spec of each new task. Follow-up turns may
+emit the brief shape above.
+
 ## Purpose
 
 This is the MOST CRITICAL phase of MCL. Without this phase, the developer

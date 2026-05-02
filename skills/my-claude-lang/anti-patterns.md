@@ -22,6 +22,7 @@
 - ❌ Translating code, variable names, or file paths
 - ❌ Assuming the developer knows English technical jargon
 - ❌ Skipping Aşama 4 because "it's obvious"
+- ❌ FAST-PATH SKIPPING THE 📋 Spec: BLOCK FOR "SMALL" EDIT/WRITE TURNS — every Edit/Write/MultiEdit/NotebookEdit tool call requires a visible English 📋 Spec: block emitted in the SAME assistant turn, before the tool call. "Tiny tweak" / "obvious change" / "follow-up nudge" are not exceptions. The spec can be brief (Changes / Behavioral contract / Out of scope) but must be present. Hard-enforced by mcl-pre-tool.sh since v10.0.3 — pre-tool blocks the tool call if no 📋 Spec: appears in the current turn's assistant text
 - ❌ Translating Claude Code's questions without explaining WHY it's asking and WHAT each answer changes — the developer must make informed decisions, not guess
 - ❌ Calling a shell `rm` or `rmdir` command (including `rm -r`, `rm -rf`, or chained bash containing them) without first presenting an Execution Plan — file/directory deletion is the ONLY action class that still requires the plan (since MCL 5.3.2). All other tool calls proceed silently. `git rm` is a git subcommand, not shell `rm`, and does NOT require the plan
 - ❌ Starting a deletion after presenting the Execution Plan without waiting for the developer's confirmation — the plan requires explicit approval just like the spec

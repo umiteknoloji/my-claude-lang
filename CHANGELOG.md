@@ -7,6 +7,66 @@
 
 ## [Unreleased]
 
+## [10.0.3] - 2026-05-02
+
+### Aşama 4 spec-presence enforcement (MCL-wide rule)
+
+Real-use feedback: in a small-tweak follow-up turn ("remove these
+buttons, auto-apply on second pick"), the model called Edit directly
+without emitting a 📋 Spec: block — fast-path rationalization based
+on perceived task size. The developer asked the model "did you give
+the spec to Claude Code in English?" and the model honestly admitted
+it had skipped. The developer requested this rule be embedded in MCL
+itself, not just in their personal `CLAUDE.md`.
+
+#### Implementation
+
+Three layers — STATIC_CONTEXT (prompt), skill files (documentation),
+hook (mechanical enforcement):
+
+1. **STATIC_CONTEXT** — new `<mcl_constraint name="no-spec-fast-path">`
+   block: "Every assistant turn that calls Write / Edit / MultiEdit /
+   NotebookEdit MUST include a visible 📋 Spec: block emitted BEFORE
+   the tool call in the same turn. There is no 'too small' exception.
+   Mid-task continuation turns count as new turns."
+
+2. **`hooks/mcl-pre-tool.sh`** — new check inserted before secret-scan:
+   when tool is Edit/Write/MultiEdit/NotebookEdit, scan the current
+   turn's transcript (assistant text events after the latest user
+   message) for 📋 Spec: line via the tolerant SPEC_LINE_RE. If
+   absent → return `decision:block` with the required-actions reason
+   text + brief-spec template. 3-strike loop-breaker
+   (`spec-required-loop-broken` audit) preserves v9.0.1 fail-open.
+
+3. **Skill files** — `asama4-spec.md` gains a "NO FAST-PATH RULE"
+   section explaining the brief-spec shape acceptable for follow-up
+   turns (Changes / Behavioral contract / Out of scope) so models
+   can comply quickly without writing a full Aşama 4 ceremony each
+   time. `anti-patterns.md` adds explicit anti-pattern entry.
+
+#### Brief-spec shape (acceptable for follow-up turns)
+
+```
+📋 Spec:
+Changes:
+- file:path — what changes and why
+Behavioral contract:
+- the observable invariant the change preserves or introduces
+Out of scope:
+- explicitly excluded behaviors
+```
+
+Original full template (Objective / MUST / SHOULD / Acceptance / Edge
+Cases / Technical Approach / Out of Scope) still applies for the
+FIRST spec of each new task.
+
+#### Tests
+
+81 passing (7 new test-v10-spec-required assertions: counter logic,
+hook source contract, transcript SPEC_RE detector positive/negative).
+
+Banner: MCL 10.0.2 → MCL 10.0.3.
+
 ## [10.0.2] - 2026-05-02
 
 ### Aşama 6b hard enforcement (narrow re-introduction)
