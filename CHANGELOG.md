@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+## [8.4.4] - 2026-05-02
+
+### Kaldırıldı — `current_phase < 4` mutating tool bloğu
+
+`hooks/mcl-pre-tool.sh`'in mutating-tool gate'inde iki kontrol vardı: faz numarası (`current_phase < 4`) ve onay boolean'ı (`spec_approved != true`). İki kontrol normal akışta aynı pencereyi kapatıyordu — Phase 1/2/3 ⇒ `spec_approved=false`. Faz numarası kontrolü kaldırıldı; `spec_approved` boolean'ı tek başına spec öncesi kod yazımını engellemeye yetiyor.
+
+#### Değişiklik
+- `hooks/mcl-pre-tool.sh` — `if [ "$CURRENT_PHASE" -lt 4 ]` branch'i silindi; `elif [ "$SPEC_APPROVED" != "true" ]` artık `if` olarak tek başına kalıyor.
+
+#### Trade-off (kabul edildi)
+- **Kayıp:** Defense-in-depth — `spec_approved=true` ama `current_phase<4` durumunda (state corruption / yarış) artık ikinci bir koruma yok. Hata mesajı da "current_phase=N (PHASE_NAME)" yerine sadece "spec_approved=false" gösteriyor.
+- **Kazanç:** Daha sade gate — tek invariant (`spec_approved=true ⇒ Phase 4`) tüm yazma yetkisini yönetiyor.
+
+### Banner
+- Tüm `MCL 8.4.3` referansları (`🌐` banner ve `AskUserQuestion` prefix'leri) `MCL 8.4.4` olarak güncellendi.
+
 ## [8.4.3] - 2026-05-01
 
 ### Kaldırıldı — `superpowers` plugin tamamen MCL'den çıkarıldı

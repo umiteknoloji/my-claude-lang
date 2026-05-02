@@ -663,9 +663,7 @@ fi
 
 
 REASON=""
-if [ "$CURRENT_PHASE" -lt 4 ] 2>/dev/null; then
-  REASON="MCL LOCK — current_phase=${CURRENT_PHASE} (${PHASE_NAME}). Mutating tool \`${TOOL_NAME}\` is blocked until Phase 4 (EXECUTE). Emit the 📋 Spec: block, get the developer's explicit approval via AskUserQuestion, then proceed."
-elif [ "$SPEC_APPROVED" != "true" ]; then
+if [ "$SPEC_APPROVED" != "true" ]; then
   REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked until the developer explicitly approves the 📋 Spec: block via AskUserQuestion."
 fi
 
