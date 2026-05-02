@@ -730,6 +730,63 @@ PYEOF
   fi
 fi
 
+# --- Aşama 7 TDD compliance audit (since v10.1.4) ---
+# Layer 1 (cheapest): scan session audit.log for tdd-test-write and
+# tdd-prod-write events emitted by mcl-post-tool.sh. Compute
+# compliance ratio: of all prod writes, how many had a preceding
+# test write in the same session? Pure audit, no block. Visible via
+# /mcl-checkup.
+_mcl_tdd_compliance() {
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo "0|0|0"; return; fi
+  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo "0|0|0"
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+test_writes = []  # list of timestamps
+prod_writes = []
+try:
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        if "| tdd-test-write |" not in line and "| tdd-prod-write |" not in line:
+            continue
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        if "tdd-test-write" in line:
+            test_writes.append(ts)
+        else:
+            prod_writes.append(ts)
+except Exception:
+    pass
+# Of each prod_write, count those preceded by at least one test_write
+preceded = sum(1 for p in prod_writes if any(t < p for t in test_writes))
+total_prod = len(prod_writes)
+score = round((preceded / total_prod) * 100) if total_prod else (100 if test_writes else 0)
+print(f"{score}|{preceded}|{total_prod}")
+PYEOF
+}
+
+_TDD_RESULT="$(_mcl_tdd_compliance 2>/dev/null || echo "0|0|0")"
+_TDD_SCORE="${_TDD_RESULT%%|*}"
+_TDD_REST="${_TDD_RESULT#*|}"
+_TDD_PRECEDED="${_TDD_REST%%|*}"
+_TDD_TOTAL="${_TDD_REST##*|}"
+# Only emit when there was at least one prod write this session
+# (avoid noise on Read-only / non-code turns).
+if [ "${_TDD_TOTAL:-0}" -gt 0 ]; then
+  mcl_audit_log "tdd-compliance" "stop" "score=${_TDD_SCORE}% preceded=${_TDD_PRECEDED} prod=${_TDD_TOTAL}"
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append tdd_compliance "${_TDD_SCORE}%"
+  mcl_state_set tdd_compliance_score "${_TDD_SCORE:-0}" >/dev/null 2>&1 || true
+fi
+
 # --- MEDIUM/HIGH must-resolve invariant (since v10.1.2) ---
 # Compute the count of open HIGH/MEDIUM findings in the current
 # session. A finding is "open" when an `asama-9-4-ambiguous` audit

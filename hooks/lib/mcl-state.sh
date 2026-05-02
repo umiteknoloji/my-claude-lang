@@ -61,6 +61,7 @@ _mcl_state_default() {
   "risk_review_state": null,
   "quality_review_state": null,
   "open_severity_count": 0,
+  "tdd_compliance_score": null,
   "rollback_sha": null,
   "rollback_notice_shown": false,
   "tdd_last_green": null,

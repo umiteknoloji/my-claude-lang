@@ -116,6 +116,63 @@ try: print(json.loads(sys.stdin.read()).get("tool_name",""))
 except: pass
 ' 2>/dev/null)"
 
+# --- TDD compliance audit (since v10.1.4) ---
+# When a write tool fires, classify the file as test/prod/skip via
+# path heuristics and emit `tdd-test-write` or `tdd-prod-write` audit.
+# Stop hook scans these to compute compliance ratio. No block, audit
+# only — visible in /mcl-checkup.
+if printf '%s' "$TOOL_NAME_POST" | grep -qE '^(Write|Edit|MultiEdit|NotebookEdit)$' 2>/dev/null; then
+  _TDD_FILE="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    tin = obj.get("tool_input") or {}
+    print(tin.get("file_path") or tin.get("notebook_path") or "")
+except Exception:
+    pass
+' 2>/dev/null)"
+  if [ -n "$_TDD_FILE" ]; then
+    _TDD_KIND="$(python3 -c '
+import os, re, sys
+path = sys.argv[1]
+SKIP_DIR_RE = re.compile(r"(^|/)(node_modules|dist|build|\.next|\.nuxt|\.cache|coverage|\.git)/")
+if SKIP_DIR_RE.search(path):
+    print("skip"); sys.exit(0)
+ext = os.path.splitext(path)[1].lower()
+TEST_PATTERNS = [
+    r"__tests__/",
+    r"(^|/)tests?/",
+    r"(^|/)specs?/",
+    r"\.test\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$",
+    r"\.spec\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$",
+    r"_test\.(go|py)$",
+    r"_spec\.rb$",
+    r"(^|/)test_[^/]+\.py$",
+    r"\.test\.[a-z]+$",
+]
+for pat in TEST_PATTERNS:
+    if re.search(pat, path):
+        print("test"); sys.exit(0)
+SRC_EXT = {".ts",".tsx",".js",".jsx",".mts",".cts",".mjs",".cjs",".py",".go",".rb",".java",".kt",".rs",".cpp",".cc",".c",".cs",".php",".swift",".lua",".ex",".exs",".vue",".svelte"}
+if ext in SRC_EXT:
+    print("prod"); sys.exit(0)
+print("skip")
+' "$_TDD_FILE" 2>/dev/null)"
+    case "${_TDD_KIND:-skip}" in
+      test)
+        _SCRIPT_DIR_TDD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        [ -f "$_SCRIPT_DIR_TDD/lib/mcl-state.sh" ] && source "$_SCRIPT_DIR_TDD/lib/mcl-state.sh" 2>/dev/null
+        command -v mcl_audit_log >/dev/null 2>&1 && mcl_audit_log "tdd-test-write" "post-tool" "file=${_TDD_FILE}"
+        ;;
+      prod)
+        _SCRIPT_DIR_TDD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        [ -f "$_SCRIPT_DIR_TDD/lib/mcl-state.sh" ] && source "$_SCRIPT_DIR_TDD/lib/mcl-state.sh" 2>/dev/null
+        command -v mcl_audit_log >/dev/null 2>&1 && mcl_audit_log "tdd-prod-write" "post-tool" "file=${_TDD_FILE}"
+        ;;
+    esac
+  fi
+fi
+
 # Track last write timestamp for Regression Guard smart-skip staleness check.
 if printf '%s' "$TOOL_NAME_POST" | grep -qE '^(Write|Edit|MultiEdit|NotebookEdit)$' 2>/dev/null; then
   _SCRIPT_DIR_WT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -7,6 +7,66 @@
 
 ## [Unreleased]
 
+## [10.1.4] - 2026-05-02
+
+### Layer 1 TDD compliance audit (cheapest path)
+
+Real-use question: *"TDD'nin gerçekten çalıştığını nasıl
+doğrularız?"* — how to verify TDD compliance? v10.1.4 adds the
+cheapest verification layer: file-classifier + session compliance
+ratio. Pure audit, no block, no developer friction.
+
+#### Implementation
+
+- **`hooks/mcl-post-tool.sh`** — new path classifier inserted
+  before regression-guard logic. On every Write/Edit/MultiEdit/
+  NotebookEdit, the file path is matched against:
+  - **Skip patterns** (`node_modules/`, `dist/`, `build/`,
+    `.next/`, `.nuxt/`, `.cache/`, `coverage/`, `.git/` — at start
+    or after `/`) → no audit emit
+  - **Test patterns** (`__tests__/`, `tests?/`, `specs?/`,
+    `.test.{ts,tsx,js,...}`, `.spec.{ts,tsx,js,...}`,
+    `_test.{go,py}`, `_spec.rb`, `test_*.py`) → emit
+    `tdd-test-write | file=<path>`
+  - **Source extensions** (`.ts/.tsx/.js/.py/.go/.rb/.java/.kt/
+    .rs/.cpp/.cs/.php/.swift/.lua/.vue/.svelte` etc.) → emit
+    `tdd-prod-write | file=<path>`
+- **`hooks/mcl-stop.sh`** — new `_mcl_tdd_compliance` helper at
+  Stop time scans session audit.log for `tdd-*-write` events.
+  Computes: `score = (prod_writes_with_preceding_test_write /
+  total_prod_writes) * 100`. Emits `tdd-compliance | score=N%
+  preceded=K prod=M` audit + writes to state
+  (`tdd_compliance_score`).
+- **`hooks/lib/mcl-state.sh`** — new default field
+  `tdd_compliance_score: null`.
+
+#### Heuristic limits (intentional, cheapest layer)
+
+- **Path-based, not behavior-based:** detects whether a test file
+  was touched in the same session as prod files; does NOT verify
+  RED→GREEN cycle (that's Layer 2).
+- **"Any test before any prod" heuristic:** counts prod-writes
+  that have ANY preceding test-write in session. Doesn't match
+  test-to-prod-file pairs (that would require richer state).
+- **Audit only, no block:** pure visibility. /mcl-checkup surfaces
+  the score; developer decides if intervention needed.
+
+#### Combined v10.1.0–v10.1.4 effect
+
+- v10.1.0: Aşama 8/9 hard-enforced (no fast-path skip)
+- v10.1.1: Stack-aware security MUST checklist
+- v10.1.2: M/H findings must-resolve invariant
+- v10.1.3: Aşama 7 title fix (test-first emphasis)
+- **v10.1.4: TDD compliance ratio audit (this release)**
+
+#### Tests
+
+117 passing (23 new in `test-v10-1-4-tdd-compliance.sh`: 7 test-
+pattern, 5 prod-pattern, 5 skip-pattern, 3 ratio scenarios + 3
+hook contract checks).
+
+Banner: MCL 10.1.3 → MCL 10.1.4.
+
 ## [10.1.3] - 2026-05-02
 
 ### Aşama 7 başlığı düzeltildi — TDD test-first vurgusu
