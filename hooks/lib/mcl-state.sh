@@ -261,6 +261,49 @@ mcl_audit_log() {
     >> "$dir/audit.log" 2>/dev/null || true
 }
 
+_mcl_loop_breaker_count() {
+  # Counts how many times a given audit event fired in the current
+  # session. Used by hard-enforcement blocks to fail-open after 3
+  # consecutive same-cause blocks so a stuck model cannot trap the
+  # developer in an infinite loop. Session boundary = most recent
+  # `session_start` event in trace.log.
+  #
+  # Defined here (since v10.1.7) so both mcl-stop.sh and mcl-pre-tool.sh
+  # can use it. Stop hook keeps a local copy for backward-compat.
+  local event="$1"
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo 0; return; fi
+  python3 - "$audit_file" "$trace_file" "$event" 2>/dev/null <<'PYEOF' || echo 0
+import os, sys
+audit_path, trace_path, event = sys.argv[1], sys.argv[2], sys.argv[3]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        with open(trace_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if "| session_start |" in line:
+                    parts = line.split("|", 1)
+                    if parts:
+                        session_ts = parts[0].strip()
+except Exception:
+    pass
+count = 0
+needle = f"| {event} |"
+try:
+    with open(audit_path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if needle not in line:
+                continue
+            ts = line.split("|", 1)[0].strip()
+            if not session_ts or ts >= session_ts:
+                count += 1
+except Exception:
+    pass
+print(count)
+PYEOF
+}
+
 mcl_get_active_phase() {
   # Returns the active aşama string (1..12) from state.
   #

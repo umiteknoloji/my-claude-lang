@@ -662,9 +662,62 @@ except Exception:
 fi
 
 
+# --- Layer 4 escape hatch (since v10.1.7) ---
+# Before deciding on the spec-approval block, scan audit.log for an
+# `asama-4-complete` emit (mandated by skills/asama4-spec.md). If
+# present in current session, force-progress state — same mechanism
+# Stop hook uses, but applied at PreToolUse so the model can recover
+# from a classifier miss WITHOUT waiting for end-of-turn. Combined
+# with Option 3 (real spec-approval block below), this creates the
+# enforcement+recovery pattern: writes blocked when spec_approved=
+# false, but model can emit `asama-4-complete` to unlock immediately.
+if [ "$SPEC_APPROVED" != "true" ] && command -v python3 >/dev/null 2>&1; then
+  _PRE_AUDIT="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  _PRE_TRACE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  _PRE_A4_HIT="$(python3 - "$_PRE_AUDIT" "$_PRE_TRACE" 2>/dev/null <<'PYEOF' || echo 0
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+hit = 0
+try:
+    if os.path.isfile(audit_path):
+        for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+            if "| asama-4-complete |" not in line:
+                continue
+            ts = line.split("|", 1)[0].strip()
+            if session_ts and ts < session_ts:
+                continue
+            hit = 1
+            break
+except Exception:
+    pass
+print(hit)
+PYEOF
+)"
+  if [ "${_PRE_A4_HIT:-0}" = "1" ]; then
+    mcl_state_set spec_approved true
+    mcl_state_set current_phase 7
+    mcl_state_set phase_name '"EXECUTE"'
+    mcl_audit_log "asama-4-progression-from-emit" "pre-tool" "via-asama-4-complete-bash-emit"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 4 7
+    SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
+    CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+    PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
+  fi
+fi
+
 REASON=""
+REASON_KIND=""
 if [ "$SPEC_APPROVED" != "true" ]; then
-  REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked until the developer explicitly approves the 📋 Spec: block via AskUserQuestion."
+  REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked (since v10.1.7 — real block, not advisory). Recovery options: (A) re-emit AskUserQuestion with prefix \`MCL <ver> | \` for spec approval; (B) if developer already approved but classifier missed, run: \`bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-4-complete mcl-stop \"spec_hash=<H> approver=user\"'\` to force-progress state; (C) loop-breaker fail-open after 3 consecutive blocks."
+  REASON_KIND="spec-approval"
 fi
 
 # -------- Branch: UI flow path-exception (Aşama 6a BUILD_UI / 4b REVIEW) --------
@@ -825,19 +878,40 @@ print("allow")
 fi
 
 if [ -n "$REASON" ]; then
-  mcl_audit_log "deny-tool" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
-  mcl_debug_log "pre-tool" "deny" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
+  # Decision matrix (since v10.1.7):
+  #   REASON_KIND=spec-approval → REAL block (deny). Was advisory in
+  #   v10.0.0; reverted because herta v10.1.4 showed advisory mode
+  #   lets writes through at phase=4/spec_approved=false, breaking
+  #   the spec-approval contract.
+  #   Other kinds (UI path-exception, pattern scan, scope guard) →
+  #   stay advisory (allow with reason) for now — same as v10.0.0+.
+  DECISION="allow"
+  if [ "$REASON_KIND" = "spec-approval" ]; then
+    _SA_LB_COUNT="$(_mcl_loop_breaker_count "spec-approval-block" 2>/dev/null || echo 0)"
+    if [ "${_SA_LB_COUNT:-0}" -ge 3 ]; then
+      mcl_audit_log "spec-approval-loop-broken" "pre-tool" "count=${_SA_LB_COUNT} fail-open"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_approval_loop_broken "${_SA_LB_COUNT}"
+      DECISION="allow"
+    else
+      DECISION="deny"
+      mcl_audit_log "spec-approval-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SA_LB_COUNT + 1))"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_approval_block "$((_SA_LB_COUNT + 1))"
+    fi
+  fi
+
+  mcl_audit_log "deny-tool" "pre-tool" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED} decision=${DECISION} kind=${REASON_KIND:-other}"
+  mcl_debug_log "pre-tool" "deny" "tool=${TOOL_NAME} phase=${CURRENT_PHASE} approved=${SPEC_APPROVED} decision=${DECISION}"
   python3 -c '
 import json, sys
-reason = sys.argv[1]
+reason, decision = sys.argv[1], sys.argv[2]
 print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
-        "permissionDecision": "allow",
+        "permissionDecision": decision,
         "permissionDecisionReason": reason
     }
 }))
-' "$REASON"
+' "$REASON" "$DECISION"
   exit 0
 fi
 

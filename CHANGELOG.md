@@ -7,6 +7,93 @@
 
 ## [Unreleased]
 
+## [10.1.7] - 2026-05-02
+
+### Spec-approval gate restored (Option 3) + escape hatch (Option 1)
+
+The MUST-have follow-up to v10.1.6. The herta investigation surfaced
+the real root cause: state freeze was the SYMPTOM; the underlying
+contract violation was that **writes happened at `spec_approved=false`
+because pre-tool was advisory** (v10.0.0 decision:approve replaced
+decision:block for "tüm MCL kilitlerini kaldır"). v10.1.5/v10.1.6
+made progression more reliable but never closed the actual write gate.
+Without this gate, "MCL koruyor" is theater — vulnerable code can
+still ship while state machine is perfectly tracked.
+
+#### Implementation
+
+**`hooks/mcl-pre-tool.sh`** — two surgical changes around the
+existing spec_approved check:
+
+1. **Layer 4 escape hatch (Option 1)** — before the spec-approval
+   block fires, scan audit.log for `asama-4-complete` emit (mandated
+   by skills/asama4-spec.md since v10.1.6). When found in current
+   session, force-progress `spec_approved=true`,
+   `current_phase=7`, `phase_name=EXECUTE` inline at PreToolUse
+   (not just at Stop). This means model can recover from a
+   classifier miss WITHOUT waiting for end-of-turn — the next
+   mutating tool call after the emit succeeds. Audit + trace get
+   `asama-4-progression-from-emit` from pre-tool.
+
+2. **Real spec-approval block (Option 3)** — when `spec_approved=
+   false` after both JIT askq advance AND escape hatch attempts,
+   pre-tool now returns `permissionDecision: "deny"` (was "allow"
+   advisory in v10.0.0+). REASON message instructs the model on
+   three recovery options: re-emit AskUserQuestion, run the
+   `asama-4-complete` Bash audit emit, or wait for 3-strike fail-
+   open. Other denial sources (UI path, pattern scan, scope guard)
+   STAY ADVISORY — only the spec-approval gate is reverted.
+
+3. **3-strike loop-breaker** — if `spec-approval-block` audit
+   already fired ≥3 times in the current session, fail-open with
+   `spec-approval-loop-broken` audit + trace. Prevents developer
+   lockout when classifier consistently fails AND model can't
+   self-recover via the emit path.
+
+**`hooks/lib/mcl-state.sh`** — `_mcl_loop_breaker_count` helper moved
+from mcl-stop.sh into the shared lib so both hooks can use it. Stop
+hook keeps its local copy for backward-compat (lib version overrides
+when sourced first).
+
+#### Why Option 3 was the must-have
+
+The herta v10.1.4 audit log showed 70+ `deny-tool` events but every
+single mutating write succeeded — because the decision was "allow"
+with a denial REASON for advisory purposes. The model wrote 36 prod
+files at `spec_approved=false` despite MCL's stated contract that
+spec approval is required first. v10.1.5/v10.1.6 made that violation
+TRACKABLE (skip-detection audit) but didn't STOP it. v10.1.7 stops
+it.
+
+Why Option 3 alone wasn't enough: classifier coverage gaps mean
+spec_approved can stay false even when developer clicked Onayla.
+Hard-block alone would lock the developer out. Option 1 (asama-4-
+complete escape hatch from v10.1.6, now active in pre-tool too) is
+the recovery path. The 3-strike loop-breaker is the final fail-safe.
+
+#### Combined v10.1.0–v10.1.7 effect
+
+- v10.1.0: Aşama 8/9 hard-enforced
+- v10.1.1: Stack-aware security MUST checklist
+- v10.1.2: M/H findings must-resolve invariant
+- v10.1.3: Aşama 7 title fix (test-first emphasis)
+- v10.1.4: TDD compliance ratio audit
+- v10.1.5: Audit-driven progression — Aşama 8 + 9 (PILOT)
+- v10.1.6: Audit-driven progression — full coverage + Layer 3 skip-detection
+- **v10.1.7: Spec-approval real block + asama-4-complete escape hatch + 3-strike loop-breaker (this release)**
+
+The spec-approval contract is now actually enforced. herta v10.1.4-
+type silent-bypass cannot recur.
+
+#### Tests
+
+180 passing (16 new in `test-v10-1-7-spec-approval-block.sh`,
+integration-style — runs actual mcl-pre-tool.sh against synthetic
+fixtures, asserts permissionDecision in JSON output, asserts state
+side effects, asserts loop-breaker fires after 3 strikes).
+
+Banner: MCL 10.1.6 → MCL 10.1.7.
+
 ## [10.1.6] - 2026-05-02
 
 ### Audit-driven phase progression — full coverage + skip-detection
