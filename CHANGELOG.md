@@ -7,6 +7,98 @@
 
 ## [Unreleased]
 
+## [10.1.8] - 2026-05-03
+
+### Aşama 8/9 skip-block — soft visibility → hard enforcement
+
+Driven by independent real-world data. The grom backoffice case
+(v10.1.7 deployment, May 2026) showed:
+
+- Model emitted `asama-4-complete` correctly (Layer 1+2 working)
+- Model wrote 29 production files BUT zero test files
+- Model did not run Aşama 8 risk review or Aşama 9 quality+tests
+- Layer 3 skip-detection correctly emitted `asama-8-emit-missing`
+  and `asama-9-emit-missing`
+- An independent security audit then found 7 issues (2 HIGH +
+  5 MEDIUM) — exactly the categories v10.1.1's stack-aware MUST
+  checklist would have caught (rate-limit beyond /login, CSRF
+  timing-safe, password-change rate-limit, logging hygiene)
+
+Conclusion: soft visibility was insufficient. The skip was visible
+but the security gaps still landed. v10.1.8 turns the
+`asama-{8,9}-emit-missing` audit into an actionable pre-tool block
+on the next mutating tool call.
+
+#### Implementation
+
+**`hooks/mcl-pre-tool.sh`** — new branch after the spec-approval
+block:
+
+1. **Skip-block trigger** — when SPEC_APPROVED=true AND
+   `asama-{8,9}-emit-missing` is present in current session AND the
+   matching `asama-{8,9}-complete` has NOT been emitted yet, set
+   REASON with recovery instructions and REASON_KIND=`asama-N-skip`.
+2. **Sequential enforcement** — checks 8 first, 9 second. Once 8 is
+   resolved (model emits asama-8-complete), the next block fires for
+   9 if it's still missing. Forces the correct ordering.
+3. **3-strike loop-breaker** — same shape as v10.1.7 spec-approval-
+   block. After 3 consecutive blocks, fail-open with
+   `asama-N-skip-loop-broken` audit + trace. Prevents developer
+   lockout when classifier consistently fails AND model can't
+   self-recover.
+
+**`hooks/lib/mcl-state.sh`** — `_mcl_audit_emitted_in_session`
+helper moved into shared lib (was inline in mcl-stop.sh). Both
+hooks can now use it. Stop hook keeps its local copy for backward-
+compat.
+
+#### Why this is the right fix
+
+The ROOT cause exposed by grom: `asama-N-emit-missing` audit was
+informational only. Model could ignore the skill instruction to
+emit `asama-N-complete`, Layer 3 would record the skip, and writes
+would continue unimpeded. Three layers of defense became one
+visibility log.
+
+v10.1.8 connects the visibility audit to enforcement: the SAME
+audit that records the skip now ALSO triggers a real block on the
+next turn. Recovery is the same Bash audit emit pattern v10.1.7
+used for asama-4-complete — model emits the missing complete to
+clear the block.
+
+The 3-strike fail-open is intentional: if model genuinely cannot
+recover (skill instruction unclear, prompt ambiguous, etc.), the
+developer is not permanently locked out. The bypass is recorded
+in audit so it remains visible.
+
+#### Combined v10.1.0–v10.1.8 effect
+
+- v10.1.0: Aşama 8/9 hard-enforced (Stop hook)
+- v10.1.1: Stack-aware security MUST checklist
+- v10.1.2: M/H findings must-resolve invariant
+- v10.1.3: Aşama 7 title fix (test-first emphasis)
+- v10.1.4: TDD compliance ratio audit
+- v10.1.5: Audit-driven progression — Aşama 8 + 9 (PILOT)
+- v10.1.6: Audit-driven progression — full coverage + Layer 3 skip-detection
+- v10.1.7: Spec-approval real block + asama-4-complete escape hatch
+- **v10.1.8: Aşama 8/9 skip-block — Layer 3 → hard enforcement (this release)**
+
+The phase-completion contract is now end-to-end enforceable:
+spec_approved=false (v10.1.7) AND asama-{4,8,9}-emit-missing
+(v10.1.8) all trigger real pre-tool denies with classifier-
+independent recovery paths.
+
+#### Tests
+
+234 passing (+17 in `test-v10-1-8-skip-block.sh`, integration-style
+with real pre-tool):
+- Cases: asama-8 trigger, asama-8 cleared → asama-9 cascading,
+  both cleared → no block, 3-strike loop-breaker, read-only tool
+  not blocked, spec-approval priority when SPEC_APPROVED=false,
+  hook + lib contract checks
+
+Banner: MCL 10.1.7 → MCL 10.1.8.
+
 ## [10.1.7] - 2026-05-02
 
 ### Spec-approval gate restored (Option 3) + escape hatch (Option 1)

@@ -877,6 +877,31 @@ print("allow")
   fi
 fi
 
+# -------- Branch: Aşama 8/9 skip-block (since v10.1.8) --------
+# When Stop hook detected `asama-{8,9}-emit-missing` (model wrote
+# production code without running risk review / quality+tests), block
+# subsequent mutating tools until the model emits the missing
+# `asama-N-complete` audit. Mirrors v10.1.7 spec-approval-block
+# pattern but for behavioral skip detection. Only fires when
+# SPEC_APPROVED=true (otherwise spec-approval-block handles it first).
+#
+# Real-world trigger: the grom backoffice case — model wrote 29 prod
+# files without Aşama 8 dialog, soft visibility surfaced the skip but
+# 7 security findings (2 HIGH + 5 MEDIUM, independently audited)
+# still landed. Soft visibility was not enough; v10.1.8 turns the
+# emit-missing audit into an actionable block on the next turn.
+if [ -z "$REASON" ] && [ "$SPEC_APPROVED" = "true" ]; then
+  for _SKIP_PH in 8 9; do
+    _EM_HIT="$(_mcl_audit_emitted_in_session "asama-${_SKIP_PH}-emit-missing" "" 2>/dev/null || echo 0)"
+    _AC_HIT="$(_mcl_audit_emitted_in_session "asama-${_SKIP_PH}-complete" "" 2>/dev/null || echo 0)"
+    if [ "${_EM_HIT:-0}" = "1" ] && [ "${_AC_HIT:-0}" != "1" ]; then
+      REASON="MCL ASAMA ${_SKIP_PH} SKIP-BLOCK (since v10.1.7 — real block, not advisory) — Stop hook detected the model wrote production code without running Aşama ${_SKIP_PH} (audit: \`asama-${_SKIP_PH}-emit-missing\`). Mutating tool \`${TOOL_NAME}\` is blocked until the phase-completion audit is recorded. Recovery: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-${_SKIP_PH}-complete mcl-stop \"<details>\"' — see \`skills/my-claude-lang/asama${_SKIP_PH}-*.md\` for required detail format. Loop-breaker: 3 consecutive blocks → fail-open."
+      REASON_KIND="asama-${_SKIP_PH}-skip"
+      break
+    fi
+  done
+fi
+
 if [ -n "$REASON" ]; then
   # Decision matrix (since v10.1.7):
   #   REASON_KIND=spec-approval → REAL block (deny). Was advisory in
@@ -896,6 +921,22 @@ if [ -n "$REASON" ]; then
       DECISION="deny"
       mcl_audit_log "spec-approval-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SA_LB_COUNT + 1))"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_approval_block "$((_SA_LB_COUNT + 1))"
+    fi
+  elif [ "$REASON_KIND" = "asama-8-skip" ] || [ "$REASON_KIND" = "asama-9-skip" ]; then
+    # v10.1.8: Aşama 8/9 skip-block. Same loop-breaker shape as
+    # spec-approval-block; recovery is the asama-N-complete Bash emit
+    # (parallels v10.1.7 spec-approval recovery via asama-4-complete).
+    _SKIP_PH_NUM="${REASON_KIND#asama-}"
+    _SKIP_PH_NUM="${_SKIP_PH_NUM%-skip}"
+    _SK_LB_COUNT="$(_mcl_loop_breaker_count "asama-${_SKIP_PH_NUM}-skip-block" 2>/dev/null || echo 0)"
+    if [ "${_SK_LB_COUNT:-0}" -ge 3 ]; then
+      mcl_audit_log "asama-${_SKIP_PH_NUM}-skip-loop-broken" "pre-tool" "count=${_SK_LB_COUNT} fail-open"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "asama_${_SKIP_PH_NUM}_skip_loop_broken" "${_SK_LB_COUNT}"
+      DECISION="allow"
+    else
+      DECISION="deny"
+      mcl_audit_log "asama-${_SKIP_PH_NUM}-skip-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SK_LB_COUNT + 1))"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "asama_${_SKIP_PH_NUM}_skip_block" "$((_SK_LB_COUNT + 1))"
     fi
   fi
 

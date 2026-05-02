@@ -261,6 +261,49 @@ mcl_audit_log() {
     >> "$dir/audit.log" 2>/dev/null || true
 }
 
+_mcl_audit_emitted_in_session() {
+  # Returns 1 if `event_name` audit fired in current session, else 0.
+  # Optional `idem_marker` (arg 2): if that marker is also present in
+  # the session, returns 0 (already-handled). Used by phase-progression
+  # scanners and by v10.1.8 skip enforcement gate.
+  #
+  # Defined here (since v10.1.8) so both mcl-stop.sh and mcl-pre-tool.sh
+  # can use it. Stop hook keeps a local copy for backward-compat.
+  local event_name="$1"
+  local idem_marker="${2:-}"
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo 0; return; fi
+  python3 - "$audit_file" "$trace_file" "$event_name" "$idem_marker" 2>/dev/null <<'PYEOF' || echo 0
+import os, sys
+audit_path, trace_path, event_name, idem = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+emitted = False
+already = False
+try:
+    needle_emit = f"| {event_name} |"
+    needle_idem = f"| {idem} |" if idem else None
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        if needle_emit in line:
+            emitted = True
+        if needle_idem and needle_idem in line:
+            already = True
+except Exception:
+    pass
+print(1 if (emitted and not already) else 0)
+PYEOF
+}
+
 _mcl_loop_breaker_count() {
   # Counts how many times a given audit event fired in the current
   # session. Used by hard-enforcement blocks to fail-open after 3
