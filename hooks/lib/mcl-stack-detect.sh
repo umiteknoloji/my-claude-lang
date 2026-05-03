@@ -281,6 +281,45 @@ mcl_is_ui_capable() {
     [ -d "$dir/resources/views" ] && return 0
   fi
 
+  # Server-rendered Node patterns (since v10.1.11) — Express/Fastify/Hapi
+  # with EJS/Handlebars/Pug/Twig templates + public assets. Caught the
+  # grom backoffice case (raw JS frontend + EJS server-side templates +
+  # public/js, public/css) that the framework-marker checks above missed
+  # because no React/Vue/Svelte/Next dependencies are present.
+  if [ -d "$dir/views" ]; then
+    if find "$dir/views" -maxdepth 4 -type f \
+         \( -name '*.ejs' -o -name '*.hbs' -o -name '*.handlebars' \
+            -o -name '*.pug' -o -name '*.twig' -o -name '*.html' \) \
+         2>/dev/null | grep -q .; then
+      return 0
+    fi
+  fi
+
+  # public/ directory with web assets (HTML/CSS/JS) — common in
+  # raw-Node, raw-Python (Flask), Go-with-static, etc. Distinguishes
+  # "public asset bundle" from build-output "dist/" or "build/".
+  if [ -d "$dir/public" ]; then
+    if find "$dir/public" -maxdepth 4 -type f \
+         \( -name '*.html' -o -name '*.css' -o -name '*.js' \) \
+         2>/dev/null | grep -q .; then
+      return 0
+    fi
+  fi
+
+  # Bare-template projects (no package.json, no composer.json, just
+  # templates/ + something to render them). Final-resort signal so a
+  # tiny EJS/Handlebars sandbox is still recognized.
+  for tpl_dir in templates app/templates resources/views; do
+    if [ -d "$dir/$tpl_dir" ]; then
+      if find "$dir/$tpl_dir" -maxdepth 3 -type f \
+           \( -name '*.ejs' -o -name '*.hbs' -o -name '*.pug' \
+              -o -name '*.twig' -o -name '*.html' \) \
+           2>/dev/null | grep -q .; then
+        return 0
+      fi
+    fi
+  done
+
   return 1
 }
 

@@ -890,6 +890,65 @@ if [ "${_A4_EMITTED:-0}" = "1" ]; then
   fi
 fi
 
+# --- Aşama 9 auto-complete (since v10.1.11) ---
+# Real-world failure mode (grom backoffice): all 8 sub-step audits
+# (asama-9-N-start/end OR asama-9-N-not-applicable) fired correctly
+# but model forgot to emit the final `asama-9-complete` summary
+# audit. Result: trace.log missed `phase_transition 9 10`, Aşama 11
+# Process Trace appeared to skip Aşama 9, developer concluded the
+# phase was atlanmış even though every sub-step actually ran.
+#
+# Fix: when Stop sees all 8 sub-step completion signals AND
+# `asama-9-complete` is missing, auto-emit it. Existing v10.1.5
+# progression scanner (below) then promotes quality_review_state to
+# complete normally. The auto-emit is logged with caller=mcl-stop-auto
+# so it's distinguishable from a model-generated emit during forensics.
+_mcl_asama_9_substeps_complete() {
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  if [ ! -f "$audit_file" ]; then echo "0|0"; return; fi
+  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo "0|0"
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+done = {n: False for n in range(1, 9)}
+try:
+    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+        ts = line.split("|", 1)[0].strip()
+        if session_ts and ts < session_ts:
+            continue
+        for n in range(1, 9):
+            # Either asama-9-N-end (sub-step ran) OR asama-9-N-not-applicable
+            # (sub-step soft-skipped with reason) counts as completion.
+            if (f"| asama-9-{n}-end |" in line or
+                f"| asama-9-{n}-not-applicable |" in line):
+                done[n] = True
+except Exception:
+    pass
+all_done = all(done.values())
+done_count = sum(1 for v in done.values() if v)
+print(f"{done_count}|{1 if all_done else 0}")
+PYEOF
+}
+
+_A9_SUB_RESULT="$(_mcl_asama_9_substeps_complete 2>/dev/null || echo "0|0")"
+_A9_SUB_DONE_COUNT="${_A9_SUB_RESULT%%|*}"
+_A9_SUB_ALL_DONE="${_A9_SUB_RESULT##*|}"
+if [ "${_A9_SUB_ALL_DONE:-0}" = "1" ]; then
+  _A9_HAS_COMPLETE="$(_mcl_audit_emitted_in_session "asama-9-complete" "" 2>/dev/null || echo 0)"
+  if [ "${_A9_HAS_COMPLETE:-0}" != "1" ]; then
+    mcl_audit_log "asama-9-complete" "mcl-stop-auto" "substeps_done=8 (auto-emitted; model forgot summary)"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append asama_9_auto_complete "8/8"
+  fi
+fi
+
 # --- Audit-driven Aşama 8 progression (since v10.1.5, PILOT) ---
 # When the model emits an explicit `asama-8-complete` audit at the end
 # of risk review, force-progress `risk_review_state` to `complete` even

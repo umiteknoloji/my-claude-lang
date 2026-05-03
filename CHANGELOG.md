@@ -7,6 +7,88 @@
 
 ## [Unreleased]
 
+## [10.1.11] - 2026-05-03
+
+### Two grom-case fixes: Aşama 9 auto-complete + UI autodetect coverage
+
+The grom backoffice retrospective surfaced two related bugs in
+real-world v10.1.10 deployment:
+
+1. **Aşama 9 visible-skip when sub-steps actually ran**: All 8
+   sub-step audits (`asama-9-{1..4}-end` + `asama-9-{5..8}-not-
+   applicable`) fired correctly, but model forgot the final
+   `asama-9-complete` summary emit. Result: trace.log missed
+   `phase_transition 9 10`, Aşama 11 Process Trace appeared to skip
+   Aşama 9, developer concluded the most-important phase was
+   atlanmış even though every sub-step executed.
+
+2. **UI autodetect false negative on raw-Node frontends**: grom's
+   stack (Express + EJS + Bootstrap + raw `public/js/*.js`)
+   returned `ui_capable=false` because the heuristic only checked
+   for React/Vue/Svelte/Next markers + `src/components`. Raw
+   server-rendered patterns (Express EJS, Flask Jinja, Go-with-
+   static) slipped through. Compounded by autodetect being one-shot
+   at session_start — projects that started bare and grew a UI
+   surface mid-session never re-evaluated.
+
+#### Implementation
+
+**`hooks/mcl-stop.sh`** (Aşama 9 auto-complete):
+- New `_mcl_asama_9_substeps_complete` helper scans audit.log for
+  `asama-9-{1..8}-end` OR `asama-9-{1..8}-not-applicable` per
+  sub-step.
+- When all 8 are present AND `asama-9-complete` is missing, Stop
+  auto-emits `asama-9-complete | mcl-stop-auto | substeps_done=8`
+  with the `mcl-stop-auto` caller marking it as auto-emitted (vs
+  model-emitted). Existing v10.1.5 progression scanner picks it up
+  next, transitioning `quality_review_state` to complete normally.
+- `mcl_trace_append asama_9_auto_complete 8/8` recorded for
+  forensics.
+
+**`hooks/lib/mcl-stack-detect.sh`** (UI autodetect heuristic):
+- `views/` directory with `*.ejs` / `*.hbs` / `*.handlebars` /
+  `*.pug` / `*.twig` / `*.html` → ui_capable=true.
+- `public/` directory with `*.html` / `*.css` / `*.js` →
+  ui_capable=true (server-rendered + static asset bundle pattern).
+- Bare-template fallback: `templates/`, `app/templates/`,
+  `resources/views/` with `*.html`/`*.ejs`/etc. → ui_capable=true.
+- All checks scan up to maxdepth 4 (covers nested asset
+  directories like `public/js/components/`).
+
+**`hooks/mcl-post-tool.sh`** (UI re-evaluation):
+- New post-tool branch: when ui_flow_active=false and a Write/
+  Edit/MultiEdit/NotebookEdit creates a UI-pattern file
+  (`public/*.{html,css,js}`, `views/*.{ejs,hbs,pug,twig,html}`,
+  root `*.{ejs,hbs,pug,twig}`, `templates/*.{html,ejs}`), bump
+  ui_flow_active=true.
+- Emits `ui-flow-reevaluated | post-tool | trigger=<filename> prev=
+  false now=true` audit + `mcl_trace_append ui_flow_reevaluated
+  <filename>` trace.
+- Catches sessions that started empty (autodetect correctly false)
+  but grew a UI surface mid-session — exactly the grom case.
+
+#### Why both at once
+
+Both bugs surfaced in the same grom retrospective and both prevent
+the developer from seeing what actually happened. Aşama 9 visible-
+skip hides a phase that ran; UI autodetect false negative hides
+that the project IS frontend-bearing. Combined fix gives the
+developer accurate visibility into what's been done and what
+applies.
+
+#### Tests
+
+272 passing (+12 in `test-v10-1-11-asama9-and-ui-fixes.sh`):
+- Aşama 9 substeps complete detection (all-8 vs partial)
+- Hook contract: helper exists, audit emit format
+- UI heuristic: views/*.ejs, public/{js,css}, empty, pure backend,
+  bare templates
+- UI re-eval: post-tool ui-flow-reevaluated audit emit
+- Real integration: post-tool run flips ui_flow_active false → true
+  on Write to public/js/app.js
+
+Banner: MCL 10.1.10 → MCL 10.1.11.
+
 ## [10.1.10] - 2026-05-03
 
 ### Aşama 13 — Completeness Audit (new phase)

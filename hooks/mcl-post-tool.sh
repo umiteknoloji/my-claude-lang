@@ -173,6 +173,49 @@ print("skip")
   fi
 fi
 
+# UI flow re-evaluation (since v10.1.11) — when ui_flow_active=false
+# but a Write/Edit creates a UI-pattern file (HTML/CSS/JS in public/,
+# EJS/HBS/Pug/Twig template anywhere, root *.html), bump
+# ui_flow_active=true. Catches sessions where the project started
+# bare (autodetect correctly returned false at session_start) but a
+# UI surface emerged mid-session — the grom backoffice case where
+# autodetect ran on an empty repo and never re-evaluated after the
+# model wrote 29 prod files including public/js/*, views/*.ejs.
+if printf '%s' "$TOOL_NAME_POST" | grep -qE '^(Write|Edit|MultiEdit|NotebookEdit)$' 2>/dev/null; then
+  _UI_RE_PATH="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    tin = obj.get("tool_input") or {}
+    print(tin.get("file_path") or tin.get("notebook_path") or "")
+except Exception:
+    pass
+' 2>/dev/null)"
+  if [ -n "$_UI_RE_PATH" ]; then
+    _SCRIPT_DIR_UI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    _STATE_LIB_UI="$_SCRIPT_DIR_UI/lib/mcl-state.sh"
+    if [ -f "$_STATE_LIB_UI" ]; then
+      source "$_STATE_LIB_UI" 2>/dev/null
+      _UI_NOW="$(mcl_state_get ui_flow_active 2>/dev/null)"
+      if [ "$_UI_NOW" = "false" ]; then
+        case "$_UI_RE_PATH" in
+          */public/*.html|*/public/*.css|*/public/*.js|\
+*/public/*/*.html|*/public/*/*.css|*/public/*/*.js|\
+*/views/*.ejs|*/views/*.hbs|*/views/*.pug|*/views/*.twig|\
+*/views/*.html|*/views/*/*.ejs|*/views/*/*.hbs|*/views/*/*.html|\
+*.ejs|*.hbs|*.pug|*.twig|\
+*/templates/*.html|*/templates/*.ejs)
+            mcl_state_set ui_flow_active true >/dev/null 2>&1 || true
+            mcl_audit_log "ui-flow-reevaluated" "post-tool" "trigger=${_UI_RE_PATH##*/} prev=false now=true"
+            [ -f "$_SCRIPT_DIR_UI/lib/mcl-trace.sh" ] && source "$_SCRIPT_DIR_UI/lib/mcl-trace.sh" 2>/dev/null
+            command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_flow_reevaluated "${_UI_RE_PATH##*/}"
+            ;;
+        esac
+      fi
+    fi
+  fi
+fi
+
 # Track last write timestamp for Regression Guard smart-skip staleness check.
 if printf '%s' "$TOOL_NAME_POST" | grep -qE '^(Write|Edit|MultiEdit|NotebookEdit)$' 2>/dev/null; then
   _SCRIPT_DIR_WT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

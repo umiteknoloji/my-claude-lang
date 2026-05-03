@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 10.1.10
+**Güncel sürüm:** 10.1.11
 
 ---
 
