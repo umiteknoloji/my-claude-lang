@@ -220,12 +220,6 @@ print("warn" if (edit_called and not spec_seen_before_edit) else "ok")
 PYEOF
 }
 
-_SP_AUDIT="$(_mcl_spec_presence_audit "$TRANSCRIPT_PATH" 2>/dev/null || echo ok)"
-if [ "$_SP_AUDIT" = "warn" ]; then
-  mcl_audit_log "spec-required-warn" "stop" "edit-without-preceding-spec-in-turn"
-  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_required_warn
-fi
-
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
 TRANSCRIPT_PATH="$(printf '%s' "$RAW_INPUT" | python3 -c '
@@ -236,6 +230,16 @@ try:
 except Exception:
     pass
 ' 2>/dev/null)"
+
+# Spec-presence audit (since v10.0.4, ordering fix v10.1.16) — must
+# run AFTER TRANSCRIPT_PATH is assigned. Prior to v10.1.16 this call
+# sat above the assignment and tripped `set -u` on every Stop hook
+# invocation, breaking phase-state advancement silently.
+_SP_AUDIT="$(_mcl_spec_presence_audit "$TRANSCRIPT_PATH" 2>/dev/null || echo ok)"
+if [ "$_SP_AUDIT" = "warn" ]; then
+  mcl_audit_log "spec-required-warn" "stop" "edit-without-preceding-spec-in-turn"
+  command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_required_warn
+fi
 
 if [ -z "$TRANSCRIPT_PATH" ] || [ ! -f "$TRANSCRIPT_PATH" ]; then
   mcl_debug_log "stop" "no-transcript" "path='${TRANSCRIPT_PATH}'"
@@ -613,7 +617,7 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
       # (sticky enforcement — Bash-only/text-only turns cannot escape the gate).
       mcl_state_set risk_review_state '"pending"' >/dev/null 2>&1 || true
       mcl_audit_log "phase-review-pending" "stop" \
-        "prev=${_PR_REVIEW_STATE} phase=${_PR_PHASE} code=${_PR_CODE}"
+        "prev=${_PR_REVIEW_STATE} phase=${_PR_ACTIVE_PHASE} code=${_PR_CODE}"
       command -v mcl_trace_append >/dev/null 2>&1 && \
         mcl_trace_append risk_review_pending "${_PR_REVIEW_STATE:-null}"
 

@@ -7,6 +7,64 @@
 
 ## [Unreleased]
 
+## [10.1.16] - 2026-05-03
+
+### Critical: Stop hook unbound-variable crash fixes
+
+A real-world v10.1.15 test session surfaced two `set -u` violations
+in `hooks/mcl-stop.sh` that caused the Stop hook to fail on every
+turn. Symptoms: phase state never advanced past whatever it was at
+the moment of the bug, repeated assistant text blocks appeared in
+the UI (Claude Code retries on Stop hook error), and downstream
+phase-skip enforcement misfired against the wrong phase context.
+
+#### Bug 1 — `TRANSCRIPT_PATH` used before assignment
+
+`mcl-stop.sh:223` called `_mcl_spec_presence_audit "$TRANSCRIPT_PATH"`
+but `TRANSCRIPT_PATH` was assigned at line 231 (parsed from
+`RAW_INPUT`). With `set -u` (line 21), the unbound reference
+triggered every Stop hook invocation. The two-line ordering must
+have been correct in an earlier version and got swapped during a
+later refactor — no single commit obviously responsible, the order
+was wrong by the time it surfaced in production.
+
+Fix: moved the spec-presence-audit call (lines 223-227) to AFTER
+the `RAW_INPUT` and `TRANSCRIPT_PATH` assignment block. Same logic,
+correct ordering. Added a comment marking the v10.1.16 fix.
+
+#### Bug 2 — `_PR_PHASE` referenced but never set
+
+`mcl-stop.sh:616` formatted the `phase-review-pending` audit detail
+using `${_PR_PHASE}` but no such variable existed in the file —
+typo for `_PR_ACTIVE_PHASE` (set at line 568). Pure rename bug;
+fix is a single substitution.
+
+#### Why the user-visible symptoms were severe
+
+When the Stop hook crashes, Claude Code does NOT advance phase
+state, does NOT update `risk_review_state`, does NOT advance
+`current_phase`. Every subsequent turn begins with stale state.
+The Aşama 8 SKIP-BLOCK gate (since v10.1.7) reads `risk_review_state`
+to decide whether to fire — with the hook crashing, the gate
+fired against the wrong phase context. In the user's session, this
+manifested as `MCL ASAMA 8 SKIP-BLOCK` firing during what was
+behaviorally an Aşama 6b UI revision, with confusing recovery
+prompts.
+
+Fixing the crash does NOT alone resolve the broader question of
+"how should MCL handle follow-up edits after the full pipeline
+completed?" — that is a separate design discussion (one-spec-per-task
+boundary detection). The crash fix is a precondition: until the
+Stop hook runs cleanly, no phase-context reasoning has a chance.
+
+#### Smoke test
+
+Mock `{"transcript_path":"/tmp/nonexistent","session_id":"smoke-1"}`
+piped to `bash hooks/mcl-stop.sh` now exits 0 with no stderr
+output. Pre-fix: crashed with two unbound-variable errors.
+
+Banner: MCL 10.1.15 → MCL 10.1.16.
+
 ## [10.1.15] - 2026-05-03
 
 ### Preventive layer — activate hook prompt rewrite with canonical phase script
