@@ -51,8 +51,11 @@ JSON
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-6-int" > "$_dir/.mcl/trace.log"
 
-# Audit log: model emitted asama-4-complete (classifier missed the askq approve)
+# Audit log: model emitted asama-4-complete (classifier missed the askq approve).
+# precision-audit also serves as Aşama 1 evidence (transitively — Aşama 2 ran
+# means Aşama 1 ran before it), so v10.1.12 asama-1-skip gate is satisfied.
 cat > "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
 $(date '+%Y-%m-%d %H:%M:%S') | precision-audit | asama2 | core_gates=2 stack_gates=0 assumes=4 skipmarks=0 skipped=false
 $(date '+%Y-%m-%d %H:%M:%S') | asama-4-complete | mcl-stop | spec_hash=abc123def456 approver=user
 EOF

@@ -139,7 +139,10 @@ fi
 # any intermediate deny — escape hatch fires before block evaluation.
 _write_frozen_state
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-7-tc-emit-first" > "$_dir/.mcl/trace.log"
-echo "$(date '+%Y-%m-%d %H:%M:%S') | asama-4-complete | mcl-stop | spec_hash=preemit approver=user" > "$_dir/.mcl/audit.log"
+cat > "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
+$(date '+%Y-%m-%d %H:%M:%S') | asama-4-complete | mcl-stop | spec_hash=preemit approver=user
+EOF
 
 _out_first="$(_run_pre_tool "${_MUT_INPUTS[0]}")"
 _dec_first="$(_extract_decision "$_out_first")"

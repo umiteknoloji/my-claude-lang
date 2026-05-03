@@ -80,6 +80,7 @@ _PRE_INPUT='{"tool_name":"Write","tool_input":{"file_path":"/p/foo.js","content"
 _write_post_spec_state
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-8-c1" > "$_dir/.mcl/trace.log"
 cat > "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
 $(date '+%Y-%m-%d %H:%M:%S') | tdd-prod-write | post-tool | file=/p/foo.js
 $(date '+%Y-%m-%d %H:%M:%S') | asama-8-emit-missing | stop | skip-detect prod-write-without-emit
 EOF
@@ -100,6 +101,7 @@ fi
 _write_post_spec_state
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-8-c2" > "$_dir/.mcl/trace.log"
 cat > "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
 $(date '+%Y-%m-%d %H:%M:%S') | tdd-prod-write | post-tool | file=/p/foo.js
 $(date '+%Y-%m-%d %H:%M:%S') | asama-8-emit-missing | stop | skip-detect prod-write-without-emit
 $(date '+%Y-%m-%d %H:%M:%S') | asama-8-complete | mcl-stop | h_count=1 m_count=2 l_count=0 resolved=3
@@ -122,6 +124,7 @@ fi
 _write_post_spec_state
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-8-c3" > "$_dir/.mcl/trace.log"
 cat > "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
 $(date '+%Y-%m-%d %H:%M:%S') | tdd-prod-write | post-tool | file=/p/foo.js
 $(date '+%Y-%m-%d %H:%M:%S') | asama-8-emit-missing | stop | skip-detect prod-write-without-emit
 $(date '+%Y-%m-%d %H:%M:%S') | asama-9-emit-missing | stop | skip-detect prod-write-without-emit
@@ -137,6 +140,7 @@ assert_equals "both 8 + 9 complete → no block (decision=none)" "$_dec3" "none"
 _write_post_spec_state
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-8-c4" > "$_dir/.mcl/trace.log"
 cat > "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
 $(date '+%Y-%m-%d %H:%M:%S') | tdd-prod-write | post-tool | file=/p/foo.js
 $(date '+%Y-%m-%d %H:%M:%S') | asama-8-emit-missing | stop | skip-detect prod-write-without-emit
 EOF
@@ -171,6 +175,7 @@ fi
 _write_post_spec_state
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-8-c5" > "$_dir/.mcl/trace.log"
 cat > "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
 $(date '+%Y-%m-%d %H:%M:%S') | tdd-prod-write | post-tool | file=/p/foo.js
 $(date '+%Y-%m-%d %H:%M:%S') | asama-8-emit-missing | stop | skip-detect prod-write-without-emit
 EOF
@@ -228,6 +233,7 @@ cat > "$_dir/.mcl/state.json" <<JSON
 JSON
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-8-c6" > "$_dir/.mcl/trace.log"
 cat > "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
 $(date '+%Y-%m-%d %H:%M:%S') | tdd-prod-write | post-tool | file=/p/foo.js
 $(date '+%Y-%m-%d %H:%M:%S') | asama-8-emit-missing | stop | skip-detect prod-write-without-emit
 EOF

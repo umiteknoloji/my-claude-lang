@@ -877,6 +877,36 @@ print("allow")
   fi
 fi
 
+# -------- Branch: Aşama 1 skip-block (since v10.1.12) --------
+# When SPEC_APPROVED=true (passed v10.1.7 gate) but there is NO
+# evidence in the audit trail that Aşama 1 (intent gathering with
+# user-confirmed summary) actually happened, model jumped from
+# prompt directly to spec-emit + spec-approval without parameter
+# verification. The spec is built on assumed parameters → wrong
+# work risk regardless of how many downstream gates pass.
+#
+# Aşama 1 evidence (any of these audits in current session):
+#   - `summary-confirm-approve` — Stop hook detected an Aşama 1
+#     summary-confirm askq with approve-family tool_result
+#   - `precision-audit` (asama2 caller) — Aşama 2 ran; canonically
+#     Aşama 1 must have run before it
+#   - `asama-1-complete` — explicit Bash audit emit (recovery hatch)
+#
+# Recovery: model emits `asama-1-complete` Bash audit (parallel to
+# v10.1.7 asama-4-complete escape hatch) OR re-runs Aşama 1
+# summary-confirm askq cycle properly.
+if [ -z "$REASON" ] && [ "$SPEC_APPROVED" = "true" ]; then
+  _A1_HIT_SC="$(_mcl_audit_emitted_in_session "summary-confirm-approve" "" 2>/dev/null || echo 0)"
+  _A1_HIT_PA="$(_mcl_audit_emitted_in_session "precision-audit" "" 2>/dev/null || echo 0)"
+  _A1_HIT_AC="$(_mcl_audit_emitted_in_session "asama-1-complete" "" 2>/dev/null || echo 0)"
+  if [ "${_A1_HIT_SC:-0}" != "1" ] \
+     && [ "${_A1_HIT_PA:-0}" != "1" ] \
+     && [ "${_A1_HIT_AC:-0}" != "1" ]; then
+    REASON="MCL ASAMA 1 SKIP-BLOCK (since v10.1.12) — spec onaylandı (spec_approved=true) AMA Aşama 1 (intent gathering) yapıldığına dair hiçbir kanıt yok: \`summary-confirm-approve\` audit yok, \`precision-audit asama2\` audit yok, \`asama-1-complete\` audit yok. Bu, spec'in **doğrulanmamış parametreler** üzerine kurulduğu anlamına gelir → yanlış kod riski downstream gate'ler geçse bile sürer. Mutating tool \`${TOOL_NAME}\` bloke edildi. Recovery options: (A) Aşama 1 summary-confirm askq cycle'ı düzgün çalıştır (model intent + constraints + success_criteria + context topla, AskUserQuestion ile özet onayı al); (B) Aşama 1 sözel olarak MCL dışı tamamlandıysa: \`bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-1-complete mcl-stop \"params=intent+constraints+success+context confirmed\"'\` ile audit emit et. Loop-breaker: 3 üst üste blok → fail-open."
+    REASON_KIND="asama-1-skip"
+  fi
+fi
+
 # -------- Branch: Aşama 8/9 skip-block (since v10.1.8) --------
 # When Stop hook detected `asama-{8,9}-emit-missing` (model wrote
 # production code without running risk review / quality+tests), block
@@ -922,10 +952,12 @@ if [ -n "$REASON" ]; then
       mcl_audit_log "spec-approval-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SA_LB_COUNT + 1))"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_approval_block "$((_SA_LB_COUNT + 1))"
     fi
-  elif [ "$REASON_KIND" = "asama-8-skip" ] || [ "$REASON_KIND" = "asama-9-skip" ]; then
-    # v10.1.8: Aşama 8/9 skip-block. Same loop-breaker shape as
-    # spec-approval-block; recovery is the asama-N-complete Bash emit
-    # (parallels v10.1.7 spec-approval recovery via asama-4-complete).
+  elif [ "$REASON_KIND" = "asama-1-skip" ] \
+       || [ "$REASON_KIND" = "asama-8-skip" ] \
+       || [ "$REASON_KIND" = "asama-9-skip" ]; then
+    # v10.1.8 + v10.1.12: phase-skip blocks. Same loop-breaker shape
+    # as spec-approval-block. Recovery is the asama-N-complete Bash
+    # emit (parallels v10.1.7 spec-approval recovery via asama-4-complete).
     _SKIP_PH_NUM="${REASON_KIND#asama-}"
     _SKIP_PH_NUM="${_SKIP_PH_NUM%-skip}"
     _SK_LB_COUNT="$(_mcl_loop_breaker_count "asama-${_SKIP_PH_NUM}-skip-block" 2>/dev/null || echo 0)"

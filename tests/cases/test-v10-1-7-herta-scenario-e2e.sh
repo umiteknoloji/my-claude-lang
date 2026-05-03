@@ -132,9 +132,14 @@ assert_equals "STEP 1 — state still phase=4 (no progression)" "$_s1_phase" "4"
 assert_equals "STEP 1 — state still spec_approved=false" "$_s1_approved" "false"
 
 # -----------------------------------------------------------------
-# STEP 2: Model emits asama-4-complete (the recovery emit)
+# STEP 2: Model emits asama-4-complete (the recovery emit) +
+# summary-confirm-approve as Aşama 1 evidence (v10.1.12 requirement —
+# real flow has Aşama 1 approval recorded before spec emit).
 # -----------------------------------------------------------------
-echo "$(date '+%Y-%m-%d %H:%M:%S') | asama-4-complete | mcl-stop | spec_hash=abc123def456 approver=user" >> "$_dir/.mcl/audit.log"
+cat >> "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
+$(date '+%Y-%m-%d %H:%M:%S') | asama-4-complete | mcl-stop | spec_hash=abc123def456 approver=user
+EOF
 
 # -----------------------------------------------------------------
 # STEP 3: Retry the Write → escape hatch fires, decision flips to allow

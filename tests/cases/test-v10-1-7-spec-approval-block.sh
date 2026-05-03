@@ -96,7 +96,12 @@ fi
 # === Case 2: asama-4-complete emit → escape hatch unblocks (Option 1) ===
 _write_frozen_state
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-7-c2" > "$_dir/.mcl/trace.log"
+# summary-confirm-approve added since v10.1.12 — v10.1.12 asama-1-skip-block
+# requires Aşama 1 evidence in audit when SPEC_APPROVED=true. Without this,
+# the escape hatch progression triggers asama-1-skip on the next gate. Real
+# sessions naturally have this audit from the Aşama 1 askq.
 cat > "$_dir/.mcl/audit.log" <<EOF
+$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla
 $(date '+%Y-%m-%d %H:%M:%S') | asama-4-complete | mcl-stop | spec_hash=def456abc approver=user
 EOF
 
@@ -191,7 +196,8 @@ cat > "$_dir/.mcl/state.json" <<JSON
 }
 JSON
 echo "$(date '+%Y-%m-%d %H:%M:%S') | session_start | mcl-activate.sh | t10-1-7-c4" > "$_dir/.mcl/trace.log"
-: > "$_dir/.mcl/audit.log"
+# Aşama 1 evidence required since v10.1.12 (real-flow simulation).
+echo "$(date '+%Y-%m-%d %H:%M:%S') | summary-confirm-approve | stop | selected=Onayla" > "$_dir/.mcl/audit.log"
 
 _out5="$(_run_pre_tool "$_PRE_INPUT")"
 _dec5="$(_extract_decision "$_out5")"

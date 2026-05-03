@@ -7,6 +7,93 @@
 
 ## [Unreleased]
 
+## [10.1.12] - 2026-05-03
+
+### Aşama 1 skip-block — close the highest-severity gap
+
+The "model unutursa" review identified Aşama 1 (intent gathering with
+user-confirmed parameter summary) as the only ✗ HIGH severity gap.
+Model could jump from prompt directly to spec-emit + spec-approval
+without parameter verification → spec built on assumed parameters →
+wrong code regardless of how many downstream gates pass.
+
+v10.1.12 closes this gap with the same v10.1.7/v10.1.8 pattern:
+real pre-tool block when SPEC_APPROVED=true but no Aşama 1 evidence,
+recovery via Bash audit emit, 3-strike loop-breaker fail-open.
+
+#### Aşama 1 evidence (any of these in current session)
+
+- `summary-confirm-approve` audit (Stop hook detected an Aşama 1
+  summary askq with approve-family tool_result — the canonical
+  signal)
+- `precision-audit asama2` audit (Aşama 2 ran — Aşama 1 must have
+  run first by the phase ordering)
+- `asama-1-complete` audit (explicit Bash emit recovery hatch)
+
+#### Implementation
+
+**`hooks/mcl-pre-tool.sh`** — new branch after Aşama 8/9 skip-block:
+
+```bash
+if [ -z "$REASON" ] && [ "$SPEC_APPROVED" = "true" ]; then
+  _A1_HIT_SC="$(_mcl_audit_emitted_in_session "summary-confirm-approve")"
+  _A1_HIT_PA="$(_mcl_audit_emitted_in_session "precision-audit")"
+  _A1_HIT_AC="$(_mcl_audit_emitted_in_session "asama-1-complete")"
+  if [ "${_A1_HIT_SC}${_A1_HIT_PA}${_A1_HIT_AC}" = "000" ]; then
+    REASON="MCL ASAMA 1 SKIP-BLOCK ..."
+    REASON_KIND="asama-1-skip"
+  fi
+fi
+```
+
+Decision logic — extended the v10.1.8 phase-skip elif branch to also
+handle `asama-1-skip` (same loop-breaker shape, same recovery pattern).
+
+#### Recovery message
+
+The block REASON instructs the model on three recovery options:
+- **(A) Re-run Aşama 1 properly** — gather intent / constraints /
+  success_criteria / context, then summary-confirm askq for user
+  approval.
+- **(B) Bash audit emit** for cases where Aşama 1 happened verbally
+  outside MCL: `mcl_audit_log asama-1-complete mcl-stop "params=
+  intent+constraints+success+context confirmed"`.
+- **(C) 3-strike fail-open** — after 3 consecutive blocks the gate
+  releases with `asama-1-skip-loop-broken` audit recorded so the
+  bypass is visible.
+
+#### Test fallout
+
+Several v10.1.6/v10.1.7/v10.1.8 tests had artificial setups that
+set `state.spec_approved=true` directly without the corresponding
+Aşama 1 audit (real flow has `summary-confirm-approve` recorded
+before spec approval). v10.1.12 correctly catches these as Aşama 1
+skips. Tests updated to seed audit.log with `summary-confirm-approve`
+where they simulate post-Aşama-4 scenarios — better real-flow fidelity.
+
+#### Combined v10.1.0–v10.1.12 effect
+
+Phase contract is now end-to-end enforceable:
+- spec_approved=false (v10.1.7) → spec-approval-block
+- spec_approved=true + no Aşama 1 evidence (v10.1.12) → asama-1-skip-block
+- code written + asama-{8,9}-emit-missing (v10.1.8) → skip-block
+- All four with classifier-independent Bash recovery emits + 3-strike fail-open
+
+The "model unutursa" review's only ✗ entry is now ✓.
+
+#### Tests
+
+288 passing (+16 in `test-v10-1-12-asama1-skip-block.sh`):
+- Block fires when SPEC_APPROVED=true + no Aşama 1 evidence
+- Each evidence source unblocks (summary-confirm-approve / precision-
+  audit / asama-1-complete)
+- 3-strike loop-breaker → 4th allows + asama-1-skip-loop-broken audit
+- Read-only tools not blocked
+- spec-approval-block has priority when SPEC_APPROVED=false
+- Hook contract checks
+
+Banner: MCL 10.1.11 → MCL 10.1.12.
+
 ## [10.1.11] - 2026-05-03
 
 ### Two grom-case fixes: Aşama 9 auto-complete + UI autodetect coverage
