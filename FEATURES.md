@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 10.1.9
+**Güncel sürüm:** 10.1.10
 
 ---
 
@@ -24,6 +24,7 @@ Aşama 8 → Risk incelemesi
 Aşama 10 → Etki analizi
 Aşama 11   → Doğrulama raporu
 Aşama 12 → Lokalize rapor (EN → geliştirici dili çevirisi)
+Aşama 13 → Tamlık denetimi (her fazın gerçekten tamamlandığını audit.log'dan doğrular; Aşama 7 TDD ve Aşama 9 sub-step deep-dive)
 ```
 
 ### Dil Köprüsü

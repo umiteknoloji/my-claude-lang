@@ -120,6 +120,14 @@ Aşama 12: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
           kullanıcı dili) senin diline çevriliyor — yorum yok,
           ekleme yok. Teknik tokenlar (dosya:satır, test isimleri)
           olduğu gibi korunuyor.
+  │
+  ▼
+Aşama 13: Tamlık Denetimi — `.mcl/audit.log` okunup her fazın
+          1-12 gerçekten uçtan uca tamamlandığı doğrulanır. İki
+          deep-dive: Aşama 7 (test-first uygulandı mı? test_command
+          GREEN mi?) ve Aşama 9 (her sub-step 9.1-9.8 start/end +
+          auto-fix yaptı mı?). Açık Konular bölümü pipeline'ın
+          atladığı boşlukları yüzeye çıkarır.
 ```
 
 **Hiçbir belirsizlik bu döngüden sağ çıkamaz.** Her kapıda "hayır" diyebilirsin ve MCL geri dönüp düzeltir. Açık onayın olmadan hiçbir şey ilerlemez.
@@ -130,7 +138,7 @@ Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 4 spec onayı, her Aşama 8
 risk, her Aşama 10 etki, plugin onayı, git-init onayı, drift çözümü,
 `/mcl-update` / `/mcl-finish` / yapıştırılan-CLI onayı) yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 10.1.9 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+`MCL 10.1.10 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
 "evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
 açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
 kalıyor.
@@ -140,7 +148,7 @@ Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
 bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
 onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
-Her yanıt `🌐 MCL 10.1.9` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 10.1.10` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ### UI Build / Review Alt-Fazları (6.2.0'dan itibaren)
 

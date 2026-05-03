@@ -124,6 +124,14 @@ Aşama 12: The full English report is formally translated back to
          your language — same strict translator pass, no
          interpretation. Technical tokens (file:line, test names)
          stay verbatim.
+  │
+  ▼
+Aşama 13: Completeness Audit — reads `.mcl/audit.log` and verifies
+         each phase 1-12 actually completed end-to-end. Two deep
+         dives: Aşama 7 (was test-first applied? was test_command
+         GREEN?) and Aşama 9 (did each sub-step 9.1-9.8 start, end,
+         and apply auto-fix?). Open Issues surface gaps the rest
+         of the pipeline missed.
 ```
 
 **No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit approval.
@@ -134,7 +142,7 @@ Every closed-ended gate (Aşama 1 summary, Aşama 4 spec approval, each
 Aşama 8 risk, each Aşama 10 impact, plugin consent, git-init consent,
 drift resolution, `/mcl-update` / `/mcl-finish` / pasted-CLI confirmation)
 arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 10.1.9 | `. You pick an option in the UI — no typing
+question prefix `MCL 10.1.10 | `. You pick an option in the UI — no typing
 "yes" or "✅ MCL APPROVED" required. Open-ended Aşama 1 gathering stays
 as a plain-text conversation.
 
@@ -143,7 +151,7 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 10.1.9` so you always know the bridge is active.
+Every response starts with `🌐 MCL 10.1.10` so you always know the bridge is active.
 
 ### UI Build / Review Sub-Phases (since 6.2.0)
 

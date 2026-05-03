@@ -9,7 +9,7 @@ description: >
   ambiguity, generates senior-engineer-grade specs, and filters sycophancy.
 ---
 
-# MCL — Semantic Development Bridge (v10.1.9)
+# MCL — Semantic Development Bridge (v10.1.10)
 
 ## How to Activate
 
@@ -43,7 +43,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 10.1.9` on its own line.
+Every response MUST start with `🌐 MCL 10.1.10` on its own line.
 
 ## AskUserQuestion Protocol
 
@@ -53,7 +53,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 partial-spec recovery, mcl-update, mcl-finish, pasted-CLI passthrough —
 uses Claude Code's native `AskUserQuestion` tool with `question` prefixed
-`MCL 10.1.9 | `. The Stop hook parses tool_use/tool_result pairs to advance
+`MCL 10.1.10 | `. The Stop hook parses tool_use/tool_result pairs to advance
 MCL state.
 
 ## MCL Tag Schema
@@ -158,7 +158,7 @@ For full Aşama 1 rules, read `my-claude-lang/asama1-gather.md`
    schema/migration, auth/permission model, public API breaking changes,
    irreversible data consequences, security boundaries.
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 10.1.9 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 10.1.10 | <localized-is-this-correct>",
    options: ["<approve>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns approve does state advance.
 
@@ -210,7 +210,7 @@ collect approval via ONE AskUserQuestion call.
    concrete technical problems (race conditions, scale issues, missing
    auth, N+1, cascading failures). If found, add one `⚠️ Teknik not:`
    line.
-5. Call `AskUserQuestion({question: "MCL 10.1.9 | <approval-prompt>",
+5. Call `AskUserQuestion({question: "MCL 10.1.10 | <approval-prompt>",
    options: [{label: "<approve-verb>", ...}, {label: "<edit>", ...},
    {label: "<cancel>", ...}]})`. The approve label is the BARE VERB.
 
@@ -364,6 +364,18 @@ The full English Aşama 11 report is translated EN → user_lang via
 strict translator pass. No interpretation, no addition, no omission.
 Technical tokens (file paths, test names, timestamps, CLI flags) stay
 verbatim. Skipped silently when source language is English.
+
+## Aşama 13: Completeness Audit
+
+For full Aşama 13 rules, read `my-claude-lang/asama13-completeness.md`
+
+Last phase before session close. Reads `.mcl/audit.log` + `state.json`
++ `trace.log` and renders a machine-verifiable summary of which
+phases 1-12 actually completed end-to-end. Two mandatory deep dives:
+**Aşama 7** (was test-first applied? was test_command run GREEN?) and
+**Aşama 9** (did each sub-step 9.1–9.8 start, end, and apply auto-fix?).
+Skips with non-✓ verdicts surface as Open Issues. Emits
+`asama-13-complete` audit on completion.
 
 ---
 

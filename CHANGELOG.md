@@ -7,6 +7,76 @@
 
 ## [Unreleased]
 
+## [10.1.10] - 2026-05-03
+
+### Aşama 13 — Completeness Audit (new phase)
+
+Pipeline gains a 13th phase that runs after Aşama 12 (or after
+Aşama 11 in English sessions where Aşama 12 is no-op). Reads the
+session's `.mcl/audit.log` + `.mcl/state.json` + `.mcl/trace.log`
+and renders a machine-verifiable summary of which phases 1-12
+actually completed end-to-end. Two mandatory deep dives surface
+the highest-leverage compliance questions:
+
+1. **Aşama 7 — Test-First**: counts `tdd-test-write` (T) vs
+   `tdd-prod-write` (P) events, reports `state.tdd_compliance_score`,
+   checks `state.tdd_last_green` for the most recent test_command
+   result. Verdict: ✓ if 100% AND last result GREEN, ⚠️ partial,
+   ✗ anti-TDD (P>0 AND T=0).
+2. **Aşama 9 — Quality+Tests sub-steps**: for each N in 1..8 scans
+   for `asama-9-N-start` + `asama-9-N-end` + `asama-9-N-not-applicable`
+   + `asama-9-4-resolved` audits. Per sub-step verdict ✓ if start/end
+   both present, ✓ if not-applicable (soft skip with reason), ⚠️ if
+   start without end (incomplete), ✗ if no start AND no not-applicable
+   (sub-step skipped without audit — Aşama 9 contract violation).
+
+Output ends with an Open Issues section (omitted per empty-section-
+omission rule when all phases ✓) so non-✓ verdicts surface as
+actionable line items, not buried in a long table.
+
+#### Why this matters
+
+Across v10.1.5–v10.1.9 the protective chain became progressively
+harder to bypass, but the developer still had no single place to
+read "what actually completed in this session." Aşama 11 covers
+spec compliance (per requirement); Aşama 13 covers PHASE compliance
+(per phase). The two are complementary.
+
+The grom backoffice case (May 2026) was the canonical example:
+Aşama 11 emitted, model claimed completion, but Aşama 8 + Aşama 9
+were skipped (visible in audit as `asama-{8,9}-emit-missing`).
+A retroactive Aşama 13 on that session would have surfaced exactly
+those two ✗ verdicts before the developer trusted the output.
+
+#### Implementation
+
+- **`skills/my-claude-lang/asama13-completeness.md`** (new) —
+  full skill file with phase-completion signal table, Aşama 7 +
+  Aşama 9 deep dive specifications, output format, anti-patterns,
+  and skip-detection note (Layer 3).
+- **`hooks/mcl-activate.sh`** — STATIC_CONTEXT carries the Aşama 13
+  directive between asama11-verify-report and rule-capture phases
+  so the rule is loaded on every prompt.
+- **`skills/my-claude-lang.md`** — main skill index gains an
+  Aşama 13 pointer per the project rule "every phase skill file
+  needs a pointer line."
+- **`FEATURES.md`, `README.md`, `README.tr.md`** — pipeline
+  diagrams updated with the 13th step.
+
+No hook code changes — Aşama 13 is a behavioral phase backed by
+audit emit (`asama-13-complete`). Layer 3 skip-detection for
+Aşama 13 itself can be added in a future release if real-world data
+shows skip patterns.
+
+#### Tests
+
+260 passing (+15 in `test-v10-1-10-asama13-completeness.sh`):
+skill file structure (sections, mcl_phase tag, sub-step references,
+emit instruction), STATIC_CONTEXT inclusion, main skill index
+pointer, pipeline diagram in FEATURES + both READMEs.
+
+Banner: MCL 10.1.9 → MCL 10.1.10.
+
 ## [10.1.9] - 2026-05-03
 
 ### Inline-spec askq fallback hash — classifier coverage fix
