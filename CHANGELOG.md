@@ -7,6 +7,119 @@
 
 ## [Unreleased]
 
+## [10.1.15] - 2026-05-03
+
+### Preventive layer — activate hook prompt rewrite with canonical phase script
+
+A second real-world test exposed a different class of bug than v10.1.14
+addressed. With v10.1.14 deployed, the developer (Ümit) ran the same
+backoffice prompt. The model now passed Aşama 2's deterministic gate
+(`asama-2-complete` fired correctly), but emitted the SPEC body in
+Turkish — Aşama 3 (Translate) was skipped entirely. v10.1.14's gate
+caught the wrong-process-1 (no Aşama 2 confirm) but not wrong-process-2
+(Aşama 3 skipped, body in dev's language).
+
+Ümit's diagnosis was sharp:
+
+> "ya herşeyi sonradan kontrol etmeye odaklanıyorsun. baştan sorun
+>  çıkmayacak şekilde düzelt."
+
+i.e. "stop fixing things post-hoc; fix them so the problem doesn't
+arise in the first place." This is the framing every prior fix
+violated — v10.1.7 (spec-approval-block), v10.1.12 (Aşama 1 skip-block),
+v10.1.14 (asama-2-complete) — they were all detection-and-block at
+mutation time. The model would still drift; the hook would just catch
+the drift later.
+
+#### Root cause (preventive frame)
+
+The activate hook's `<mcl_core>` inline prompt was the leverage point
+all along. The current prompt:
+
+- Used non-canonical legacy labels (`PHASE 1.5`, `PHASE 1.7`) that
+  did not match the skill files (`asama2-precision-audit.md`,
+  `asama3-translator.md`).
+- Buried Aşama 2, Aşama 3, and Aşama 4 inside one giant rule (rule 5)
+  that ran 800+ words.
+- Did NOT name Aşama 3 at the same visual level as the others; the
+  "Engineering Brief" was a sub-paragraph of rule 5.
+- Did NOT explicitly state "SPEC BODY IS ENGLISH" as a top-level
+  directive — only implied via "translate then spec".
+- Did NOT give explicit closing-askq title prefixes per phase (only
+  "MCL <ver> | " was specified, not "Faz 1 — Niyet özeti onayı:" /
+  "Faz 2 — Precision-audit niyet onayı:" / "Faz 4 — Spec onayı:").
+
+The model invented its own labels (`Faz 1 — Niyet`, `Faz 2 — Belirsizlik
+Taraması`, `Faz 3 — Spec`, `Faz 4 — Spec İncelemesi`) because the
+prompt did not enforce the canonical numbering. With the model's
+custom labeling, Aşama 3 had no slot — and so it was skipped.
+
+#### Fix
+
+**`hooks/mcl-activate.sh`** — `<mcl_core>` rules block fully rewritten.
+The new structure:
+
+- Rule 1: Banner. Unchanged.
+- Rule 2: Language. Tightened: code is English; communication, section
+  headers, and AskUserQuestion bodies are dev-language.
+- Rule 3: PHASE SCRIPT — the canonical Aşama 1 → 2 → 3 → 4 sequence
+  rendered as four visually-separated blocks (`━━━ Aşama N — <name>`).
+  Each block lists: skill file to read, what to do, the exact closing
+  AskUserQuestion title prefix, the audit emitted on approve, and
+  what is forbidden. Aşama 3 is now its own visible block with the
+  explicit "OUTPUT IS ENGLISH" directive at top — impossible to miss
+  or merge with another phase.
+- Rule 4: PHASE LABEL DISCIPLINE — explicit list of canonical phase
+  labels in 14 languages (Faz/Phase/Fase/Étape/フェーズ/단계/阶段/
+  مرحلة/שלב/चरण/Tahap/Этап/...) and prohibition on inventing labels.
+- Rule 5: All code English / all communication dev-language; refers
+  back to Aşama 1's disambiguation triage.
+
+The prompt is ~1000 chars longer net, but each phase is visually
+distinct and the canonical numbering is at the top of each block.
+The model cannot drift because the script tells it exactly what to
+emit, with what title, in what order.
+
+**`skills/my-claude-lang/asama1-gather.md`** — closing askq title
+prefix template now includes the explicit `Faz 1 — Niyet özeti onayı:`
+form (TR calibration) with parallel EN/ES translations and a note
+about the parser dependency.
+
+**`skills/my-claude-lang/asama3-translator.md`** — new "Why this phase
+exists (preventive frame)" section explaining the dependency chain:
+Aşama 3 is the only phase that converts dev-language parameters into
+the English parameter set Aşama 4 emits as the SPEC body. Skipping
+Aşama 3 is the most common failure mode that puts the SPEC body in
+the wrong language. No detection-only enforcement — the preventive
+contract is in the prompt itself.
+
+**`skills/my-claude-lang/asama4-spec.md`** — Rules section rewritten:
+new explicit "SPEC BODY IS ENGLISH — non-negotiable" directive (rule
+4); closing askq title prefix template now lists `Faz 4 — Spec onayı:`
+(TR) / `Phase 4 — Spec approval:` (EN) / equivalent; added the
+asama-2-complete + spec-approve audit chain as a precondition for
+Aşama 7 advance.
+
+#### Why this is preventive, not detective
+
+Hook detection (PreToolUse blocks, Stop-hook audits) catches drift
+AFTER the model has already produced wrong output. The user sees the
+wrong output; the hook then refuses the next mutation. Cycle of bad
+UX.
+
+Prompt-level instruction shaping prevents drift BEFORE it happens.
+The model reads the canonical phase script at the top of every turn,
+sees explicit closing-askq titles, sees the English-body directive
+named explicitly, and produces correct output the first time. The
+hook layer (asama-2-complete gate, spec-approval-block) becomes a
+safety net for residual model error — not the primary mechanism.
+
+This is what MCL fundamentally is: prompt engineering as model
+behavior shaping. v10.1.7 / v10.1.12 / v10.1.14 lost sight of that.
+v10.1.15 brings it back.
+
+Banner: MCL 10.1.14 → MCL 10.1.15.
+
 ## [10.1.14] - 2026-05-03
 
 ### Aşama 2 deterministic gate — `asama-2-complete` audit replaces v10.1.12 OR-list

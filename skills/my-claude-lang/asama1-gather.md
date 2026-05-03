@@ -60,10 +60,13 @@ I understood the following:
 ━━━━━━━━━━━━━━━━━━━━━
 ```
 
-Then call:
+Then call (title prefix is mandatory and is parsed by `mcl-askq-scanner.py` — deviating from the prefix breaks classification and the Stop hook will not emit `summary-confirm-approve`):
 ```
 AskUserQuestion({
-  question: "MCL 7.1.6 | <localized 'Is this correct?'>",
+  question: "MCL <ver> | Faz 1 — Niyet özeti onayı: <localized 'Is this correct?'>",   // TR (calibration language)
+  // EN: "MCL <ver> | Phase 1 — Intent summary confirmation: <body>"
+  // ES: "MCL <ver> | Fase 1 — Confirmación de resumen de intención: <body>"
+  // (translate the segment after the third pipe; `Faz N` / `Phase N` / `Fase N` is the canonical phase label per dev-lang)
   options: [
     "<approve-verb>",
     "<edit-verb>",

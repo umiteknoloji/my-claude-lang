@@ -56,13 +56,14 @@ a senior English-speaking engineer wrote the requirements themselves.
 1. Announce: "All points are clear. Generating the specification..."
 2. Write the spec in a visible `📋 Spec:` block in the response — NOT internally
 3. The spec MUST be visible to the developer in the conversation output
-4. After the spec, explain in the developer's language what it says
-5. Call `AskUserQuestion({question: "MCL 6.0.0 | <localized spec-approval
-   prompt>", options: ["<approve-family>", "<edit>", "<cancel>"]})` —
-   since 6.0.0 this REPLACES the text-based "yes / no" prompt. Do NOT
-   emit the legacy `✅ MCL APPROVED` marker; it is dead.
-6. Do NOT proceed to Aşama 7 until the tool_result returns an
-   approve-family option (Stop hook audit: `approve-via-askuserquestion`).
+4. **SPEC BODY IS ENGLISH — non-negotiable (since 10.1.15).** Every section's body content (Objective, MUST/SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope, conditional sections) is written in English, derived from the Aşama 3 Engineering Brief — NOT from Aşama 1's dev-language summary. If the spec body is in dev's language, Aşama 3 was skipped — go back and run Aşama 3 first. Section section *labels* (e.g. "Objective", "MUST/SHOULD") stay English; the *content under each label* is also English. This is what enables Claude Code to consume the spec as if a native English engineer wrote it.
+5. After the spec, write a 3-5 sentence summary paragraph in dev's language (plain text, BEFORE the AskUserQuestion call). This is the developer-facing TLDR.
+6. Call `AskUserQuestion` with question prefix EXACTLY (parsed by `mcl-askq-scanner.py` — deviating breaks classification):
+   - TR: `MCL <ver> | Faz 4 — Spec onayı: <localized spec-approval prompt>`
+   - EN: `MCL <ver> | Phase 4 — Spec approval: <body>`
+   - Other: `MCL <ver> | <translated phase label> — Spec approval: <body>` (translate the body, keep `Spec` as a fixed MCL technical token)
+   Options: approve-family / edit / cancel in dev's language. Do NOT emit the legacy `✅ MCL APPROVED` marker; it is dead.
+7. Do NOT proceed to Aşama 7 until the tool_result returns an approve-family option (Stop hook audit: `approve-via-askuserquestion` AND `spec-approve` AND `asama-2-complete` must all be present).
 
 ## Spec Quality Standard
 

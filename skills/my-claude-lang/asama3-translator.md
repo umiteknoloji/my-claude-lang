@@ -21,16 +21,18 @@ brief was a faithful translator only — vague verbs ("list", "show",
 verbs to surgical English so Aşama 4 spec uses senior-engineer
 vocabulary by default.
 
-## When Aşama 2 → 1.5 Runs
+## When Aşama 3 Runs
 
-After Aşama 1 AskUserQuestion approve, Aşama 2 completes (audit emitted).
-Then Aşama 3 runs immediately (same response or next, depending on
-whether Aşama 2 had GATE questions). Aşama 4 follows.
+After Aşama 2's closing `precision-confirm` AskUserQuestion returns an approve-family option (Stop hook emits `asama-2-complete` audit). Aşama 3 then runs **before** Aşama 4. The phase chain is strict: Aşama 1 → Aşama 2 → Aşama 3 → Aşama 4. Skipping Aşama 3 is the most common failure mode that makes the Aşama 4 SPEC body land in the developer's language instead of English.
 
 For English source language: translation step skipped (no language
 conversion needed); **upgrade step still runs** because vague English
 ("list users") needs upgrade to surgical English ("render a paginated
 user table") same as Turkish "kullanıcı listele" needs it.
+
+## Why this phase exists (preventive frame, since 10.1.15)
+
+Aşama 3 is the **only** phase that converts dev-language parameters into the English parameter set Aşama 4 emits as the SPEC body. If Aşama 3 is skipped, Aşama 4 has nothing English to derive from — it would either invent English on the fly (lossy) or default to dev-language (wrong). The activate hook prompt mandates Aşama 3 explicitly between Aşama 2's closing approve and Aşama 4's SPEC emit; this skill file is the deep reference. There is no detection-only enforcement for "Aşama 3 ran" — the preventive contract is in the prompt itself.
 
 ## Output Format
 
