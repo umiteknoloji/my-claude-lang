@@ -254,10 +254,19 @@ mcl_audit_log() {
   # Every state write attempt (allow or deny) lands here so Claude-
   # driven bypass attempts are visible to the developer after the fact.
   # Fields: timestamp | event | caller | detail.
+  #
+  # Timestamp format (since v10.1.13): UTC ISO 8601 (e.g.
+  # `2026-05-03T13:42:30Z`) — matches `mcl_trace_append` format so
+  # session_ts filtering in scanners can use direct string comparison
+  # without timezone or format mismatch. Prior to v10.1.13 audit used
+  # local time with space separator (`2026-05-03 13:42:30`); when
+  # compared against trace's ISO format, the space (0x20) sorted
+  # BEFORE 'T' (0x54), causing all audit entries to be filtered as
+  # stale and recovery emits to never reach the scanner.
   local dir="${MCL_STATE_DIR}"
   mkdir -p "$dir" 2>/dev/null || true
   printf '%s | %s | %s | %s\n' \
-    "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2" "$3" \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1" "$2" "$3" \
     >> "$dir/audit.log" 2>/dev/null || true
 }
 
@@ -267,22 +276,40 @@ _mcl_audit_emitted_in_session() {
   # the session, returns 0 (already-handled). Used by phase-progression
   # scanners and by v10.1.8 skip enforcement gate.
   #
-  # Defined here (since v10.1.8) so both mcl-stop.sh and mcl-pre-tool.sh
-  # can use it. Stop hook keeps a local copy for backward-compat.
+  # Timestamp normalization (since v10.1.13): trace.log uses UTC ISO
+  # 8601 (`YYYY-MM-DDTHH:MM:SSZ`), audit.log was using local-tz space-
+  # separator format until v10.1.13 fixed it to ISO UTC. To handle
+  # both old and new audit formats AND tolerate timezone mismatch,
+  # parse both timestamps to epoch seconds via _norm() before
+  # comparison. String compare alone failed because space (0x20) <
+  # 'T' (0x54) caused all space-format audits to be filtered as stale.
   local event_name="$1"
   local idem_marker="${2:-}"
   local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
   local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
   if [ ! -f "$audit_file" ]; then echo 0; return; fi
   python3 - "$audit_file" "$trace_file" "$event_name" "$idem_marker" 2>/dev/null <<'PYEOF' || echo 0
-import os, sys
+import datetime, os, sys
 audit_path, trace_path, event_name, idem = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-session_ts = ""
+
+def _norm(ts):
+    """Parse 'YYYY-MM-DDTHH:MM:SSZ' (UTC ISO) OR 'YYYY-MM-DD HH:MM:SS'
+    (local) into epoch seconds. Returns 0.0 on parse failure."""
+    if not ts:
+        return 0.0
+    try:
+        if "T" in ts:
+            return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+        return datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").timestamp()
+    except Exception:
+        return 0.0
+
+session_epoch = 0.0
 try:
     if os.path.isfile(trace_path):
         for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
             if "| session_start |" in line:
-                session_ts = line.split("|", 1)[0].strip()
+                session_epoch = _norm(line.split("|", 1)[0].strip())
 except Exception:
     pass
 emitted = False
@@ -291,8 +318,8 @@ try:
     needle_emit = f"| {event_name} |"
     needle_idem = f"| {idem} |" if idem else None
     for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
-        ts = line.split("|", 1)[0].strip()
-        if session_ts and ts < session_ts:
+        ts_epoch = _norm(line.split("|", 1)[0].strip())
+        if session_epoch and ts_epoch and ts_epoch < session_epoch:
             continue
         if needle_emit in line:
             emitted = True
@@ -311,24 +338,33 @@ _mcl_loop_breaker_count() {
   # developer in an infinite loop. Session boundary = most recent
   # `session_start` event in trace.log.
   #
-  # Defined here (since v10.1.7) so both mcl-stop.sh and mcl-pre-tool.sh
-  # can use it. Stop hook keeps a local copy for backward-compat.
+  # Timestamp normalization (since v10.1.13): see comment on
+  # _mcl_audit_emitted_in_session for the format-mismatch backstory.
   local event="$1"
   local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
   local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
   if [ ! -f "$audit_file" ]; then echo 0; return; fi
   python3 - "$audit_file" "$trace_file" "$event" 2>/dev/null <<'PYEOF' || echo 0
-import os, sys
+import datetime, os, sys
 audit_path, trace_path, event = sys.argv[1], sys.argv[2], sys.argv[3]
-session_ts = ""
+
+def _norm(ts):
+    if not ts:
+        return 0.0
+    try:
+        if "T" in ts:
+            return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+        return datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").timestamp()
+    except Exception:
+        return 0.0
+
+session_epoch = 0.0
 try:
     if os.path.isfile(trace_path):
         with open(trace_path, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 if "| session_start |" in line:
-                    parts = line.split("|", 1)
-                    if parts:
-                        session_ts = parts[0].strip()
+                    session_epoch = _norm(line.split("|", 1)[0].strip())
 except Exception:
     pass
 count = 0
@@ -338,8 +374,8 @@ try:
         for line in f:
             if needle not in line:
                 continue
-            ts = line.split("|", 1)[0].strip()
-            if not session_ts or ts >= session_ts:
+            ts_epoch = _norm(line.split("|", 1)[0].strip())
+            if not session_epoch or not ts_epoch or ts_epoch >= session_epoch:
                 count += 1
 except Exception:
     pass

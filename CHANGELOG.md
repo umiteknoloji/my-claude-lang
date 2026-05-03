@@ -7,6 +7,95 @@
 
 ## [Unreleased]
 
+## [10.1.13] - 2026-05-03
+
+### Critical timestamp-format-mismatch fix — recovery hatches now actually work
+
+A real-world v10.1.12 deployment exposed a critical hidden bug
+that had been silently degrading every Layer 2/3 scanner since the
+session-boundary filter was introduced. The user's session showed:
+
+1. v10.1.7 spec-approval-block fired correctly
+2. Model attempted recovery via `asama-4-complete` Bash audit emit
+3. Audit emit succeeded (file written)
+4. Pre-tool re-checked → block STILL fired ("escape hatch did not escape")
+5. Model added another audit; still blocked
+6. v10.1.12 asama-1-skip-block fired with "no Aşama 1 evidence"
+   even though `summary-confirm-approve` was in the audit file
+
+#### Root cause
+
+`mcl_trace_append` writes UTC ISO 8601: `2026-05-03T13:42:30Z`.
+`mcl_audit_log` was writing local-tz with space: `2026-05-03 13:42:30`.
+
+Scanner filter:
+```python
+ts = line.split("|", 1)[0].strip()
+if session_ts and ts < session_ts:
+    continue
+```
+
+Lexicographic comparison of `"2026-05-03 13:42:30"` vs
+`"2026-05-03T13:42:30Z"` at character 10: `' '` (0x20) < `'T'` (0x54).
+Result: every audit entry was filtered as "stale" (before session)
+even when emitted seconds AFTER session_start. Recovery emits never
+reached the scanner; phase-progression scanners couldn't see their
+own targets; loop-breaker counters always read 0.
+
+The bug was masked by tests that used the same format
+(`date '+%Y-%m-%d %H:%M:%S'`) for both fixture session_start and
+audit entries — string comparison there is consistent. Real
+sessions had the format mismatch and silently broke.
+
+#### Fix
+
+**`hooks/lib/mcl-state.sh`**:
+
+1. `mcl_audit_log` now uses `date -u '+%Y-%m-%dT%H:%M:%SZ'` —
+   matches `mcl_trace_append` format. New sessions have all-ISO
+   audit logs. String comparison works correctly for new sessions.
+
+2. `_mcl_audit_emitted_in_session` and `_mcl_loop_breaker_count`
+   helpers gained `_norm(ts)` Python helper that parses BOTH
+   formats (UTC ISO and legacy local space) into epoch seconds via
+   `datetime.fromisoformat` / `datetime.strptime`. This makes the
+   fix robust against transition sessions where audit.log has
+   mixed-format entries (pre-v10.1.13 and post-v10.1.13).
+
+**`hooks/mcl-stop.sh`**:
+
+3. Removed the duplicate inline definitions of
+   `_mcl_loop_breaker_count` and `_mcl_audit_emitted_in_session`
+   that shadowed the lib versions. Stop hook now uses the
+   normalized lib helpers via the existing `source` of mcl-state.sh.
+   Replaced with reference comments pointing at lib.
+
+#### Why this affects EVERYTHING
+
+Every gate that uses session_ts filtering was affected:
+- v10.1.5/v10.1.6: phase-progression detection (Aşama 4/8/9/10/11/12)
+- v10.1.7: spec-approval recovery via asama-4-complete
+- v10.1.8: Aşama 8/9 skip-block recovery via asama-N-complete
+- v10.1.10: Aşama 13 audit scanning (deep-dive depth)
+- v10.1.11: Aşama 9 auto-complete (substep counting)
+- v10.1.12: Aşama 1 skip-block evidence detection
+
+All of these silently filtered out their target audits. Recovery
+hatches existed in code but didn't actually escape because the
+scanner couldn't see the recovery emit. v10.1.13 makes the
+existing protective architecture actually work as designed.
+
+#### Tests
+
+294 passing (+6 in `test-v10-1-13-timestamp-format-fix.sh`):
+- mcl_audit_log emits ISO UTC format
+- lib helpers normalize timestamps (no naive string compare)
+- pure-ISO session: audit detected correctly
+- Legacy stop.sh duplicates removed (lib version takes effect)
+- mcl_audit_log date format check
+
+Banner: MCL 10.1.12 → MCL 10.1.13.
+
 ## [10.1.12] - 2026-05-03
 
 ### Aşama 1 skip-block — close the highest-severity gap

@@ -152,46 +152,13 @@ PYEOF
 }
 trap _mcl_session_context_write EXIT
 
-# --- Loop-breaker helper (since v9.0.0) ---
-# Counts how many times a given audit event fired in the current session.
-# Used by hard-enforcement blocks (Aşama 2 precision-audit, Aşama 8
-# risk-review) to fail-open after 3 consecutive same-cause blocks so a
-# stuck model cannot trap the developer in an infinite spec-emit loop.
-# Session boundary is the most recent `session_start` event in trace.log.
-_mcl_loop_breaker_count() {
-  local event="$1"
-  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
-  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
-  if [ ! -f "$audit_file" ]; then echo 0; return; fi
-  python3 - "$audit_file" "$trace_file" "$event" 2>/dev/null <<'PYEOF' || echo 0
-import os, sys
-audit_path, trace_path, event = sys.argv[1], sys.argv[2], sys.argv[3]
-session_ts = ""
-try:
-    if os.path.isfile(trace_path):
-        with open(trace_path, "r", encoding="utf-8", errors="replace") as f:
-            for line in f:
-                if "| session_start |" in line:
-                    parts = line.split("|", 1)
-                    if parts:
-                        session_ts = parts[0].strip()
-except Exception:
-    pass
-count = 0
-needle = f"| {event} |"
-try:
-    with open(audit_path, "r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            if needle not in line:
-                continue
-            ts = line.split("|", 1)[0].strip()
-            if not session_ts or ts >= session_ts:
-                count += 1
-except Exception:
-    pass
-print(count)
-PYEOF
-}
+# Loop-breaker helper has moved to hooks/lib/mcl-state.sh (since
+# v10.1.7) so both Stop and PreToolUse can use it. Lib version uses
+# proper timestamp normalization (since v10.1.13) — handles both
+# legacy local-tz space format AND ISO UTC format. The duplicate
+# definition that used to live here has been removed; the lib's
+# `_mcl_loop_breaker_count` is in scope via the `source` of
+# mcl-state.sh near the top of this file.
 
 # --- Aşama 4 spec-presence audit (since v10.0.4) ---
 # Scan the latest assistant message: if it called Edit/Write/MultiEdit/
@@ -1053,43 +1020,11 @@ fi
 # (mandated by skills/asama12-translate.md) — no new emit needed.
 # Idempotent: re-runs of Stop in same session skip if progression
 # already traced.
-_mcl_audit_emitted_in_session() {
-  # $1 = event name (audit middle field), $2 = optional skip if this
-  # progression-marker name already present (idempotency).
-  local event_name="$1"
-  local idem_marker="${2:-}"
-  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
-  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
-  if [ ! -f "$audit_file" ]; then echo 0; return; fi
-  python3 - "$audit_file" "$trace_file" "$event_name" "$idem_marker" 2>/dev/null <<'PYEOF' || echo 0
-import os, sys
-audit_path, trace_path, event_name, idem = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-session_ts = ""
-try:
-    if os.path.isfile(trace_path):
-        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
-            if "| session_start |" in line:
-                session_ts = line.split("|", 1)[0].strip()
-except Exception:
-    pass
-emitted = False
-already = False
-try:
-    needle_emit = f"| {event_name} |"
-    needle_idem = f"| {idem} |" if idem else None
-    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
-        ts = line.split("|", 1)[0].strip()
-        if session_ts and ts < session_ts:
-            continue
-        if needle_emit in line:
-            emitted = True
-        if needle_idem and needle_idem in line:
-            already = True
-except Exception:
-    pass
-print(1 if (emitted and not already) else 0)
-PYEOF
-}
+# `_mcl_audit_emitted_in_session` helper has moved to
+# hooks/lib/mcl-state.sh (since v10.1.8) and uses proper timestamp
+# normalization (since v10.1.13). The duplicate that used to live
+# here has been removed; the lib version is in scope via the
+# `source` of mcl-state.sh at the top of this file.
 
 # Aşama 10 — explicit asama-10-complete emit
 _A10_FIRE="$(_mcl_audit_emitted_in_session "asama-10-complete" "asama-10-progression-from-emit" 2>/dev/null || echo 0)"
