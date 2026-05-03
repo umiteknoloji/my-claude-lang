@@ -16,7 +16,7 @@
 #                  drop pre-restart askq's from the scan.
 # Output: a single JSON object on stdout with fields:
 #   {
-#     "intent":    "spec-approve" | "summary-confirm" | "ui-review" | "other",
+#     "intent":    "spec-approve" | "precision-confirm" | "summary-confirm" | "ui-review" | "other",
 #     "selected":  "<developer's selected option label, raw>",
 #     "spec_hash": "<sha256 of the latest 📋 Spec: block visible
 #                    in the transcript, or empty string>"
@@ -141,6 +141,58 @@ APPROVE_VERBS = [
     "\u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434",
 ]
 
+# PRECISION_CONFIRM_TOKENS — added in v10.1.14.
+# Aşama 2 (precision audit) closing askq: after the 7-dimension scan +
+# any GATE answers, the model emits a closing AskUserQuestion that
+# asks the developer to approve the precision-audited intent before
+# Aşama 4 (SPEC) emits. Title prefix template:
+#
+#   MCL <ver> | Faz 2 — Precision-audit niyet onayı: ...   (TR)
+#   MCL <ver> | Phase 2 — Precision-audit intent confirmation: ...  (EN)
+#
+# `Precision-audit` is treated as a fixed MCL technical token across
+# all languages (like "MCL", "GATE", "Spec") — same convention used
+# in CLAUDE.md for technical-token preservation. The detection token
+# combines this anchor with the language-specific "intent/niyet"
+# word so the scanner does not mis-match the existing `precision-audit`
+# audit name appearing elsewhere in question prose.
+PRECISION_CONFIRM_TOKENS = [
+    # Turkish (calibration language)
+    "precision-audit niyet",
+    "precision audit niyet",
+    # English
+    "precision-audit intent",
+    "precision audit intent",
+    "precision-audited intent",
+    # Spanish
+    "precision-audit intención",
+    "intención auditada",
+    # French
+    "precision-audit intention",
+    "intention auditée",
+    # German
+    "precision-audit absicht",
+    "auditierte absicht",
+    # Japanese
+    "precision-audit 意図",
+    # Korean
+    "precision-audit 의도",
+    # Chinese
+    "precision-audit 意图",
+    # Arabic
+    "precision-audit النية",
+    # Hebrew
+    "precision-audit כוונה",
+    # Hindi
+    "precision-audit इरादा",
+    # Indonesian
+    "precision-audit niat",
+    # Portuguese
+    "precision-audit intenção",
+    # Russian
+    "precision-audit намерен",
+]
+
 SUMMARY_CONFIRM_TOKENS = [
     "is this correct",
     "is this summary correct",
@@ -262,8 +314,12 @@ def _classify_intent(question_body_lower, options_lower=None,
     Order:
       1. Strict UI review tokens.
       2. Strict spec approve tokens (english/turkish/etc).
-      3. Strict summary confirm tokens.
-      4. FALLBACK heuristic — when none of the strict token lists match
+      3. Strict precision confirm tokens (Aşama 2 closing askq).
+         Checked BEFORE summary-confirm because the precision-audit
+         closing question may also contain generic confirm phrasing
+         and we want the more specific phase-2 intent to win.
+      4. Strict summary confirm tokens (Aşama 1 closing askq).
+      5. FALLBACK heuristic — when none of the strict token lists match
          AND a \U0001F4CB Spec block exists in the transcript AND an
          approve-family verb appears in either the question body or a
          user-selected option, classify as `spec-approve`. This catches
@@ -271,9 +327,9 @@ def _classify_intent(question_body_lower, options_lower=None,
          Onaylıyor musun?" that don't carry the literal "spec"
          keyword but are structurally a spec-approve question following
          a spec emit.
-      5. FALLBACK for summary-confirm — if no spec exists and an approve
+      6. FALLBACK for summary-confirm — if no spec exists and an approve
          verb appears, classify as `summary-confirm`.
-      6. Else `other`.
+      7. Else `other`.
     """
     options_lower = options_lower or []
 
@@ -283,6 +339,9 @@ def _classify_intent(question_body_lower, options_lower=None,
     for tok in SPEC_APPROVE_TOKENS:
         if tok in question_body_lower:
             return "spec-approve"
+    for tok in PRECISION_CONFIRM_TOKENS:
+        if tok in question_body_lower:
+            return "precision-confirm"
     for tok in SUMMARY_CONFIRM_TOKENS:
         if tok in question_body_lower:
             return "summary-confirm"

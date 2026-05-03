@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 10.1.13
+**Güncel sürüm:** 10.1.14
 
 ---
 
@@ -93,6 +93,8 @@ Aşama 1 "completeness" sağlar; Aşama 2 "precision" sağlar. Aşama 1 onayı s
 - Her add-on 2-5 delta boyut içerir. Solid/Angular/Qwik ve kotlin-mobile vs kotlin-backend ayrımı gelecek genişleme için TODO.
 
 İngilizce session'da skip — audit entry yine emit edilir (`skipped=true`) detection control olarak. **Hard enforcement (8.3.2):** `mcl-stop.sh` Aşama 1→2 transition'ında audit'te `precision-audit` entry yoksa hem `precision-audit-skipped-warn` (8.3.0 detection signal, backward compat) hem `precision-audit-block` audit'leri yazar VE `decision:block` JSON döndürür — Aşama 1→2 transition rewind edilir, Claude aynı response içinde Aşama 2'i çalıştırıp spec'i yeniden emit etmek zorunda. Aşama 8 ile aynı tier. İngilizce session safety valve: `skipped=true` audit emit edildiğinde block fire etmez.
+
+**Deterministic gate (10.1.14):** Aşama 2 dimension scan + GATE cevapları toplandıktan sonra **closing AskUserQuestion** zorunludur. Title prefix: `MCL <ver> | Faz 2 — Precision-audit niyet onayı:` (TR / kalibrasyon dili) — `Precision-audit` sabit MCL teknik token'ı (her dilde literal kalır, `MCL` / `Spec` / `GATE` / `Faz N` ile aynı konvansiyon). Geliştirici approve-family seçince `mcl-stop.sh` `asama-2-complete | stop | selected=<option>` audit'i emit eder. Bu **tek audit** Aşama 4 SPEC emit'ini unblock eder; `summary-confirm-approve`, `precision-audit`, `asama-1-complete` artık tek başına yetersiz (v10.1.14'ten önce OR-list idi). Geçerli `asama-2-complete` audit'i, Aşama 1'in de çalıştığını implicitly kanıtlar (faz zinciri canonical). İngilizce session: dimension scan skipped olsa da closing askq yine zorunlu (tek satırlık onay) — determinism principle, dile bağlı muafiyet yok. Recovery hatch: `bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-2-complete mcl-stop "params=precision-audit-confirmed"'`.
 
 ### Aşama 3 — Engineering Brief (Upgrade-Translator, 8.4.0+)
 

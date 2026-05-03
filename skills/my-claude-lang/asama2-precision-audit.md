@@ -278,15 +278,59 @@ For each dimension in order — core 1→7 first, then matching stack add-ons:
 4. **Wait for the developer's answer before evaluating the next dimension.** When multiple dimensions classify as GATE in the same audit pass, queue them and ask sequentially across turns — never batch two GATE questions in the same response, even with bullet/numbered formatting. Each GATE answer is confirmed and marked in the parameter set before the next GATE is evaluated.
 5. Continue to the next dimension.
 
-When all dimensions resolve, emit the audit entry, advance to Aşama 3.
+When all dimensions resolve, emit the `precision-audit` audit entry, then emit the Aşama 2 **closing AskUserQuestion** (see "Closing AskUserQuestion" below) and wait for an approve-family answer before advancing to Aşama 3.
+
+## Closing AskUserQuestion (since 10.1.14 — deterministic gate)
+
+After the dimension scan and any GATE answers are collected, Aşama 2 ends with a single `AskUserQuestion` that asks the developer to approve the precision-audited intent. This is the **deterministic gate** that unblocks Aşama 4 (SPEC) emission. Without this approval, `mcl-pre-tool.sh` blocks every mutating tool call with reason `MCL ASAMA 2 SKIP-BLOCK`.
+
+### Title prefix (mandatory)
+
+The askq title MUST start with the exact prefix below so `mcl-askq-scanner.py` can classify the intent as `precision-confirm`:
+
+- **Turkish (calibration):** `MCL <ver> | Faz 2 — Precision-audit niyet onayı: ...`
+- **English:** `MCL <ver> | Phase 2 — Precision-audit intent confirmation: ...`
+- **Other languages:** keep `Precision-audit` as a literal MCL technical token (same convention as `MCL`, `Spec`, `GATE`, `Faz N`); translate the rest. Example (Spanish): `MCL <ver> | Fase 2 — Precision-audit intención: ...`
+
+### Body structure
+
+- One short paragraph summarizing the precision-audited intent: which dimensions were classified, which were SILENT-ASSUME, which were SKIP-MARK, which had GATE answers.
+- Three options: approve / edit / cancel — same 3-option shape as Aşama 1's summary-confirm askq.
+
+### Audit emission (automatic)
+
+When the developer selects an approve-family option, `mcl-stop.sh` emits:
+
+```
+asama-2-complete | stop | selected=<option-label>
+```
+
+This single audit unblocks Aşama 4 SPEC emission. No other audit substitutes — `summary-confirm-approve`, `precision-audit`, and `asama-1-complete` are no longer sufficient on their own (since 10.1.14). A valid `asama-2-complete` implicitly proves Aşama 1 also ran, since Aşama 2 is canonically called only after Aşama 1's summary-confirm-approve.
+
+### English-language sessions
+
+Aşama 2's dimension scan is skipped for English sources (the audit entry still fires with `skipped=true` as a detection control), but the **closing AskUserQuestion is still required**. The body becomes a one-line confirmation ("Aşama 2 skipped — English session. Approve to proceed to SPEC?"). Determinism is the principle: no exceptions, no language-conditional skips of the gate itself.
+
+### Recovery hatch
+
+If the closing askq fails to emit (model error, transcript loss), the developer can manually emit:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-2-complete mcl-stop "params=precision-audit-confirmed"'
+```
+
+This mirrors the `asama-4-complete` Bash recovery hatch from v10.1.7 and is the same shape as other phase-skip recovery paths.
 
 ## Audit
 
-Every Aşama 2 execution emits one audit entry:
+Every Aşama 2 execution emits **two** audit entries (since 10.1.14):
 
 ```
 precision-audit | asama2 | core_gates=N stack_gates=M assumes=K skipmarks=L stack_tags=<comma> skipped=<true|false>
+asama-2-complete | stop | selected=<approve-option-label>
 ```
+
+The first entry (`precision-audit`) is emitted by the model at the end of the dimension scan and records what was classified. The second (`asama-2-complete`) is emitted by `mcl-stop.sh` when the closing AskUserQuestion (intent: `precision-confirm`) returns an approve-family answer; it is the deterministic gate enforced by `mcl-pre-tool.sh` for Aşama 4 SPEC emission.
 
 - `core_gates`: how many of the 7 core dimensions fired GATE-PRECISION questions
 - `stack_gates`: how many stack add-on dimensions fired GATE-PRECISION

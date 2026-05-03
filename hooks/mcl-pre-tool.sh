@@ -877,33 +877,30 @@ print("allow")
   fi
 fi
 
-# -------- Branch: Aşama 1 skip-block (since v10.1.12) --------
-# When SPEC_APPROVED=true (passed v10.1.7 gate) but there is NO
-# evidence in the audit trail that Aşama 1 (intent gathering with
-# user-confirmed summary) actually happened, model jumped from
-# prompt directly to spec-emit + spec-approval without parameter
-# verification. The spec is built on assumed parameters → wrong
-# work risk regardless of how many downstream gates pass.
+# -------- Branch: Aşama 2 skip-block (since v10.1.14) --------
+# Replaces the v10.1.12 Aşama 1 OR-list check. Per the deterministic-
+# GATE design principle, Aşama 4 (SPEC) emission requires exactly one
+# audit: `asama-2-complete`. That audit is emitted by the Stop hook
+# only when the Aşama 2 closing AskUserQuestion (intent: precision-
+# confirm) returns an approve-family answer. Because Aşama 2 is
+# canonically called only after Aşama 1's summary-confirm-approve, a
+# valid `asama-2-complete` implicitly proves Aşama 1 also ran — one
+# gate, full chain.
 #
-# Aşama 1 evidence (any of these audits in current session):
-#   - `summary-confirm-approve` — Stop hook detected an Aşama 1
-#     summary-confirm askq with approve-family tool_result
-#   - `precision-audit` (asama2 caller) — Aşama 2 ran; canonically
-#     Aşama 1 must have run before it
-#   - `asama-1-complete` — explicit Bash audit emit (recovery hatch)
+# This replaces the previous OR-list (summary-confirm-approve |
+# precision-audit | asama-1-complete) which was too permissive: any
+# of three signals would unblock SPEC, allowing the model to skip the
+# precision audit entirely while still passing the gate.
 #
-# Recovery: model emits `asama-1-complete` Bash audit (parallel to
-# v10.1.7 asama-4-complete escape hatch) OR re-runs Aşama 1
-# summary-confirm askq cycle properly.
+# Recovery: model runs the Aşama 2 closing askq cycle properly
+# (7-dimension scan, GATE answers, then closing AskUserQuestion with
+# title prefix `MCL <ver> | Faz 2 — Precision-audit niyet onayı:`),
+# OR emits the explicit Bash audit hatch.
 if [ -z "$REASON" ] && [ "$SPEC_APPROVED" = "true" ]; then
-  _A1_HIT_SC="$(_mcl_audit_emitted_in_session "summary-confirm-approve" "" 2>/dev/null || echo 0)"
-  _A1_HIT_PA="$(_mcl_audit_emitted_in_session "precision-audit" "" 2>/dev/null || echo 0)"
-  _A1_HIT_AC="$(_mcl_audit_emitted_in_session "asama-1-complete" "" 2>/dev/null || echo 0)"
-  if [ "${_A1_HIT_SC:-0}" != "1" ] \
-     && [ "${_A1_HIT_PA:-0}" != "1" ] \
-     && [ "${_A1_HIT_AC:-0}" != "1" ]; then
-    REASON="MCL ASAMA 1 SKIP-BLOCK (since v10.1.12) — spec onaylandı (spec_approved=true) AMA Aşama 1 (intent gathering) yapıldığına dair hiçbir kanıt yok: \`summary-confirm-approve\` audit yok, \`precision-audit asama2\` audit yok, \`asama-1-complete\` audit yok. Bu, spec'in **doğrulanmamış parametreler** üzerine kurulduğu anlamına gelir → yanlış kod riski downstream gate'ler geçse bile sürer. Mutating tool \`${TOOL_NAME}\` bloke edildi. Recovery options: (A) Aşama 1 summary-confirm askq cycle'ı düzgün çalıştır (model intent + constraints + success_criteria + context topla, AskUserQuestion ile özet onayı al); (B) Aşama 1 sözel olarak MCL dışı tamamlandıysa: \`bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-1-complete mcl-stop \"params=intent+constraints+success+context confirmed\"'\` ile audit emit et. Loop-breaker: 3 üst üste blok → fail-open."
-    REASON_KIND="asama-1-skip"
+  _A2_HIT_AC="$(_mcl_audit_emitted_in_session "asama-2-complete" "" 2>/dev/null || echo 0)"
+  if [ "${_A2_HIT_AC:-0}" != "1" ]; then
+    REASON="MCL ASAMA 2 SKIP-BLOCK (since v10.1.14) — spec onaylandı (spec_approved=true) AMA Aşama 2 (precision audit + niyet onayı) tamamlandığına dair \`asama-2-complete\` audit'i yok. Bu, spec'in **doğrulanmamış / precision-audit'ten geçmemiş parametreler** üzerine kurulduğu anlamına gelir → yanlış kod riski downstream gate'ler geçse bile sürer. Mutating tool \`${TOOL_NAME}\` bloke edildi. Recovery options: (A) Aşama 2 closing askq cycle'ı düzgün çalıştır — 7 boyutluk precision audit (skills/my-claude-lang/asama2-precision-audit.md) tamamla, ardından \`MCL <ver> | Faz 2 — Precision-audit niyet onayı:\` başlıklı AskUserQuestion ile niyet onayı al; (B) Aşama 2 sözel olarak MCL dışı tamamlandıysa: \`bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-2-complete mcl-stop \"params=precision-audit-confirmed\"'\` ile audit emit et. Loop-breaker: 3 üst üste blok → fail-open."
+    REASON_KIND="asama-2-skip"
   fi
 fi
 
@@ -952,7 +949,7 @@ if [ -n "$REASON" ]; then
       mcl_audit_log "spec-approval-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SA_LB_COUNT + 1))"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_approval_block "$((_SA_LB_COUNT + 1))"
     fi
-  elif [ "$REASON_KIND" = "asama-1-skip" ] \
+  elif [ "$REASON_KIND" = "asama-2-skip" ] \
        || [ "$REASON_KIND" = "asama-8-skip" ] \
        || [ "$REASON_KIND" = "asama-9-skip" ]; then
     # v10.1.8 + v10.1.12: phase-skip blocks. Same loop-breaker shape

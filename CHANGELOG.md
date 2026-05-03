@@ -7,6 +7,102 @@
 
 ## [Unreleased]
 
+## [10.1.14] - 2026-05-03
+
+### Aşama 2 deterministic gate — `asama-2-complete` audit replaces v10.1.12 OR-list
+
+Real-world test session exposed a structural gap in the
+v10.1.12 Aşama 1 SKIP-BLOCK design. The user (Ümit) ran a
+fresh greenfield project request through MCL: the model emitted
+"Faz 1 — Niyet Tespiti" as a plain-text paragraph, jumped to
+"Faz 2 — GATE Soruları" with ad-hoc gate questions, and emitted
+"Faz 3 — Mühendislik Şartnamesi" with a `📋 Spec:` block. The
+developer typed `onay`. v10.1.12 SKIP-BLOCK fired correctly at
+Write time but only because none of the three OR-list audits
+(`summary-confirm-approve`, `precision-audit`, `asama-1-complete`)
+existed yet. The deeper observation, made by the developer,
+was that `📋 Spec:` is an MCL classifier-reserved token and
+should not have been emitable at all before Aşama 2's
+precision audit ran.
+
+#### Root cause
+
+Two layers stacked:
+
+1. **Model behavior:** Aşama 1's closing summary-confirm
+   AskUserQuestion was skipped — model wrote a plain-text
+   intent paragraph and jumped to Aşama 2-style gate
+   questions in the same turn.
+2. **Hook permissiveness:** the v10.1.12 SKIP-BLOCK accepted
+   any of three audits as evidence of intent gathering. This
+   was too loose — none of the three independently proves the
+   precision audit ran. The model could legitimately emit
+   `precision-audit` (Aşama 2 entry) without ever reaching the
+   closing dimension scan, and SPEC would unblock.
+
+The deterministic-GATE design principle (per Ümit) requires
+exactly one audit to gate SPEC emission: one that fires only
+when the developer has explicitly approved the precision-
+audited intent at the end of Aşama 2. Per the canonical phase
+chain (Aşama 1 → Aşama 2 → Aşama 3 → Aşama 4), this single
+audit implicitly proves Aşama 1 also ran.
+
+#### Fix
+
+**`hooks/lib/mcl-askq-scanner.py`**:
+
+- New `precision-confirm` intent classification.
+- New `PRECISION_CONFIRM_TOKENS` list (14 languages) anchored
+  on `Precision-audit` as a fixed MCL technical token (same
+  convention as `MCL`, `Spec`, `GATE`, `Faz N`).
+- Classification order: ui-review → spec-approve →
+  **precision-confirm** → summary-confirm → fallbacks.
+
+**`hooks/mcl-stop.sh`**:
+
+- New detection branch parallel to `summary-confirm`: when
+  `ASKQ_INTENT=precision-confirm` and the developer's
+  selection is approve-family, emit
+  `asama-2-complete | stop | selected=<option>`.
+
+**`hooks/mcl-pre-tool.sh`**:
+
+- Replaced the v10.1.12 OR-list with a single-audit check.
+  When `SPEC_APPROVED=true` and `asama-2-complete` audit is
+  absent, deny mutating tool calls with reason
+  `MCL ASAMA 2 SKIP-BLOCK (since v10.1.14)`.
+- `REASON_KIND` renamed `asama-1-skip` → `asama-2-skip`;
+  loop-breaker shape unchanged (3 consecutive blocks → fail-open).
+
+**`skills/my-claude-lang/asama2-precision-audit.md`**:
+
+- New "Closing AskUserQuestion" section documenting the
+  mandatory askq title prefix
+  `MCL <ver> | Faz 2 — Precision-audit niyet onayı:` and
+  body structure.
+- Question Flow updated: dimension scan → precision-audit
+  audit emit → closing AskUserQuestion → wait for approve →
+  Aşama 3.
+- English-language sessions: dimension scan still skipped,
+  but the closing askq is required (one-line confirmation).
+  Determinism is the principle — no language-conditional
+  skips of the gate itself.
+
+#### Why the OR-list was wrong
+
+Determinism means one audit, not three. An OR-list lets the
+model produce ANY of the three signals to unblock SPEC, which
+allows partial-Aşama-2 traversal: the model can emit a
+`precision-audit` audit at the start of Aşama 2 (or via the
+recovery hatch) without ever asking the dimensions or
+running the GATE classifications. SPEC then unblocks despite
+no real precision audit happening. The single-audit model
+tied to user approval makes the gate impossible to fake
+behaviorally — the audit only fires on a real approve-family
+selection in the closing askq.
+
+Banner: MCL 10.1.13 → MCL 10.1.14.
+
 ## [10.1.13] - 2026-05-03
 
 ### Critical timestamp-format-mismatch fix — recovery hatches now actually work

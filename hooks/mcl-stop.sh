@@ -1815,6 +1815,24 @@ if [ "$ASKQ_INTENT" = "summary-confirm" ]; then
   fi
 fi
 
+# --- Aşama 2 precision-confirm (since v10.1.14) ---
+# Aşama 2 closing askq: emitted after the 7-dimension scan + GATE
+# answers, asks the developer to approve the precision-audited intent
+# before Aşama 4 (SPEC) emits. On approve, this branch emits the
+# `asama-2-complete` audit which is the deterministic gate enforced by
+# mcl-pre-tool.sh's Aşama 2 SKIP-BLOCK. Mirrors the summary-confirm
+# pattern above. The approve-family detection is the same 14-language
+# whitelist used by other gates.
+if [ "$ASKQ_INTENT" = "precision-confirm" ]; then
+  if _mcl_is_approve_option "$ASKQ_SELECTED"; then
+    mcl_audit_log "asama-2-complete" "stop" "selected=${ASKQ_SELECTED}"
+    mcl_debug_log "stop" "asama-2-complete" "selected=${ASKQ_SELECTED}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append asama_2_complete approved
+  else
+    mcl_debug_log "stop" "precision-confirm-non-approve" "selected=${ASKQ_SELECTED}"
+  fi
+fi
+
 # --- Aşama 6b ui-review dispatch ---
 # Emitted when the developer selects an option on the UI review askq.
 # - approve-family: advance ui_sub_phase to BACKEND, unlock backend paths
