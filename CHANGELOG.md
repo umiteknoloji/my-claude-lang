@@ -7,6 +7,67 @@
 
 ## [Unreleased]
 
+## [10.1.23] - 2026-05-05
+
+### v11.0 migration R7 — Aşama 19 mock-cleanup logic activates
+
+Seventh step of the v11.0 migration. The mock-data cleanup that v10
+embedded inside Aşama 6c (BACKEND_INTEGRATION) and that R2 fenced as
+inert prose inside `asama8-tdd.md` is now **active in
+`asama19-verify-report.md`**. Aşama 19 (Verification Report) is the
+v11 architecture's natural location for the cleanup — per the v11
+vision pipeline diagram in README.md, "Mock data is removed from
+the project" right after the verification table.
+
+#### Changes
+
+- `skills/my-claude-lang/asama8-tdd.md` — the fenced `<!-- v11:
+  will move to Aşama 19 -->` block (originally migrated from
+  asama6c-backend.md:72-84 in R2) is removed. Replaced with a
+  short marker noting that the cleanup is now active in
+  asama19-verify-report.md.
+- `skills/my-claude-lang/asama19-verify-report.md` — new
+  "Mock Data Cleanup" section appended at the end. Sections:
+  - **Detection** — three indices (path-based via `find
+    __fixtures__/` / `mocks/`, symbol-based via `grep MOCK_/mock_`,
+    state-toggle index via `grep useSearchParams.*state` /
+    `<select.*mock`).
+  - **Per-fixture handling** — for each candidate fixture, grep
+    importers; zero importers = safe delete; test-only importers
+    = KEEP; component importers remaining = STOP and surface as
+    Aşama 21 Open Issue (means Aşama 8 backend wiring was
+    incomplete).
+  - **What to KEEP** (never delete) — types under `src/types/**`,
+    test-imported fixtures, test-only `__fixtures__/` dirs.
+  - **What to DELETE** — `?state=...` URL-param hooks,
+    `<select>` mock-state toggles, orphan `__fixtures__/*.fixture.*`,
+    truly orphan `MOCK_*` / `mock_*` consts.
+  - **Audit emit** — three new audits
+    `asama-19-mock-cleanup-started`,
+    `asama-19-mock-cleanup-end`,
+    `asama-19-mock-cleanup-skipped`. Audit-only — `mcl-pre-tool.sh`
+    does NOT gate any tool on these audits in v10.1.23 (advisory).
+
+#### Why advisory only in this release
+
+The detection logic is non-trivial — `grep` for importers can
+miss dynamic imports, the path conventions vary across stacks, and
+the state-toggle index is heuristic. R7 lands the prose and the
+audit shape; v10.2.x or v11.x can upgrade to hard enforcement once
+production sessions validate the detection accuracy. Audit-only
+landing means a session that fails to clean up shows the gap in
+Aşama 21 Open Issues but doesn't block tool execution.
+
+#### What does NOT change
+
+- mcl-pre-tool.sh — no new path gates.
+- mcl-stop.sh — no new audit-emit auto-progression. The new audits
+  are recorded but not used for state transitions.
+- The cleanup is purely a developer-visible report item; if the
+  model skips it, only Aşama 21 Open Issues surfaces the miss.
+
+Banner: MCL 10.1.22 → MCL 10.1.23.
+
 ## [10.1.22] - 2026-05-05
 
 ### v11.0 migration R6 — tail rename (Impact, Verify, Localized, Completeness) → Aşama 18/19/20/21

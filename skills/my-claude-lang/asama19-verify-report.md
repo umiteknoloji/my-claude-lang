@@ -348,4 +348,105 @@ serves trace.log completeness so the developer can prove the
 verification report ran. Stop hook scans audit.log and writes
 `phase_transition 11 12` to trace.log (v10 numbering; R8 retitles).
 
+## Mock Data Cleanup (since v10.1.23 — moved from Aşama 6c → fenced in Aşama 8 → active here)
+
+After the Spec Coverage / MUST-test / Process Trace sections are
+written, AND after the v11 + v10 completion audit has been emitted,
+Aşama 19 owns one final responsibility: **remove the dummy/mock data
+that Aşama 6 introduced for the UI build**. This step is the
+v11 architecture's natural location for the cleanup that v10 placed
+inside Aşama 6c (BACKEND_INTEGRATION); R2 fenced the block inside
+`asama8-tdd.md` so it would not execute during TDD; R7 (this release)
+moves it here where it actually executes.
+
+### Detection
+
+Scan the project for mock data left over from Aşama 6:
+
+```bash
+# 1. Path-based index — files in __fixtures__/ or mocks/ directories
+find . -type d -name "__fixtures__" -prune -o \
+       -type d -name "mocks" -prune -o \
+       -type f \( -name "*.fixture.ts" -o -name "*.fixture.tsx" \
+                  -o -name "*.fixture.js" -o -name "*.fixture.jsx" \) -print
+
+# 2. Symbol-based index — MOCK_ / mock_ prefix in source code
+grep -rln "^[[:space:]]*\(const\|let\|var\)[[:space:]]\+MOCK_\|^[[:space:]]*\(const\|let\|var\)[[:space:]]\+mock_" src/
+
+# 3. State-toggle index — components with `?state=…` URL-param hooks
+#    or `<select>` dev toggles for mock-state switching
+grep -rln "useSearchParams\(\).*state\|<select.*mock\|const \[mockState," src/
+```
+
+### Per-fixture handling
+
+For each `__fixtures__/*.fixture.{ts,tsx,js,jsx}` file:
+
+```bash
+# Find importers
+grep -rln "from.*['\"].*__fixtures__/<name>.fixture['\"]" src/
+```
+
+- **Zero importers** → safe to delete the fixture file.
+- **Imported by test files only** (`*.test.*`, `*.spec.*`) → KEEP.
+  Tests are still allowed to use fixtures.
+- **Imported by component files** → STOP. The Aşama 8 backend
+  wiring step (asama8-tdd.md Step 5) was supposed to swap these for
+  real `fetch`/`axios` calls. Surface as a Aşama 21 Open Issue:
+  "fixture `<file>` still has component importers — backend wiring
+  incomplete." Do NOT delete.
+
+### What to KEEP (never delete)
+
+- Type definitions in `src/types/**` — production code reuses them.
+- Any fixture imported by test files (Jest/Vitest/etc.).
+- `__fixtures__/` directories that contain only test-imported files.
+
+### What to DELETE
+
+- `?state=...` URL-param hooks whose purpose was visual state toggle.
+- `<select>` dev toggles that expose mock-state switching to the
+  developer.
+- `__fixtures__/<name>.fixture.{ts,tsx,js,jsx}` files with zero
+  importers (verified by step above).
+- `MOCK_<NAME>` / `mock_<name>` constants in component files that
+  are not referenced anywhere else after backend wiring (rare;
+  usually swapped during Aşama 8 backend wiring step).
+
+### Audit emit
+
+Before the cleanup runs:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-19-mock-cleanup-started mcl-stop "candidates=N"'
+```
+
+After the cleanup completes:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-19-mock-cleanup-end mcl-stop "deleted=D kept=K orphan_components=O"'
+```
+
+Where:
+- D: count of files actually deleted
+- K: count of fixtures kept (test-imported or has type-only role)
+- O: count of fixtures still imported by component files
+  (surfaced as Aşama 21 Open Issues)
+
+Skip case (no UI flow, no fixtures present, or no `__fixtures__/`
+directory exists):
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-19-mock-cleanup-skipped mcl-stop "reason=<no-ui-flow|no-fixtures-found>"'
+```
+
+The cleanup is **advisory** in v10.1.23 — `mcl-pre-tool.sh` does NOT
+gate any tool on these audits. The audit trail lets Aşama 21 surface
+gaps but does not block tool execution. R8 cutover may upgrade to
+hard enforcement once the cleanup logic has been validated in
+production sessions.
+
 </mcl_phase>

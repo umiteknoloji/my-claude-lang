@@ -270,27 +270,13 @@ backend differs from the fixture shape, STOP and surface the
 mismatch to the developer as a Aşama 1-4 micro-cycle — do not
 silently change the type.
 
-<!-- v11: will move to Aşama 19, do not execute here.
-     Mock-data cleanup is parked under v11 plan R7 — the verification
-     report (Aşama 19) owns this responsibility, not the TDD execute
-     phase (Aşama 8). Until R7 ships, this block stays inert: do
-     NOT execute these deletions during Aşama 7/8 even though the
-     prose below describes them — they will be triggered later by
-     Aşama 19 in the v11 architecture.
+<!-- v10.1.23: mock-data cleanup MOVED to Aşama 19 (verify-report).
+     The fenced block previously parked here is now active in
+     `asama19-verify-report.md` under the "Mock Data Cleanup" section.
+     Aşama 8 (this file) no longer carries the cleanup responsibility
+     — keep dummy fixtures intact during TDD execute; Aşama 19 deletes
+     them after the verification report has been built. -->
 
-### Remove Dev-Only Bits (DEFERRED — see fence above)
-
-Delete:
-- `?state=...` URL-param hooks whose purpose was visual state toggle
-- `<select>` dev toggles that expose mock-state switching
-- `__fixtures__/<name>.fixture.ts` files that have no remaining
-  importers (grep before deleting)
-
-Keep:
-- Type definitions from `src/types/` — real code uses them
-- Any fixture that is also used by test files (the swap targets
-  component imports; Jest/Vitest test imports stay)
--->
 
 ### Phase Behavior Notes
 
