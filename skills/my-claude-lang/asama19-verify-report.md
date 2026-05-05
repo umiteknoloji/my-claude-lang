@@ -1,6 +1,6 @@
-<mcl_phase name="asama11-verify-report">
+<mcl_phase name="asama19-verify-report">
 
-# Aşama 11: Verification Report
+# Aşama 19: Verification Report (was Aşama 11 in v10)
 
 Aşama 11 is NOT just a review translation. It is a comprehensive verification
 that gives the developer confidence that the AI did the right thing.
@@ -322,14 +322,16 @@ When code review, test results, or completion reports come back
 4. After presenting results, ask: "Do you understand what this means? (yes / no)"
    If "no" → re-explain differently
 
-## Audit Emit on Completion (since v10.1.6)
+## Audit Emit on Completion (since v10.1.6; dual-emit since v10.1.22)
 
 After all three Verification Report sections are emitted (Spec
 Coverage, MUST-test phrase, Process Trace) and BEFORE proceeding to
-Aşama 12 (Localized Translation), emit:
+Aşama 20 (Localized Translation), emit BOTH the v11 audit name AND
+the v10 alias:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-19-complete mcl-stop "covered=N must_test=K trace_lines=L"; \
   mcl_audit_log asama-11-complete mcl-stop "covered=N must_test=K trace_lines=L"'
 ```
 
@@ -338,9 +340,12 @@ Where:
 - K: items in the !!! YOU MUST TEST THESE !!! section (0 if omitted)
 - L: lines rendered from trace.log
 
-Aşama 11 is a TRANSIENT phase (no persisted state field). The emit
+The v10 alias keeps existing v10 enforcement at mcl-stop.sh:1041+
+operating during the bridge. R8 cutover removes the alias line.
+
+Aşama 19 is a TRANSIENT phase (no persisted state field). The emit
 serves trace.log completeness so the developer can prove the
 verification report ran. Stop hook scans audit.log and writes
-`phase_transition 11 12` to trace.log.
+`phase_transition 11 12` to trace.log (v10 numbering; R8 retitles).
 
 </mcl_phase>

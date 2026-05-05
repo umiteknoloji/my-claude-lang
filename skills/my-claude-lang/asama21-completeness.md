@@ -1,11 +1,12 @@
-<mcl_phase name="asama13-completeness">
+<mcl_phase name="asama21-completeness">
 
-# Aşama 13: Completeness Audit
+# Aşama 21: Completeness Audit (was Aşama 13 in v10) — audits phases 1–20
 
-Aşama 13 runs AFTER Aşama 12 (Localized Report) and BEFORE the
+Aşama 21 runs AFTER Aşama 20 (Localized Report) and BEFORE the
 session closes. It reads the session's audit/state/trace files and
 produces a machine-verifiable summary of which phases ran end-to-end
-— with deep dives on Aşama 7 (test-first) and Aşama 9 (8 sub-steps).
+— with deep dives on Aşama 8 (test-first; was Aşama 7 in v10) and
+the 8 quality phases Aşama 10–17 (was Aşama 9.1–9.8 sub-steps in v10).
 
 ## Critical Questions Aşama 13 Answers
 
@@ -34,11 +35,13 @@ Completeness audit is the LAST output before the session closes.
    below) and assign verdict ✓ / ⚠️ / ✗ / n/a.
 6. Render the completeness report (markdown, in developer's language
    per the language rule — only the technical signals stay English).
-7. Emit completion audit:
+7. Emit completion audit (dual-emit since v10.1.22 — v11 + v10 alias):
    ```
    bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+     mcl_audit_log asama-21-complete mcl-stop "phases_done=N phases_missing=M"; \
      mcl_audit_log asama-13-complete mcl-stop "phases_done=N phases_missing=M"'
    ```
+   R8 cutover removes the v10 alias line.
 
 ## Phase Completion Signals (audit.log inspection)
 

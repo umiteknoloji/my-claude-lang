@@ -9,10 +9,10 @@
 # rendering the report on real sessions) is validated separately
 # via real-world deployment audit logs.
 
-echo "--- test-v10-1-10-asama13-completeness ---"
+echo "--- test-v10-1-10-asama21-completeness ---"
 
 # === Skill file exists with required sections ===
-_skill="$REPO_ROOT/skills/my-claude-lang/asama13-completeness.md"
+_skill="$REPO_ROOT/skills/my-claude-lang/asama21-completeness.md"
 if [ -f "$_skill" ]; then
   PASS=$((PASS+1))
   printf '  PASS: skill file exists at %s\n' "$_skill"
@@ -21,9 +21,9 @@ else
   printf '  FAIL: skill file missing at %s\n' "$_skill"
 fi
 
-if grep -q '<mcl_phase name="asama13-completeness">' "$_skill"; then
+if grep -q '<mcl_phase name="asama21-completeness">' "$_skill"; then
   PASS=$((PASS+1))
-  printf '  PASS: skill file uses <mcl_phase name="asama13-completeness"> tag\n'
+  printf '  PASS: skill file uses <mcl_phase name="asama21-completeness"> tag\n'
 else
   FAIL=$((FAIL+1))
   printf '  FAIL: mcl_phase tag missing\n'
@@ -75,12 +75,12 @@ fi
 
 # === STATIC_CONTEXT in mcl-activate.sh includes the phase ===
 _activate="$REPO_ROOT/hooks/mcl-activate.sh"
-if grep -q 'mcl_phase name=\\"asama13-completeness\\"' "$_activate"; then
+if grep -q 'mcl_phase name=\\"asama21-completeness\\"' "$_activate"; then
   PASS=$((PASS+1))
-  printf '  PASS: STATIC_CONTEXT includes asama13-completeness phase\n'
+  printf '  PASS: STATIC_CONTEXT includes asama21-completeness phase\n'
 else
   FAIL=$((FAIL+1))
-  printf '  FAIL: asama13-completeness phase missing from STATIC_CONTEXT\n'
+  printf '  FAIL: asama21-completeness phase missing from STATIC_CONTEXT\n'
 fi
 
 if grep -q "COMPLETENESS AUDIT (Aşama 13)" "$_activate"; then
@@ -93,9 +93,9 @@ fi
 
 # === Main skill index has pointer ===
 _index="$REPO_ROOT/skills/my-claude-lang.md"
-if grep -q "asama13-completeness.md" "$_index"; then
+if grep -q "asama21-completeness.md" "$_index"; then
   PASS=$((PASS+1))
-  printf '  PASS: main skill index points to asama13-completeness.md\n'
+  printf '  PASS: main skill index points to asama21-completeness.md\n'
 else
   FAIL=$((FAIL+1))
   printf '  FAIL: pointer in main skill index missing\n'

@@ -7,6 +7,81 @@
 
 ## [Unreleased]
 
+## [10.1.22] - 2026-05-05
+
+### v11.0 migration R6 — tail rename (Impact, Verify, Localized, Completeness) → Aşama 18/19/20/21
+
+Sixth step of the v11.0 migration. The four delivery-side phases at
+the end of the pipeline rename to their v11 numbers; each renamed
+file gains a v10-audit-name dual-emit so existing v10 enforcement
+keeps working through the bridge. Aşama 9 (Risk Review) also picks
+up dual-emit at this release so its `asama-8-complete` v10 emit is
+joined by `asama-9-complete` (R4 only renamed the file; R6 adds
+the audit alias).
+
+#### Renames
+
+| v10 file | v11 file | v11 phase number |
+|---|---|---|
+| `asama10-impact-review.md` | `asama18-impact-review.md` | Aşama 18 |
+| `asama11-verify-report.md` | `asama19-verify-report.md` | Aşama 19 |
+| `asama12-translate.md` | `asama20-localized-report.md` | Aşama 20 |
+| `asama13-completeness.md` | `asama21-completeness.md` | Aşama 21 |
+
+mcl_phase tags + bulk path replace across 10 referencing files
+(hooks/mcl-activate.sh PHASE SCRIPT, mcl-stop.sh comments, umbrella,
+mcl-finish.md, asama8-tdd.md, plus the renamed files themselves and
+two test cases).
+
+#### Audit dual-emit added (v10 alias preserved during bridge)
+
+Each renamed file now emits BOTH the v11 audit name and the v10 alias:
+
+| Phase | v11 audit | v10 alias |
+|---|---|---|
+| Aşama 9 (Risk Review) | `asama-9-complete` | `asama-8-complete` |
+| Aşama 18 (Impact Review) | `asama-18-complete` | `asama-10-complete` |
+| Aşama 19 (Verification Report) | `asama-19-complete` | `asama-11-complete` |
+| Aşama 20 (Localized Report) | `asama-20-complete` | `localize-report` |
+| Aşama 21 (Completeness Audit) | `asama-21-complete` | `asama-13-complete` |
+
+The v10 aliases keep mcl-stop.sh's existing progression-from-emit
+helpers (lines 1034, 1041, 1048) operating during the bridge.
+
+#### Self-phase header updates inside renamed files
+
+- `# Aşama 10: Post-Risk Impact Review` → `# Aşama 18: Post-Risk
+  Impact Review (was Aşama 10 in v10)`
+- `# Aşama 11: Verification Report` → `# Aşama 19: Verification
+  Report (was Aşama 11 in v10)`
+- `# Aşama 12: Localize Report` → `# Aşama 20: Localized Report
+  (was Aşama 12 in v10)`
+- `# Aşama 13: Completeness Audit` → `# Aşama 21: Completeness
+  Audit (was Aşama 13 in v10) — audits phases 1–20`
+
+#### What does NOT change
+
+- mcl-stop.sh logic — the existing progression-from-emit helpers
+  scan v10 audit names, which still appear via the dual-emit. R8
+  cutover migrates the helpers to scan v11 names only.
+- `mcl_get_active_phase()` mapping — still returns v10 numbers
+  ("11" for verify, "12" for localize). R8 cutover updates this to
+  return v11 numbers.
+- The `asama-13-skipped-warn` enforcement (the existing
+  Aşama 13 skip-block helper) still scans `asama-13-complete`. The
+  dual-emit ensures that audit name appears whenever the renamed
+  Aşama 21 file emits its completion.
+
+#### Tail-end namespace clears in this release
+
+Before R6, the `asama10-*`, `asama11-*`, `asama12-*`, `asama13-*`
+prefixes had two file occupants each (R5's quality phases under v11
+numbering, plus the v10 delivery phases). After R6, each prefix has
+only one occupant (the v11 quality phase). Namespace coexistence
+that R5 introduced is now resolved.
+
+Banner: MCL 10.1.21 → MCL 10.1.22.
+
 ## [10.1.21] - 2026-05-05
 
 ### v11.0 migration R5 — Quality phase split (Aşama 9.x → Aşama 10–17)

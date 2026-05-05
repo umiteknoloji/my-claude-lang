@@ -162,8 +162,8 @@ else
 fi
 
 # Skill contracts
-_skill10="$REPO_ROOT/skills/my-claude-lang/asama10-impact-review.md"
-_skill11="$REPO_ROOT/skills/my-claude-lang/asama11-verify-report.md"
+_skill10="$REPO_ROOT/skills/my-claude-lang/asama18-impact-review.md"
+_skill11="$REPO_ROOT/skills/my-claude-lang/asama19-verify-report.md"
 
 if grep -q "mcl_audit_log asama-10-complete" "$_skill10"; then
   PASS=$((PASS+1))

@@ -9,7 +9,7 @@ description: >
   ambiguity, generates senior-engineer-grade specs, and filters sycophancy.
 ---
 
-# MCL — Semantic Development Bridge (v10.1.21)
+# MCL — Semantic Development Bridge (v10.1.22)
 
 ## How to Activate
 
@@ -43,7 +43,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 10.1.21` on its own line.
+Every response MUST start with `🌐 MCL 10.1.22` on its own line.
 
 ## AskUserQuestion Protocol
 
@@ -53,7 +53,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 partial-spec recovery, mcl-update, mcl-finish, pasted-CLI passthrough —
 uses Claude Code's native `AskUserQuestion` tool with `question` prefixed
-`MCL 10.1.21 | `. The Stop hook parses tool_use/tool_result pairs to advance
+`MCL 10.1.22 | `. The Stop hook parses tool_use/tool_result pairs to advance
 MCL state.
 
 ## MCL Tag Schema
@@ -158,7 +158,7 @@ For full Aşama 1 rules, read `my-claude-lang/asama1-gather.md`
    schema/migration, auth/permission model, public API breaking changes,
    irreversible data consequences, security boundaries.
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 10.1.21 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 10.1.22 | <localized-is-this-correct>",
    options: ["<approve>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns approve does state advance.
 
@@ -210,7 +210,7 @@ collect approval via ONE AskUserQuestion call.
    concrete technical problems (race conditions, scale issues, missing
    auth, N+1, cascading failures). If found, add one `⚠️ Teknik not:`
    line.
-5. Call `AskUserQuestion({question: "MCL 10.1.21 | <approval-prompt>",
+5. Call `AskUserQuestion({question: "MCL 10.1.22 | <approval-prompt>",
    options: [{label: "<approve-verb>", ...}, {label: "<edit>", ...},
    {label: "<cancel>", ...}]})`. The approve label is the BARE VERB.
 
@@ -341,7 +341,7 @@ plus the v10 alias for hook compatibility.
 
 ## Aşama 10: Impact Review (interactive dialog)
 
-For full Aşama 10 rules, read `my-claude-lang/asama10-impact-review.md`
+For full Aşama 10 rules, read `my-claude-lang/asama18-impact-review.md`
 
 After Aşama 9 auto-fix complete. Sequential, one-impact-per-turn
 AskUserQuestion dialog. An "impact" is a real downstream effect on
@@ -356,7 +356,7 @@ Per impact, developer replies: skip / specific fix / make rule.
 
 ## Aşama 11: Verify Report
 
-For full rules, read `my-claude-lang/asama11-verify-report.md`
+For full rules, read `my-claude-lang/asama19-verify-report.md`
 
 Spec Coverage table — every MUST/SHOULD requirement linked to the test
 that covers it: ✅ file:line / ⚠️ partial / ❌ no test written.
@@ -366,7 +366,7 @@ producing the Verification Report after Aşama 10 finishes.
 
 ## Aşama 12: Translate Report
 
-For full Aşama 12 rules, read `my-claude-lang/asama12-translate.md`
+For full Aşama 12 rules, read `my-claude-lang/asama20-localized-report.md`
 
 The full English Aşama 11 report is translated EN → user_lang via
 strict translator pass. No interpretation, no addition, no omission.
@@ -375,7 +375,7 @@ verbatim. Skipped silently when source language is English.
 
 ## Aşama 13: Completeness Audit
 
-For full Aşama 13 rules, read `my-claude-lang/asama13-completeness.md`
+For full Aşama 13 rules, read `my-claude-lang/asama21-completeness.md`
 
 Last phase before session close. Reads `.mcl/audit.log` + `state.json`
 + `trace.log` and renders a machine-verifiable summary of which

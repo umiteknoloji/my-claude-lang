@@ -312,7 +312,7 @@ After a final GREEN verify (and Step 5 backend wiring if
 `ui_flow_active=true`), Aşama 7 is complete. Aşama 8 (Risk
 Review) and Aşama 10 (Impact Review) run as usual. The Aşama 11
 Verification Report cites the Aşama 7 GREEN verify instead of
-re-invoking the runner — see `asama11-verify-report.md` for the exact
+re-invoking the runner — see `asama19-verify-report.md` for the exact
 summary-line format.
 
 ## Audit trail

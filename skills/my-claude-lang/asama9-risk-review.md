@@ -251,14 +251,21 @@ Skip the re-verify ONLY when Aşama 8 was omitted entirely.
 
 ## Audit Emit on Completion (since v10.1.5)
 
-When all Aşama 8 risks are resolved and TDD re-verify is GREEN (or
-skipped per the rules above), BEFORE handing off to Aşama 9, emit the
-completion audit via Bash:
+When all risks (was "Aşama 8 risks" in v10) are resolved and TDD
+re-verify is GREEN (or skipped per the rules above), BEFORE handing
+off to the next phase (Aşama 10 Code Review in v11; was Aşama 9
+Quality+Tests in v10), emit the completion audit via Bash. **Dual
+emit since v10.1.22** — v11 audit name plus v10 alias so existing
+v10 hook enforcement at mcl-stop.sh keeps operating during the
+bridge:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-9-complete mcl-stop "h_count=N m_count=M l_count=K resolved=R"; \
   mcl_audit_log asama-8-complete mcl-stop "h_count=N m_count=M l_count=K resolved=R"'
 ```
+
+R8 cutover removes the v10 alias (`asama-8-complete`) line.
 
 Where:
 - N: HIGH-severity finding count surfaced this session (from §2b checklist)

@@ -1021,7 +1021,7 @@ fi
 # These phases are transient (no persisted state field). Each emits a
 # completion audit so trace.log reflects the full pipeline run.
 # Aşama 12 reuses the existing `localize-report asama12` audit
-# (mandated by skills/asama12-translate.md) — no new emit needed.
+# (mandated by skills/asama20-localized-report.md) — no new emit needed.
 # Idempotent: re-runs of Stop in same session skip if progression
 # already traced.
 # `_mcl_audit_emitted_in_session` helper has moved to

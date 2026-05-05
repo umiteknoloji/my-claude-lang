@@ -1,6 +1,6 @@
-<mcl_phase name="asama10-impact-review">
+<mcl_phase name="asama18-impact-review">
 
-# Aşama 10: Post-Risk Impact Review
+# Aşama 18: Post-Risk Impact Review (was Aşama 10 in v10)
 
 Aşama 10 is a **mandatory, sequential, interactive dialog** that runs
 AFTER Aşama 8 (risk review is resolved) and BEFORE Aşama 11
@@ -169,22 +169,29 @@ check this next week" items. Risks cannot.
 For Aşama 10 anti-patterns, see `my-claude-lang/anti-patterns.md` —
 anti-patterns live in a single file to avoid drift.
 
-## Audit Emit on Completion (since v10.1.6)
+## Audit Emit on Completion (since v10.1.6; dual-emit since v10.1.22)
 
-When all impacts are resolved (or Aşama 10 is omitted because no real
-impacts surfaced), BEFORE handing off to Aşama 11, emit:
+When all impacts are resolved (or Aşama 18 is omitted because no real
+impacts surfaced), BEFORE handing off to Aşama 19 (Verification),
+emit BOTH the v11 audit name AND the v10 alias:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-18-complete mcl-stop "impacts=N resolved=R"; \
   mcl_audit_log asama-10-complete mcl-stop "impacts=N resolved=R"'
 ```
 
 Where N is the count of impacts surfaced (0 when omitted) and R is
 the count of resolved decisions (apply / skip / rule-capture).
 
-Aşama 10 is a TRANSIENT phase (no persisted state field). The emit
+The v10 alias `asama-10-complete` keeps existing v10 enforcement at
+mcl-stop.sh:1034+ (progression-from-emit transition) operating during
+the bridge. R8 cutover removes the alias line.
+
+Aşama 18 is a TRANSIENT phase (no persisted state field). The emit
 serves trace.log completeness so the developer can prove the impact
 review ran end-to-end. Stop hook scans audit.log and writes
-`phase_transition 10 11` to trace.log.
+`phase_transition 10 11` (v10 numbering — will become 18 19 in R8) to
+trace.log.
 
 </mcl_phase>

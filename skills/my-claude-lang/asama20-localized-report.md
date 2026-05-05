@@ -1,6 +1,6 @@
-<mcl_phase name="asama12-localize-report">
+<mcl_phase name="asama20-localized-report">
 
-# Aşama 12: Localize Report
+# Aşama 20: Localized Report (was Aşama 12 in v10)
 
 Called automatically after Aşama 11 (Verification Report) is produced.
 
@@ -50,15 +50,29 @@ NOT localized (stays English):
    or test runner output — these are technical artifacts, not MCL prose.
 4. Preserve all formatting (bold, bullet, numbered list, code fence).
 
-## Audit
+## Audit (dual-emit since v10.1.22)
 
-Every Aşama 12 execution emits an audit entry:
+Every Aşama 20 execution emits TWO audit entries — the v11 audit
+name AND the v10 alias `localize-report` (which mcl-stop.sh:1048
+scans for the existing progression-from-emit transition):
+
 ```
-localize-report | asama12 | lang=<detected> skipped=<true|false>
+asama-20-complete | mcl-stop | lang=<detected> skipped=<true|false>
+localize-report   | asama12  | lang=<detected> skipped=<true|false>
 ```
 
-`skipped=true` when source language is English. `skipped=false` otherwise.
-This is the detection control: the audit confirms Aşama 12 was evaluated
-even when it is a no-op.
+`skipped=true` when source language is English. `skipped=false`
+otherwise. This is the detection control: the audit confirms Aşama 20
+was evaluated even when it is a no-op.
+
+Recommended emit:
+
+```
+bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
+  mcl_audit_log asama-20-complete mcl-stop "lang=<detected> skipped=<bool>"; \
+  mcl_audit_log localize-report asama12 "lang=<detected> skipped=<bool>"'
+```
+
+R8 cutover removes the v10 alias line.
 
 </mcl_phase>
