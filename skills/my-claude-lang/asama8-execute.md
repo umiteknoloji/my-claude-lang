@@ -1,33 +1,36 @@
-<mcl_phase name="asama7-execute">
+<mcl_phase name="asama8-execute">
 
-# Aşama 7: Test-First Development (TDD) with Live Translation
+# Aşama 8: Test-First Development (TDD) with Live Translation
 
 Called automatically when Aşama 4 is confirmed.
 
-**Naming clarification:** Aşama 7 is colloquially "the code-writing
+**Naming clarification:** Aşama 8 is colloquially "the code-writing
 stage", but its discipline is strict TDD: the **test is written
 first** (RED), then production code (GREEN), then refactor. Reading
 the title as "code first" would be the opposite of TDD. See
-`asama7-tdd.md` for the per-criterion cycle.
+`asama8-tdd.md` for the per-criterion cycle.
 
 ## Flow Split (since MCL 6.2.0)
 
-Aşama 7 forks on `ui_flow_active`:
+Aşama 8 forks on `ui_flow_active`:
 
 - `ui_flow_active = true` (Aşama 1 approve with UI included, default):
-  Aşama 7 runs as two preceding UI phases plus the TDD execute body:
+  Aşama 8 is preceded by two UI phases and then runs the TDD execute body:
   - **Aşama 6 BUILD_UI** — read `my-claude-lang/asama6-ui-build.md`
   - **Aşama 7 UI_REVIEW** — read `my-claude-lang/asama7-ui-review.md`
-  - **Backend wiring** — folded into the TDD execute body since
-    v10.1.18. Read `my-claude-lang/asama7-tdd.md` Step 5
-    ("Backend Wiring (UI Flow Path)"). Was a separate Aşama 6c
-    skill file in v10 architecture; that file has been removed.
-  All rules below still apply during each phase; they describe the
-  shared Aşama 7 behavior. The backend wiring (formerly Aşama 6c)
-  flows directly into Aşama 8 once TDD GREEN-verifies.
+  - **Aşama 8 TDD execute (this file + asama8-tdd.md)** — body below
+    plus the backend wiring step. Read
+    `my-claude-lang/asama8-tdd.md` Step 5 ("Backend Wiring (UI
+    Flow Path)") for the swap procedure that was previously a
+    separate Aşama 6c skill file in v10 architecture; that file
+    has been removed.
+  All rules below still apply during the TDD execute body; they
+  describe the shared Aşama 8 behavior. The backend wiring
+  (formerly Aşama 6c) flows directly into the next phase
+  (Risk Review) once TDD GREEN-verifies.
 - `ui_flow_active = false` (Aşama 1 approve with "skip UI") OR task
   has no UI by construction: the default flow below runs top-to-bottom
-  and exits directly to Aşama 8.
+  and exits directly to the next phase (Risk Review).
 
 Sub-phases share state (`spec_approved`, `current_phase`, `ui_sub_phase`)
 managed by `hooks/lib/mcl-state.sh`. Never transition sub-phase by

@@ -1,15 +1,16 @@
-<mcl_phase name="asama7-tdd">
+<mcl_phase name="asama8-tdd">
 
-# Aşama 7 TDD: incremental red-green-refactor
+# Aşama 8 TDD: incremental red-green-refactor
 
-Aşama 7 normally writes production code immediately after the spec
+Aşama 8 normally writes production code immediately after the spec
 is approved. This overlay turns that into an **incremental TDD cycle**:
 for each Acceptance Criterion, one test → RED → minimum code → GREEN
 → refactor — then move to the next criterion. The full cycle happens
-entirely inside Aşama 7; Aşama 8, Aşama 10, and Aşama 11 run
-afterward as usual.
+entirely inside Aşama 8; the next phase (Risk Review), Aşama 10
+(Impact Review in v10 numbering), and Aşama 11 (Verification Report
+in v10 numbering) run afterward as usual.
 
-TDD is **mandatory** — it runs on every Aşama 7 execution. There
+TDD is **mandatory** — it runs on every Aşama 8 execution. There
 is no opt-in flag. The only path that skips TDD is when the test
 command cannot be resolved even after auto-detection and the
 developer explicitly declines to provide one (see Step 1).
@@ -293,7 +294,7 @@ Keep:
 
 ### Phase Behavior Notes
 
-- This step inherits all of `asama7-execute.md` discipline (English
+- This step inherits all of `asama8-execute.md` discipline (English
   code/comments/commits, dev-language communication, Gate 1/2/3,
   deletion-only execution-plan rule, scope-creep handling).
 - This step does NOT re-implement those rules — it is Aşama 7

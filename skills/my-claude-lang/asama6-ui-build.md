@@ -13,7 +13,7 @@ Aşama 6 starts automatically when ALL of these hold after spec approval:
 - `ui_sub_phase = "BUILD_UI"` (set by stop hook on spec-approve)
 
 When `ui_flow_active = false` (developer picked "Onay, UI atlayacağız" at
-Aşama 1) — Aşama 6 is SKIPPED. Jump straight to `asama7-execute.md`.
+Aşama 1) — Aşama 6 is SKIPPED. Jump straight to `asama8-execute.md`.
 
 ## Core Intent
 
@@ -56,7 +56,7 @@ them in Aşama 6 is correct and required.
 
 If Claude attempts to write a true backend path, the DENY reason says:
 > MCL UI-BUILD LOCK — backend is unlocked in the TDD execute backend
-> wiring step (`asama7-tdd.md` Step 5; was Aşama 6c) after the UI is
+> wiring step (`asama8-tdd.md` Step 5; was Aşama 6c) after the UI is
 > approved. Keep dummy fixtures in the component for now.
 
 ## Curated Plugin Dispatch

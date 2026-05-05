@@ -9,7 +9,7 @@ description: >
   ambiguity, generates senior-engineer-grade specs, and filters sycophancy.
 ---
 
-# MCL — Semantic Development Bridge (v10.1.18)
+# MCL — Semantic Development Bridge (v10.1.19)
 
 ## How to Activate
 
@@ -43,7 +43,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 10.1.18` on its own line.
+Every response MUST start with `🌐 MCL 10.1.19` on its own line.
 
 ## AskUserQuestion Protocol
 
@@ -53,7 +53,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 partial-spec recovery, mcl-update, mcl-finish, pasted-CLI passthrough —
 uses Claude Code's native `AskUserQuestion` tool with `question` prefixed
-`MCL 10.1.18 | `. The Stop hook parses tool_use/tool_result pairs to advance
+`MCL 10.1.19 | `. The Stop hook parses tool_use/tool_result pairs to advance
 MCL state.
 
 ## MCL Tag Schema
@@ -158,7 +158,7 @@ For full Aşama 1 rules, read `my-claude-lang/asama1-gather.md`
    schema/migration, auth/permission model, public API breaking changes,
    irreversible data consequences, security boundaries.
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 10.1.18 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 10.1.19 | <localized-is-this-correct>",
    options: ["<approve>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns approve does state advance.
 
@@ -210,7 +210,7 @@ collect approval via ONE AskUserQuestion call.
    concrete technical problems (race conditions, scale issues, missing
    auth, N+1, cascading failures). If found, add one `⚠️ Teknik not:`
    line.
-5. Call `AskUserQuestion({question: "MCL 10.1.18 | <approval-prompt>",
+5. Call `AskUserQuestion({question: "MCL 10.1.19 | <approval-prompt>",
    options: [{label: "<approve-verb>", ...}, {label: "<edit>", ...},
    {label: "<cancel>", ...}]})`. The approve label is the BARE VERB.
 
@@ -251,17 +251,19 @@ When `ui_flow_active = true`:
   see-it-yourself / cancel". Revise → loop to Aşama 6.
   See-it-yourself → opt-in Playwright + screenshot + multimodal Read.
 - **Backend wiring** — folded into the TDD execute phase
-  (`asama7-tdd.md` Step 5; will be renamed `asama8-tdd.md` in v11
+  (`asama8-tdd.md` Step 5; will be renamed `asama8-tdd.md` in v11
   R3). Path lock lifts on `ui_sub_phase="BACKEND"`. No longer a
   separate Aşama 6c skill file as of v10.1.18.
 
 When `ui_flow_active = false`, Aşama 6 and Aşama 7 are skipped
 entirely; the TDD execute phase runs the standard code flow.
 
-## Aşama 7: Code + TDD
+## Aşama 8: Code + TDD (was Aşama 7 in v10 architecture)
 
-For full execution rules, read `my-claude-lang/asama7-execute.md`
-For incremental TDD rules, read `my-claude-lang/asama7-tdd.md`
+For full execution rules, read `my-claude-lang/asama8-execute.md`
+For incremental TDD rules, read `my-claude-lang/asama8-tdd.md`
+(also includes Step 5 backend wiring — folded from the v10
+Aşama 6c skill file in v10.1.18.)
 
 On every approval the Stop hook auto-saves the spec body to
 `.mcl/specs/NNNN-slug.md`. Code-writing aşama with kademeli TDD:

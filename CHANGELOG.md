@@ -7,6 +7,80 @@
 
 ## [Unreleased]
 
+## [10.1.19] - 2026-05-05
+
+### v11.0 migration R3 — Aşama 7 (TDD execute) → Aşama 8 rename
+
+Third step of the v11.0 migration. Renames the TDD execute skill
+files from the v10 number 7 to the v11 number 8, clearing the
+`asama7-*` namespace that R1 left in mixed state. Path-only rename
+plus first-line phase-header updates inside the renamed files.
+Audit names unchanged — `asama-8-complete` audit already matched
+v11 Aşama 8 in v10's flow because the integer `current_phase=7`
+was always the coarse "code+TDD" bucket; only the documented
+phase number shifts.
+
+#### Changes
+
+- `skills/my-claude-lang/asama7-execute.md` →
+  `skills/my-claude-lang/asama8-execute.md`
+- `skills/my-claude-lang/asama7-tdd.md` →
+  `skills/my-claude-lang/asama8-tdd.md`
+- mcl_phase tag inside each renamed file: `asama7-execute` →
+  `asama8-execute`, `asama7-tdd` → `asama8-tdd`.
+- Bulk path replace of `asama7-execute` → `asama8-execute` and
+  `asama7-tdd` → `asama8-tdd` across 6 referencing files
+  (skills/my-claude-lang.md umbrella, asama11-verify-report.md,
+  asama7-ui-review.md, asama6-ui-build.md, plus the two renamed
+  files themselves).
+- Self-phase-label updates inside the renamed files:
+  `asama8-execute.md`: title `# Aşama 7: ...` → `# Aşama 8: ...`,
+  flow-split prose updated to describe Aşama 8 as the merging
+  phase. `asama8-tdd.md`: title `# Aşama 7 TDD: ...` →
+  `# Aşama 8 TDD: ...`, opening paragraph reframed for v11
+  numbering. **Deeper internal references to "Aşama 7" inside
+  these files (lines 21, 51, 65, 71, 209, 217, 234, 276, 299,
+  311 of asama8-tdd.md) intentionally left alone — they are
+  about the phase's own internal mechanics and will be rewritten
+  in R4 when the state machine is widened. Adjusting them in R3
+  would have produced semantic drift at the boundary with
+  asama8-risk-review.md (currently still numbered Aşama 8 in
+  v10; becomes Aşama 9 in R4).**
+- Umbrella section header `## Aşama 7: Code + TDD` →
+  `## Aşama 8: Code + TDD (was Aşama 7 in v10 architecture)`
+  with a pointer noting that asama8-tdd.md Step 5 absorbs the
+  v10 Aşama 6c backend wiring.
+
+#### What does NOT change
+
+- mcl-state.sh `current_phase` enum still bounded `<= 11`. The
+  integer mapping is unchanged (bucket 7 is still "code+TDD",
+  whether it documents Aşama 7 or Aşama 8). Widening to 21
+  happens in R4.
+- mcl-stop.sh, mcl-pre-tool.sh, mcl-activate.sh logic. Audit
+  names stay the same; SKIP-BLOCK keys stay the same.
+- All v10 tests keyed on `asama-8-complete`,
+  `asama-8-emit-missing` etc. continue to operate against the
+  renamed v11 files because audit names didn't shift.
+
+#### Bridge-period notes (v11 plan R4 forward)
+
+- `asama8-risk-review.md` is currently the v10 Aşama 8 (Risk
+  Review) skill file. After R3 completes, the directory listing
+  shows: asama8-execute.md (TDD execute, v11), asama8-tdd.md
+  (TDD overlay, v11), asama8-risk-review.md (Risk Review,
+  v10) — three files starting with `asama8-` but only two
+  describe the same v11 phase. R4 renames asama8-risk-review.md
+  → asama9-risk-review.md to clear this.
+- `asama8-tdd.md` Step 5 (Backend Wiring) still references
+  "Aşama 7" in its body prose ("inherits all of asama7-execute.md
+  discipline"). The cross-reference path was sed-updated to
+  asama8-execute.md, but a few "Aşama 7" labels remain because
+  they refer to the phase's own historic name; they will be
+  flushed when R4 reorders the state machine bucket map.
+
+Banner: MCL 10.1.18 → MCL 10.1.19.
+
 ## [10.1.18] - 2026-05-05
 
 ### v11.0 migration R2 — Aşama 6c → Aşama 8 fold (skill-content merge)

@@ -54,7 +54,7 @@ phase file.
 
 ### TDD mode — skip re-invocation
 
-When `tdd=true` (see `asama7-tdd.md`) AND Aşama 7 **or Aşama 8**
+When `tdd=true` (see `asama8-tdd.md`) AND Aşama 7 **or Aşama 8**
 has already emitted a `🟢 GREEN verify` block in this session, DO NOT
 invoke the runner again here. Aşama 11 starts instead with a localized
 TDD-cycle summary line. Examples:
