@@ -1,10 +1,10 @@
-<mcl_phase name="asama9-risk-review">
+<mcl_phase name="asama10-risk-review">
 
 > ⚠️ SYNC NOTE: The active Aşama 9 rule lives in `mcl-activate.sh` STATIC_CONTEXT
-> (the `mcl_phase name="asama9-risk-review"` block). This file is the extended
+> (the `mcl_phase name="asama10-risk-review"` block). This file is the extended
 > reference. When updating Aşama 9 behavior, BOTH must be updated together.
 
-# Aşama 9: Post-Code Risk Review (interactive dialog) — was Aşama 8 in v10
+# Aşama 10: Post-Code Risk Review (interactive dialog) — was Aşama 8 in v10
 
 Aşama 9 is a **mandatory, sequential, interactive dialog** that runs
 AFTER Aşama 8 (code is written via TDD) and BEFORE the quality/test
@@ -261,7 +261,7 @@ bridge:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-9-complete mcl-stop "h_count=N m_count=M l_count=K resolved=R"'
+  mcl_audit_log asama-10-complete mcl-stop "h_count=N m_count=M l_count=K resolved=R"'
 ```
 
 Where:

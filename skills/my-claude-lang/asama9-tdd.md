@@ -1,6 +1,6 @@
-<mcl_phase name="asama8-tdd">
+<mcl_phase name="asama9-tdd">
 
-# Aşama 8 TDD: incremental red-green-refactor
+# Aşama 9 TDD: incremental red-green-refactor
 
 Aşama 8 normally writes production code immediately after the spec
 is approved. This overlay turns that into an **incremental TDD cycle**:
@@ -272,7 +272,7 @@ silently change the type.
 
 <!-- v10.1.23: mock-data cleanup MOVED to Aşama 19 (verify-report).
      The fenced block previously parked here is now active in
-     `asama19-verify-report.md` under the "Mock Data Cleanup" section.
+     `asama20-verify-report.md` under the "Mock Data Cleanup" section.
      Aşama 8 (this file) no longer carries the cleanup responsibility
      — keep dummy fixtures intact during TDD execute; Aşama 19 deletes
      them after the verification report has been built. -->
@@ -280,7 +280,7 @@ silently change the type.
 
 ### Phase Behavior Notes
 
-- This step inherits all of `asama8-execute.md` discipline (English
+- This step inherits all of `asama9-execute.md` discipline (English
   code/comments/commits, dev-language communication, Gate 1/2/3,
   deletion-only execution-plan rule, scope-creep handling).
 - This step does NOT re-implement those rules — it is Aşama 7
@@ -298,7 +298,7 @@ After a final GREEN verify (and Step 5 backend wiring if
 `ui_flow_active=true`), Aşama 7 is complete. Aşama 8 (Risk
 Review) and Aşama 10 (Impact Review) run as usual. The Aşama 11
 Verification Report cites the Aşama 7 GREEN verify instead of
-re-invoking the runner — see `asama19-verify-report.md` for the exact
+re-invoking the runner — see `asama20-verify-report.md` for the exact
 summary-line format.
 
 ## Audit trail

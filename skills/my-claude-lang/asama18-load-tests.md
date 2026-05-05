@@ -1,6 +1,6 @@
-<mcl_phase name="asama17-load-tests">
+<mcl_phase name="asama18-load-tests">
 
-# Aşama 17: Load Tests (auto-fix on changed files)
+# Aşama 18: Load Tests (auto-fix on changed files)
 
 Eighth and last of the dedicated quality phases (was sub-step `9.8`
 in v10 monolithic `asama9-quality-tests.md`). Auto-fix only.
@@ -24,17 +24,17 @@ endpoints).
 Skip when no throughput-sensitive path is detected. Audit:
 
 ```
-asama-17-not-applicable  reason=no-throughput-path
+asama-18-not-applicable  reason=no-throughput-path
 ```
 
 ## Audit emit (dual — v11 + v10 backward-compat)
 
 ```
-mcl_audit_log "asama-17-start" "mcl-stop.sh" "scope=<files>"
+mcl_audit_log "asama-18-start" "mcl-stop.sh" "scope=<files>"
 
-mcl_audit_log "asama-17-end" "mcl-stop.sh" "scripts_added=N met_target=true|false"
+mcl_audit_log "asama-18-end" "mcl-stop.sh" "scripts_added=N met_target=true|false"
 
-mcl_audit_log "asama-17-not-applicable" "mcl-stop.sh" "reason=<why>"
+mcl_audit_log "asama-18-not-applicable" "mcl-stop.sh" "reason=<why>"
 ```
 
 After Aşama 17 ends, the quality pipeline (Aşama 10–17) is

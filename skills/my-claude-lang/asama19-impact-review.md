@@ -1,6 +1,6 @@
-<mcl_phase name="asama18-impact-review">
+<mcl_phase name="asama19-impact-review">
 
-# Aşama 18: Post-Risk Impact Review (was Aşama 10 in v10)
+# Aşama 19: Post-Risk Impact Review (was Aşama 10 in v10)
 
 Aşama 10 is a **mandatory, sequential, interactive dialog** that runs
 AFTER Aşama 8 (risk review is resolved) and BEFORE Aşama 11
@@ -177,7 +177,7 @@ emit BOTH the v11 audit name AND the v10 alias:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-18-complete mcl-stop "impacts=N resolved=R"'
+  mcl_audit_log asama-19-complete mcl-stop "impacts=N resolved=R"'
 ```
 
 Where N is the count of impacts surfaced (0 when omitted) and R is

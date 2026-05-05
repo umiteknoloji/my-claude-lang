@@ -1,6 +1,6 @@
-<mcl_phase name="asama8-execute">
+<mcl_phase name="asama9-execute">
 
-# Aşama 8: Test-First Development (TDD) with Live Translation
+# Aşama 9: Test-First Development (TDD) with Live Translation
 
 Called automatically when Aşama 4 is confirmed.
 
@@ -8,7 +8,7 @@ Called automatically when Aşama 4 is confirmed.
 stage", but its discipline is strict TDD: the **test is written
 first** (RED), then production code (GREEN), then refactor. Reading
 the title as "code first" would be the opposite of TDD. See
-`asama8-tdd.md` for the per-criterion cycle.
+`asama9-tdd.md` for the per-criterion cycle.
 
 ## Flow Split (since MCL 6.2.0)
 
@@ -18,9 +18,9 @@ Aşama 8 forks on `ui_flow_active`:
   Aşama 8 is preceded by two UI phases and then runs the TDD execute body:
   - **Aşama 6 BUILD_UI** — read `my-claude-lang/asama6-ui-build.md`
   - **Aşama 7 UI_REVIEW** — read `my-claude-lang/asama7-ui-review.md`
-  - **Aşama 8 TDD execute (this file + asama8-tdd.md)** — body below
+  - **Aşama 8 TDD execute (this file + asama9-tdd.md)** — body below
     plus the backend wiring step. Read
-    `my-claude-lang/asama8-tdd.md` Step 5 ("Backend Wiring (UI
+    `my-claude-lang/asama9-tdd.md` Step 5 ("Backend Wiring (UI
     Flow Path)") for the swap procedure that was previously a
     separate Aşama 6c skill file in v10 architecture; that file
     has been removed.

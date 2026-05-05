@@ -1,6 +1,6 @@
-<mcl_phase name="asama16-e2e-tests">
+<mcl_phase name="asama17-e2e-tests">
 
-# Aşama 16: E2E Tests (auto-fix on changed files)
+# Aşama 17: E2E Tests (auto-fix on changed files)
 
 Seventh of 8 dedicated quality phases (was sub-step `9.7` in v10
 monolithic `asama9-quality-tests.md`). Auto-fix only.
@@ -23,17 +23,17 @@ For UI stack active + new user flows:
 Skip when `ui_flow_active=false` OR no E2E framework available. Audit:
 
 ```
-asama-16-not-applicable  reason=<no-ui-or-framework>
+asama-17-not-applicable  reason=<no-ui-or-framework>
 ```
 
 ## Audit emit (dual — v11 + v10 backward-compat)
 
 ```
-mcl_audit_log "asama-16-start" "mcl-stop.sh" "scope=<files>"
+mcl_audit_log "asama-17-start" "mcl-stop.sh" "scope=<files>"
 
-mcl_audit_log "asama-16-end" "mcl-stop.sh" "tests_added=N green=true|false"
+mcl_audit_log "asama-17-end" "mcl-stop.sh" "tests_added=N green=true|false"
 
-mcl_audit_log "asama-16-not-applicable" "mcl-stop.sh" "reason=<why>"
+mcl_audit_log "asama-17-not-applicable" "mcl-stop.sh" "reason=<why>"
 ```
 
 R8 cutover removes the v10 alias lines.

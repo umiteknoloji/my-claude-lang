@@ -1,6 +1,6 @@
-<mcl_phase name="asama11-simplify">
+<mcl_phase name="asama12-simplify">
 
-# Aşama 11: Simplify (auto-fix on changed files)
+# Aşama 12: Simplify (auto-fix on changed files)
 
 Second of 8 dedicated quality phases (was sub-step `9.2` in v10
 monolithic `asama9-quality-tests.md`). Auto-fix only — no
@@ -26,22 +26,22 @@ the current session.
 
 When auto-fix is ambiguous (e.g., multiple plausible helper
 locations, abstraction may have value the static scan can't see),
-write `asama-11-ambiguous` audit and skip.
+write `asama-12-ambiguous` audit and skip.
 
 ## Audit emit (dual — v11 + v10 backward-compat)
 
 Start / End / Not-applicable follow the same pattern as Aşama 10:
 
 ```
-mcl_audit_log "asama-11-start" "mcl-stop.sh" "scope=<files>"
+mcl_audit_log "asama-12-start" "mcl-stop.sh" "scope=<files>"
 ```
 
 ```
-mcl_audit_log "asama-11-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"
+mcl_audit_log "asama-12-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"
 ```
 
 ```
-mcl_audit_log "asama-11-not-applicable" "mcl-stop.sh" "reason=<why>"
+mcl_audit_log "asama-12-not-applicable" "mcl-stop.sh" "reason=<why>"
 ```
 
 R8 cutover removes the v10 alias lines.

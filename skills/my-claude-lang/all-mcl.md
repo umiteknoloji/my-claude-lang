@@ -272,10 +272,10 @@ a Pass condition, and a Skip condition.
 ---
 
 ### STEP-53: static-context-skill-sync
-**Phase:** 0 (setup validation) | **Description:** Every `<mcl_phase>` block in `STATIC_CONTEXT` (inside `mcl-activate.sh`) has an extended reference skill file under `skills/my-claude-lang/`. During check-up, Claude reads the STATIC_CONTEXT Aşama 8 block and `skills/my-claude-lang/asama9-risk-review.md` and checks for structural divergence: different step counts, different rule headings, missing sections, or the sync note missing from the skill file. Divergence means the active behavior (STATIC_CONTEXT) and the extended documentation no longer match — the next developer touching that phase has no reliable reference.
+**Phase:** 0 (setup validation) | **Description:** Every `<mcl_phase>` block in `STATIC_CONTEXT` (inside `mcl-activate.sh`) has an extended reference skill file under `skills/my-claude-lang/`. During check-up, Claude reads the STATIC_CONTEXT Aşama 8 block and `skills/my-claude-lang/asama10-risk-review.md` and checks for structural divergence: different step counts, different rule headings, missing sections, or the sync note missing from the skill file. Divergence means the active behavior (STATIC_CONTEXT) and the extended documentation no longer match — the next developer touching that phase has no reliable reference.
 **Signal:** check-up Step 9 divergence report (PASS / WARN / SKIP).
-**Pass:** No structural divergence detected between STATIC_CONTEXT Aşama 8 block and `asama9-risk-review.md`. Sync note is present in the skill file.
-**Skip:** When `skills/my-claude-lang/asama9-risk-review.md` does not exist (fresh clone before `bash setup.sh`). Expected skip — not a failure.
+**Pass:** No structural divergence detected between STATIC_CONTEXT Aşama 8 block and `asama10-risk-review.md`. Sync note is present in the skill file.
+**Skip:** When `skills/my-claude-lang/asama10-risk-review.md` does not exist (fresh clone before `bash setup.sh`). Expected skip — not a failure.
 
 ---
 

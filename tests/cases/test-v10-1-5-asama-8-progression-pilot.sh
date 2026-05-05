@@ -125,7 +125,7 @@ else
 fi
 
 # Skill contract: skill must mandate the emit.
-_skill="$REPO_ROOT/skills/my-claude-lang/asama9-risk-review.md"
+_skill="$REPO_ROOT/skills/my-claude-lang/asama10-risk-review.md"
 if grep -q "mcl_audit_log asama-8-complete" "$_skill"; then
   PASS=$((PASS+1))
   printf '  PASS: skill file mandates asama-8-complete emit\n'

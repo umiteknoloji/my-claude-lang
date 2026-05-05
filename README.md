@@ -35,9 +35,7 @@ You could use a translator. But here's what happens when you translate your requ
 
 ## What my-claude-lang Actually Does
 
-It runs a **twenty-one-stage mutual understanding loop** before a single line of code is written:
-
-> **Note (v11.0 vision):** The pipeline below is MCL's v11.0 target architecture. The current stable release (see `VERSION`) still runs the 13-phase architecture; v11.0 is being delivered incrementally. During the bridge period, CHANGELOG.md describes which phases the active version supports.
+It runs a **twenty-two-stage mutual understanding loop** before a single line of code is written:
 
 ```
 You (in your own language)
@@ -84,7 +82,14 @@ Phase 7: You inspect the UI. If updates are needed, tell MCL.
          have it run too if you want, but it is costly.
   │
   ▼
-Phase 8: Test-first development (TDD). For every acceptance
+Phase 8: DB design — schema is laid out per normalization rules
+         and built to avoid future trouble. Index strategy and
+         query plan estimates for hot paths are produced. ORM
+         migrations are generated. Soft-skipped when no DB is in
+         scope.
+  │
+  ▼
+Phase 9: Test-first development (TDD). For every acceptance
          criterion, a failing test is written FIRST (RED), THEN
          the minimum production code to pass it (GREEN), then
          refactor. The cycle repeats for each criterion; at the
@@ -93,7 +98,7 @@ Phase 8: Test-first development (TDD). For every acceptance
          real TDD.
   │
   ▼
-Phase 9 (Risk Review): MCL verifies that the security and
+Phase 10 (Risk Review): MCL verifies that the security and
          performance decisions designed in the spec are correctly
          implemented; then scans for missed risks — edge cases,
          regressions — and walks through each one with you. After
@@ -102,58 +107,58 @@ Phase 9 (Risk Review): MCL verifies that the security and
          you decide.
   │
   ▼
-Phase 10: Code review is performed on new or changed files.
+Phase 11: Code review is performed on new or changed files.
           Found issues are auto-fixed.
   │
   ▼
-Phase 11: Simplify is performed on new or changed files.
+Phase 12: Simplify is performed on new or changed files.
           Found issues are auto-fixed.
   │
   ▼
-Phase 12: Performance check is performed on new or changed files.
+Phase 13: Performance check is performed on new or changed files.
           Found issues are auto-fixed.
   │
   ▼
-Phase 13: Security vulnerability check is performed on the
+Phase 14: Security vulnerability check is performed on the
           entire project. Found issues are auto-fixed.
   │
   ▼
-Phase 14: Unit tests and TDD tests are performed on new or
+Phase 15: Unit tests and TDD tests are performed on new or
           changed files. Found issues are auto-fixed.
   │
   ▼
-Phase 15: Integration tests are performed on new or changed files.
+Phase 16: Integration tests are performed on new or changed files.
           Found issues are auto-fixed.
   │
   ▼
-Phase 16: E2E tests are performed on new or changed files.
+Phase 17: E2E tests are performed on new or changed files.
           Found issues are auto-fixed.
   │
   ▼
-Phase 17: Load tests are performed on new or changed files.
+Phase 18: Load tests are performed on new or changed files.
           Found issues are auto-fixed.
   │
   ▼
-Phase 18 (Impact Review): MCL scans the rest of the project for
+Phase 19 (Impact Review): MCL scans the rest of the project for
           actual downstream effects of the change — callers,
           shared utilities, schema/API shifts — and puts each
           one in front of you for your decision.
   │
   ▼
-Phase 19: Verification Report — Spec Coverage table (each
+Phase 20: Verification Report — Spec Coverage table (each
           MUST/SHOULD requirement linked to the test that covers
           it: ✅ with file:line, ⚠️ partial, ❌ no test written).
           Mock data is removed from the project.
   │
   ▼
-Phase 20: The full English report is translated to your language
+Phase 21: The full English report is translated to your language
           with a strict translator pass (EN → user language) —
           no interpretation, no additions. Technical tokens
           (file:line, test names) are preserved as-is.
   │
   ▼
-Phase 21: Completeness Audit — `.mcl/audit.log` is read and
-          each phase 1-20 is verified to have actually completed
+Phase 22: Completeness Audit — `.mcl/audit.log` is read and
+          each phase 1-21 is verified to have actually completed
           end-to-end. The Open Issues section surfaces gaps the
           pipeline missed.
 ```
@@ -166,7 +171,7 @@ Every closed-ended gate (Aşama 1 summary, Aşama 4 spec approval, each
 Aşama 8 risk, each Aşama 10 impact, plugin consent, git-init consent,
 drift resolution, `/mcl-update` / `/mcl-finish` / pasted-CLI confirmation)
 arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 11.0.1 | `. You pick an option in the UI — no typing
+question prefix `MCL 12.0.0 | `. You pick an option in the UI — no typing
 "yes" or "✅ MCL APPROVED" required. Open-ended Aşama 1 gathering stays
 as a plain-text conversation.
 
@@ -175,7 +180,7 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 11.0.1` so you always know the bridge is active.
+Every response starts with `🌐 MCL 12.0.0` so you always know the bridge is active.
 
 ### UI Build / Review Sub-Phases (since 6.2.0)
 

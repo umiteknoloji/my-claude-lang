@@ -1,6 +1,6 @@
-<mcl_phase name="asama21-completeness">
+<mcl_phase name="asama22-completeness">
 
-# Aşama 21: Completeness Audit (was Aşama 13 in v10) — audits phases 1–20
+# Aşama 22: Completeness Audit (was Aşama 13 in v10) — audits phases 1–20
 
 Aşama 21 runs AFTER Aşama 20 (Localized Report) and BEFORE the
 session closes. It reads the session's audit/state/trace files and
@@ -38,7 +38,7 @@ Completeness audit is the LAST output before the session closes.
 7. Emit completion audit:
    ```
    bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-     mcl_audit_log asama-21-complete mcl-stop "phases_done=N phases_missing=M"'
+     mcl_audit_log asama-22-complete mcl-stop "phases_done=N phases_missing=M"'
    ```
 
 ## Phase Completion Signals (audit.log inspection)
@@ -157,7 +157,7 @@ the completion audit via Bash:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-21-complete mcl-stop "phases_done=N phases_missing=M"'
+  mcl_audit_log asama-22-complete mcl-stop "phases_done=N phases_missing=M"'
 ```
 
 Where N is the count of phases with ✓ verdict and M is the count

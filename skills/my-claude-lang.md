@@ -9,7 +9,7 @@ description: >
   ambiguity, generates senior-engineer-grade specs, and filters sycophancy.
 ---
 
-# MCL — Semantic Development Bridge (v11.0.1)
+# MCL — Semantic Development Bridge (v12.0.0)
 
 ## How to Activate
 
@@ -43,7 +43,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 11.0.1` on its own line.
+Every response MUST start with `🌐 MCL 12.0.0` on its own line.
 
 ## AskUserQuestion Protocol
 
@@ -53,7 +53,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 partial-spec recovery, mcl-update, mcl-finish, pasted-CLI passthrough —
 uses Claude Code's native `AskUserQuestion` tool with `question` prefixed
-`MCL 11.0.1 | `. The Stop hook parses tool_use/tool_result pairs to advance
+`MCL 12.0.0 | `. The Stop hook parses tool_use/tool_result pairs to advance
 MCL state.
 
 ## MCL Tag Schema
@@ -158,7 +158,7 @@ For full Aşama 1 rules, read `my-claude-lang/asama1-gather.md`
    schema/migration, auth/permission model, public API breaking changes,
    irreversible data consequences, security boundaries.
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 11.0.1 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 12.0.0 | <localized-is-this-correct>",
    options: ["<approve>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns approve does state advance.
 
@@ -210,7 +210,7 @@ collect approval via ONE AskUserQuestion call.
    concrete technical problems (race conditions, scale issues, missing
    auth, N+1, cascading failures). If found, add one `⚠️ Teknik not:`
    line.
-5. Call `AskUserQuestion({question: "MCL 11.0.1 | <approval-prompt>",
+5. Call `AskUserQuestion({question: "MCL 12.0.0 | <approval-prompt>",
    options: [{label: "<approve-verb>", ...}, {label: "<edit>", ...},
    {label: "<cancel>", ...}]})`. The approve label is the BARE VERB.
 
@@ -251,7 +251,7 @@ When `ui_flow_active = true`:
   see-it-yourself / cancel". Revise → loop to Aşama 6.
   See-it-yourself → opt-in Playwright + screenshot + multimodal Read.
 - **Backend wiring** — folded into the TDD execute phase
-  (`asama8-tdd.md` Step 5; will be renamed `asama8-tdd.md` in v11
+  (`asama9-tdd.md` Step 5; will be renamed `asama9-tdd.md` in v11
   R3). Path lock lifts on `ui_sub_phase="BACKEND"`. No longer a
   separate Aşama 6c skill file as of v10.1.18.
 
@@ -260,8 +260,8 @@ entirely; the TDD execute phase runs the standard code flow.
 
 ## Aşama 8: Code + TDD (was Aşama 7 in v10 architecture)
 
-For full execution rules, read `my-claude-lang/asama8-execute.md`
-For incremental TDD rules, read `my-claude-lang/asama8-tdd.md`
+For full execution rules, read `my-claude-lang/asama9-execute.md`
+For incremental TDD rules, read `my-claude-lang/asama9-tdd.md`
 (also includes Step 5 backend wiring — folded from the v10
 Aşama 6c skill file in v10.1.18.)
 
@@ -285,7 +285,7 @@ proceeds silently. All other actions proceed silently.
 
 ## Aşama 8: Risk Review (interactive dialog)
 
-For full Aşama 8 rules, read `my-claude-lang/asama9-risk-review.md`
+For full Aşama 8 rules, read `my-claude-lang/asama10-risk-review.md`
 
 After Aşama 7 writes code but BEFORE Aşama 9 (auto-fix pipeline).
 Sequential, one-risk-per-turn AskUserQuestion dialog.
@@ -320,14 +320,14 @@ each phase has a top-level audit identity instead of a shared
 
 | v11 # | v10 # | Phase | What it does | Skill file |
 |---|---|---|---|---|
-| Aşama 10 | 9.1 | Code review | Correctness, dead code, validations | `asama10-code-review.md` |
-| Aşama 11 | 9.2 | Simplify | Premature abstraction, duplicate logic | `asama11-simplify.md` |
-| Aşama 12 | 9.3 | Performance | N+1, unbounded loops, blocking calls | `asama12-performance.md` |
-| Aşama 13 | 9.4 | Security | Semgrep + injection / auth / CSRF / secrets (whole-project scope in v11) | `asama13-security.md` |
-| Aşama 14 | 9.5 | Unit + TDD tests | One per new function/class/module | `asama14-unit-tests.md` |
-| Aşama 15 | 9.6 | Integration tests | Cross-module, API endpoints, DB | `asama15-integration-tests.md` |
-| Aşama 16 | 9.7 | E2E tests | UI active + new user flows | `asama16-e2e-tests.md` |
-| Aşama 17 | 9.8 | Load tests | Throughput-sensitive paths | `asama17-load-tests.md` |
+| Aşama 10 | 9.1 | Code review | Correctness, dead code, validations | `asama11-code-review.md` |
+| Aşama 11 | 9.2 | Simplify | Premature abstraction, duplicate logic | `asama12-simplify.md` |
+| Aşama 12 | 9.3 | Performance | N+1, unbounded loops, blocking calls | `asama13-performance.md` |
+| Aşama 13 | 9.4 | Security | Semgrep + injection / auth / CSRF / secrets (whole-project scope in v11) | `asama14-security.md` |
+| Aşama 14 | 9.5 | Unit + TDD tests | One per new function/class/module | `asama15-unit-tests.md` |
+| Aşama 15 | 9.6 | Integration tests | Cross-module, API endpoints, DB | `asama16-integration-tests.md` |
+| Aşama 16 | 9.7 | E2E tests | UI active + new user flows | `asama17-e2e-tests.md` |
+| Aşama 17 | 9.8 | Load tests | Throughput-sensitive paths | `asama18-load-tests.md` |
 
 **Soft applicability ("yumuşak katılık"):** when not applicable for
 the current code shape (load test for calculator, E2E for CLI), each
@@ -341,7 +341,7 @@ plus the v10 alias for hook compatibility.
 
 ## Aşama 10: Impact Review (interactive dialog)
 
-For full Aşama 10 rules, read `my-claude-lang/asama18-impact-review.md`
+For full Aşama 10 rules, read `my-claude-lang/asama19-impact-review.md`
 
 After Aşama 9 auto-fix complete. Sequential, one-impact-per-turn
 AskUserQuestion dialog. An "impact" is a real downstream effect on
@@ -356,7 +356,7 @@ Per impact, developer replies: skip / specific fix / make rule.
 
 ## Aşama 11: Verify Report
 
-For full rules, read `my-claude-lang/asama19-verify-report.md`
+For full rules, read `my-claude-lang/asama20-verify-report.md`
 
 Spec Coverage table — every MUST/SHOULD requirement linked to the test
 that covers it: ✅ file:line / ⚠️ partial / ❌ no test written.
@@ -366,7 +366,7 @@ producing the Verification Report after Aşama 10 finishes.
 
 ## Aşama 12: Translate Report
 
-For full Aşama 12 rules, read `my-claude-lang/asama20-localized-report.md`
+For full Aşama 12 rules, read `my-claude-lang/asama21-localized-report.md`
 
 The full English Aşama 11 report is translated EN → user_lang via
 strict translator pass. No interpretation, no addition, no omission.
@@ -375,7 +375,7 @@ verbatim. Skipped silently when source language is English.
 
 ## Aşama 13: Completeness Audit
 
-For full Aşama 13 rules, read `my-claude-lang/asama21-completeness.md`
+For full Aşama 13 rules, read `my-claude-lang/asama22-completeness.md`
 
 Last phase before session close. Reads `.mcl/audit.log` + `state.json`
 + `trace.log` and renders a machine-verifiable summary of which

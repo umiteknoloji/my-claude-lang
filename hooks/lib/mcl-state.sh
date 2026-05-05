@@ -110,7 +110,7 @@ try:
     assert isinstance(obj, dict)
     assert obj.get("schema_version") == 3
     assert isinstance(obj.get("current_phase"), int)
-    assert 1 <= obj["current_phase"] <= 21
+    assert 1 <= obj["current_phase"] <= 22
 except Exception:
     sys.exit(1)
 ' 2>/dev/null

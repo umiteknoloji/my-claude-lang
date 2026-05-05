@@ -1,6 +1,6 @@
-<mcl_phase name="asama15-integration-tests">
+<mcl_phase name="asama16-integration-tests">
 
-# Aşama 15: Integration Tests (auto-fix on changed files)
+# Aşama 16: Integration Tests (auto-fix on changed files)
 
 Sixth of 8 dedicated quality phases (was sub-step `9.6` in v10
 monolithic `asama9-quality-tests.md`). Auto-fix only.
@@ -24,17 +24,17 @@ For each new API endpoint, cross-module data flow, or DB interaction:
 Skip when integration boundary doesn't apply. Audit:
 
 ```
-asama-15-not-applicable  reason=<no-api-or-db>
+asama-16-not-applicable  reason=<no-api-or-db>
 ```
 
 ## Audit emit (dual — v11 + v10 backward-compat)
 
 ```
-mcl_audit_log "asama-15-start" "mcl-stop.sh" "scope=<files>"
+mcl_audit_log "asama-16-start" "mcl-stop.sh" "scope=<files>"
 
-mcl_audit_log "asama-15-end" "mcl-stop.sh" "tests_added=N green=true|false"
+mcl_audit_log "asama-16-end" "mcl-stop.sh" "tests_added=N green=true|false"
 
-mcl_audit_log "asama-15-not-applicable" "mcl-stop.sh" "reason=<why>"
+mcl_audit_log "asama-16-not-applicable" "mcl-stop.sh" "reason=<why>"
 ```
 
 R8 cutover removes the v10 alias lines.

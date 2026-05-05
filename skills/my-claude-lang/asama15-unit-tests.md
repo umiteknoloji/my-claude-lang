@@ -1,6 +1,6 @@
-<mcl_phase name="asama14-unit-tests">
+<mcl_phase name="asama15-unit-tests">
 
-# Aşama 14: Unit Tests + TDD verification (auto-fix on changed files)
+# Aşama 15: Unit Tests + TDD verification (auto-fix on changed files)
 
 Fifth of 8 dedicated quality phases (was sub-step `9.5` in v10
 monolithic `asama9-quality-tests.md`). Auto-fix only.
@@ -25,7 +25,7 @@ For each new function/class/module written in Aşama 8:
 Skip when `test_command` is unconfigured. Audit:
 
 ```
-asama-14-not-applicable  reason=test_command-missing
+asama-15-not-applicable  reason=test_command-missing
 ```
 
 (Plus v10 alias `asama-9-5-not-applicable`.)
@@ -33,11 +33,11 @@ asama-14-not-applicable  reason=test_command-missing
 ## Audit emit (dual — v11 + v10 backward-compat)
 
 ```
-mcl_audit_log "asama-14-start" "mcl-stop.sh" "scope=<files>"
+mcl_audit_log "asama-15-start" "mcl-stop.sh" "scope=<files>"
 
-mcl_audit_log "asama-14-end" "mcl-stop.sh" "tests_added=N green=true|false"
+mcl_audit_log "asama-15-end" "mcl-stop.sh" "tests_added=N green=true|false"
 
-mcl_audit_log "asama-14-not-applicable" "mcl-stop.sh" "reason=<why>"
+mcl_audit_log "asama-15-not-applicable" "mcl-stop.sh" "reason=<why>"
 ```
 
 R8 cutover removes the v10 alias lines.

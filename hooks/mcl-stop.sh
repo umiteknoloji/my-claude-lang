@@ -864,13 +864,13 @@ fi
 # --- Aşama 9 auto-complete (since v10.1.11) ---
 # Real-world failure mode (grom backoffice): all 8 sub-step audits
 # (asama-9-N-start/end OR asama-9-N-not-applicable) fired correctly
-# but model forgot to emit the final `asama-9-complete` summary
+# but model forgot to emit the final `asama-10-complete` summary
 # audit. Result: trace.log missed `phase_transition 9 10`, Aşama 11
 # Process Trace appeared to skip Aşama 9, developer concluded the
 # phase was atlanmış even though every sub-step actually ran.
 #
 # Fix: when Stop sees all 8 sub-step completion signals AND
-# `asama-9-complete` is missing, auto-emit it. Existing v10.1.5
+# `asama-10-complete` is missing, auto-emit it. Existing v10.1.5
 # progression scanner (below) then promotes quality_review_state to
 # complete normally. The auto-emit is logged with caller=mcl-stop-auto
 # so it's distinguishable from a model-generated emit during forensics.
@@ -916,9 +916,9 @@ _A9_SUB_RESULT="$(_mcl_asama_9_substeps_complete 2>/dev/null || echo "0|0")"
 _A9_SUB_DONE_COUNT="${_A9_SUB_RESULT%%|*}"
 _A9_SUB_ALL_DONE="${_A9_SUB_RESULT##*|}"
 if [ "${_A9_SUB_ALL_DONE:-0}" = "1" ]; then
-  _A9_HAS_COMPLETE="$(_mcl_audit_emitted_in_session "asama-9-complete" "" 2>/dev/null || echo 0)"
+  _A9_HAS_COMPLETE="$(_mcl_audit_emitted_in_session "asama-10-complete" "" 2>/dev/null || echo 0)"
   if [ "${_A9_HAS_COMPLETE:-0}" != "1" ]; then
-    mcl_audit_log "asama-9-complete" "mcl-stop-auto" "substeps_done=8 (auto-emitted; model forgot summary)"
+    mcl_audit_log "asama-10-complete" "mcl-stop-auto" "substeps_done=8 (auto-emitted; model forgot summary)"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append asama_9_auto_complete "8/8"
   fi
 fi
@@ -974,7 +974,7 @@ fi
 
 # --- Audit-driven Aşama 9 progression (since v10.1.5, PILOT) ---
 # Symmetric to the Aşama 8 progression above. When the model emits
-# `asama-9-complete` after 9.1–9.8 sub-steps, force-progress
+# `asama-10-complete` after 9.1–9.8 sub-steps, force-progress
 # `quality_review_state` to `complete`. Behavioral skips that bypass
 # the normal "all sub-steps end" transition still get tracked.
 # Severity gate (v10.1.2 open_severity_count check) still applies
@@ -997,7 +997,7 @@ except Exception:
 hit = 0
 try:
     for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
-        if "| asama-9-complete |" not in line:
+        if "| asama-10-complete |" not in line:
             continue
         ts = line.split("|", 1)[0].strip()
         if session_ts and ts < session_ts:
@@ -1015,7 +1015,7 @@ if [ "${_A9_EMITTED:-0}" = "1" ]; then
   _A9_CUR="$(mcl_state_get quality_review_state 2>/dev/null)"
   if [ "$_A9_CUR" != "complete" ]; then
     mcl_state_set quality_review_state '"complete"' >/dev/null 2>&1 || true
-    mcl_audit_log "asama-9-progression-from-emit" "stop" "prev=${_A9_CUR:-null}"
+    mcl_audit_log "asama-10-progression-from-emit" "stop" "prev=${_A9_CUR:-null}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 9 10
   fi
 fi
@@ -1024,7 +1024,7 @@ fi
 # These phases are transient (no persisted state field). Each emits a
 # completion audit so trace.log reflects the full pipeline run.
 # Aşama 12 reuses the existing `localize-report asama12` audit
-# (mandated by skills/asama20-localized-report.md) — no new emit needed.
+# (mandated by skills/asama21-localized-report.md) — no new emit needed.
 # Idempotent: re-runs of Stop in same session skip if progression
 # already traced.
 # `_mcl_audit_emitted_in_session` helper has moved to

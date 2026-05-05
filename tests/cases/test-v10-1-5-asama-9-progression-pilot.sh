@@ -161,14 +161,14 @@ fi
 # Skill contract: in v11 architecture (since v10.1.21) the monolithic
 # asama9-quality-tests.md skill is split into asama10..17. The v10
 # alias `asama-9-complete` is now mandated inside the LAST quality
-# phase skill (asama17-load-tests.md) so the existing v10 hook
+# phase skill (asama18-load-tests.md) so the existing v10 hook
 # enforcement chain continues to operate during the bridge period.
 # R8 cutover removes that mandate; this test will be retired or
 # rewritten as test-v11-* at that point.
-_skill="$REPO_ROOT/skills/my-claude-lang/asama17-load-tests.md"
+_skill="$REPO_ROOT/skills/my-claude-lang/asama18-load-tests.md"
 if grep -q "mcl_audit_log asama-9-complete" "$_skill"; then
   PASS=$((PASS+1))
-  printf '  PASS: skill file mandates asama-9-complete emit (v11: asama17-load-tests.md)\n'
+  printf '  PASS: skill file mandates asama-9-complete emit (v11: asama18-load-tests.md)\n'
 else
   FAIL=$((FAIL+1))
   printf '  FAIL: asama-9-complete emit instruction missing from skill file\n'

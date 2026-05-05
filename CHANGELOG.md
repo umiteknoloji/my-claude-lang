@@ -7,6 +7,99 @@
 
 ## [Unreleased]
 
+## [12.0.0] - 2026-05-05
+
+### v12.0 cutover — 22-phase pipeline with new Aşama 8 (DB design)
+
+Insert a dedicated **Aşama 8 (DB Design)** phase between v11's
+Aşama 7 (UI Inspection) and v11's Aşama 8 (TDD execute). Aşama 8+
+shifts +1 across the entire pipeline; final phase becomes
+**Aşama 22 (Completeness Audit, audits 1–21)**. Single-release
+cutover — no v11 audit aliases (in-progress sessions start a fresh
+session after upgrade, per the precedent set by v11.0.0).
+
+#### Why a new DB design phase?
+
+v11.0.0 systematic check kapsamı yeterliydi ama Aşama 12 (Performance)
+ve Aşama 13 (Security) DB-specific concerns'i sadece N+1 / SQL-injection
+seviyesinde tarıyordu. Index strategy / query plan / normalization is a
+DESIGN concern that belongs BEFORE TDD writes queries, not AFTER as a
+quality fix. v12 elevates DB design to a top-level phase that runs after
+UI approval and before TDD.
+
+#### Mapping (v11 → v12)
+
+| v11 phase | v12 phase | File rename |
+|---|---|---|
+| Aşama 1–7 | Aşama 1–7 | unchanged |
+| — | **Aşama 8 (NEW)** | `asama8-db-design.md` (new file) |
+| Aşama 8 (TDD execute) | Aşama 9 | `asama8-tdd.md` → `asama9-tdd.md`, `asama8-execute.md` → `asama9-execute.md` |
+| Aşama 9 (Risk Review) | Aşama 10 | `asama9-risk-review.md` → `asama10-risk-review.md` |
+| Aşama 10 (Code Review) | Aşama 11 | `asama10-code-review.md` → `asama11-code-review.md` |
+| Aşama 11 (Simplify) | Aşama 12 | `asama11-simplify.md` → `asama12-simplify.md` |
+| Aşama 12 (Performance) | Aşama 13 | `asama12-performance.md` → `asama13-performance.md` |
+| Aşama 13 (Security) | Aşama 14 | `asama13-security.md` → `asama14-security.md` |
+| Aşama 14 (Unit) | Aşama 15 | `asama14-unit-tests.md` → `asama15-unit-tests.md` |
+| Aşama 15 (Integration) | Aşama 16 | `asama15-integration-tests.md` → `asama16-integration-tests.md` |
+| Aşama 16 (E2E) | Aşama 17 | `asama16-e2e-tests.md` → `asama17-e2e-tests.md` |
+| Aşama 17 (Load) | Aşama 18 | `asama17-load-tests.md` → `asama18-load-tests.md` |
+| Aşama 18 (Impact) | Aşama 19 | `asama18-impact-review.md` → `asama19-impact-review.md` |
+| Aşama 19 (Verify+Mock) | Aşama 20 | `asama19-verify-report.md` → `asama20-verify-report.md` |
+| Aşama 20 (Localized) | Aşama 21 | `asama20-localized-report.md` → `asama21-localized-report.md` |
+| Aşama 21 (Completeness) | Aşama 22 | `asama21-completeness.md` → `asama22-completeness.md` |
+
+15 file renames + 1 new file (`asama8-db-design.md`).
+
+#### New skill — asama8-db-design.md
+
+- **When it runs:** after Aşama 7 UI approval, before Aşama 9 TDD.
+- **Soft-applicability:** skipped silently when no DB in scope
+  (CLI tool, static site, no `prisma/`/`drizzle/`/`migrations/`,
+  spec mentions no persistence). Audits emit
+  `asama-8-not-applicable | reason=no-db-in-scope`.
+- **Procedure:** 5 steps — read entity declarations from spec;
+  3NF schema design with denormalization justified inline; index
+  strategy by query pattern; ORM migration generation (detected
+  by stack: Prisma/Drizzle/TypeORM/Django/AR/Alembic/SQL); query
+  plan estimates for spec hot paths.
+- **Forbidden:** application code, production data writes, schema
+  decisions absent from spec, indexing every column.
+- **Audit emit:** `asama-8-start`, `asama-8-end`,
+  `asama-8-not-applicable`.
+
+#### Hook updates
+
+- `hooks/lib/mcl-state.sh:108` — validation widened `<= 21` → `<= 22`.
+- `hooks/mcl-stop.sh` — audit name scanners shifted +1 across
+  the board (asama-9-complete → asama-10-complete; asama-10-end
+  → asama-11-end; asama-13-{ambiguous,resolved,autofix} →
+  asama-14-*; etc.).
+- `hooks/mcl-activate.sh` — `<mcl_core>` PHASE SCRIPT's
+  `Aşama 7+ — Execute` block is now `Aşama 5+ — Execute` and
+  lists the v12 phase chain (1–22) with the new Aşama 8 DB
+  design callout.
+
+#### What does NOT change
+
+- mcl-askq-scanner.py classification — unchanged.
+- Aşama 1–7 — unchanged (file names, audit names).
+- Aşama 4 SPEC enforcement (📋 Spec block detection,
+  asama-2-complete + spec-approve audit chain).
+- Banner format / audit timestamp / state schema version (v3).
+
+#### Bridge artifacts
+
+- v10/v11-numbered tests reference older audit names; pre-existing
+  baseline failures unrelated to v12. Future patch retires them as
+  `test-v12-*`.
+- README/README.tr.md historical sections (UI Build/Review
+  Sub-Phases) reference the old 6a/6b/6c split; preserved as
+  historical context.
+- CHANGELOG entries before this one preserve their v11 (and earlier)
+  phase numbers.
+
+Banner: MCL 11.0.1 → **MCL 12.0.0**.
+
 ## [11.0.0] - 2026-05-05
 
 ### v11.0 cutover — 21-phase architecture is now the default

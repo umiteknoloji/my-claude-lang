@@ -35,9 +35,7 @@ Ama İngilizce düşünüyor. Ve İngilizce bilmiyorsan, tüm bunların dışın
 
 ## my-claude-lang Gerçekte Ne Yapıyor
 
-Tek bir satır kod yazılmadan önce **yirmi bir aşamalı karşılıklı anlama döngüsü** kuruyor:
-
-> **Not (v11.0 vision):** Aşağıdaki pipeline, MCL'in v11.0 hedef mimarisidir. Mevcut kararlı sürüm (`VERSION` dosyasına bakın) hâlâ 13-fazlı yapıyı çalıştırıyor; v11.0 bu yapıya kademeli olarak dönüşüyor. Köprü dönemi boyunca CHANGELOG.md güncel sürümün hangi fazları desteklediğini açıklıyor.
+Tek bir satır kod yazılmadan önce **yirmi iki aşamalı karşılıklı anlama döngüsü** kuruyor:
 
 ```
 Sen (kendi dilinde)
@@ -81,7 +79,10 @@ Aşama 7: UI'ı incelersin. Güncelleme gerekiyorsa MCL'e söylersin.
          Opt-in Playwright görsel incelemesi mevcut. İstersen onu da yaptırabilirsin ama maliyetlidir.
   │
   ▼
-Aşama 8: Test-first geliştirme (TDD). Her kabul kriteri için
+Aşama 8: DB yi normalizasyon kurallarına uygun ve ileriye dönük sorun çıkarmayacak şekilde tasarlar. index strategy ve query plan gibi gerekli bütün adımları uygular.
+  │
+  ▼
+Aşama 9: Test-first geliştirme (TDD). Her kabul kriteri için
          ÖNCE failing test yazılıyor (RED), SONRA onu geçecek
          minimum production kod (GREEN), ardından refactor. Döngü
          her kriter için tekrar eder; sonda tam suite tekrar
@@ -89,7 +90,7 @@ Aşama 8: Test-first geliştirme (TDD). Her kabul kriteri için
          "kod yaz sonra test ekle" değil, gerçek TDD.
   │
   ▼
-Aşama 9 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
+Aşama 10: (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
          performans kararlarının doğru uygulandığını doğrular; ardından
          atlanmış riskleri tarar — uç durumlar, gerilemeler — ve her
          birini seninle tek tek konuşur. Risk düzeltmeleri bittikten
@@ -97,49 +98,49 @@ Aşama 9 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
          → ilgili kod düzeltilir; çelişki → sen karar verirsin.
   │
   ▼
-Aşama 10: Yeni ya da değişen dosyalara code review yapılır. bulunan sorunlar otomatik düzeltilir.
+Aşama 11: Yeni ya da değişen dosyalara code review yapılır. bulunan sorunlar otomatik düzeltilir.
   │
   ▼
-Aşama 11: Yeni ya da değişen dosyalara Simplify yapılır. bulunan sorunlar otomatik düzeltilir.
+Aşama 12: Yeni ya da değişen dosyalara Simplify yapılır. bulunan sorunlar otomatik düzeltilir.
   │
   ▼
-Aşama 12: Yeni ya da değişen dosyalara performans kontrolü yapılır. bulunan sorunlar otomatik düzeltilir.
+Aşama 13: Yeni ya da değişen dosyalara performans kontrolü yapılır. bulunan sorunlar otomatik düzeltilir.
   │
   ▼
-Aşama 13: Tüm projeye güvenlik kontrolü (security vulnerability check) yapılır. bulunan sorunlar otomatik düzeltilir.
+Aşama 14: Tüm projeye güvenlik kontrolü (security vulnerability check) yapılır. bulunan sorunlar otomatik düzeltilir.
   │
   ▼
-Aşama 14: Yeni ya da değişen dosyalara unit test ve TDD testleri yapılır. bulunan sorunlar otomatik düzeltilir.
+Aşama 15: Yeni ya da değişen dosyalara unit test ve TDD testleri yapılır. bulunan sorunlar otomatik düzeltilir.
   │
   ▼
-Aşama 15: Yeni ya da değişen dosyalara integration test yapılır. bulunan sorunlar otomatik düzeltilir.
+Aşama 16: Yeni ya da değişen dosyalara integration test yapılır. bulunan sorunlar otomatik düzeltilir.
   │
   ▼
-Aşama 16: Yeni ya da değişen dosyalara E2E testi yapılır. bulunan sorunlar otomatik düzeltilir.
+Aşama 17: Yeni ya da değişen dosyalara E2E testi yapılır. bulunan sorunlar otomatik düzeltilir.
   │
   ▼
-Aşama 17: Yeni ya da değişen dosyalara yük testi yapılır. bulunan sorunlar otomatik düzeltilir.
+Aşama 18: Yeni ya da değişen dosyalara yük testi yapılır. bulunan sorunlar otomatik düzeltilir.
   │
   ▼
-Aşama 18: (Etki İncelemesi): MCL projenin geri kalanını,
+Aşama 19: (Etki İncelemesi): MCL projenin geri kalanını,
          değişikliğin gerçek downstream etkileri için tarıyor —
          çağıranlar, ortak yardımcılar, şema/API kaymaları — ve
          her birini senin kararın için önüne koyuyor.
   │
   ▼
-Aşama 19: Doğrulama Raporu — Spec Kapsama tablosu (her MUST/SHOULD
+Aşama 20: Doğrulama Raporu — Spec Kapsama tablosu (her MUST/SHOULD
           gereksinimi, onu kapsayan teste bağlı: ✅ dosya:satır ile,
           ⚠️ kısmi, ❌ test yazılmamış).  Mock data projeden silinir.
   │
   ▼
-Aşama 20: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
+Aşama 21: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
           kullanıcı dili) senin diline çevriliyor — yorum yok,
           ekleme yok. Teknik tokenlar (dosya:satır, test isimleri)
           olduğu gibi korunuyor.
   │
   ▼
-Aşama 21: Tamlık Denetimi — `.mcl/audit.log` okunup her fazın
-          1-20 gerçekten uçtan uca tamamlandığı doğrulanır. Açık Konular bölümü pipeline'ın
+Aşama 22: Tamlık Denetimi — `.mcl/audit.log` okunup her fazın
+          1-21 gerçekten uçtan uca tamamlandığı doğrulanır. Açık Konular bölümü pipeline'ın
           atladığı boşlukları yüzeye çıkarır.
 ```
 
@@ -151,7 +152,7 @@ Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 4 spec onayı, her Aşama 8
 risk, her Aşama 10 etki, plugin onayı, git-init onayı, drift çözümü,
 `/mcl-update` / `/mcl-finish` / yapıştırılan-CLI onayı) yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 11.0.1 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+`MCL 12.0.0 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
 "evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
 açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
 kalıyor.
@@ -161,7 +162,7 @@ Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
 bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
 onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
-Her yanıt `🌐 MCL 11.0.1` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 12.0.0` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ### UI Build / Review Alt-Fazları (6.2.0'dan itibaren)
 

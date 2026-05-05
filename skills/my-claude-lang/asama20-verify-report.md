@@ -1,6 +1,6 @@
-<mcl_phase name="asama19-verify-report">
+<mcl_phase name="asama20-verify-report">
 
-# Aşama 19: Verification Report (was Aşama 11 in v10)
+# Aşama 20: Verification Report (was Aşama 11 in v10)
 
 Aşama 11 is NOT just a review translation. It is a comprehensive verification
 that gives the developer confidence that the AI did the right thing.
@@ -54,7 +54,7 @@ phase file.
 
 ### TDD mode — skip re-invocation
 
-When `tdd=true` (see `asama8-tdd.md`) AND Aşama 7 **or Aşama 8**
+When `tdd=true` (see `asama9-tdd.md`) AND Aşama 7 **or Aşama 8**
 has already emitted a `🟢 GREEN verify` block in this session, DO NOT
 invoke the runner again here. Aşama 11 starts instead with a localized
 TDD-cycle summary line. Examples:
@@ -331,7 +331,7 @@ the v10 alias:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-19-complete mcl-stop "covered=N must_test=K trace_lines=L"'
+  mcl_audit_log asama-20-complete mcl-stop "covered=N must_test=K trace_lines=L"'
 ```
 
 Where:
@@ -355,7 +355,7 @@ Aşama 19 owns one final responsibility: **remove the dummy/mock data
 that Aşama 6 introduced for the UI build**. This step is the
 v11 architecture's natural location for the cleanup that v10 placed
 inside Aşama 6c (BACKEND_INTEGRATION); R2 fenced the block inside
-`asama8-tdd.md` so it would not execute during TDD; R7 (this release)
+`asama9-tdd.md` so it would not execute during TDD; R7 (this release)
 moves it here where it actually executes.
 
 ### Detection
@@ -390,7 +390,7 @@ grep -rln "from.*['\"].*__fixtures__/<name>.fixture['\"]" src/
 - **Imported by test files only** (`*.test.*`, `*.spec.*`) → KEEP.
   Tests are still allowed to use fixtures.
 - **Imported by component files** → STOP. The Aşama 8 backend
-  wiring step (asama8-tdd.md Step 5) was supposed to swap these for
+  wiring step (asama9-tdd.md Step 5) was supposed to swap these for
   real `fetch`/`axios` calls. Surface as a Aşama 21 Open Issue:
   "fixture `<file>` still has component importers — backend wiring
   incomplete." Do NOT delete.
@@ -418,14 +418,14 @@ Before the cleanup runs:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-19-mock-cleanup-started mcl-stop "candidates=N"'
+  mcl_audit_log asama-20-mock-cleanup-started mcl-stop "candidates=N"'
 ```
 
 After the cleanup completes:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-19-mock-cleanup-end mcl-stop "deleted=D kept=K orphan_components=O"'
+  mcl_audit_log asama-20-mock-cleanup-end mcl-stop "deleted=D kept=K orphan_components=O"'
 ```
 
 Where:
@@ -439,7 +439,7 @@ directory exists):
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-19-mock-cleanup-skipped mcl-stop "reason=<no-ui-flow|no-fixtures-found>"'
+  mcl_audit_log asama-20-mock-cleanup-skipped mcl-stop "reason=<no-ui-flow|no-fixtures-found>"'
 ```
 
 The cleanup is **advisory** in v10.1.23 — `mcl-pre-tool.sh` does NOT

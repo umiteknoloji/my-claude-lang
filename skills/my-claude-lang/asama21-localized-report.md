@@ -1,6 +1,6 @@
-<mcl_phase name="asama20-localized-report">
+<mcl_phase name="asama21-localized-report">
 
-# Aşama 20: Localized Report (was Aşama 12 in v10)
+# Aşama 21: Localized Report (was Aşama 12 in v10)
 
 Called automatically after Aşama 11 (Verification Report) is produced.
 
@@ -57,7 +57,7 @@ name AND the v10 alias `localize-report` (which mcl-stop.sh:1048
 scans for the existing progression-from-emit transition):
 
 ```
-asama-20-complete | mcl-stop | lang=<detected> skipped=<true|false>
+asama-21-complete | mcl-stop | lang=<detected> skipped=<true|false>
 localize-report   | asama12  | lang=<detected> skipped=<true|false>
 ```
 
@@ -69,7 +69,7 @@ Recommended emit:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-20-complete mcl-stop "lang=<detected> skipped=<bool>"'
+  mcl_audit_log asama-21-complete mcl-stop "lang=<detected> skipped=<bool>"'
 ```
 
 </mcl_phase>

@@ -1,6 +1,6 @@
-<mcl_phase name="asama10-code-review">
+<mcl_phase name="asama11-code-review">
 
-# Aşama 10: Code Review (auto-fix on changed files)
+# Aşama 11: Code Review (auto-fix on changed files)
 
 Aşama 10 is the first of 8 dedicated quality phases (Aşama 10–17 in
 the v11 architecture; previously the sub-step `9.1` of the monolithic
@@ -44,7 +44,7 @@ unambiguous:
 - Added validation for already-typed inputs
 
 When auto-fix is ambiguous (multiple valid fixes, no clear winner),
-write `asama-10-ambiguous` audit and skip the fix. The earlier
+write `asama-11-ambiguous` audit and skip the fix. The earlier
 Aşama 9 risk dialog already gave the developer a chance to surface
 ambiguous items.
 
@@ -54,21 +54,21 @@ Start of phase:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log "asama-10-start" "mcl-stop.sh" "scope=<files>"'
+  mcl_audit_log "asama-11-start" "mcl-stop.sh" "scope=<files>"'
 ```
 
 End of phase:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log "asama-10-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"'
+  mcl_audit_log "asama-11-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"'
 ```
 
 Not applicable:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log "asama-10-not-applicable" "mcl-stop.sh" "reason=<why>"'
+  mcl_audit_log "asama-11-not-applicable" "mcl-stop.sh" "reason=<why>"'
 ```
 
 The `asama-9-1-*` lines are v10 backward-compat aliases. Existing

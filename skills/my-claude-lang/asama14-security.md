@@ -1,6 +1,6 @@
-<mcl_phase name="asama13-security">
+<mcl_phase name="asama14-security">
 
-# Aşama 13: Security Vulnerability Check (whole-project scope)
+# Aşama 14: Security Vulnerability Check (whole-project scope)
 
 Fourth of 8 dedicated quality phases (was sub-step `9.4` in v10
 monolithic `asama9-quality-tests.md`). **Scope widens in v11**: the
@@ -31,7 +31,7 @@ changed-files-only sub-step `9.4`).
 ## Per-finding handling
 
 - **HIGH/MEDIUM with unambiguous autofix** → apply silently via
-  Edit/MultiEdit. Record `mcl_audit_log "asama-13-autofix" "stop"
+  Edit/MultiEdit. Record `mcl_audit_log "asama-14-autofix" "stop"
   "rule=<id> file=<f>:<l>"` (v11). Append to
   `state.open_severity_findings` with `status=fixed`.
 - **HIGH/MEDIUM ambiguous (no safe autofix)** → ESCALATE to the
@@ -69,15 +69,15 @@ verdict (fixed / accepted / not-applicable with documented reason).
 ## Audit emit (dual — v11 + v10 backward-compat)
 
 ```
-mcl_audit_log "asama-13-start" "mcl-stop.sh" "scope=whole-project"
+mcl_audit_log "asama-14-start" "mcl-stop.sh" "scope=whole-project"
 
-mcl_audit_log "asama-13-end" "mcl-stop.sh" "findings=N fixes=M open=K"
+mcl_audit_log "asama-14-end" "mcl-stop.sh" "findings=N fixes=M open=K"
 
-mcl_audit_log "asama-13-ambiguous" "stop" "rule=<id> file=<f>:<l>"
+mcl_audit_log "asama-14-ambiguous" "stop" "rule=<id> file=<f>:<l>"
 
-mcl_audit_log "asama-13-resolved" "stop" "rule=<id> file=<f>:<l> status=fixed|accepted"
+mcl_audit_log "asama-14-resolved" "stop" "rule=<id> file=<f>:<l> status=fixed|accepted"
 
-mcl_audit_log "asama-13-autofix" "stop" "rule=<id> file=<f>:<l>"
+mcl_audit_log "asama-14-autofix" "stop" "rule=<id> file=<f>:<l>"
 ```
 
 The v10 enforcement at mcl-stop.sh:1115+ (open-severity must-resolve

@@ -44,7 +44,7 @@ remote.
 Both directories are created on demand (`mkdir -p`). Empty dirs are
 treated as "no entries", never an error.
 
-Impact file format is defined in `asama18-impact-review.md` under
+Impact file format is defined in `asama19-impact-review.md` under
 "Impact Persistence".
 
 ## Trigger
@@ -60,7 +60,7 @@ Two activation sources:
 1. **Explicit:** developer types `mcl-finish` on its own.
 2. **Tail reminder prompt:** every Aşama 11 Verification Report ends
    with a localized reminder line pointing at `mcl-finish` (see
-   `asama19-verify-report.md` → "Tail Reminder").
+   `asama20-verify-report.md` → "Tail Reminder").
 
 There is NO automatic execution — the developer is always the trigger.
 
@@ -137,8 +137,8 @@ the hook's intercept branches on the first-matching literal.
 
 - `hooks/mcl-activate.sh` — the literal-prompt intercept
 - `hooks/lib/mcl-finish.sh` — filesystem convention helper
-- `skills/my-claude-lang/asama18-impact-review.md` — impact
+- `skills/my-claude-lang/asama19-impact-review.md` — impact
   persistence format
-- `skills/my-claude-lang/asama19-verify-report.md` — tail reminder line
+- `skills/my-claude-lang/asama20-verify-report.md` — tail reminder line
 
 </mcl_constraint>
