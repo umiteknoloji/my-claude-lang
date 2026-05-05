@@ -35,7 +35,9 @@ Ama İngilizce düşünüyor. Ve İngilizce bilmiyorsan, tüm bunların dışın
 
 ## my-claude-lang Gerçekte Ne Yapıyor
 
-Tek bir satır kod yazılmadan önce **on iki aşamalı karşılıklı anlama döngüsü** kuruyor:
+Tek bir satır kod yazılmadan önce **yirmi bir aşamalı karşılıklı anlama döngüsü** kuruyor:
+
+> **Not (v11.0 vision):** Aşağıdaki pipeline, MCL'in v11.0 hedef mimarisidir. Mevcut kararlı sürüm (`VERSION` dosyasına bakın) hâlâ 13-fazlı yapıyı çalıştırıyor; v11.0 bu yapıya kademeli olarak dönüşüyor. Köprü dönemi boyunca CHANGELOG.md güncel sürümün hangi fazları desteklediğini açıklıyor.
 
 ```
 Sen (kendi dilinde)
@@ -72,16 +74,14 @@ Aşama 5: Pattern Matching yapılır. Proje yeni yaratılıyorsa
          atlanır.
   │
   ▼
-Aşama 6: UI yüzeyi tespit edildiğinde (varsayılan: ON), Aşama 6 üçe bölünür:
-         ├─ 6a BUILD_UI  — sadece dummy data ile çalışır frontend.
-         │                 Çalıştırma komutu verilir; MCL tarayıcıyı açar.
-         ├─ 6b UI_REVIEW — backend başlamadan önce UI'ı onaylarsın.
-         │                 Opt-in Playwright görsel incelemesi mevcut.
-         └─ 6c BACKEND   — gerçek API çağrıları, data layer, async bağlantı.
-                           Yalnızca UI onayından sonra çalışır.
+Aşama 6: Front-end dummy data ile yapılır. Proje ve tüm bağımlılıkları ayağa kaldırılır. Proje otomatik olarak tarayıcıda açılır.
   │
   ▼
-Aşama 7: Test-first geliştirme (TDD). Her kabul kriteri için
+Aşama 7: UI'ı incelersin. Güncelleme gerekiyorsa MCL'e söylersin.
+         Opt-in Playwright görsel incelemesi mevcut. İstersen onu da yaptırabilirsin ama maliyetlidir.
+  │
+  ▼
+Aşama 8: Test-first geliştirme (TDD). Her kabul kriteri için
          ÖNCE failing test yazılıyor (RED), SONRA onu geçecek
          minimum production kod (GREEN), ardından refactor. Döngü
          her kriter için tekrar eder; sonda tam suite tekrar
@@ -89,7 +89,7 @@ Aşama 7: Test-first geliştirme (TDD). Her kabul kriteri için
          "kod yaz sonra test ekle" değil, gerçek TDD.
   │
   ▼
-Aşama 8 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
+Aşama 9 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
          performans kararlarının doğru uygulandığını doğrular; ardından
          atlanmış riskleri tarar — uç durumlar, gerilemeler — ve her
          birini seninle tek tek konuşur. Risk düzeltmeleri bittikten
@@ -97,36 +97,49 @@ Aşama 8 (Risk İncelemesi): MCL, spec'te tasarlanan güvenlik ve
          → ilgili kod düzeltilir; çelişki → sen karar verirsin.
   │
   ▼
-Aşama 9: code review
-         Simplify
-         Performans
-         Güvenlik
-         unit test, integration test, E2E test, yük testi.
-         Sırasıyla bunlar yapılır, AskUserQuestion olmadan auto-fix.
+Aşama 10: Yeni ya da değişen dosyalara code review yapılır. bulunan sorunlar otomatik düzeltilir.
   │
   ▼
-Aşama 10 (Etki İncelemesi): MCL projenin geri kalanını,
+Aşama 11: Yeni ya da değişen dosyalara Simplify yapılır. bulunan sorunlar otomatik düzeltilir.
+  │
+  ▼
+Aşama 12: Yeni ya da değişen dosyalara performans kontrolü yapılır. bulunan sorunlar otomatik düzeltilir.
+  │
+  ▼
+Aşama 13: Tüm projeye güvenlik kontrolü (security vulnerability check) yapılır. bulunan sorunlar otomatik düzeltilir.
+  │
+  ▼
+Aşama 14: Yeni ya da değişen dosyalara unit test ve TDD testleri yapılır. bulunan sorunlar otomatik düzeltilir.
+  │
+  ▼
+Aşama 15: Yeni ya da değişen dosyalara integration test yapılır. bulunan sorunlar otomatik düzeltilir.
+  │
+  ▼
+Aşama 16: Yeni ya da değişen dosyalara E2E testi yapılır. bulunan sorunlar otomatik düzeltilir.
+  │
+  ▼
+Aşama 17: Yeni ya da değişen dosyalara yük testi yapılır. bulunan sorunlar otomatik düzeltilir.
+  │
+  ▼
+Aşama 18: (Etki İncelemesi): MCL projenin geri kalanını,
          değişikliğin gerçek downstream etkileri için tarıyor —
          çağıranlar, ortak yardımcılar, şema/API kaymaları — ve
          her birini senin kararın için önüne koyuyor.
   │
   ▼
-Aşama 11: Doğrulama Raporu — Spec Kapsama tablosu (her MUST/SHOULD
+Aşama 19: Doğrulama Raporu — Spec Kapsama tablosu (her MUST/SHOULD
           gereksinimi, onu kapsayan teste bağlı: ✅ dosya:satır ile,
-          ⚠️ kısmi, ❌ test yazılmamış).
+          ⚠️ kısmi, ❌ test yazılmamış).  Mock data projeden silinir.
   │
   ▼
-Aşama 12: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
+Aşama 20: Tam İngilizce rapor, katı çevirmen geçişiyle (EN →
           kullanıcı dili) senin diline çevriliyor — yorum yok,
           ekleme yok. Teknik tokenlar (dosya:satır, test isimleri)
           olduğu gibi korunuyor.
   │
   ▼
-Aşama 13: Tamlık Denetimi — `.mcl/audit.log` okunup her fazın
-          1-12 gerçekten uçtan uca tamamlandığı doğrulanır. İki
-          deep-dive: Aşama 7 (test-first uygulandı mı? test_command
-          GREEN mi?) ve Aşama 9 (her sub-step 9.1-9.8 start/end +
-          auto-fix yaptı mı?). Açık Konular bölümü pipeline'ın
+Aşama 21: Tamlık Denetimi — `.mcl/audit.log` okunup her fazın
+          1-20 gerçekten uçtan uca tamamlandığı doğrulanır. Açık Konular bölümü pipeline'ın
           atladığı boşlukları yüzeye çıkarır.
 ```
 

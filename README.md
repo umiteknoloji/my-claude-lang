@@ -35,103 +35,127 @@ You could use a translator. But here's what happens when you translate your requ
 
 ## What my-claude-lang Actually Does
 
-It runs a **twelve-stage mutual understanding loop** before a single line of code is written:
+It runs a **twenty-one-stage mutual understanding loop** before a single line of code is written:
+
+> **Note (v11.0 vision):** The pipeline below is MCL's v11.0 target architecture. The current stable release (see `VERSION`) still runs the 13-phase architecture; v11.0 is being delivered incrementally. During the bridge period, CHANGELOG.md describes which phases the active version supports.
 
 ```
-You (your language)
+You (in your own language)
   │
   ▼
-Aşama 1: MCL gathers what you want — one question at a time.
-         No ambiguity passes. You confirm the summary.
-         MCL may also challenge your architectural answers: if you
-         say "JWT" but describe a server-side session flow, MCL
-         surfaces the mismatch and asks which you meant — before
-         any spec is written.
+Phase 1: MCL asks you one question at a time to understand what you want.
+         No ambiguity passes through. You approve the summary.
+         MCL also challenges your architectural answers:
+         if you say "JWT" but describe a server-side session flow,
+         MCL surfaces the contradiction and asks which one
+         you meant — before any spec is written.
   │
   ▼
-Aşama 2: 7-dimension precision audit + hard enforcement —
-         MCL walks permission, failure modes, scope boundaries,
-         PII, observability, performance SLA, idempotency, plus
-         stack-specific dimensions. Each gets a [assumed: X] /
-         [unspecified: X] / GATE classification. Verifies the
-         intent's correctness and completeness before any spec.
+Phase 2: Verifies the correctness and completeness of your intent
+         with a 7-dimension precision audit + hard enforcement.
   │
   ▼
-Aşama 3 (invisible): Your confirmed, audited intent passes through
-         a strict translator pass (user_lang → EN). No interpretation,
-         no additions — only natural language is translated; technical
-         terms stay intact. The resulting English Engineering Brief
-         is the sole input for spec generation.
+Phase 3: The approved intent goes through a strict translator pass
+         (user language → EN). No interpretation, no additions —
+         only natural language is translated; technical terms
+         remain as-is. The resulting English Engineering
+         Brief becomes the sole input for spec generation.
   │
   ▼
-Aşama 4: Your confirmed intent becomes a visible English spec
-         (📋 Spec:) written like a senior engineer with 15+ years
-         experience — and MCL explains it back in your language,
-         all in the same turn. One AskUserQuestion, one approval.
-         The spec block is collapsible — click to hide once you've
-         read it.
+Phase 4: The approved intent becomes a visible English technical
+         specification (📋 Spec:) — written like a senior engineer
+         with 15+ years of experience — and MCL explains the spec
+         back to you in your own language; both in the same turn,
+         with a single AskUserQuestion approval. The spec block
+         is collapsible — click to hide it once you've read it.
   │
   ▼
-Aşama 5: Pattern matching is performed. Skipped if the project
-         is brand new and no stack is detected.
+Phase 5: Pattern Matching is performed. Skipped if the project
+         is being created from scratch.
   │
   ▼
-Aşama 6: When a UI surface is detected (default ON), Aşama 6 splits:
-         ├─ 6a BUILD_UI  — runnable frontend with dummy data only.
-         │                 You get a run command; MCL auto-opens it.
-         ├─ 6b UI_REVIEW — approve the UI before backend starts.
-         │                 Opt-in Playwright vision review available.
-         └─ 6c BACKEND   — real API calls, data layer, async wiring.
-                           Only runs after UI approval.
+Phase 6: Front-end is built with dummy data. The project and all
+         its dependencies are brought up. The project is automatically
+         opened in the browser.
   │
   ▼
-Aşama 7: Test-first development (TDD). For each acceptance
-         criterion: write the failing test FIRST (RED), then the
-         minimum production code to make it pass (GREEN), then
-         refactor. The cycle repeats per criterion; full suite
-         re-checked at end. Test always precedes production code —
-         this is what differentiates TDD from "test after the fact".
+Phase 7: You inspect the UI. If updates are needed, tell MCL.
+         Opt-in Playwright visual review is available. You can
+         have it run too if you want, but it is costly.
   │
   ▼
-Aşama 8 (Risk Review): MCL verifies that the security and
-         performance decisions designed in the spec were correctly
-         implemented, then scans for any missed risks — edge cases,
-         regressions — walking each one with you. After risk fixes,
-         TDD re-runs: all green → passes; any red → code is fixed;
-         MCL / Claude Code conflict → you decide.
+Phase 8: Test-first development (TDD). For every acceptance
+         criterion, a failing test is written FIRST (RED), THEN
+         the minimum production code to pass it (GREEN), then
+         refactor. The cycle repeats for each criterion; at the
+         end the full suite is run again. Tests always come
+         before production code — not "write code then add tests",
+         real TDD.
   │
   ▼
-Aşama 9: code review
-         Simplify
-         Performance
-         Security
-         unit test, integration test, E2E test, load test.
-         These run sequentially, auto-fix without dialog.
+Phase 9 (Risk Review): MCL verifies that the security and
+         performance decisions designed in the spec are correctly
+         implemented; then scans for missed risks — edge cases,
+         regressions — and walks through each one with you. After
+         risk fixes are done, TDD tests are re-run: all green →
+         passes; red → the relevant code is fixed; conflict →
+         you decide.
   │
   ▼
-Aşama 10 (Impact Review): MCL scans the rest of the project for
-         real downstream effects of the change — callers, shared
-         utilities, schema/API shifts — and surfaces each one for
-         your decision.
+Phase 10: Code review is performed on new or changed files.
+          Found issues are auto-fixed.
   │
   ▼
-Aşama 11: Verification Report — Spec Coverage traceability table
-         (each MUST/SHOULD requirement linked to the test that
-         covers it: ✅ with file:line, ⚠️ partial, ❌ not tested).
+Phase 11: Simplify is performed on new or changed files.
+          Found issues are auto-fixed.
   │
   ▼
-Aşama 12: The full English report is formally translated back to
-         your language — same strict translator pass, no
-         interpretation. Technical tokens (file:line, test names)
-         stay verbatim.
+Phase 12: Performance check is performed on new or changed files.
+          Found issues are auto-fixed.
   │
   ▼
-Aşama 13: Completeness Audit — reads `.mcl/audit.log` and verifies
-         each phase 1-12 actually completed end-to-end. Two deep
-         dives: Aşama 7 (was test-first applied? was test_command
-         GREEN?) and Aşama 9 (did each sub-step 9.1-9.8 start, end,
-         and apply auto-fix?). Open Issues surface gaps the rest
-         of the pipeline missed.
+Phase 13: Security vulnerability check is performed on the
+          entire project. Found issues are auto-fixed.
+  │
+  ▼
+Phase 14: Unit tests and TDD tests are performed on new or
+          changed files. Found issues are auto-fixed.
+  │
+  ▼
+Phase 15: Integration tests are performed on new or changed files.
+          Found issues are auto-fixed.
+  │
+  ▼
+Phase 16: E2E tests are performed on new or changed files.
+          Found issues are auto-fixed.
+  │
+  ▼
+Phase 17: Load tests are performed on new or changed files.
+          Found issues are auto-fixed.
+  │
+  ▼
+Phase 18 (Impact Review): MCL scans the rest of the project for
+          actual downstream effects of the change — callers,
+          shared utilities, schema/API shifts — and puts each
+          one in front of you for your decision.
+  │
+  ▼
+Phase 19: Verification Report — Spec Coverage table (each
+          MUST/SHOULD requirement linked to the test that covers
+          it: ✅ with file:line, ⚠️ partial, ❌ no test written).
+          Mock data is removed from the project.
+  │
+  ▼
+Phase 20: The full English report is translated to your language
+          with a strict translator pass (EN → user language) —
+          no interpretation, no additions. Technical tokens
+          (file:line, test names) are preserved as-is.
+  │
+  ▼
+Phase 21: Completeness Audit — `.mcl/audit.log` is read and
+          each phase 1-20 is verified to have actually completed
+          end-to-end. The Open Issues section surfaces gaps the
+          pipeline missed.
 ```
 
 **No ambiguity survives this loop.** At every gate, you can say "no" and MCL goes back to fix it. Nothing proceeds without your explicit approval.
