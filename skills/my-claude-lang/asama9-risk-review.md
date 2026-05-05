@@ -1,8 +1,8 @@
 <mcl_phase name="asama9-risk-review">
 
-> ⚠️ SYNC NOTE: The active Aşama 8 rule lives in `mcl-activate.sh` STATIC_CONTEXT
-> (the `<mcl_phase name="asama9-risk-review">` block). This file is the extended
-> reference. When updating Aşama 8 behavior, BOTH must be updated together.
+> ⚠️ SYNC NOTE: The active Aşama 9 rule lives in `mcl-activate.sh` STATIC_CONTEXT
+> (the `mcl_phase name="asama9-risk-review"` block). This file is the extended
+> reference. When updating Aşama 9 behavior, BOTH must be updated together.
 
 # Aşama 9: Post-Code Risk Review (interactive dialog) — was Aşama 8 in v10
 
