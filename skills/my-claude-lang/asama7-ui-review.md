@@ -1,11 +1,11 @@
-<mcl_phase name="asama6b-ui-review">
+<mcl_phase name="asama7-ui-review">
 
-# Aşama 6b: UI_REVIEW — Developer-Verified Before Backend
+# Aşama 7: UI_REVIEW — Developer-Verified Before Backend
 
 ## Entry Condition
 
-Aşama 6b is **deferred** since 6.5.0. Aşama 6a now auto-starts the dev
-server and opens the browser, then STOPS. Aşama 6b only begins when
+Aşama 7 is **deferred** since 6.5.0. Aşama 6 now auto-starts the dev
+server and opens the browser, then STOPS. Aşama 7 only begins when
 the developer returns on their own — i.e. on the developer's NEXT
 turn after the browser-open, carrying a free-form reply in their own
 words. There is no preemptive `AskUserQuestion`.
@@ -25,11 +25,11 @@ approval at Aşama 4 cannot fully verify visual intent.
 ## Sub-Topic Files
 
 For the opt-in "MCL sees its own UI" pipeline (Playwright + screenshot
-+ Read multimodal), read `my-claude-lang/asama6b-ui-review/visual-inspect.md`.
++ Read multimodal), read `my-claude-lang/asama7-ui-review/visual-inspect.md`.
 
 ## Interpreting the Developer's Free-Form Reply
 
-When the developer's next turn arrives after Aşama 6a's browser-open,
+When the developer's next turn arrives after Aşama 6's browser-open,
 MCL reads their message and classifies it into one of three intents
 **before** calling any tool. No `AskUserQuestion` is emitted up front —
 the reply itself is the decision.
@@ -96,7 +96,7 @@ locales). Reference labels:
 | Option chosen       | Stop-hook intent     | State transition                             | Next MCL step                  |
 | ------------------- | -------------------- | -------------------------------------------- | ------------------------------ |
 | Approve             | `ui-review-approve`  | `ui_reviewed=true`, `ui_sub_phase="BACKEND"` | Aşama 6c (`asama6c-backend.md`) |
-| Revise              | `ui-review-revise`   | no state change                              | Re-enter Aşama 6a with feedback |
+| Revise              | `ui-review-revise`   | no state change                              | Re-enter Aşama 6 with feedback |
 | Visual inspect      | `ui-vision-request`  | no state change                              | Run visual-inspect sub-skill    |
 | Cancel              | `ui-review-cancel`   | state cleared (ui flags reset)               | Abort                          |
 
@@ -108,7 +108,7 @@ against the 14-language token sets defined in `hooks/mcl-stop.sh`
 ## Revise Loop
 
 When Revise is chosen, the developer's free-text feedback is the input
-for the next Aşama 6a turn. Treat feedback as parameters for the
+for the next Aşama 6 turn. Treat feedback as parameters for the
 existing spec — do NOT re-run Aşama 1/4. The spec is still
 canonical; only the visual realization is being tweaked.
 
@@ -120,7 +120,7 @@ fresh Aşama 1-4 cycle for the delta, do not quietly rewrite.
 ## Visual-Inspect Loop
 
 When "See it yourself" is chosen, run the pipeline in
-`asama6b-ui-review/visual-inspect.md`, emit the observation report,
+`asama7-ui-review/visual-inspect.md`, emit the observation report,
 then re-call this same review `AskUserQuestion` so the developer can
 still choose approve / revise / cancel. Visual-inspect is
 informational — it never auto-advances to Aşama 6c.
@@ -133,7 +133,7 @@ entirely. The `.mcl/specs/NNNN-slug.md` entry is marked
 
 ## Exit
 
-Only "Approve" exits Aşama 6b. On approve, the next turn starts
+Only "Approve" exits Aşama 7. On approve, the next turn starts
 Aşama 6c; the UI-BUILD pre-tool lock is lifted (because
 `ui_sub_phase = "BACKEND"` now).
 

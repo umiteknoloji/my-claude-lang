@@ -9,7 +9,7 @@ description: >
   ambiguity, generates senior-engineer-grade specs, and filters sycophancy.
 ---
 
-# MCL — Semantic Development Bridge (v10.1.16)
+# MCL — Semantic Development Bridge (v10.1.17)
 
 ## How to Activate
 
@@ -43,7 +43,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 10.1.16` on its own line.
+Every response MUST start with `🌐 MCL 10.1.17` on its own line.
 
 ## AskUserQuestion Protocol
 
@@ -53,7 +53,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 partial-spec recovery, mcl-update, mcl-finish, pasted-CLI passthrough —
 uses Claude Code's native `AskUserQuestion` tool with `question` prefixed
-`MCL 10.1.16 | `. The Stop hook parses tool_use/tool_result pairs to advance
+`MCL 10.1.17 | `. The Stop hook parses tool_use/tool_result pairs to advance
 MCL state.
 
 ## MCL Tag Schema
@@ -158,7 +158,7 @@ For full Aşama 1 rules, read `my-claude-lang/asama1-gather.md`
    schema/migration, auth/permission model, public API breaking changes,
    irreversible data consequences, security boundaries.
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 10.1.16 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 10.1.17 | <localized-is-this-correct>",
    options: ["<approve>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns approve does state advance.
 
@@ -210,7 +210,7 @@ collect approval via ONE AskUserQuestion call.
    concrete technical problems (race conditions, scale issues, missing
    auth, N+1, cascading failures). If found, add one `⚠️ Teknik not:`
    line.
-5. Call `AskUserQuestion({question: "MCL 10.1.16 | <approval-prompt>",
+5. Call `AskUserQuestion({question: "MCL 10.1.17 | <approval-prompt>",
    options: [{label: "<approve-verb>", ...}, {label: "<edit>", ...},
    {label: "<cancel>", ...}]})`. The approve label is the BARE VERB.
 
@@ -237,8 +237,8 @@ injected into every Aşama 7 turn.
 ## Aşama 6: UI Flow (conditional)
 
 For full Aşama 6 rules:
-- Aşama 6a BUILD_UI: read `my-claude-lang/asama6a-ui-build.md`
-- Aşama 6b UI_REVIEW: read `my-claude-lang/asama6b-ui-review.md`
+- Aşama 6 BUILD_UI: read `my-claude-lang/asama6-ui-build.md`
+- Aşama 7 UI_REVIEW: read `my-claude-lang/asama7-ui-review.md`
 - Aşama 6c BACKEND: read `my-claude-lang/asama6c-backend.md`
 
 UI flow activates automatically when `mcl_is_ui_capable` returns true
@@ -246,9 +246,9 @@ at session start (heuristic: `package.json` + components/pages/views,
 Django + templates, root `index.html`, etc.).
 
 When `ui_flow_active = true`:
-- **Aşama 6a (BUILD_UI)** — runnable frontend with dummy data only,
+- **Aşama 6 (BUILD_UI)** — runnable frontend with dummy data only,
   emits run snippet, transitions to 6b. Backend writes BLOCKED.
-- **Aşama 6b (UI_REVIEW)** — AskUserQuestion: "approve / revise /
+- **Aşama 7 (UI_REVIEW)** — AskUserQuestion: "approve / revise /
   see-it-yourself / cancel". Revise → loop to 6a. See-it-yourself →
   opt-in Playwright + screenshot + multimodal Read.
 - **Aşama 6c (BACKEND)** — path lock lifts, real API calls, data

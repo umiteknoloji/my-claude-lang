@@ -16,8 +16,8 @@ Aşama 7 forks on `ui_flow_active`:
 
 - `ui_flow_active = true` (Aşama 1 approve with UI included, default):
   Aşama 7 runs as three sub-phases in order:
-  - **Aşama 6a BUILD_UI** — read `my-claude-lang/asama6a-ui-build.md`
-  - **Aşama 6b UI_REVIEW** — read `my-claude-lang/asama6b-ui-review.md`
+  - **Aşama 6 BUILD_UI** — read `my-claude-lang/asama6-ui-build.md`
+  - **Aşama 7 UI_REVIEW** — read `my-claude-lang/asama7-ui-review.md`
   - **Aşama 6c BACKEND** — read `my-claude-lang/asama6c-backend.md`
   All rules below still apply inside each sub-phase; they describe
   the shared Aşama 7 behavior. Only Aşama 6c reaches Aşama 8.

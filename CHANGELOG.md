@@ -7,6 +7,72 @@
 
 ## [Unreleased]
 
+## [10.1.17] - 2026-05-05
+
+### v11.0 migration R1 — UI sub-phase rename (skill files only)
+
+First step of the v11.0 architecture migration plan
+(see `~/.claude/plans/g-zel-bi-plan-yap-iridescent-star.md` and
+the v11.0 vision sections of README.md / README.tr.md). This
+release is **skill-file-rename only** — no audit names change,
+no state machine touched, no hook behavior modified. R1 is
+intentionally the smallest, safest first step.
+
+#### Changes
+
+- `skills/my-claude-lang/asama6a-ui-build.md` →
+  `skills/my-claude-lang/asama6-ui-build.md`
+- `skills/my-claude-lang/asama6b-ui-review.md` →
+  `skills/my-claude-lang/asama7-ui-review.md`
+- Sibling directories renamed in lockstep:
+  `asama6a-ui-build/` → `asama6-ui-build/`
+  `asama6b-ui-review/` → `asama7-ui-review/`
+- `<mcl_phase name="asama6a-ui-build">` →
+  `<mcl_phase name="asama6-ui-build">` (and the 6b counterpart)
+- Visible labels in renamed skill files: `Aşama 6a` → `Aşama 6`,
+  `Aşama 6b` → `Aşama 7`. Ditto in the umbrella
+  `skills/my-claude-lang.md` UI sub-phase pointer block and in
+  `asama7-execute.md`'s cross-reference list.
+- `ui_sub_phase` enum value `BUILD_UI`/`REVIEW`/`BACKEND`
+  unchanged — those are code-level identifiers, not phase
+  numbers. State machine behaves identically.
+- `asama6c-backend.md` left intact — folds into Aşama 8 in R2.
+
+#### Bridge-period notes
+
+- `skills/my-claude-lang/asama7-execute.md` and
+  `skills/my-claude-lang/asama7-tdd.md` (current Aşama 7 = TDD
+  execute) coexist alongside the newly-renamed
+  `asama7-ui-review.md` for one release. Both point at the same
+  numerical phase from different vintages: v11 says Aşama 7 =
+  UI inspection; v10 still has Aşama 7 = TDD execute. The
+  umbrella file documents both during this bridge window. R3
+  resolves the conflict by renaming `asama7-execute.md` /
+  `asama7-tdd.md` to `asama8-*`.
+- README/README.tr.md/FEATURES.md still have a "UI Build /
+  Review Sub-Phases (since 6.2.0)" section that describes the
+  old 6a/6b/6c three-way split. The v11 vision diagram at the
+  top of each README contradicts that section; both are present
+  during the bridge. R2 (folding 6c into Aşama 8) is the
+  natural place to drop the old sub-phase description; not
+  changed in this release to keep R1's diff minimal.
+- Hook comments in mcl-stop.sh, mcl-pre-tool.sh, and
+  mcl-stack-detect.sh that mention "Aşama 6a / Aşama 6b" are
+  unchanged — they describe code paths keyed on `ui_sub_phase`
+  enum values, which still operate identically. Comments will
+  be updated when their underlying logic is touched in R3/R4.
+
+#### What does NOT change
+
+- `mcl_audit_log "asama-N-..."` audit names — none renamed.
+- `current_phase` integer in state.json — still bounded
+  `1 <= current_phase <= 11`. Widening to 21 happens in R4.
+- Skip-block enforcement, AskUserQuestion intent classification,
+  spec-approval gate — all keyed on audit names that didn't
+  change, so behavior is identical to v10.1.16.
+
+Banner: MCL 10.1.16 → MCL 10.1.17.
+
 ## [10.1.16] - 2026-05-03
 
 ### Critical: Stop hook unbound-variable crash fixes

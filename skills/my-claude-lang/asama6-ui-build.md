@@ -1,10 +1,10 @@
-<mcl_phase name="asama6a-ui-build">
+<mcl_phase name="asama6-ui-build">
 
-# Aşama 6a: BUILD_UI — Runnable Frontend with Dummy Data
+# Aşama 6: BUILD_UI — Runnable Frontend with Dummy Data
 
 ## Entry Condition
 
-Aşama 6a starts automatically when ALL of these hold after spec approval:
+Aşama 6 starts automatically when ALL of these hold after spec approval:
 
 - `current_phase = 7`
 - `spec_approved = true`
@@ -13,7 +13,7 @@ Aşama 6a starts automatically when ALL of these hold after spec approval:
 - `ui_sub_phase = "BUILD_UI"` (set by stop hook on spec-approve)
 
 When `ui_flow_active = false` (developer picked "Onay, UI atlayacağız" at
-Aşama 1) — Aşama 6a is SKIPPED. Jump straight to `asama7-execute.md`.
+Aşama 1) — Aşama 6 is SKIPPED. Jump straight to `asama7-execute.md`.
 
 ## Core Intent
 
@@ -26,13 +26,13 @@ is no separate preview artifact.
 
 For dummy-data fixture conventions (inline constants, `__fixtures__/`
 directory, loading/error/success toggles), read
-`my-claude-lang/asama6a-ui-build/fixtures.md`.
+`my-claude-lang/asama6-ui-build/fixtures.md`.
 
 For framework-specific component syntax (React, Vue, Svelte, static
-HTML), read `my-claude-lang/asama6a-ui-build/frameworks.md`.
+HTML), read `my-claude-lang/asama6-ui-build/frameworks.md`.
 
 For styling fallbacks (when no design system is configured) and
-neutrality rules, read `my-claude-lang/asama6a-ui-build/styles.md`.
+neutrality rules, read `my-claude-lang/asama6-ui-build/styles.md`.
 
 ## Path Discipline (enforced by mcl-pre-tool.sh)
 
@@ -51,8 +51,8 @@ While `ui_sub_phase = "BUILD_UI"`, the pre-tool hook:
 
 Build tool configs (`vite.config.*`, `next.config.*`, `nuxt.config.*`,
 `tailwind.config.*`, `tsconfig*`, `postcss.config.*`) are **explicitly
-allowed** — they are needed to run `npm run dev` in Aşama 6a. Writing
-them in Aşama 6a is correct and required.
+allowed** — they are needed to run `npm run dev` in Aşama 6. Writing
+them in Aşama 6 is correct and required.
 
 If Claude attempts to write a true backend path, the DENY reason says:
 > MCL UI-BUILD LOCK — backend is unlocked in Aşama 6c after the UI
@@ -60,13 +60,13 @@ If Claude attempts to write a true backend path, the DENY reason says:
 
 ## Curated Plugin Dispatch
 
-Auto-dispatch `frontend-design` plugin silently when Aşama 6a starts
+Auto-dispatch `frontend-design` plugin silently when Aşama 6 starts
 (Rule B — multi-angle validation). Merge its suggestions into the
 component code / prose. Never expose the raw plugin output as a tool
 call to the developer. See `my-claude-lang/plugin-suggestions.md` for
 promotion details.
 
-## Aşama 6a Procedure
+## Aşama 6 Procedure
 
 1. Read the approved spec.
 2. Detect framework from `mcl-stack-detect.sh` tags:
@@ -145,11 +145,11 @@ promotion details.
 
 6. **STOP.** Do not call `AskUserQuestion` now. The developer needs
    room to inspect the UI in their browser without a modal dialog
-   blocking the terminal. Aşama 6b takes over on the developer's
+   blocking the terminal. Aşama 7 takes over on the developer's
    NEXT turn, after they return with free-form feedback (see
-   `my-claude-lang/asama6b-ui-review.md`).
+   `my-claude-lang/asama7-ui-review.md`).
 
-## What Does NOT Happen in Aşama 6a
+## What Does NOT Happen in Aşama 6
 
 - No backend code. No API routes. No database schema. No `.env`
   changes. No server-side config.
@@ -164,10 +164,10 @@ promotion details.
 
 ## Revise Loop (4a ↔ 4b)
 
-When the developer picks "Revize" in Aşama 6b, Aşama 6a re-enters
+When the developer picks "Revize" in Aşama 7, Aşama 6 re-enters
 with free-text feedback ("buttons to the right, bigger header").
 Edit the frontend files in place, emit a fresh "run it" snippet,
-re-call the Aşama 6b askq. The loop is unbounded — exit only on
-approve or cancel from Aşama 6b.
+re-call the Aşama 7 askq. The loop is unbounded — exit only on
+approve or cancel from Aşama 7.
 
 </mcl_phase>
