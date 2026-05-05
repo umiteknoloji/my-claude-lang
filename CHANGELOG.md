@@ -7,6 +7,110 @@
 
 ## [Unreleased]
 
+## [10.1.21] - 2026-05-05
+
+### v11.0 migration R5 — Quality phase split (Aşama 9.x → Aşama 10–17)
+
+Fifth step of the v11.0 migration. The most structurally significant
+release before R8 cutover: the monolithic `asama9-quality-tests.md`
+skill (274 lines) is split into 8 dedicated phase skill files, one
+per quality concern, matching the v11 vision pipeline diagram.
+Backward-compat aliases protect in-progress sessions.
+
+#### Strategy
+
+Each new skill file (`asama10-code-review.md` through
+`asama17-load-tests.md`) is **self-contained**: its own audit emit
+instructions, its own soft-applicability rules. To preserve v10
+hook compatibility (mcl-stop.sh's `asama-9-complete` auto-emit
+helper, the `asama-9-4-ambiguous` / `asama-9-4-resolved`
+must-resolve gate at line 1115+), each new file emits BOTH the v11
+audit name AND the v10 alias. R8 cutover removes the v10 emit
+lines and migrates hook code to scan v11 names only.
+
+#### New skill files (8)
+
+| Phase | File | Replaces | Scope difference vs v10 |
+|---|---|---|---|
+| Aşama 10 | `asama10-code-review.md` | sub-step 9.1 | unchanged scope |
+| Aşama 11 | `asama11-simplify.md` | sub-step 9.2 | unchanged |
+| Aşama 12 | `asama12-performance.md` | sub-step 9.3 | unchanged |
+| Aşama 13 | `asama13-security.md` | sub-step 9.4 | **scope widens** — runs on whole project (v10 ran on changed files only); per the v11 vision pipeline |
+| Aşama 14 | `asama14-unit-tests.md` | sub-step 9.5 | unchanged |
+| Aşama 15 | `asama15-integration-tests.md` | sub-step 9.6 | unchanged |
+| Aşama 16 | `asama16-e2e-tests.md` | sub-step 9.7 | unchanged |
+| Aşama 17 | `asama17-load-tests.md` | sub-step 9.8 | unchanged + emits the cumulative `asama-9-complete` v10 alias at end of pipeline |
+
+#### Audit aliases ADDED (per skill file dual-emit)
+
+For phase N in 10..17 (v11) ↔ sub-step (N-9) in 9.1..9.8 (v10):
+
+```
+mcl_audit_log "asama-N-start"           ↔  mcl_audit_log "asama-9-(N-9)-start"
+mcl_audit_log "asama-N-end"             ↔  mcl_audit_log "asama-9-(N-9)-end"
+mcl_audit_log "asama-N-not-applicable"  ↔  mcl_audit_log "asama-9-(N-9)-not-applicable"
+mcl_audit_log "asama-N-ambiguous"       ↔  mcl_audit_log "asama-9-(N-9)-ambiguous"
+```
+
+Special for Aşama 13 (security):
+```
+mcl_audit_log "asama-13-resolved"  ↔  mcl_audit_log "asama-9-4-resolved"
+mcl_audit_log "asama-13-autofix"   ↔  mcl_audit_log "asama-9-4-autofix"
+```
+
+Special for Aşama 17 (last phase): the cumulative `asama-9-complete`
+v10 emit happens once at the end of the pipeline, so existing v10
+hook enforcement (mcl-stop.sh:867+ auto-emit helper, mcl-stop.sh:974+
+progression-from-emit transition) continues to operate.
+
+#### Deleted
+
+- `skills/my-claude-lang/asama9-quality-tests.md` (274 lines —
+  content distributed across the 8 new files).
+
+#### Other changes
+
+- `skills/my-claude-lang.md` (umbrella) — section "Aşama 9: Quality
+  + Tests" rewritten as "Aşama 10–17: Quality + Tests pipeline
+  (split into 8 dedicated phases in v11.0 R5)" with a v10↔v11
+  mapping table pointing to the 8 new skill files.
+- `tests/cases/test-v10-1-5-asama-9-progression-pilot.sh:162` —
+  test's `_skill=...asama9-quality-tests.md` updated to point at
+  `asama17-load-tests.md`, which is now the file that mandates the
+  v10 cumulative `asama-9-complete` emit. Test continues to assert
+  the same invariant; comment notes R8 will retire this test.
+
+#### What does NOT change
+
+- mcl-stop.sh logic. The `asama-9-complete` auto-emit (line 916–918),
+  the `asama-9-progression-from-emit` transition (line 1015), and the
+  open-severity must-resolve gate (line 1115+) all keep operating —
+  the v10 alias dual-emit ensures the audit names they scan still
+  appear in the audit log.
+- mcl-pre-tool.sh enforcement. Skip-block codes still keyed on
+  `asama-N-skip` family; no change.
+- Existing tests that scan for `asama-9-N-*` audit lines keep
+  passing because dual-emit produces those lines.
+
+#### Bridge-period notes
+
+- During R5 → R7, every quality-phase audit log entry will appear
+  TWICE — once with the v11 name, once with the v10 alias. This
+  doubles the audit.log size for those phases but preserves
+  enforcement. R8 cutover halves it back by removing the alias
+  emits.
+- Hook source comments mentioning sub-steps `9.1`, `9.2`, etc.
+  (mcl-stop.sh, mcl-pre-tool.sh) still describe the underlying
+  enforcement logic accurately because the dual-emit still
+  produces `asama-9-N-*` audits. R8 retitles those comments.
+- Aşama 8 risk-dialog escalation pattern: when a security finding
+  is ambiguous in Aşama 13, the model escalates back to Aşama 9
+  (Risk Review). Today this re-opens `risk_review_state="running"`
+  and the existing dialog runs. No code change needed in R5 — the
+  enum state still maps via the bucket integer (current_phase=7).
+
+Banner: MCL 10.1.20 → MCL 10.1.21.
+
 ## [10.1.20] - 2026-05-05
 
 ### v11.0 migration R4 — State machine widening + Aşama 8 (Risk Review) → Aşama 9

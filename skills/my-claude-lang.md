@@ -9,7 +9,7 @@ description: >
   ambiguity, generates senior-engineer-grade specs, and filters sycophancy.
 ---
 
-# MCL — Semantic Development Bridge (v10.1.20)
+# MCL — Semantic Development Bridge (v10.1.21)
 
 ## How to Activate
 
@@ -43,7 +43,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 10.1.20` on its own line.
+Every response MUST start with `🌐 MCL 10.1.21` on its own line.
 
 ## AskUserQuestion Protocol
 
@@ -53,7 +53,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 partial-spec recovery, mcl-update, mcl-finish, pasted-CLI passthrough —
 uses Claude Code's native `AskUserQuestion` tool with `question` prefixed
-`MCL 10.1.20 | `. The Stop hook parses tool_use/tool_result pairs to advance
+`MCL 10.1.21 | `. The Stop hook parses tool_use/tool_result pairs to advance
 MCL state.
 
 ## MCL Tag Schema
@@ -158,7 +158,7 @@ For full Aşama 1 rules, read `my-claude-lang/asama1-gather.md`
    schema/migration, auth/permission model, public API breaking changes,
    irreversible data consequences, security boundaries.
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 10.1.20 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 10.1.21 | <localized-is-this-correct>",
    options: ["<approve>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns approve does state advance.
 
@@ -210,7 +210,7 @@ collect approval via ONE AskUserQuestion call.
    concrete technical problems (race conditions, scale issues, missing
    auth, N+1, cascading failures). If found, add one `⚠️ Teknik not:`
    line.
-5. Call `AskUserQuestion({question: "MCL 10.1.20 | <approval-prompt>",
+5. Call `AskUserQuestion({question: "MCL 10.1.21 | <approval-prompt>",
    options: [{label: "<approve-verb>", ...}, {label: "<edit>", ...},
    {label: "<cancel>", ...}]})`. The approve label is the BARE VERB.
 
@@ -309,30 +309,35 @@ Capture). HEAD-based dedup via `.mcl/risk-session.md`.
 
 ⛔ STOP RULE: Do NOT emit Aşama 9 until Aşama 8 is complete.
 
-## Aşama 9: Quality + Tests (auto-fix pipeline)
+## Aşama 10–17: Quality + Tests pipeline (split into 8 dedicated phases in v11.0 R5)
 
-For full Aşama 9 rules, read `my-claude-lang/asama9-quality-tests.md`
+**v11.0 architecture (since v10.1.21):** the v10 monolithic Aşama 9
+sub-steps `9.1`–`9.8` are now 8 top-level dedicated phases, each
+with its own skill file. The pipeline still runs sequentially with
+no AskUserQuestion (auto-fix only); only the addressing changes —
+each phase has a top-level audit identity instead of a shared
+`asama-9-N-*` namespace.
 
-After Aşama 8 dialog complete. Eight sequential sub-steps execute
-in order; each detects + auto-fixes its scope. **No AskUserQuestion** —
-Claude Code applies fixes directly.
-
-| # | Sub-step | What it does |
-|---|----------|--------------|
-| 9.1 | Code review | Correctness, dead code, validations |
-| 9.2 | Simplify | Premature abstraction, duplicate logic |
-| 9.3 | Performance | N+1, unbounded loops, blocking calls |
-| 9.4 | Security | Semgrep + injection / auth / CSRF / secrets |
-| 9.5 | Unit tests | One per new function/class/module |
-| 9.6 | Integration tests | Cross-module, API endpoints, DB |
-| 9.7 | E2E tests | UI active + new user flows |
-| 9.8 | Load tests | Throughput-sensitive paths |
+| v11 # | v10 # | Phase | What it does | Skill file |
+|---|---|---|---|---|
+| Aşama 10 | 9.1 | Code review | Correctness, dead code, validations | `asama10-code-review.md` |
+| Aşama 11 | 9.2 | Simplify | Premature abstraction, duplicate logic | `asama11-simplify.md` |
+| Aşama 12 | 9.3 | Performance | N+1, unbounded loops, blocking calls | `asama12-performance.md` |
+| Aşama 13 | 9.4 | Security | Semgrep + injection / auth / CSRF / secrets (whole-project scope in v11) | `asama13-security.md` |
+| Aşama 14 | 9.5 | Unit + TDD tests | One per new function/class/module | `asama14-unit-tests.md` |
+| Aşama 15 | 9.6 | Integration tests | Cross-module, API endpoints, DB | `asama15-integration-tests.md` |
+| Aşama 16 | 9.7 | E2E tests | UI active + new user flows | `asama16-e2e-tests.md` |
+| Aşama 17 | 9.8 | Load tests | Throughput-sensitive paths | `asama17-load-tests.md` |
 
 **Soft applicability ("yumuşak katılık"):** when not applicable for
-the current code shape (load test for calculator, E2E for CLI), write
-audit `asama-9-N-not-applicable | reason=<why>` and skip silently.
+the current code shape (load test for calculator, E2E for CLI), each
+phase writes its own `asama-N-not-applicable | reason=<why>` audit
+and skips silently. Backward-compat aliases (`asama-9-N-*`) are
+also emitted by each phase during the v10.1.21 → v11.0.0 bridge
+period; R8 cutover removes the v10 alias emits.
 
-Each sub-step writes start/end audit entries (skip-detection control).
+Each phase writes start/end audit entries (skip-detection control)
+plus the v10 alias for hook compatibility.
 
 ## Aşama 10: Impact Review (interactive dialog)
 
