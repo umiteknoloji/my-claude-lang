@@ -9,7 +9,7 @@ description: >
   ambiguity, generates senior-engineer-grade specs, and filters sycophancy.
 ---
 
-# MCL — Semantic Development Bridge (v10.1.19)
+# MCL — Semantic Development Bridge (v10.1.20)
 
 ## How to Activate
 
@@ -43,7 +43,7 @@ Developer's language is auto-detected from their first message.
 
 ## Activation Indicator
 
-Every response MUST start with `🌐 MCL 10.1.19` on its own line.
+Every response MUST start with `🌐 MCL 10.1.20` on its own line.
 
 ## AskUserQuestion Protocol
 
@@ -53,7 +53,7 @@ Every closed-ended MCL interaction — spec approval, summary confirmation,
 risk/impact walkthrough, plugin consent, git-init consent, stack fallback,
 partial-spec recovery, mcl-update, mcl-finish, pasted-CLI passthrough —
 uses Claude Code's native `AskUserQuestion` tool with `question` prefixed
-`MCL 10.1.19 | `. The Stop hook parses tool_use/tool_result pairs to advance
+`MCL 10.1.20 | `. The Stop hook parses tool_use/tool_result pairs to advance
 MCL state.
 
 ## MCL Tag Schema
@@ -158,7 +158,7 @@ For full Aşama 1 rules, read `my-claude-lang/asama1-gather.md`
    schema/migration, auth/permission model, public API breaking changes,
    irreversible data consequences, security boundaries.
 3. If ALL parameters clear → present summary as plain text, THEN call
-   `AskUserQuestion({question: "MCL 10.1.19 | <localized-is-this-correct>",
+   `AskUserQuestion({question: "MCL 10.1.20 | <localized-is-this-correct>",
    options: ["<approve>", "<edit>", "<cancel>"]})`.
 4. Only after the tool_result returns approve does state advance.
 
@@ -210,7 +210,7 @@ collect approval via ONE AskUserQuestion call.
    concrete technical problems (race conditions, scale issues, missing
    auth, N+1, cascading failures). If found, add one `⚠️ Teknik not:`
    line.
-5. Call `AskUserQuestion({question: "MCL 10.1.19 | <approval-prompt>",
+5. Call `AskUserQuestion({question: "MCL 10.1.20 | <approval-prompt>",
    options: [{label: "<approve-verb>", ...}, {label: "<edit>", ...},
    {label: "<cancel>", ...}]})`. The approve label is the BARE VERB.
 
@@ -285,7 +285,7 @@ proceeds silently. All other actions proceed silently.
 
 ## Aşama 8: Risk Review (interactive dialog)
 
-For full Aşama 8 rules, read `my-claude-lang/asama8-risk-review.md`
+For full Aşama 8 rules, read `my-claude-lang/asama9-risk-review.md`
 
 After Aşama 7 writes code but BEFORE Aşama 9 (auto-fix pipeline).
 Sequential, one-risk-per-turn AskUserQuestion dialog.

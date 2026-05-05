@@ -153,11 +153,11 @@ After writing `hc.md`, show the developer:
 
 ## Step 8 — STATIC_CONTEXT Sync Check (STEP-53)
 
-Read the `<mcl_phase name="asama8-risk-review">` block inside the STATIC_CONTEXT
+Read the `<mcl_phase name="asama9-risk-review">` block inside the STATIC_CONTEXT
 heredoc in `hooks/mcl-activate.sh`.
 
-Read `skills/my-claude-lang/asama8-risk-review.md` (resolve path relative to MCL repo root,
-or `~/.claude/skills/my-claude-lang/asama8-risk-review.md` if installed).
+Read `skills/my-claude-lang/asama9-risk-review.md` (resolve path relative to MCL repo root,
+or `~/.claude/skills/my-claude-lang/asama9-risk-review.md` if installed).
 
 Compare:
 - Are the same four numbered steps present in both (SPEC COMPLIANCE PRE-CHECK, INTEGRATED

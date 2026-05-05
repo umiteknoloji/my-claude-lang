@@ -227,7 +227,7 @@ upgraded brief or downstream spec) and surfaces any element that:
 
 This is the safety net. If Aşama 3 hallucinated scope, Aşama 8
 catches it before Aşama 11 sign-off. See
-`my-claude-lang/asama8-risk-review.md` Lens (e) for full rules.
+`my-claude-lang/asama9-risk-review.md` Lens (e) for full rules.
 
 ## Aşama 4 Scope Changes Callout (Companion Check)
 

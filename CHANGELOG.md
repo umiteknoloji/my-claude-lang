@@ -7,6 +7,91 @@
 
 ## [Unreleased]
 
+## [10.1.20] - 2026-05-05
+
+### v11.0 migration R4 — State machine widening + Aşama 8 (Risk Review) → Aşama 9
+
+Fourth step of the v11.0 migration. First release that touches
+**executable hook code** (R1-R3 were skill-file-only). Two coupled
+changes that share a release:
+
+1. **State machine widening.** `mcl-state.sh` now accepts
+   `current_phase` integers in `[1, 21]` instead of `[1, 11]`.
+   The integer remains a **coarse bucket** (1, 4, 7, 11 today —
+   GATHER, SPEC_REVIEW, EXECUTE, DELIVER); the widening just
+   makes future bucket additions (R5-R7) representable without
+   another schema bump.
+2. **Risk Review skill rename.** `asama8-risk-review.md` →
+   `asama9-risk-review.md` to match the v11 numbering.
+
+#### Changes
+
+- `hooks/lib/mcl-state.sh:108` — `assert 1 <= obj["current_phase"]
+  <= 11` becomes `<= 21`.
+- `hooks/lib/mcl-state.sh:13-21` — schema-v3 comment block notes
+  the v11 widening and points at the migration plan.
+- `hooks/lib/mcl-state.sh:386-401` — `mcl_get_active_phase`
+  comment block updated to reflect the v11 bucket map (the
+  function logic itself is unchanged; comments now show what each
+  bucket maps to in v11 numbering).
+- `skills/my-claude-lang/asama8-risk-review.md` →
+  `skills/my-claude-lang/asama9-risk-review.md`.
+- Self-phase header inside the renamed file: `# Aşama 8:
+  Post-Code Risk Review` → `# Aşama 9: Post-Code Risk Review
+  (was Aşama 8 in v10)`. The "When Aşama 8 Runs" section
+  retitled "When Aşama 9 Runs" and reframed for the v11 phase
+  chain.
+- mcl_phase tag inside the renamed file: `name="asama8-risk-review"`
+  → `name="asama9-risk-review"` (handled by bulk path replace).
+- Bulk path replace `asama8-risk-review` → `asama9-risk-review`
+  across 8 referencing files: hooks/mcl-activate.sh (PHASE
+  SCRIPT prompt body), skills/my-claude-lang.md umbrella,
+  asama3-translator.md, all-mcl.md (STEP catalog),
+  mcl-tag-schema.md, check-up.md,
+  tests/cases/test-v10-1-5-asama-8-progression-pilot.sh.
+
+#### Smoke tests for state widening
+
+Boundary tests via `_mcl_state_valid`:
+
+| Input `current_phase` | Expected | Actual |
+|---|---|---|
+| 1 | OK | OK |
+| 11 | OK | OK |
+| 21 | OK | OK (v11 widening confirmed) |
+| 22 | FAIL | FAIL |
+| 0 | FAIL | FAIL |
+
+#### What does NOT change
+
+- The integer in state.json is still 1, 4, 7, or 11 in practice
+  (no v11 bucket fills 12-21 yet — those land in R5-R7).
+- Hook enforcement keyed on phase integer — `current_phase=7`
+  still means EXECUTE; no logic shift.
+- Audit names. `asama-8-*` audits (precision-audit-block,
+  asama-8-emit-missing, asama-8-complete) still emit under the
+  same names. R5/R6 add aliases that map them to v11 numbers;
+  R8 removes the v10 names.
+- The `risk_review_state` field. Its enum (`null` → `running`
+  → `pending` → `complete`) stays as-is; only the prose
+  describing it inside the skill file moved from "Aşama 8" to
+  "Aşama 9" framing.
+
+#### Bridge-period notes
+
+- Hook source comments mentioning "Aşama 8" (mcl-stop.sh,
+  mcl-pre-tool.sh) still describe the risk-review enforcement.
+  These will be retitled when their code paths are touched in
+  R5 (quality split — same hooks).
+- The renamed `asama9-risk-review.md` still has many "Aşama 8"
+  references in its body (lines beyond the header). Those refer
+  to the phase's own historic name and will be flushed in R8
+  cutover when the v10 alias removal happens. The header and
+  "When Aşama 9 Runs" block are correct for v11; the rest is
+  honest historical documentation.
+
+Banner: MCL 10.1.19 → MCL 10.1.20.
+
 ## [10.1.19] - 2026-05-05
 
 ### v11.0 migration R3 — Aşama 7 (TDD execute) → Aşama 8 rename

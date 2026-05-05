@@ -166,7 +166,7 @@ Every closed-ended gate (Aşama 1 summary, Aşama 4 spec approval, each
 Aşama 8 risk, each Aşama 10 impact, plugin consent, git-init consent,
 drift resolution, `/mcl-update` / `/mcl-finish` / pasted-CLI confirmation)
 arrives as a native Claude Code `AskUserQuestion` prompt with the
-question prefix `MCL 10.1.19 | `. You pick an option in the UI — no typing
+question prefix `MCL 10.1.20 | `. You pick an option in the UI — no typing
 "yes" or "✅ MCL APPROVED" required. Open-ended Aşama 1 gathering stays
 as a plain-text conversation.
 
@@ -175,7 +175,7 @@ now **warn-only**: mutating tools are never blocked, but MCL surfaces a
 drift notice each turn and asks you via AskUserQuestion whether to
 re-approve the new body or revert to the approved one.
 
-Every response starts with `🌐 MCL 10.1.19` so you always know the bridge is active.
+Every response starts with `🌐 MCL 10.1.20` so you always know the bridge is active.
 
 ### UI Build / Review Sub-Phases (since 6.2.0)
 

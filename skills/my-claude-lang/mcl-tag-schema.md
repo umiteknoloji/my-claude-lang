@@ -45,7 +45,7 @@ output breaks rendering.
   `language-detection.md`, `technical-disambiguation.md`,
   `cultural-pragmatics.md`, `gates.md`
 
-Attribute form: `<mcl_phase name="asama8-risk-review">...`
+Attribute form: `<mcl_phase name="asama9-risk-review">...`
 
 ### `<mcl_constraint>`
 

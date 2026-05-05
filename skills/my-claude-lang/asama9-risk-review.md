@@ -1,25 +1,29 @@
-<mcl_phase name="asama8-risk-review">
+<mcl_phase name="asama9-risk-review">
 
 > ⚠️ SYNC NOTE: The active Aşama 8 rule lives in `mcl-activate.sh` STATIC_CONTEXT
-> (the `<mcl_phase name="asama8-risk-review">` block). This file is the extended
+> (the `<mcl_phase name="asama9-risk-review">` block). This file is the extended
 > reference. When updating Aşama 8 behavior, BOTH must be updated together.
 
-# Aşama 8: Post-Code Risk Review (interactive dialog)
+# Aşama 9: Post-Code Risk Review (interactive dialog) — was Aşama 8 in v10
 
-Aşama 8 is a **mandatory, sequential, interactive dialog** that runs
-AFTER Aşama 7 (code is written) and BEFORE Aşama 9 (Quality + Tests
-auto-fix pipeline). It surfaces risks the developer must decide on —
-spec compliance gaps, missed edge cases, regression surfaces, scope
-drift — one at a time via AskUserQuestion.
+Aşama 9 is a **mandatory, sequential, interactive dialog** that runs
+AFTER Aşama 8 (code is written via TDD) and BEFORE the quality/test
+auto-fix pipeline (still labeled "Aşama 9" in the active code; v11
+plan R5 splits it into 8 dedicated phases 10..17). It surfaces risks
+the developer must decide on — spec compliance gaps, missed edge
+cases, regression surfaces, scope drift — one at a time via
+AskUserQuestion.
 
 The deeper code-quality lenses (code review, simplify, performance,
 security) and comprehensive test coverage (unit, integration, E2E,
-load) are NOT in Aşama 8 — they live in Aşama 9 (auto-fix, no dialog).
+load) are NOT in Aşama 9 — they live in the quality/test pipeline
+that R5 will rename out of "Aşama 9".
 
-## When Aşama 8 Runs
+## When Aşama 9 Runs
 
-Immediately after Aşama 7 finishes writing code. Aşama 7 does NOT end
-with "done" or a changes summary — it hands off to Aşama 8.
+Immediately after Aşama 8 finishes writing code (TDD GREEN-verified).
+Aşama 8 does NOT end with "done" or a changes summary — it hands off
+to Aşama 9.
 
 ## The Dialog Structure
 
