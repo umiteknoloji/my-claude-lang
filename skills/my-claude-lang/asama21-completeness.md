@@ -35,13 +35,11 @@ Completeness audit is the LAST output before the session closes.
    below) and assign verdict ✓ / ⚠️ / ✗ / n/a.
 6. Render the completeness report (markdown, in developer's language
    per the language rule — only the technical signals stay English).
-7. Emit completion audit (dual-emit since v10.1.22 — v11 + v10 alias):
+7. Emit completion audit:
    ```
    bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-     mcl_audit_log asama-21-complete mcl-stop "phases_done=N phases_missing=M"; \
-     mcl_audit_log asama-13-complete mcl-stop "phases_done=N phases_missing=M"'
+     mcl_audit_log asama-21-complete mcl-stop "phases_done=N phases_missing=M"'
    ```
-   R8 cutover removes the v10 alias line.
 
 ## Phase Completion Signals (audit.log inspection)
 
@@ -159,7 +157,7 @@ the completion audit via Bash:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-13-complete mcl-stop "phases_done=N phases_missing=M"'
+  mcl_audit_log asama-21-complete mcl-stop "phases_done=N phases_missing=M"'
 ```
 
 Where N is the count of phases with ✓ verdict and M is the count

@@ -54,24 +54,21 @@ Start of phase:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log "asama-10-start" "mcl-stop.sh" "scope=<files>"; \
-  mcl_audit_log "asama-9-1-start" "mcl-stop.sh" "scope=<files>"'
+  mcl_audit_log "asama-10-start" "mcl-stop.sh" "scope=<files>"'
 ```
 
 End of phase:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log "asama-10-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"; \
-  mcl_audit_log "asama-9-1-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"'
+  mcl_audit_log "asama-10-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"'
 ```
 
 Not applicable:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log "asama-10-not-applicable" "mcl-stop.sh" "reason=<why>"; \
-  mcl_audit_log "asama-9-1-not-applicable" "mcl-stop.sh" "reason=<why>"'
+  mcl_audit_log "asama-10-not-applicable" "mcl-stop.sh" "reason=<why>"'
 ```
 
 The `asama-9-1-*` lines are v10 backward-compat aliases. Existing

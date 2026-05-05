@@ -34,17 +34,14 @@ Start / End / Not-applicable follow the same pattern as Aşama 10:
 
 ```
 mcl_audit_log "asama-11-start" "mcl-stop.sh" "scope=<files>"
-mcl_audit_log "asama-9-2-start" "mcl-stop.sh" "scope=<files>"  # v10 alias
 ```
 
 ```
 mcl_audit_log "asama-11-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"
-mcl_audit_log "asama-9-2-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"  # v10 alias
 ```
 
 ```
 mcl_audit_log "asama-11-not-applicable" "mcl-stop.sh" "reason=<why>"
-mcl_audit_log "asama-9-2-not-applicable" "mcl-stop.sh" "reason=<why>"  # v10 alias
 ```
 
 R8 cutover removes the v10 alias lines.

@@ -69,10 +69,7 @@ Recommended emit:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-20-complete mcl-stop "lang=<detected> skipped=<bool>"; \
-  mcl_audit_log localize-report asama12 "lang=<detected> skipped=<bool>"'
+  mcl_audit_log asama-20-complete mcl-stop "lang=<detected> skipped=<bool>"'
 ```
-
-R8 cutover removes the v10 alias line.
 
 </mcl_phase>

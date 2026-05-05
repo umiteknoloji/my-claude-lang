@@ -889,17 +889,20 @@ try:
                 session_ts = line.split("|", 1)[0].strip()
 except Exception:
     pass
-done = {n: False for n in range(1, 9)}
+done = {n: False for n in range(10, 18)}
 try:
     for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
         ts = line.split("|", 1)[0].strip()
         if session_ts and ts < session_ts:
             continue
-        for n in range(1, 9):
-            # Either asama-9-N-end (sub-step ran) OR asama-9-N-not-applicable
-            # (sub-step soft-skipped with reason) counts as completion.
-            if (f"| asama-9-{n}-end |" in line or
-                f"| asama-9-{n}-not-applicable |" in line):
+        # v11 (since v11.0.0): scan asama-10..17 (the dedicated quality
+        # phases). Either asama-N-end (phase ran) OR asama-N-not-applicable
+        # (phase soft-skipped with reason) counts as completion. Pre-v11
+        # this scanned asama-9-1..9-8 sub-steps; the rename matches the
+        # v11 architecture's flat phase numbering.
+        for n in range(10, 18):
+            if (f"| asama-{n}-end |" in line or
+                f"| asama-{n}-not-applicable |" in line):
                 done[n] = True
 except Exception:
     pass

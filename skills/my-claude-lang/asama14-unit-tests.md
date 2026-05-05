@@ -34,13 +34,10 @@ asama-14-not-applicable  reason=test_command-missing
 
 ```
 mcl_audit_log "asama-14-start" "mcl-stop.sh" "scope=<files>"
-mcl_audit_log "asama-9-5-start" "mcl-stop.sh" "scope=<files>"  # v10 alias
 
 mcl_audit_log "asama-14-end" "mcl-stop.sh" "tests_added=N green=true|false"
-mcl_audit_log "asama-9-5-end" "mcl-stop.sh" "tests_added=N green=true|false"  # v10 alias
 
 mcl_audit_log "asama-14-not-applicable" "mcl-stop.sh" "reason=<why>"
-mcl_audit_log "asama-9-5-not-applicable" "mcl-stop.sh" "reason=<why>"  # v10 alias
 ```
 
 R8 cutover removes the v10 alias lines.

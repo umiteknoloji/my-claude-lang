@@ -31,13 +31,10 @@ audit, skip.
 
 ```
 mcl_audit_log "asama-12-start" "mcl-stop.sh" "scope=<files>"
-mcl_audit_log "asama-9-3-start" "mcl-stop.sh" "scope=<files>"  # v10 alias
 
 mcl_audit_log "asama-12-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"
-mcl_audit_log "asama-9-3-end" "mcl-stop.sh" "findings=N fixes=M skipped=K"  # v10 alias
 
 mcl_audit_log "asama-12-not-applicable" "mcl-stop.sh" "reason=<why>"
-mcl_audit_log "asama-9-3-not-applicable" "mcl-stop.sh" "reason=<why>"  # v10 alias
 ```
 
 R8 cutover removes the v10 alias lines.

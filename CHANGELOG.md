@@ -7,6 +7,124 @@
 
 ## [Unreleased]
 
+## [11.0.0] - 2026-05-05
+
+### v11.0 cutover — 21-phase architecture is now the default
+
+Eighth and final step of the v11.0 migration plan
+(`~/.claude/plans/g-zel-bi-plan-yap-iridescent-star.md`). The v10
+audit-name aliases that R5 and R6 introduced as a backward-compat
+bridge are removed; the active hook scanners are migrated to v11
+audit names; the banner everywhere becomes `MCL 11.0.0`. This is a
+**major release** — semantic versioning's MAJOR bump. In-progress
+v10.1.x sessions should start a fresh session after upgrade.
+
+#### Architecture shift (recap)
+
+| Pipeline phase | v10 | v11.0.0 |
+|---|---|---|
+| Gather | Aşama 1 | Aşama 1 |
+| Precision audit | Aşama 2 | Aşama 2 |
+| Translate | Aşama 3 | Aşama 3 |
+| Spec emit | Aşama 4 | Aşama 4 |
+| Pattern matching | Aşama 5 | Aşama 5 |
+| UI build (dummy data) | Aşama 6a | Aşama 6 |
+| UI inspection | Aşama 6b | Aşama 7 |
+| TDD execute (+ backend wiring) | Aşama 6c + Aşama 7 | Aşama 8 |
+| Risk review | Aşama 8 | Aşama 9 |
+| Code review (auto-fix) | Aşama 9.1 | Aşama 10 |
+| Simplify | Aşama 9.2 | Aşama 11 |
+| Performance check | Aşama 9.3 | Aşama 12 |
+| Security check (whole project) | Aşama 9.4 | Aşama 13 |
+| Unit + TDD tests | Aşama 9.5 | Aşama 14 |
+| Integration tests | Aşama 9.6 | Aşama 15 |
+| E2E tests | Aşama 9.7 | Aşama 16 |
+| Load tests | Aşama 9.8 | Aşama 17 |
+| Impact review | Aşama 10 | Aşama 18 |
+| Verification report + mock cleanup | Aşama 11 | Aşama 19 |
+| Localized report | Aşama 12 | Aşama 20 |
+| Completeness audit (audits 1–20) | Aşama 13 | Aşama 21 |
+
+#### v10 audit aliases REMOVED (R5/R6 dual-emit lines deleted)
+
+Each new quality skill file (`asama10-code-review.md` through
+`asama17-load-tests.md`) and each renamed delivery skill file
+(`asama9-risk-review.md`, `asama18-impact-review.md`,
+`asama19-verify-report.md`, `asama20-localized-report.md`,
+`asama21-completeness.md`) previously dual-emitted v11 audit names
+alongside v10 alias names during the bridge period. R8 cutover
+removes the v10 alias emit line from every skill file. Audits now
+emit ONLY v11 names:
+
+| Phase | v11 audit (kept) | v10 alias (removed) |
+|---|---|---|
+| Aşama 9 (Risk Review) | `asama-9-complete` | `asama-8-complete` |
+| Aşama 10 (Code Review) | `asama-10-{start,end,not-applicable,ambiguous}` | `asama-9-1-*` |
+| Aşama 11 (Simplify) | `asama-11-*` | `asama-9-2-*` |
+| Aşama 12 (Performance) | `asama-12-*` | `asama-9-3-*` |
+| Aşama 13 (Security) | `asama-13-{start,end,ambiguous,resolved,autofix}` | `asama-9-4-*` |
+| Aşama 14 (Unit) | `asama-14-*` | `asama-9-5-*` |
+| Aşama 15 (Integration) | `asama-15-*` | `asama-9-6-*` |
+| Aşama 16 (E2E) | `asama-16-*` | `asama-9-7-*` |
+| Aşama 17 (Load) | `asama-17-*` | `asama-9-8-*` and the cumulative `asama-9-complete` |
+| Aşama 18 (Impact Review) | `asama-18-complete` | `asama-10-complete` |
+| Aşama 19 (Verification Report) | `asama-19-complete` | `asama-11-complete` |
+| Aşama 20 (Localized Report) | `asama-20-complete` | `localize-report` |
+| Aşama 21 (Completeness Audit) | `asama-21-complete` | `asama-13-complete` |
+
+Final grep across skill files confirms zero v10 alias emit lines
+remain.
+
+#### Hook scanner migration
+
+`hooks/mcl-stop.sh` `_mcl_asama_9_substeps_complete` helper
+(line 877+) now scans v11 audit names (`asama-10-end` ..
+`asama-17-end`, plus the `not-applicable` variants) instead of the
+v10 sub-step names (`asama-9-1-end` .. `asama-9-8-end`). The
+helper still emits `asama-9-complete` as the cumulative signal;
+this signal name is reused — it now means "Risk Review (v11)
+complete" instead of "Quality+Tests cumulative (v10)" — but
+existing v10.1.5 progression-from-emit logic at line 1015 keys on
+the same name and continues to operate.
+
+#### Banner everywhere → MCL 11.0.0
+
+VERSION file, README.md, README.tr.md, FEATURES.md, skills/my-claude-lang.md
+Activation Indicator + AskUserQuestion prefix + Schema-V banner +
+Function Model section, and hooks/mcl-activate.sh PHASE SCRIPT
+inline body — all updated together.
+
+#### What does NOT change
+
+- mcl-state.sh `current_phase` schema. Still bounded `<= 21`
+  (R4 widening) and still uses coarse buckets (1, 4, 7, 11). The
+  documented phase numbers shifted; the integer storage stayed.
+- Spec block detection (`📋 Spec:` line-anchored token) and the
+  Aşama 4 SPEC enforcement at PreToolUse / Stop hook.
+- Aşama 1 summary-confirm-approve flow and Aşama 2 closing
+  precision-confirm askq (R5 of v10.1.14 plan; both still gate
+  the same way).
+- Audit emit timestamps (UTC ISO 8601 since v10.1.13).
+- AskUserQuestion classification (`spec-approve`, `precision-confirm`,
+  `summary-confirm`, `ui-review`, `other`). All five still operate.
+
+#### Bridge artifacts that survive in v11.0.0
+
+- Hook source comments mentioning sub-step names (`asama-9-1`,
+  `asama-9-4-ambiguous`, etc.) still describe enforcement helpers
+  in terms of v10 names where the helper code happened to keep
+  v10 names as scan keys. These are documentation-only and have
+  no runtime impact.
+- README/README.tr.md "UI Build / Review Sub-Phases (since 6.2.0)"
+  prose describing the old 6a/6b/6c three-way split is preserved
+  as historical context. The v11 vision diagram at the top of the
+  README is the canonical pipeline.
+- v10-named test files (`tests/cases/test-v10-*.sh`) remain;
+  they will be retired or rewritten as `test-v11-*` in a future
+  patch release.
+
+Banner: MCL 10.1.23 → **MCL 11.0.0**.
+
 ## [10.1.23] - 2026-05-05
 
 ### v11.0 migration R7 — Aşama 19 mock-cleanup logic activates

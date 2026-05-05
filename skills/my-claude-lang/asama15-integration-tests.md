@@ -31,13 +31,10 @@ asama-15-not-applicable  reason=<no-api-or-db>
 
 ```
 mcl_audit_log "asama-15-start" "mcl-stop.sh" "scope=<files>"
-mcl_audit_log "asama-9-6-start" "mcl-stop.sh" "scope=<files>"  # v10 alias
 
 mcl_audit_log "asama-15-end" "mcl-stop.sh" "tests_added=N green=true|false"
-mcl_audit_log "asama-9-6-end" "mcl-stop.sh" "tests_added=N green=true|false"  # v10 alias
 
 mcl_audit_log "asama-15-not-applicable" "mcl-stop.sh" "reason=<why>"
-mcl_audit_log "asama-9-6-not-applicable" "mcl-stop.sh" "reason=<why>"  # v10 alias
 ```
 
 R8 cutover removes the v10 alias lines.

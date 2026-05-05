@@ -70,19 +70,14 @@ verdict (fixed / accepted / not-applicable with documented reason).
 
 ```
 mcl_audit_log "asama-13-start" "mcl-stop.sh" "scope=whole-project"
-mcl_audit_log "asama-9-4-start" "mcl-stop.sh" "scope=whole-project"  # v10 alias
 
 mcl_audit_log "asama-13-end" "mcl-stop.sh" "findings=N fixes=M open=K"
-mcl_audit_log "asama-9-4-end" "mcl-stop.sh" "findings=N fixes=M open=K"  # v10 alias
 
 mcl_audit_log "asama-13-ambiguous" "stop" "rule=<id> file=<f>:<l>"
-mcl_audit_log "asama-9-4-ambiguous" "stop" "rule=<id> file=<f>:<l>"  # v10 alias
 
 mcl_audit_log "asama-13-resolved" "stop" "rule=<id> file=<f>:<l> status=fixed|accepted"
-mcl_audit_log "asama-9-4-resolved" "stop" "rule=<id> file=<f>:<l> status=fixed|accepted"  # v10 alias
 
 mcl_audit_log "asama-13-autofix" "stop" "rule=<id> file=<f>:<l>"
-mcl_audit_log "asama-9-4-autofix" "stop" "rule=<id> file=<f>:<l>"  # v10 alias
 ```
 
 The v10 enforcement at mcl-stop.sh:1115+ (open-severity must-resolve

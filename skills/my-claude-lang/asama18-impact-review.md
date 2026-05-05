@@ -177,8 +177,7 @@ emit BOTH the v11 audit name AND the v10 alias:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-18-complete mcl-stop "impacts=N resolved=R"; \
-  mcl_audit_log asama-10-complete mcl-stop "impacts=N resolved=R"'
+  mcl_audit_log asama-18-complete mcl-stop "impacts=N resolved=R"'
 ```
 
 Where N is the count of impacts surfaced (0 when omitted) and R is

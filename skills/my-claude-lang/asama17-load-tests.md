@@ -31,26 +31,15 @@ asama-17-not-applicable  reason=no-throughput-path
 
 ```
 mcl_audit_log "asama-17-start" "mcl-stop.sh" "scope=<files>"
-mcl_audit_log "asama-9-8-start" "mcl-stop.sh" "scope=<files>"  # v10 alias
 
 mcl_audit_log "asama-17-end" "mcl-stop.sh" "scripts_added=N met_target=true|false"
-mcl_audit_log "asama-9-8-end" "mcl-stop.sh" "scripts_added=N met_target=true|false"  # v10 alias
 
 mcl_audit_log "asama-17-not-applicable" "mcl-stop.sh" "reason=<why>"
-mcl_audit_log "asama-9-8-not-applicable" "mcl-stop.sh" "reason=<why>"  # v10 alias
 ```
 
-After Aşama 17 ends, the model emits the cumulative phase-9
-completion audit (the v10 monolithic completion signal) so existing
-v10 enforcement at mcl-stop.sh continues to operate:
-
-```
-bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-9-complete mcl-stop \
-  "applied=A skipped=S ambiguous=B na=N (v11 phases 10-17 split)"'
-```
-
-R8 cutover removes both the v10 alias lines AND this monolithic
-`asama-9-complete` emit.
+After Aşama 17 ends, the quality pipeline (Aşama 10–17) is
+complete. The downstream Aşama 18 (Impact Review) reads the per-phase
+completion audits emitted by each of Aşama 10–17 to verify the chain
+ran end-to-end; no monolithic completion signal is required in v11.
 
 </mcl_phase>

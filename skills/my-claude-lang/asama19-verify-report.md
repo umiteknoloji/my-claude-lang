@@ -331,8 +331,7 @@ the v10 alias:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-19-complete mcl-stop "covered=N must_test=K trace_lines=L"; \
-  mcl_audit_log asama-11-complete mcl-stop "covered=N must_test=K trace_lines=L"'
+  mcl_audit_log asama-19-complete mcl-stop "covered=N must_test=K trace_lines=L"'
 ```
 
 Where:

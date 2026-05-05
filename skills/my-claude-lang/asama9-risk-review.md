@@ -261,11 +261,8 @@ bridge:
 
 ```
 bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
-  mcl_audit_log asama-9-complete mcl-stop "h_count=N m_count=M l_count=K resolved=R"; \
-  mcl_audit_log asama-8-complete mcl-stop "h_count=N m_count=M l_count=K resolved=R"'
+  mcl_audit_log asama-9-complete mcl-stop "h_count=N m_count=M l_count=K resolved=R"'
 ```
-
-R8 cutover removes the v10 alias (`asama-8-complete`) line.
 
 Where:
 - N: HIGH-severity finding count surfaced this session (from §2b checklist)
