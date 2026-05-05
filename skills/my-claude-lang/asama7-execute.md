@@ -15,12 +15,16 @@ the title as "code first" would be the opposite of TDD. See
 Aşama 7 forks on `ui_flow_active`:
 
 - `ui_flow_active = true` (Aşama 1 approve with UI included, default):
-  Aşama 7 runs as three sub-phases in order:
+  Aşama 7 runs as two preceding UI phases plus the TDD execute body:
   - **Aşama 6 BUILD_UI** — read `my-claude-lang/asama6-ui-build.md`
   - **Aşama 7 UI_REVIEW** — read `my-claude-lang/asama7-ui-review.md`
-  - **Aşama 6c BACKEND** — read `my-claude-lang/asama6c-backend.md`
-  All rules below still apply inside each sub-phase; they describe
-  the shared Aşama 7 behavior. Only Aşama 6c reaches Aşama 8.
+  - **Backend wiring** — folded into the TDD execute body since
+    v10.1.18. Read `my-claude-lang/asama7-tdd.md` Step 5
+    ("Backend Wiring (UI Flow Path)"). Was a separate Aşama 6c
+    skill file in v10 architecture; that file has been removed.
+  All rules below still apply during each phase; they describe the
+  shared Aşama 7 behavior. The backend wiring (formerly Aşama 6c)
+  flows directly into Aşama 8 once TDD GREEN-verifies.
 - `ui_flow_active = false` (Aşama 1 approve with "skip UI") OR task
   has no UI by construction: the default flow below runs top-to-bottom
   and exits directly to Aşama 8.

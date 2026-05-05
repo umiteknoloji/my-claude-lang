@@ -95,7 +95,7 @@ locales). Reference labels:
 
 | Option chosen       | Stop-hook intent     | State transition                             | Next MCL step                  |
 | ------------------- | -------------------- | -------------------------------------------- | ------------------------------ |
-| Approve             | `ui-review-approve`  | `ui_reviewed=true`, `ui_sub_phase="BACKEND"` | Aşama 6c (`asama6c-backend.md`) |
+| Approve             | `ui-review-approve`  | `ui_reviewed=true`, `ui_sub_phase="BACKEND"` | TDD execute backend wiring (`asama7-tdd.md` Step 5; was Aşama 6c) |
 | Revise              | `ui-review-revise`   | no state change                              | Re-enter Aşama 6 with feedback |
 | Visual inspect      | `ui-vision-request`  | no state change                              | Run visual-inspect sub-skill    |
 | Cancel              | `ui-review-cancel`   | state cleared (ui flags reset)               | Abort                          |
@@ -123,7 +123,7 @@ When "See it yourself" is chosen, run the pipeline in
 `asama7-ui-review/visual-inspect.md`, emit the observation report,
 then re-call this same review `AskUserQuestion` so the developer can
 still choose approve / revise / cancel. Visual-inspect is
-informational — it never auto-advances to Aşama 6c.
+informational — it never auto-advances to backend wiring.
 
 ## Cancel
 
@@ -134,7 +134,8 @@ entirely. The `.mcl/specs/NNNN-slug.md` entry is marked
 ## Exit
 
 Only "Approve" exits Aşama 7. On approve, the next turn starts
-Aşama 6c; the UI-BUILD pre-tool lock is lifted (because
-`ui_sub_phase = "BACKEND"` now).
+the TDD execute backend wiring (`asama7-tdd.md` Step 5; was a
+separate Aşama 6c file in v10 architecture). The UI-BUILD
+pre-tool lock is lifted because `ui_sub_phase = "BACKEND"` now.
 
 </mcl_phase>

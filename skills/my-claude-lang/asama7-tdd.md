@@ -211,9 +211,104 @@ bash ~/.claude/hooks/lib/mcl-test-runner.sh green-verify
   Surface the failing test as a Aşama 8 risk (do not iterate
   silently — the developer must see the regression).
 
+## Step 5 — Backend Wiring (UI Flow Path)
+
+This step runs **only** when `ui_flow_active=true` and the developer
+has approved the UI in Aşama 7 (`ui_sub_phase` advanced to `"BACKEND"`
+by the Stop hook). When `ui_flow_active=false`, skip this step
+entirely — TDD already covers the full execution path.
+
+When this step runs, it owns the swap from Aşama 6's dummy fixtures
+to real data sources. The spec has not changed — the same MUST /
+SHOULD requirements approved in Aşama 4 still apply. This is
+execution, not re-specification.
+
+(Content folded from `asama6c-backend.md` in v10.1.18; that file
+is removed because the v11 architecture merges backend wiring into
+this phase rather than keeping it as a separate Aşama 6c.)
+
+### Path Discipline Change
+
+On entry to this step, `mcl-pre-tool.sh` lifts the UI-BUILD path
+restriction because `ui_sub_phase` is now `"BACKEND"`. All paths are
+open again, subject to the standard Aşama 7 gate (spec approved,
+phase = 4). Frontend edits are still allowed — there is no new
+restriction in the opposite direction.
+
+### Procedure
+
+1. Grep the frontend for `MOCK_` / `__fixtures__/` prefixes and the
+   Aşama 6 files that import them. Enumerate the swap-sites.
+2. Write backend code in the conventional project location:
+   - Next.js: `src/app/api/<route>/route.ts`
+   - SvelteKit: `src/routes/<route>/+server.ts`
+   - Express/Fastify: `src/api/<route>.ts`
+   - Nuxt: `server/api/<route>.ts`
+3. Write the data layer:
+   - ORM schema / migration under `prisma/` / `drizzle/` when
+     detected
+   - Query functions under `src/lib/db/` or project-conventional
+     service path
+4. Replace frontend fixtures with real calls:
+   - `const MOCK_USER` becomes `const user = await fetchUser()`
+   - State toggle hook (`useState<MockState>`) becomes real async
+     state (TanStack Query, SWR, or the project's existing pattern)
+   - Error state wired to caught rejections; loading wired to
+     pending state; empty wired to empty response
+5. Update `.env.example` (never `.env`) with any new required keys.
+   Surface them to the developer with install/setup instructions.
+6. Run the test runner if `test_command` is configured (Step 1
+   above) — failures block Aşama 8 exit.
+
+### Preserve the Type Contract
+
+The TypeScript types written alongside Aşama 6 fixtures
+(`src/types/user.ts` etc.) stay as-is. The real API returns data
+matching the same shape; the type is the boundary. If the real
+backend differs from the fixture shape, STOP and surface the
+mismatch to the developer as a Aşama 1-4 micro-cycle — do not
+silently change the type.
+
+<!-- v11: will move to Aşama 19, do not execute here.
+     Mock-data cleanup is parked under v11 plan R7 — the verification
+     report (Aşama 19) owns this responsibility, not the TDD execute
+     phase (Aşama 8). Until R7 ships, this block stays inert: do
+     NOT execute these deletions during Aşama 7/8 even though the
+     prose below describes them — they will be triggered later by
+     Aşama 19 in the v11 architecture.
+
+### Remove Dev-Only Bits (DEFERRED — see fence above)
+
+Delete:
+- `?state=...` URL-param hooks whose purpose was visual state toggle
+- `<select>` dev toggles that expose mock-state switching
+- `__fixtures__/<name>.fixture.ts` files that have no remaining
+  importers (grep before deleting)
+
+Keep:
+- Type definitions from `src/types/` — real code uses them
+- Any fixture that is also used by test files (the swap targets
+  component imports; Jest/Vitest test imports stay)
+-->
+
+### Phase Behavior Notes
+
+- This step inherits all of `asama7-execute.md` discipline (English
+  code/comments/commits, dev-language communication, Gate 1/2/3,
+  deletion-only execution-plan rule, scope-creep handling).
+- This step does NOT re-implement those rules — it is Aşama 7
+  execution with the UI already committed. Think of it as the
+  second half of the `ui_flow_active = true` execution pair.
+- Aşama 11's Verification Report "must-test" list MUST include:
+  - UI interaction verification (click primary button, form submit, etc.)
+  - Real backend verification (network panel shows `POST /api/...`,
+    status 200, payload matches type)
+  - Error-path verification (what happens when the backend returns 500)
+
 ## Phase transition
 
-After a final GREEN verify, Aşama 7 is complete. Aşama 8 (Risk
+After a final GREEN verify (and Step 5 backend wiring if
+`ui_flow_active=true`), Aşama 7 is complete. Aşama 8 (Risk
 Review) and Aşama 10 (Impact Review) run as usual. The Aşama 11
 Verification Report cites the Aşama 7 GREEN verify instead of
 re-invoking the runner — see `asama11-verify-report.md` for the exact

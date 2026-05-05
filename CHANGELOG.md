@@ -7,6 +7,87 @@
 
 ## [Unreleased]
 
+## [10.1.18] - 2026-05-05
+
+### v11.0 migration R2 — Aşama 6c → Aşama 8 fold (skill-content merge)
+
+Second step of the v11.0 architecture migration. Moves the
+backend-wiring responsibility (formerly its own Aşama 6c skill
+file) into the TDD execute phase (`asama7-tdd.md`). The fold is
+content-only: no audit names change, no hook behavior modified,
+no state machine touched. The `ui_sub_phase=BACKEND` enum value
+is preserved — `mcl-pre-tool.sh` still lifts the UI-BUILD path
+restriction at the same gate; only the documentation describing
+that gate moves location.
+
+#### Changes
+
+- Deleted `skills/my-claude-lang/asama6c-backend.md`.
+- Appended a new `## Step 5 — Backend Wiring (UI Flow Path)`
+  section to `skills/my-claude-lang/asama7-tdd.md` containing
+  the migrated body: entry condition, path discipline change,
+  procedure (grep + swap + env), type contract preservation,
+  phase behavior notes (Aşama 11 must-test items, downstream
+  Aşama 8 / 10 / 11 chain).
+- **Mock-cleanup section fenced.** The "Remove Dev-Only Bits"
+  block from `asama6c-backend.md:72-84` is wrapped in an HTML
+  comment marked `<!-- v11: will move to Aşama 19, do not
+  execute here -->`. The prose stays in the file as a parking
+  spot; R7 will move it into the Aşama 19 verification report
+  skill where it actually executes. The fence prevents the model
+  from running these deletions during Aşama 7/8.
+- Updated `skills/my-claude-lang.md` (umbrella) — removed the
+  `Aşama 6c BACKEND: read asama6c-backend.md` pointer, replaced
+  the "Aşama 6c (BACKEND)" bullet in the UI-flow narrative with
+  a "Backend wiring — folded into asama7-tdd.md Step 5" note.
+- Updated `skills/my-claude-lang/asama7-execute.md` — the
+  sub-phase list no longer points at the deleted file; describes
+  the fold inline.
+- Updated `skills/my-claude-lang/asama7-ui-review.md` — dispatch
+  table "Approve" row, "Visual-Inspect Loop" closing line, and
+  "Exit" section all updated to reference the merged backend
+  wiring step instead of the deleted Aşama 6c.
+- Updated `skills/my-claude-lang/asama6-ui-build.md` — UI-BUILD
+  LOCK deny reason describes the new gate location.
+- Updated `skills/my-claude-lang/all-mcl.md` STEP-40b entry —
+  exits to "TDD execute backend wiring" instead of Aşama 6c.
+
+#### What does NOT change
+
+- `mcl-state.sh` schema and validation are untouched. The
+  `ui_sub_phase` field still flows `null → BUILD_UI → REVIEW →
+  BACKEND`; only the prose explanation of `BACKEND` moved.
+- `mcl-stop.sh` and `mcl-pre-tool.sh` enforcement is identical.
+  Comments in those files that say "Aşama 6c" describe the
+  enum behavior and stay accurate (the enum is still `BACKEND`);
+  they will be retitled when those code paths are touched in
+  R3 / R4.
+- Audit names. No audit was emitted by an Aşama 6c step in v10
+  except via the generic Aşama 7 audit chain; that chain
+  continues to operate.
+- Tests — `test-v10-1-asama8-9-enforcement.sh`,
+  `test-v10-1-5-asama-8-progression-pilot.sh` and other v10
+  Aşama-7-keyed tests still pass because audit names are
+  unchanged.
+
+#### Bridge-period notes (v11 plan R3 forward)
+
+- `asama7-tdd.md` now contains both TDD methodology (its
+  original duty) and backend-wiring procedure (formerly
+  Aşama 6c). When R3 renames the file to `asama8-tdd.md`, both
+  duties land under v11 Aşama 8 as designed.
+- The umbrella's UI-flow section still uses v10 phase numbers
+  in places (e.g., "Aşama 7 UI_REVIEW" — currently a v11 label
+  pinned in v10 territory because R1 already renamed). When R3
+  resolves the asama7-* namespace, the umbrella will get a
+  pass to settle remaining inconsistencies.
+- The mock-cleanup fence in `asama7-tdd.md` is the explicit
+  parking spot R7 will pick up. Until then, mock cleanup
+  remains the developer's responsibility (per the v10
+  manual-enumerate convention) — exactly the same UX as v10.
+
+Banner: MCL 10.1.17 → MCL 10.1.18.
+
 ## [10.1.17] - 2026-05-05
 
 ### v11.0 migration R1 — UI sub-phase rename (skill files only)

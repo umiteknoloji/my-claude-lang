@@ -55,8 +55,9 @@ allowed** — they are needed to run `npm run dev` in Aşama 6. Writing
 them in Aşama 6 is correct and required.
 
 If Claude attempts to write a true backend path, the DENY reason says:
-> MCL UI-BUILD LOCK — backend is unlocked in Aşama 6c after the UI
-> is approved. Keep dummy fixtures in the component for now.
+> MCL UI-BUILD LOCK — backend is unlocked in the TDD execute backend
+> wiring step (`asama7-tdd.md` Step 5; was Aşama 6c) after the UI is
+> approved. Keep dummy fixtures in the component for now.
 
 ## Curated Plugin Dispatch
 

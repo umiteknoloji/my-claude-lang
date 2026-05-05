@@ -146,7 +146,7 @@ a Pass condition, and a Skip condition.
 ---
 
 ### STEP-40b: ui-review-phase
-**Phase:** 4b | **Description:** Developer provides free-form visual feedback. MCL calls AskUserQuestion with options approve-backend/revise/see-yourself/cancel. Only Approve exits to Aşama 6c.
+**Phase:** 4b | **Description:** Developer provides free-form visual feedback. MCL calls AskUserQuestion with options approve-backend/revise/see-yourself/cancel. Only Approve exits to TDD execute backend wiring (was Aşama 6c).
 **Signal:** audit.log `approve-ui-review-via-askuserquestion | stop`. trace.log `ui_review_approved`. state.json `ui_reviewed=true`, `ui_sub_phase="BACKEND"`.
 **Pass:** trace.log contains `ui_review_approved`. state.json `ui_reviewed=true`.
 **Skip:** When `ui_flow_active=false`. Correct and expected skip.
