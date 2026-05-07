@@ -7,6 +7,62 @@
 
 ## [Unreleased]
 
+## [13.0.5] - 2026-05-07
+
+### 3-Layer pre-hoc deterministic enforcement — fast-skip / spec-skip protection
+
+**Real-world failure trigger:** Production session — geliştirici "backoffice projesi yapacağım..." dedi, model **doğrudan Write(package.json)** denedi (Aşama 1-4 atlandı). PreToolUse Write block fire etti (mevcut MCL LOCK), ardından model **Aşama 1 disambiguation, Aşama 2 precision-audit, Aşama 3 brief'i atlayarak direkt Aşama 4 prose spec emisyonuna** atladı. v13.0.4 DSI yeterli direktif sağlamadı.
+
+**Kullanıcı kararı (option A):** Pre-hoc only — post-hoc safety net (Stop hook spec-detection block) eklenmedi.
+
+#### Layer 1 — MCL LOCK conditional enrichment
+
+`hooks/mcl-pre-tool.sh` mevcut `spec_approved=false` MCL LOCK'unun REASON metni audit-aware:
+- Audit boş (yeni oturum, hiçbir Aşama 1-4 audit'i yok) → **enriched directive**: "Sirayla yap: (1) Asama 1 gelistirici niyeti, tek soru ya da SILENT-ASSUME ozet + summary-confirm-approve audit. (2) Asama 2 7 boyutluk precision audit + asama-2-complete. (3) Asama 3 engineering-brief. (4) Asama 4 spec emit + onay askq."
+- Audit'te en az bir Aşama 1+ marker varsa → **original recovery message** (backward compat preserved — mevcut skip-block testleri etkilenmez).
+
+Detection: Aşama 1+ markers = `asama-1-`, `summary-confirm-approve`, `asama-2-`, `asama-3-`, `asama-4-`, `precision-audit`, `engineering-brief`. Session boundary respect.
+
+#### Layer 2 — AskUserQuestion @ Aşama 4 spec-approval gate
+
+PreToolUse'da yeni branch (line ~292): TOOL_NAME=AskUserQuestion + question prefix `MCL <ver> | Faz 4 / Phase 4 / Aşama 4 / Etape 4 / ...` → audit'te `asama-2-complete` veya `precision-audit` aranır. Yoksa **block** + REASON: "Asama 4 spec onay AskUserQuestion'i acilamaz: precision-audit yok. Onceki spec emisyonunu unut. Sirayla: (1) Asama 2 (2) closing askq (3) Asama 3 brief (4) Asama 4 spec." Multilingual prefix support: `Faz / Phase / Aşama / Étape / Étape / Fase / フェーズ / 阶段 / 단계 / مرحلة / שלב / चरण / Tahap / Этап / Step`.
+
+#### Layer 3 — DSI loud Aşama 1 ZORUNLU mode
+
+`hooks/lib/mcl-dsi.sh`: phase=1 + audit boş → forbidden-list mode:
+```
+⛔ ASAMA 1 ZORUNLU — Henuz hicbir Asama 1 audit i emit edilmedi.
+YASAK: Spec yazma. Write/Edit/MultiEdit cagirma. AskUserQuestion (Faz 4 spec onayi) acmaya kalkma.
+ILK IS: Tek soru sor (one-question-at-a-time) VEYA SILENT-ASSUME ozet uret.
+Sonra: Bash mcl_audit_log ile asama-1-question-N veya summary-confirm-approve audit i emit et.
+Audit i seed eden Bash + Read/Glob/Grep/LS aracilari serbest. Mutating tools KILITLI.
+```
+
+EN loud variant da var (`ASAMA 1 MANDATORY` + `FORBIDDEN: emitting a spec`).
+
+Phase=2/3/4'te audit boş bile olsa loud mode fire etmez (model muhtemelen orta-akışta, panik enjeksiyonu zararlı). Phase=1 + audit boş = `first turn fast-skip detected` heuristic.
+
+#### Out of Scope (kasıtlı)
+
+- ❌ Stop hook spec-emission detection + decision:block — post-hoc, kullanıcı direktifine aykırı
+- ❌ AskUserQuestion deny on Faz 4 askq when items-declared missing (Aşama 10 değil bu, çakışma yok ama yine de skip)
+- ❌ Prose `📋 Spec:` text detection in tool inputs — nadir vaka, belirsiz fayda
+- ❌ Plain-text approval enforcement (model "onaylıyorum" yazınca audit-skip kontrolü) — post-hoc
+
+#### Verification
+
+- bash -n: 4 hook + dsi.sh clean
+- 18 yeni unit test (`tests/cases/test-v1305-deterministic-gates.sh`) — L1×3, L2×4, L3×7 + edge case'ler
+- Test baseline: 317 → **335 passed** / 24 failed (değişmedi) / 2 skipped — sıfır regresyon
+- Production failure scenario simulated:
+  1. Empty session, Write attempt → enriched MCL LOCK fires with "Sirayla yap: (1) Asama 1..."
+  2. Even if model emits prose spec, AskUserQuestion for spec approval blocked by L2 gate (precision-audit missing)
+  3. DSI banner her turn'de phase=1+empty-audit'i loud forbidden-list ile vurur
+
+#### Realistic determinism estimate
+
+v13.0.4 ~92-96% → v13.0.5 ~96-98%. Prose-spec gap (model markdown text olarak `📋 Spec:` yazarsa hiçbir hook yakalamaz) mimari sınır olarak kalır — bu pure prompt katmanın LLM instruction-following ceiling'i. %100 fiziksel olarak mümkün değil; en yakın yer burası.
+
 ## [13.0.4] - 2026-05-07
 
 ### Dynamic Status Injection (DSI) — focused per-turn phase status

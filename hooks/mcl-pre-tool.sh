@@ -289,6 +289,64 @@ print(json.dumps({
     exit 0
   fi
 fi
+# -------- Branch: Aşama 4 spec-approval askq requires precision-audit (since v13.0.5) --------
+# Layer 2 of v13.0.5 deterministic enforcement. The Aşama 2 skip-block at
+# line ~1028 fires AFTER spec is approved (post-hoc detection). This earlier
+# gate fires when the model attempts to OPEN the spec-approval askq before
+# precision-audit ran — forcing it into the correct order: Aşama 1 → 2 → 3
+# → 4 (spec emit + askq). Detects spec-approval askq via question prefix
+# matching `MCL <ver> | Faz 4` / `MCL <ver> | Phase 4` / `MCL <ver> | Aşama 4`.
+if [ "$TOOL_NAME" = "AskUserQuestion" ] && command -v python3 >/dev/null 2>&1; then
+  _A4_QUESTION="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    print((obj.get("tool_input") or {}).get("question") or "")
+except Exception:
+    print("")
+' 2>/dev/null)"
+  if printf '%s' "$_A4_QUESTION" | grep -qiE "MCL[[:space:]]+[0-9]+(\.[0-9]+){2}[[:space:]]*\|[[:space:]]*(Faz|Phase|Aşama|Etape|Étape|Fase|フェーズ|阶段|단계|مرحلة|שלב|चरण|Tahap|Этап|Step)[[:space:]]+4[[:space:]]"; then
+    _A4_AUDIT="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+    _A4_TRACE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+    _A4_PRECISION="$(python3 - "$_A4_AUDIT" "$_A4_TRACE" 2>/dev/null <<'PYEOF'
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+seen = False
+try:
+    if os.path.isfile(audit_path):
+        for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+            ts = line.split("|", 1)[0].strip()
+            if session_ts and ts < session_ts:
+                continue
+            if "| asama-2-complete |" in line or "| precision-audit |" in line:
+                seen = True; break
+except Exception:
+    pass
+print("present" if seen else "missing")
+PYEOF
+)"
+    if [ "$_A4_PRECISION" = "missing" ]; then
+      mcl_audit_log "asama-4-askq-gate-block" "pre-tool" "no-precision-audit"
+      python3 -c '
+import json, sys
+print(json.dumps({
+    "decision": "block",
+    "reason": "MCL ASAMA 4 ASKQ GATE (v13.0.5) — Aşama 4 spec onay AskUserQuestion'"'"'i acilamaz: bu oturumda asama-2-complete ya da precision-audit audit i yok. Spec tum 7 boyutluk precision audit ten gecmemis parametreler uzerine kurulu olur — yanlis kod riski. Onceki spec emisyonunu unut. Sirayla: (1) Asama 2 (skills/my-claude-lang/asama2-precision-audit.md) 7 boyutu walk et SILENT-ASSUME / SKIP-MARK / GATE classification yap; (2) Closing AskUserQuestion `MCL <ver> | Faz 2 — Precision-audit niyet onayi:` ile niyet onayi al; (3) Asama 3 brief uret; (4) Sonra Asama 4 spec emit + onay askq."
+}))
+'
+      exit 0
+    fi
+  fi
+fi
+
 # -------- Branch: plan critique substance gate (Gap 3 + 8.3.3) --------
 # Task with subagent_type containing "general-purpose" AND model containing
 # "sonnet" is the plan-critique shape. 8.2.10 set plan_critique_done=true on
@@ -753,7 +811,48 @@ fi
 REASON=""
 REASON_KIND=""
 if [ "$SPEC_APPROVED" != "true" ]; then
-  REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked (since v10.1.7 — real block, not advisory). Recovery options: (A) re-emit AskUserQuestion with prefix \`MCL <ver> | \` for spec approval; (B) if developer already approved but classifier missed, run: \`bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-4-complete mcl-stop \"spec_hash=<H> approver=user\"'\` to force-progress state; (C) loop-breaker fail-open after 3 consecutive blocks."
+  # v13.0.5: When the session has zero Aşama 1-4 audit evidence, the model
+  # is attempting a fast-skip (Write/Edit before any phase). Surface a
+  # directive that walks Aşama 1 → 2 → 3 → 4 sequentially. When at least
+  # one Aşama 1+ audit exists, fall back to the original recovery options
+  # message (preserves backward-compat with existing skip-block tests).
+  _MCLLOCK_AUDIT="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  _MCLLOCK_TRACE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  _MCLLOCK_HAS_A1="absent"
+  if command -v python3 >/dev/null 2>&1; then
+    _MCLLOCK_HAS_A1="$(python3 - "$_MCLLOCK_AUDIT" "$_MCLLOCK_TRACE" 2>/dev/null <<'PYEOF'
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for l in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in l:
+                session_ts = l.split("|", 1)[0].strip()
+except Exception:
+    pass
+seen = False
+try:
+    if os.path.isfile(audit_path):
+        for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+            ts = line.split("|", 1)[0].strip()
+            if session_ts and ts < session_ts:
+                continue
+            for marker in ("| asama-1-", "| summary-confirm-approve |", "| asama-2-", "| asama-3-", "| asama-4-", "| precision-audit |", "| engineering-brief |"):
+                if marker in line:
+                    seen = True; break
+            if seen: break
+except Exception:
+    pass
+print("present" if seen else "absent")
+PYEOF
+)"
+  fi
+  if [ "$_MCLLOCK_HAS_A1" = "absent" ]; then
+    REASON="MCL LOCK — spec_approved=false (yeni oturum, hicbir Asama 1-4 audit i yok). Mutating tool \`${TOOL_NAME}\` blocked. ASLA kod yazma, ASLA spec emit etme. Sirayla yap: (1) Asama 1 — gelistiricinin niyetini anla, tek soru sor (one-question-at-a-time) VEYA tum parametreler net ise SILENT-ASSUME path le ozet uret + summary-confirm-approve audit emit. (2) Asama 2 — 7 boyutluk precision audit (skills/my-claude-lang/asama2-precision-audit.md) walk et + closing AskUserQuestion ile asama-2-complete audit. (3) Asama 3 — engineering brief (audit: engineering-brief). (4) Asama 4 — spec emit + AskUserQuestion onay askq. Mutating tools yalnizca asama-4-complete audit i emit edildikten sonra acilir. Recovery: spec onayindan kacis yok — pipeline sirasini izle."
+  else
+    REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked (since v10.1.7 — real block, not advisory). Recovery options: (A) re-emit AskUserQuestion with prefix \`MCL <ver> | \` for spec approval; (B) if developer already approved but classifier missed, run: \`bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-4-complete mcl-stop \"spec_hash=<H> approver=user\"'\` to force-progress state; (C) loop-breaker fail-open after 3 consecutive blocks."
+  fi
   REASON_KIND="spec-approval"
 fi
 

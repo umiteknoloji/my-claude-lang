@@ -173,8 +173,36 @@ if next_phase_int and str(next_phase_int) in spec["phases"]:
 header = f"{labels['current']}: {phase} — {phase_name}"
 print(header)
 
-# Minimal DSI for Aşama 1-4 (pre-spec phases — cognitive overhead low)
+# Aşama 1-4 (pre-spec phases). Two modes:
+# - Empty session (no Aşama 1 audit yet) → LOUD forbidden-list mode (v13.0.5)
+# - Normal phase 2/3/4 → minimal status (cognitive overhead low)
 if phase_int <= 4:
+    has_any_a1 = any(
+        any(marker in l for marker in (
+            "| asama-1-", "| summary-confirm-approve |",
+            "| asama-2-", "| asama-3-", "| asama-4-",
+            "| precision-audit |", "| engineering-brief |",
+        ))
+        for l in audit_lines
+    )
+    if phase_int == 1 and not has_any_a1:
+        # LOUD mode — first turn of session, no audit emitted yet.
+        if lang == "tr":
+            print("⛔ ASAMA 1 ZORUNLU — Henuz hicbir Asama 1 audit i emit edilmedi.")
+            print("YASAK: Spec yazma. Write/Edit/MultiEdit cagirma. AskUserQuestion (Faz 4 spec onayi) acmaya kalkma.")
+            print("ILK IS: Gelistiricinin niyetini anla. Tek soru sor (one-question-at-a-time)")
+            print("       VEYA tum parametreler net ise SILENT-ASSUME path ile ozet uret.")
+            print("Sonra: Bash mcl_audit_log ile asama-1-question-N veya summary-confirm-approve audit i emit et.")
+            print("Audit i seed eden Bash + Read/Glob/Grep/LS aracilari serbest. Mutating tools KILITLI.")
+        else:
+            print("⛔ ASAMA 1 MANDATORY — No Aşama 1 audit emitted in this session yet.")
+            print("FORBIDDEN: emitting a spec, calling Write/Edit/MultiEdit, opening AskUserQuestion (Faz 4 spec approval).")
+            print("FIRST ACTION: understand developer intent. Ask one disambiguation question (one-question-at-a-time)")
+            print("              OR if all parameters are clear, produce a SILENT-ASSUME summary.")
+            print("Then: emit asama-1-question-N or summary-confirm-approve audit via Bash mcl_audit_log.")
+            print("Audit-seed Bash + Read/Glob/Grep/LS are allowed; mutating tools are LOCKED.")
+        sys.exit(0)
+    # Normal minimal mode for phase 2/3/4 or phase 1 after first audit
     next_audit_hint = ""
     if "required_audits" in pspec:
         missing = [a for a in pspec["required_audits"] if not has_audit(a)]
