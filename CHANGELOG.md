@@ -7,6 +7,81 @@
 
 ## [Unreleased]
 
+## [13.0.9] - 2026-05-07
+
+### Determinism mimari değişikliği — single-phase view + phase allowlist + reference doc
+
+**Problem:** v13.0.2'den v13.0.8'e kadar 8 ardışık release her biri spot-fix ekledi (Aşama 1 strict gate, Aşama 2 zero-gate synthesis, Aşama 4 askq gate, Aşama 6 server-without-browser, vb). Üretimde model hâlâ "Tamamlandı" deyip duruyor. Asıl mimari sorun: (a) attention decay (lost-in-the-middle, 54KB prompt'un orta-pipeline fazları silikleşiyor); (b) tool-level enforcement yok (model wrong-phase tool çağırabiliyor).
+
+**Çözüm:** İki mimari kaldıraç + 1 referans doc.
+
+#### Layer A — Single-phase PHASE SCRIPT (mcl-activate.sh + mcl-dsi.sh)
+
+**Önceki:** Activate hook STATIC_CONTEXT'te 22 statik `━━━ Aşama N` bloğu (v13.0.2'de eklenen). Aşama 5-22 detayları her UserPromptSubmit'te yüklü → attention decay.
+
+**Yeni:** Aşama 1-4 detaylı blokları korundu (askq prefix'leri version embed eder, exact format gerekir). Aşama 5-22 explicit blokları kaldırıldı, yerine TEK referans satırı: `<mcl_active_phase_directive>` block'una yönlendir.
+
+`<mcl_active_phase_directive>` her turda dinamik render edilir (`_mcl_dsi_render_active_phase` yeni helper):
+- AKTİF FAZ: Aşama N — `<name>` (skill file, görev, emit pattern, skip)
+- SONRAKİ FAZ: Aşama N+1 preview
+- TÜM FAZLAR: kompakt 6-satır 22-faz indeksi (current marker `← AKTİF`)
+- Header: NO MID-PIPELINE STOP RULE
+
+**Sonuç:** Prompt size 54,646 → 50,456 char (-4,190 static, +1,400 dinamik = net -2,800 char). Daha önemli: model'in attention odağı tüm 22 faz listesi yerine ŞU AKTİF FAZ'a yöneliyor.
+
+#### Layer B — Phase allowlist + denied_paths (mcl-pre-tool.sh + gate-spec.json)
+
+`gate-spec.json` her faza yeni alan kazandı:
+- `allowed_tools`: Bu fazda izin verilen mutating tool'lar (Write/Edit/MultiEdit/NotebookEdit/AskUserQuestion/TodoWrite arasından)
+- `denied_paths`: Tool izinli olsa bile glob pattern eşleşince block (Aşama 6 backend yollarını yasaklıyor)
+- `phase_marker_audits`: Faz aktivite işareti (Layer C için altyapı, v13.1)
+
+**Global-always-allowed tools** (her fazda izinli, gate-spec'e bakılmıyor): Read, Glob, Grep, LS, WebFetch, WebSearch, Task, Skill, Bash. Investigation valves + audit-emit always available.
+
+**Per-phase enforcement (örnek):**
+- Aşama 9 (TDD) `allowed_tools`: `[Write, Edit, MultiEdit, NotebookEdit, TodoWrite]` — AskUserQuestion DEĞİL → Aşama 10 askq açmak için önce phase advance şart
+- Aşama 6 (UI Build) `allowed_tools`: `[Write, Edit, MultiEdit, NotebookEdit, TodoWrite]` + `denied_paths`: `[src/api/**, src/server/**, prisma/**, models/**, ...]` — frontend yazılır, backend yasak
+- Aşama 10 (Risk Review) `allowed_tools`: `[AskUserQuestion, Edit, Write, MultiEdit, TodoWrite]` — askq + risk-fix tool'ları açık
+- Aşama 21/22 (Localized Report, Completeness): mutating tool yok (sadece Bash audit emit)
+
+**Decision dispatcher** (mcl-pre-tool.sh:1148): yeni REASON_KIND'ler `phase-allowlist-tool` + `phase-allowlist-path` → DECISION=deny + 5-strike loop-breaker.
+
+**Fast-path düzeltmesi** (line 588): AskUserQuestion + TodoWrite artık fast-path'i geçip Layer B'ye ulaşıyor (önceki v'ler exit 0 ile by-pass ediyordu).
+
+#### Layer E — `docs/llm-attention-failure-patterns.md` referans doc
+
+17 LLM agent anti-pattern + counter-mechanism + MCL coverage tablosu. Devtime checklist (hook logic değil): yeni özellik tasarlarken / üretim failure analizinde "bu pattern'i hangi mekanizmayla kapsadık" cevabı.
+
+3 known gap işaretli: #7 halüsinasyon, #15 reward hacking, #17 context kirliliği.
+
+#### Out of Scope (v13.1'e ertelenen)
+
+- ❌ **Layer C — Checkpoint ritual.** Plan'da explicit "asama-N-complete olmadan N+1 tool yasak" gate vardı. Layer B'nin `allowed_tools` kontrolü zaten bunu büyük ölçüde sağlıyor (current_phase=N iken Aşama N+1'e özgü tool'lar genelde izinsiz). Layer C eklemek redundant olurdu — v13.1'de production data'sıyla değerlendirilir.
+- ❌ **Layer D — Stop hook full validation generalize.** Mevcut v13.0.6/0.7/0.8 lens'leri (Aşama 6 server-browser, Aşama 2 zero-gate, Aşama 6 strict) korunmuş halde çalışıyor. Generalize etmek mevcut testleri etkileyebilir; v13.1'de "bilmiyorum" valve + 5-strike loop-breaker ile birlikte alınacak.
+- ❌ Pattern #7/15/17 (open gaps) — v13.1.
+
+#### Verification
+
+- **Test baseline:** 361 → **382 passed** / 24 failed (değişmedi) / 2 skipped — sıfır regresyon
+- 21 yeni unit test (`tests/cases/test-v1309-active-phase-allowlist.sh`):
+  - T1-T3: Layer A active phase render (markers, EN variant, last-phase no-next)
+  - T4-T10: Layer B phase allowlist (deny:tool, deny:path, allow patterns, global-always-allowed)
+  - T11: Integration (activate hook injects `<mcl_active_phase_directive>`, prompt < 55KB)
+- bash -n: 4 hooks + dsi.sh clean
+- Prompt size: 50,456 char (54,646'dan -7.7%)
+
+#### Critical files
+
+- `hooks/mcl-activate.sh` — PHASE SCRIPT replace (Aşama 5-22 static blocks → dynamic injection wiring)
+- `hooks/lib/mcl-dsi.sh` — `_mcl_dsi_render_active_phase` yeni helper (PHASE_META dict, EN/TR labels)
+- `hooks/mcl-pre-tool.sh` — phase allowlist branch + REASON_KIND dispatcher genişlemesi + fast-path düzeltmesi
+- `skills/my-claude-lang/gate-spec.json` — allowed_tools + denied_paths + phase_marker_audits her faza
+- `docs/llm-attention-failure-patterns.md` — YENİ referans doc
+
+#### Realistic determinism estimate
+
+v13.0.8 ~98-99% → v13.0.9 ~99% (Layer B hard gate + Layer A attention focus). Layer C/D v13.1'e ertelendi — eğer üretimde Layer A+B yeterli değilse o zaman ele alınır.
+
 ## [13.0.8] - 2026-05-07
 
 ### Aşama 6 lens hardened — full invariant enforcement (block:neither + path-aware regex)
