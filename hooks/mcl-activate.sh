@@ -1002,7 +1002,37 @@ print(json.dumps(sys.stdin.read().strip())[1:-1])
   fi
 fi
 
-FULL_CONTEXT="${SESSION_CONTEXT_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${STATIC_CONTEXT}"
+# Dynamic Status Injection (v13.0.4) — focused per-turn phase status.
+# Reads gate-spec.json + audit.log + state.json, emits a tight summary
+# of "current phase / what this turn must produce / what remains".
+# Critical for unbounded-question phases (Aşama 10 risk dialog,
+# Aşama 19 impact dialog) where K is determined at runtime via
+# asama-N-items-declared count=K — DSI surfaces M/K progress and the
+# next item audit name. Read-only — never writes state.
+DSI_NOTICE=""
+if [ -f "${REPO_LIB:-${HOME}/.claude/hooks/lib}/mcl-dsi.sh" ]; then
+  _DSI_LIB="${REPO_LIB:-${HOME}/.claude/hooks/lib}/mcl-dsi.sh"
+elif [ -f "$(dirname "$0")/lib/mcl-dsi.sh" ]; then
+  _DSI_LIB="$(dirname "$0")/lib/mcl-dsi.sh"
+else
+  _DSI_LIB=""
+fi
+if [ -n "$_DSI_LIB" ] && command -v python3 >/dev/null 2>&1; then
+  _DSI_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+  [ -z "$_DSI_PHASE" ] && _DSI_PHASE="1"
+  if [ "$_DSI_PHASE" -ge 1 ] 2>/dev/null && [ "$_DSI_PHASE" -le 22 ] 2>/dev/null; then
+    _DSI_BODY="$( . "$_DSI_LIB"; _mcl_dsi_render "$_DSI_PHASE" 2>/dev/null )"
+    if [ -n "$_DSI_BODY" ]; then
+      _DSI_ESC="$(printf '%s' "$_DSI_BODY" | python3 -c '
+import json, sys
+print(json.dumps(sys.stdin.read())[1:-1])
+' 2>/dev/null)"
+      DSI_NOTICE="<mcl_phase_status>\\n${_DSI_ESC}\\n</mcl_phase_status>\\n\\n"
+    fi
+  fi
+fi
+
+FULL_CONTEXT="${SESSION_CONTEXT_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${DSI_NOTICE}${STATIC_CONTEXT}"
 
 # Log MCL injection size for cost accounting (mcl-doctor)
 if command -v python3 >/dev/null 2>&1; then
