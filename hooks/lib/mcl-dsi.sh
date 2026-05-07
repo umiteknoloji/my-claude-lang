@@ -342,9 +342,143 @@ print("DSI: unrecognized phase type")
 PYEOF
 }
 
+# v13.0.9 — Active phase directive renderer.
+# Replaces the static 22-block PHASE SCRIPT in mcl-activate.sh with a
+# dynamic single-phase view (attention-decay mitigation: lost-in-the-middle).
+# Output: directive block for the CURRENT phase only + compact phase index
+# + next-phase preview. ~10x smaller than the old 22-block PHASE SCRIPT.
+#
+# Public API:
+#   _mcl_dsi_render_active_phase <phase>  → stdout text
+#
+# Used by mcl-activate.sh to inject `<mcl_active_phase_directive>` block.
+_mcl_dsi_render_active_phase() {
+  local phase="$1"
+  local spec_file="${MCL_GATE_SPEC:-${HOME}/.claude/skills/my-claude-lang/gate-spec.json}"
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  local lang="${MCL_LANG:-tr}"
+
+  python3 - "$spec_file" "$audit_file" "$trace_file" "$phase" "$lang" 2>/dev/null <<'PYEOF' || echo "AKTIF FAZ DIRECTIVE: helper crashed"
+import json, os, re, sys
+
+spec_path, audit_path, trace_path, phase, lang = sys.argv[1:6]
+
+# Phase metadata: name + skill file + 1-2 line task + emit pattern + skip cond
+# Source: MCL_Pipeline.md (canonical 22-phase architecture).
+PHASE_META = {
+    "1":  {"name_tr": "Niyet (Gather)",          "name_en": "Intent (Gather)",      "skill": "asama1-gather.md",          "task_tr": "Geliştirici niyetini anla. Tek soru sor (one-question-at-a-time) VEYA tum parametreler net ise SILENT-ASSUME path ile özet üret.", "emit_tr": "asama-1-question-N | summary-confirm-approve (closing askq sonrası)", "skip_tr": ""},
+    "2":  {"name_tr": "Precision Audit",         "name_en": "Precision Audit",      "skill": "asama2-precision-audit.md", "task_tr": "7 boyutluk precision audit (permission, failure modes, out-of-scope, PII, audit, perf SLA, idempotency) + stack add-on. Her boyut SILENT-ASSUME / SKIP-MARK / GATE classification.", "emit_tr": "precision-audit core_gates=N stack_gates=M | closing askq sonrası asama-2-complete", "skip_tr": "İngilizce session'da skipped=true"},
+    "3":  {"name_tr": "Engineering Brief",       "name_en": "Engineering Brief",    "skill": "asama3-translator.md",      "task_tr": "Onaylanan parametreleri İngilizce engineering brief'e çevir. Vague verb upgrade (list → fetch+paginate, manage → expose CRUD).", "emit_tr": "engineering-brief | asama-3-complete", "skip_tr": "İngilizce session'da identity"},
+    "4":  {"name_tr": "Spec + Verify",           "name_en": "Spec + Verify",        "skill": "asama4-spec.md",            "task_tr": "📋 Spec: bloğu emit et (Objective, MUST/SHOULD, AC, Edge Cases, Technical Approach, Out of Scope). Geliştirici diline özet. AskUserQuestion ile onay. asama-4-ac-count must=N should=M emit ZORUNLU.", "emit_tr": "asama-4-ac-count must=N should=M | asama-4-complete (askq onayı sonrası)", "skip_tr": ""},
+    "5":  {"name_tr": "Pattern Matching",        "name_en": "Pattern Matching",     "skill": "asama5-pattern-matching.md","task_tr": "Mevcut sibling dosyaları oku, naming + error handling + test pattern çıkar. Greenfield ise atla.", "emit_tr": "pattern-summary-stored | asama-5-complete | asama-5-skipped reason=greenfield", "skip_tr": "Greenfield veya empty+no-stack"},
+    "6":  {"name_tr": "UI Build",                "name_en": "UI Build",             "skill": "asama6-ui-build.md",        "task_tr": "Frontend dummy data ile yaz, npm install + npm run dev (run_in_background:true), sleep + tarayıcıyı OTOMATİK aç. denied_paths: backend (src/api/**, prisma/**, ...).", "emit_tr": "asama-6-end server_started=true browser_opened=true | asama-6-skipped reason=no-ui-flow", "skip_tr": "UI flow yoksa"},
+    "7":  {"name_tr": "UI Review",               "name_en": "UI Review",            "skill": "asama7-ui-review.md",       "task_tr": "AskUserQuestion ile geliştirici UI onayı. Options: Onayla / Revize / Sen de bak ve raporla / İptal.", "emit_tr": "asama-7-complete (askq onayı sonrası) | asama-7-skipped (Aşama 6 atlandıysa)", "skip_tr": "Aşama 6 atlandıysa"},
+    "8":  {"name_tr": "DB Design",               "name_en": "DB Design",            "skill": "asama8-db-design.md",       "task_tr": "Schema (3NF), index strategy, query plan. Migration files yaz.", "emit_tr": "asama-8-end | asama-8-not-applicable reason=no-db-in-scope", "skip_tr": "DB scope yoksa"},
+    "9":  {"name_tr": "TDD Execute",             "name_en": "TDD Execute",          "skill": "asama9-tdd.md",             "task_tr": "Her AC için RED (failing test) → GREEN (minimum kod) → REFACTOR. asama-4-ac-count'tan must+should toplamı kadar üçlü.", "emit_tr": "asama-9-ac-{i}-red, asama-9-ac-{i}-green, asama-9-ac-{i}-refactor (her AC için)", "skip_tr": ""},
+    "10": {"name_tr": "Risk Review",             "name_en": "Risk Review",          "skill": "asama10-risk-review.md",    "task_tr": "Spec compliance pre-check + missed-risk scan. asama-10-items-declared count=K emit ZORUNLU. Sonra her risk için sıralı AskUserQuestion (skip / fix / rule).", "emit_tr": "asama-10-items-declared count=K | her item için asama-10-item-{n}-resolved", "skip_tr": ""},
+    "11": {"name_tr": "Code Review",             "name_en": "Code Review",          "skill": "asama11-code-review.md",    "task_tr": "Yeni/değişen dosyalarda code review. Scan → fix → rescan loop, otomatik fix.", "emit_tr": "asama-11-scan count=K | asama-11-issue-{n}-fixed | asama-11-rescan count=0 (stable)", "skip_tr": ""},
+    "12": {"name_tr": "Simplify",                "name_en": "Simplify",             "skill": "asama12-simplify.md",       "task_tr": "Yeni/değişen dosyalarda simplify. Premature abstraction, duplicate logic.", "emit_tr": "asama-12-scan / issue-fixed / rescan", "skip_tr": ""},
+    "13": {"name_tr": "Performance",             "name_en": "Performance",          "skill": "asama13-performance.md",    "task_tr": "N+1, unbounded loops, blocking calls.", "emit_tr": "asama-13-scan / issue-fixed / rescan", "skip_tr": ""},
+    "14": {"name_tr": "Security",                "name_en": "Security",             "skill": "asama14-security.md",       "task_tr": "Whole-project semgrep + injection / auth / CSRF / secrets.", "emit_tr": "asama-14-scan / issue-fixed / rescan", "skip_tr": ""},
+    "15": {"name_tr": "Unit Tests",              "name_en": "Unit Tests",           "skill": "asama15-unit-tests.md",     "task_tr": "Yeni function/class/module için unit test + TDD verify.", "emit_tr": "asama-15-end-green", "skip_tr": "Code shape not applicable"},
+    "16": {"name_tr": "Integration Tests",       "name_en": "Integration Tests",    "skill": "asama16-integration-tests.md","task_tr": "Cross-module, API endpoints, DB.", "emit_tr": "asama-16-end-green", "skip_tr": ""},
+    "17": {"name_tr": "E2E Tests",               "name_en": "E2E Tests",            "skill": "asama17-e2e-tests.md",      "task_tr": "UI active + new user flows.", "emit_tr": "asama-17-end-green", "skip_tr": ""},
+    "18": {"name_tr": "Load Tests",              "name_en": "Load Tests",           "skill": "asama18-load-tests.md",     "task_tr": "Throughput-sensitive paths.", "emit_tr": "asama-18-end-target-met", "skip_tr": ""},
+    "19": {"name_tr": "Impact Review",           "name_en": "Impact Review",        "skill": "asama19-impact-review.md",  "task_tr": "Downstream impact scan. asama-19-items-declared count=K emit ZORUNLU. Her impact için sıralı AskUserQuestion.", "emit_tr": "asama-19-items-declared count=K | asama-19-item-{n}-resolved", "skip_tr": ""},
+    "20": {"name_tr": "Verify Report",           "name_en": "Verify Report",        "skill": "asama20-verify-report.md",  "task_tr": "Spec coverage table + mock cleanup.", "emit_tr": "asama-20-complete + asama-20-mock-cleanup-resolved", "skip_tr": ""},
+    "21": {"name_tr": "Localized Report",        "name_en": "Localized Report",     "skill": "asama21-localized-report.md","task_tr": "EN → geliştirici diline strict çeviri.", "emit_tr": "asama-21-complete", "skip_tr": "İngilizce session'da identity"},
+    "22": {"name_tr": "Completeness Audit",      "name_en": "Completeness Audit",   "skill": "asama22-completeness.md",   "task_tr": "audit.log okunup 1-21 fazlarının tamamlandığını doğrula. Hook self-emit eder.", "emit_tr": "asama-22-complete (hook auto-emit)", "skip_tr": ""},
+}
+
+L = {
+    "tr": {
+        "active_label": "AKTİF FAZ",
+        "skill_label": "Skill",
+        "task_label": "Görev",
+        "emit_label": "Emit",
+        "skip_label": "Skip koşulu",
+        "next_label": "SONRAKİ FAZ",
+        "auto_advance": "audit emit edilince auto-advance",
+        "phase_index_label": "TÜM FAZLAR",
+        "current_marker": "← AKTİF",
+        "skip_marker": "(skip-eligible)",
+        "unknown_phase": "AKTİF FAZ: bilinmiyor",
+        "header_directive": "🛑 NO MID-PIPELINE STOP RULE — Aşama 4 spec onayından sonra Aşama 22 tamamlanana kadar pipeline ortasında durmak yasak. Bu turun sonunda mevcut fazın audit'i emit edilmeli + bir sonraki fazın başlangıcı yapılmalı. Yalnızca AskUserQuestion gate'lerinde dur (Faz 7, 10-her-risk, 19-her-impact). 'Kod yazdım, bitti' diyerek faz ortasında durmak yasak.",
+    },
+    "en": {
+        "active_label": "ACTIVE PHASE",
+        "skill_label": "Skill",
+        "task_label": "Task",
+        "emit_label": "Emit",
+        "skip_label": "Skip condition",
+        "next_label": "NEXT PHASE",
+        "auto_advance": "auto-advance on audit emit",
+        "phase_index_label": "ALL PHASES",
+        "current_marker": "← ACTIVE",
+        "skip_marker": "(skip-eligible)",
+        "unknown_phase": "ACTIVE PHASE: unknown",
+        "header_directive": "🛑 NO MID-PIPELINE STOP RULE — Between Aşama 4 spec approval and Aşama 22 completion, mid-pipeline stops are forbidden. End of every turn must emit current phase's audit + start the next phase. Only AskUserQuestion gates pause (Faz 7, 10 per-risk, 19 per-impact). 'Wrote code, done' mid-phase = forbidden.",
+    },
+}
+labels = L.get(lang, L["en"])
+name_key = "name_tr" if lang == "tr" else "name_en"
+task_key = "task_tr"  # tasks always TR for now (calibration); skill files have full multilingual content
+emit_key = "emit_tr"
+skip_key = "skip_tr"
+
+if phase not in PHASE_META:
+    print(labels["unknown_phase"])
+    sys.exit(0)
+
+meta = PHASE_META[phase]
+phase_int = int(phase)
+
+# Header directive (ONE line, top of injection)
+print(labels["header_directive"])
+print()
+
+# Active phase block
+print(f"━━━ {labels['active_label']}: Aşama {phase} — {meta[name_key]} ━━━")
+print(f"{labels['skill_label']}: ~/.claude/skills/my-claude-lang/{meta['skill']}")
+print(f"{labels['task_label']}: {meta[task_key]}")
+print(f"{labels['emit_label']}: {meta[emit_key]}")
+if meta.get(skip_key):
+    print(f"{labels['skip_label']}: {meta[skip_key]}")
+
+# Next phase preview
+if phase_int < 22:
+    next_p = str(phase_int + 1)
+    next_meta = PHASE_META.get(next_p)
+    if next_meta:
+        print()
+        print(f"{labels['next_label']}: Aşama {next_p} — {next_meta[name_key]} ({labels['auto_advance']})")
+
+# Compact phase index — all 22 phases on a few lines for global awareness
+print()
+print(f"{labels['phase_index_label']}:")
+groups = [
+    ("1-4 Niyet→Spec",  ["1", "2", "3", "4"]),
+    ("5-8 Hazırlık",    ["5", "6", "7", "8"]),
+    ("9 TDD + 10 Risk", ["9", "10"]),
+    ("11-14 Quality",   ["11", "12", "13", "14"]),
+    ("15-18 Tests",     ["15", "16", "17", "18"]),
+    ("19-22 Kapanış",   ["19", "20", "21", "22"]),
+]
+for grp_label, phases in groups:
+    parts = []
+    for p in phases:
+        m = PHASE_META.get(p, {})
+        nm = m.get(name_key, "?")
+        marker = f" {labels['current_marker']}" if p == phase else ""
+        parts.append(f"{p} {nm}{marker}")
+    print(f"  {grp_label}: " + " · ".join(parts))
+PYEOF
+}
+
 # CLI entrypoint for unit tests
 if [ "${1:-}" = "--cli" ] || [ "${BASH_SOURCE[0]}" = "${0}" ]; then
-  _PHASE=""; _AUDIT=""; _SPEC=""; _STATE=""; _LANG="tr"
+  _PHASE=""; _AUDIT=""; _SPEC=""; _STATE=""; _LANG="tr"; _MODE="status"
   shift 2>/dev/null  # consume --cli if present
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -353,11 +487,15 @@ if [ "${1:-}" = "--cli" ] || [ "${BASH_SOURCE[0]}" = "${0}" ]; then
       --spec)  _SPEC="$2";  shift 2;;
       --state) _STATE="$2"; shift 2;;
       --lang)  _LANG="$2";  shift 2;;
+      --mode)  _MODE="$2";  shift 2;;
       *) shift;;
     esac
   done
   [ -n "$_AUDIT" ] && export MCL_STATE_DIR="$(dirname "$_AUDIT")"
   [ -n "$_SPEC" ] && export MCL_GATE_SPEC="$_SPEC"
   export MCL_LANG="$_LANG"
-  _mcl_dsi_render "$_PHASE"
+  case "$_MODE" in
+    active) _mcl_dsi_render_active_phase "$_PHASE" ;;
+    *)      _mcl_dsi_render "$_PHASE" ;;
+  esac
 fi
