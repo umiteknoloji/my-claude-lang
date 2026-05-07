@@ -1,0 +1,28 @@
+{
+  "version": "13.0.0",
+  "_comment": "Universal deterministic gate spec. Hook reads this to decide phase completeness. Model emits per-item / per-section / scan-rescan / triple audits ONLY; *-complete and phase_transition are hook-emitted via lib/mcl-gate.sh.",
+  "phases": {
+    "1":  {"type": "single",    "required_audits": ["summary-confirm-approve"]},
+    "2":  {"type": "single",    "required_audits": ["asama-2-complete"]},
+    "3":  {"type": "single",    "required_audits": ["asama-3-complete"]},
+    "4":  {"type": "single",    "required_audits": ["asama-4-complete", "asama-4-ac-count"]},
+    "5":  {"type": "single",    "required_audits_any": ["asama-5-complete", "asama-5-skipped"]},
+    "6":  {"type": "single",    "required_audits_any": ["asama-6-complete", "asama-6-skipped"]},
+    "7":  {"type": "single",    "required_audits_any": ["asama-7-complete", "asama-7-skipped"]},
+    "8":  {"type": "single",    "required_audits_any": ["asama-8-end", "asama-8-not-applicable"]},
+    "9":  {"type": "substep",   "ac_source_audit": "asama-4-ac-count", "ac_keys": ["must", "should"], "triple_audits": ["red", "green", "refactor"], "audit_pattern": "asama-9-ac-{i}-{tag}"},
+    "10": {"type": "list",      "declared_audit": "asama-10-items-declared", "item_audit_pattern": "asama-10-item-{n}-resolved", "count_key": "count"},
+    "11": {"type": "iterative", "scan_audit": "asama-11-scan", "fix_audit_pattern": "asama-11-issue-{n}-fixed", "rescan_audit": "asama-11-rescan", "completion_when": "rescan_count_eq_zero", "max_rescans": 5},
+    "12": {"type": "iterative", "scan_audit": "asama-12-scan", "fix_audit_pattern": "asama-12-issue-{n}-fixed", "rescan_audit": "asama-12-rescan", "completion_when": "rescan_count_eq_zero", "max_rescans": 5},
+    "13": {"type": "iterative", "scan_audit": "asama-13-scan", "fix_audit_pattern": "asama-13-issue-{n}-fixed", "rescan_audit": "asama-13-rescan", "completion_when": "rescan_count_eq_zero", "max_rescans": 5},
+    "14": {"type": "iterative", "scan_audit": "asama-14-scan", "fix_audit_pattern": "asama-14-issue-{n}-fixed", "rescan_audit": "asama-14-rescan", "completion_when": "rescan_count_eq_zero", "max_rescans": 5},
+    "15": {"type": "section",   "required_sections": ["asama-15-end-green"]},
+    "16": {"type": "section",   "required_sections": ["asama-16-end-green"]},
+    "17": {"type": "section",   "required_sections": ["asama-17-end-green"]},
+    "18": {"type": "section",   "required_sections": ["asama-18-end-target-met"]},
+    "19": {"type": "list",      "declared_audit": "asama-19-items-declared", "item_audit_pattern": "asama-19-item-{n}-resolved", "count_key": "count"},
+    "20": {"type": "section",   "required_sections": ["asama-20-complete", "asama-20-mock-cleanup-resolved"]},
+    "21": {"type": "single",    "required_audits": ["asama-21-complete"]},
+    "22": {"type": "self-check","required_phases_complete": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]}
+  }
+}
