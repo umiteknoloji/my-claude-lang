@@ -7,6 +7,50 @@
 
 ## [Unreleased]
 
+## [13.0.7] - 2026-05-07
+
+### Aşama 2 zero-gate synthesis — auto-complete when nothing to ask
+
+**Real-world failure trigger (kullanıcı raporu):** "faz 2 soracak bişey bulamazsa asama-2-complete yapmalı." Production'da gözlenen pattern: model Aşama 2'yi prose olarak yürüyor (7 boyutu zihinde sınıflıyor, hepsini SILENT-ASSUME buluyor), `precision-audit` Bash audit'ini emit etmiyor, GATE askq da açmıyor. Gate engine `_mcl_gate_check 2` `incomplete` döner (precision-audit yok), universal loop ilerlemez, phase=2 stuck.
+
+**Çözüm:** Stop hook'ta hedefli synthesis. Model Aşama 2'de hiçbir audit/askq evidence üretmemişse, hook synthetic precision-audit emit eder (core_gates=0), universal loop bunu görüp `asama-2-complete` ile devam eder.
+
+#### Trigger koşulları (hepsi current session'da, `AND`)
+
+1. `current_phase = 2`
+2. `summary-confirm-approve` audit present (Aşama 1 tamamlandı)
+3. NO `precision-audit` audit (model dimension scan emit etmedi)
+4. NO MCL `Faz 2 / Phase 2 / Aşama 2 / Etape 2 / ...` AskUserQuestion in last assistant turn (model GATE sormadı) — 14-dilli regex
+5. NO `asama-2-complete` audit (idempotent)
+
+Hepsi tutarsa synthesize:
+```
+precision-audit | stop-auto | core_gates=0 stack_gates=0 assumes=7 skipmarks=0 stack_tags= skipped=false synthesized=true
+asama-2-zero-gate-synthesis | stop-auto | reason=no-precision-audit-no-faz2-askq
+```
+
+Sonra v13.0 universal loop bu yeni audit'i okur, gate engine'in `auto_complete_check: no_gates_or_skipped` logic'i (v13.0.1'den) "complete" döner, loop `asama-2-complete | stop-auto | gate=passed` emit eder ve phase 2→3 advance eder.
+
+#### Safe by construction
+
+- Synthesis sadece model **HİÇBİR Aşama 2 evidence üretmemişse** fire eder (audit yok + askq yok + complete yok).
+- Eğer model GATE bulup askq açmışsa (T3) veya audit emit etmişse (T2) → synthesis fire etmez, model'in akışı respect edilir.
+- Eğer Aşama 2 zaten `asama-2-complete` ile bitmişse (T6) → idempotent, fire etmez.
+- Eğer phase=2 değilse (T4) veya Aşama 1 tamamlanmamışsa (T5) → fire etmez.
+
+#### Verification
+
+- bash -n: 4 hook + dsi.sh + state libs clean
+- 10 yeni unit test (`tests/cases/test-v1307-asama2-zero-gate-synthesis.sh`):
+  - T1: classic synth path → phase 2→3 + audit chain
+  - T2-T7: 6 farklı bypass koşulu (model audit emitted, GATE askq, phase=1, no Aşama 1, already complete, EN prefix)
+- Test baseline: 347 → **357 passed** / 24 failed (unchanged) / 2 skipped — sıfır regresyon
+- Production simulation: model "All dimensions silent-assume" prose-only response → synth + auto-complete + phase advance (T1 doğrulamış)
+
+#### Realistic determinism estimate
+
+v13.0.6 ~98-99% → v13.0.7 ~99% (Aşama 2 zero-gate stuck pattern eliminate). Model'in audit emit etmemesi gibi behavior gap'lerini hook sentezliyor; pre-hoc + post-hoc synthesis kombinasyonu.
+
 ## [13.0.6] - 2026-05-07
 
 ### Aşama 6 server-without-browser STRICT lens (post-hoc — single targeted exception)

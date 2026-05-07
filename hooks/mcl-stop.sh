@@ -1011,6 +1011,103 @@ if [ "${_A4_EMITTED:-0}" = "1" ]; then
   fi
 fi
 
+# --- v13.0.7 — Aşama 2 zero-gate synthesis ---
+# Real-world failure: model walks Aşama 2 in prose only (silently classifies
+# all 7 dimensions as SILENT-ASSUME), never emits the precision-audit Bash
+# audit, and never asks a GATE askq. Result: gate engine has nothing to read,
+# returns "incomplete", phase 2 stuck forever.
+#
+# Synthesis trigger (all must hold, in current session):
+#   1. current_phase = 2
+#   2. summary-confirm-approve audit present (Aşama 1 done)
+#   3. NO precision-audit audit (model didn't emit dimension scan)
+#   4. NO MCL `Faz 2 / Phase 2 / etc.` AskUserQuestion (no GATE asked)
+#   5. NO asama-2-complete audit (not already done)
+# When all hold, synthesize:
+#   - precision-audit | stop-auto | core_gates=0 stack_gates=0 assumes=7 skipmarks=0 stack_tags= skipped=false synthesized=true
+# Then the universal loop below will see the gate as complete (via
+# auto_complete_check no_gates_or_skipped) and auto-emit asama-2-complete.
+#
+# Safe by construction: if model is mid-walk and about to emit audit /
+# ask GATE next turn, conditions (3) and (4) are intentionally narrow —
+# the synthesis only fires when model produced ZERO Aşama 2 evidence.
+_A2_SYN_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+if [ "$_A2_SYN_PHASE" = "2" ] && command -v python3 >/dev/null 2>&1; then
+  _A2_SYN_AUDIT="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  _A2_SYN_TRACE="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  _A2_SYN_VERDICT="$(python3 - "$_A2_SYN_AUDIT" "$_A2_SYN_TRACE" "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
+import json, os, re, sys
+audit_path, trace_path, transcript_path = sys.argv[1], sys.argv[2], sys.argv[3]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+has_summary = False
+has_precision = False
+has_a2_complete = False
+try:
+    if os.path.isfile(audit_path):
+        for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+            ts = line.split("|", 1)[0].strip()
+            if session_ts and ts < session_ts:
+                continue
+            if "| summary-confirm-approve |" in line:
+                has_summary = True
+            if "| precision-audit |" in line:
+                has_precision = True
+            if "| asama-2-complete |" in line:
+                has_a2_complete = True
+except Exception:
+    pass
+# Check transcript for any Faz 2 / Phase 2 askq this turn
+faz2_askq = False
+PHASE2_PREFIX_RE = re.compile(
+    r"MCL\s+\d+(\.\d+){2}\s*\|\s*(Faz|Phase|Aşama|Etape|Étape|Fase|Schritt|フェーズ|阶段|단계|مرحلة|שלב|चरण|Tahap|Этап|Step)\s+2\b",
+    re.IGNORECASE,
+)
+try:
+    if transcript_path and os.path.isfile(transcript_path):
+        with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                msg = obj.get("message") or obj
+                if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                    continue
+                content = msg.get("content")
+                if not isinstance(content, list):
+                    continue
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "AskUserQuestion":
+                        q = ((block.get("input") or {}).get("question") or "")
+                        if PHASE2_PREFIX_RE.search(q):
+                            faz2_askq = True
+                            break
+except Exception:
+    pass
+# Synthesis criteria
+if has_summary and not has_precision and not has_a2_complete and not faz2_askq:
+    print("synthesize")
+else:
+    print("skip")
+PYEOF
+)"
+  if [ "$_A2_SYN_VERDICT" = "synthesize" ]; then
+    mcl_audit_log "precision-audit" "stop-auto" "core_gates=0 stack_gates=0 assumes=7 skipmarks=0 stack_tags= skipped=false synthesized=true"
+    mcl_audit_log "asama-2-zero-gate-synthesis" "stop-auto" "reason=no-precision-audit-no-faz2-askq"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append asama_2_synth zero_gate
+  fi
+fi
+
 # --- v13.0 — Universal phase completion loop ---
 # Replaces all hardcoded asama-8/9/10/11/12 progression blocks (v11/v12 era).
 # Reads gate-spec.json via lib/mcl-gate.sh, walks current_phase forward,
