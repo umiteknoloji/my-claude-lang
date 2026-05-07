@@ -861,7 +861,41 @@ if [ "${_A4_EMITTED:-0}" = "1" ]; then
   fi
 fi
 
-# --- Aşama 9 auto-complete (since v10.1.11) ---
+# --- v13.0 — Universal phase completion loop ---
+# Replaces all hardcoded asama-8/9/10/11/12 progression blocks (v11/v12 era).
+# Reads gate-spec.json via lib/mcl-gate.sh, walks current_phase forward,
+# auto-emits *-complete + phase_transition for each gate that passes.
+# Loop bound: max 22 iterations (defensive cap, never reached in practice).
+if [ -f "$_MCL_HOOK_DIR/lib/mcl-gate.sh" ]; then
+  source "$_MCL_HOOK_DIR/lib/mcl-gate.sh"
+  _V13_CUR="$(mcl_state_get current_phase 2>/dev/null || echo 1)"
+  _V13_ITER=0
+  while [ "$_V13_ITER" -lt 22 ]; do
+    _V13_ITER=$((_V13_ITER + 1))
+    _V13_PHASE="$_V13_CUR"
+    _V13_RESULT="$(_mcl_gate_check "$_V13_PHASE" 2>/dev/null || echo incomplete)"
+    if [ "$_V13_RESULT" != "complete" ]; then
+      break
+    fi
+    # Idempotency: skip emit if asama-N-complete already in session audit
+    _V13_HAS="$(_mcl_audit_emitted_in_session "asama-${_V13_PHASE}-complete" "" 2>/dev/null || echo 0)"
+    if [ "${_V13_HAS:-0}" != "1" ]; then
+      mcl_audit_log "asama-${_V13_PHASE}-complete" "stop-auto" "gate=passed"
+    fi
+    _V13_NEXT=$((_V13_PHASE + 1))
+    if [ "$_V13_NEXT" -gt 22 ]; then
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition "$_V13_PHASE" "done"
+      break
+    fi
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition "$_V13_PHASE" "$_V13_NEXT"
+    mcl_state_set current_phase "$_V13_NEXT" >/dev/null 2>&1 || true
+    _V13_CUR="$_V13_NEXT"
+  done
+fi
+
+# --- Legacy: Aşama 9 auto-complete (since v10.1.11) — kept for v12 fallback ---
+# v13.0 universal loop (above) is primary. This block remains for v12.x
+# audit format detection (asama-N-N-end pattern). Sunset v13.1.
 # Real-world failure mode (grom backoffice): all 8 sub-step audits
 # (asama-9-N-start/end OR asama-9-N-not-applicable) fired correctly
 # but model forgot to emit the final `asama-10-complete` summary

@@ -78,6 +78,43 @@ except Exception:
     pass
 ' 2>/dev/null)"
 
+# -------- Branch: v13.0 Universal Model Emit Denylist (soft) --------
+# v13.0 BRIDGE: deny sadece `phase_transition` ve `asama-N-progression-from-emit`
+# için aktif. `asama-N-complete` model tarafından emit edilebilir (legacy v12
+# pattern); gate engine bunu legacy fallback ile algılar. v13.1 hard cutover'da
+# `asama-N-complete` model emit'i de yasaklanır — o zaman tüm 24 skill MD dosyası
+# yeni emit pattern'lerine (items-declared/scan/triple) geçmiş olmalı.
+# Deny scope dar (Risk #2): TOOL_NAME=Bash AND command body içinde mcl_audit_log
+# veya mcl_trace_append çağrısı varsa.
+if [ "$TOOL_NAME" = "Bash" ]; then
+  _BASH_CMD="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    print((obj.get("tool_input") or {}).get("command","") or "")
+except Exception:
+    pass
+' 2>/dev/null)"
+  # Emit-tool çağrısı + yasak token kontrolü (her ikisi şart)
+  if echo "$_BASH_CMD" | grep -qE '(mcl_audit_log|mcl_trace_append)' && \
+     echo "$_BASH_CMD" | grep -qE '(phase_transition[[:space:]]+[0-9]+[[:space:]]+[0-9]+|asama-[0-9]+-progression-from-emit)'; then
+    _BAD_TOKEN="$(echo "$_BASH_CMD" | grep -oE '(phase_transition[[:space:]]+[0-9]+[[:space:]]+[0-9]+|asama-[0-9]+-progression-from-emit)' | head -1)"
+    _DENY_PHASE="$(echo "$_BAD_TOKEN" | grep -oE '[0-9]+' | head -1)"
+    mcl_audit_log "asama-${_DENY_PHASE:-?}-illegal-emit-attempt" "pre-tool" "token=${_BAD_TOKEN} tool=${TOOL_NAME}"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append illegal_emit_attempt "${_BAD_TOKEN}"
+    python3 -c '
+import json, sys
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": sys.argv[1]
+    }
+}))' "v13.0 deterministic gate: \`${_BAD_TOKEN}\` is hook-emitted only via universal completeness loop. Model must NOT emit phase transitions directly. Hook reads gate-spec.json and writes phase_transition + state advance when per-phase gate criteria are met."
+    exit 0
+  fi
+fi
+
 # Trace: Task tool dispatch records which subagent MCL invoked.
 if [ "$TOOL_NAME" = "Task" ] && command -v mcl_trace_append >/dev/null 2>&1; then
   SUBAGENT_TYPE="$(printf '%s' "$RAW_INPUT" | python3 -c '
