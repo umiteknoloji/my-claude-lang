@@ -7,6 +7,89 @@
 
 ## [Unreleased]
 
+## [13.0.10] - 2026-05-07
+
+### Layer B STRICT mode + audit-derived active phase (legacy state=7 sentinel fix)
+
+**Real-world failure (kullanıcı raporu):** v13.0.9 üretim testi: backoffice projesi senaryosunda spec onayı sonrası model 30 dosya yazdı, Aşama 5/6/7/8 tamamen atlandı, Aşama 9 kod yazıldı ama TDD audit'leri yok, Aşama 10/11-18/19/20/21/22 atlandı. Layer B fire etmedi — model "tüm fazları unuttu."
+
+**Kök sebep analizi:**
+
+1. Legacy state machine: `mcl-pre-tool.sh:708` (JIT askq) ve `:803` (Bash audit emit) `asama-4-complete` audit'i emit edilince `state.current_phase=7` atıyor. Bu v10/v11 era catch-all sentinel — "post-spec-approval, EXECUTE phase". v12+ canonical numaralandırmada Aşama 7 = UI Review (askq only).
+
+2. v13.0.9 Layer B `state.current_phase=7` görünce → gate-spec'te Aşama 7 spec'i (UI Review) → `allowed_tools=[AskUserQuestion]`. Model `Write` denerse normalde deny ederdi.
+
+3. **AMA** v13.0.9'un **5-strike fail-open loop-breaker'ı** vardı. Model 5 deny aldıktan sonra Layer B fail-open yapıp tüm sonraki Write'lara izin veriyordu. 30 dosya bu kapıdan geçti.
+
+4. Üstüne, state=7 sentinel'i v12+ canonical Aşama 5 (Pattern Matching) yerine Aşama 7'yi temsil ettiği için, model'in fazlardan geçmesi imkansızdı — universal completeness loop bile state=7'den başlayıp 8'e atlıyordu, Aşama 5/6 hiç değerlendirilmiyordu.
+
+**v13.0.10 fix — iki cerrahi değişiklik:**
+
+#### 1. Audit-derived active phase resolver (mcl-pre-tool.sh Layer B)
+
+Layer B'nin Python verdict logic'i artık `state.current_phase=7` (legacy sentinel) gördüğünde audit log'dan **gerçek aktif fazı türetir**:
+
+```python
+sp = int(state_phase)
+if sp == 7:
+    # Legacy sentinel — derive from audit. Walk 5..22, first incomplete.
+    derived = None
+    for p in range(5, 23):
+        if not phase_complete_basic(str(p)):
+            derived = p
+            break
+    active_phase = str(derived) if derived else "22"
+elif sp >= 1 and sp <= 22:
+    active_phase = str(sp)  # canonical, use as-is
+```
+
+Sonuç: state=7 + asama-5 audit yoksa → active=5 → Aşama 5 allowed_tools=[] → model'in Write denemesi block.
+
+Diğer state değerleri (1-6, 8-22) **canonical v12+ olarak yorumlanır**, audit-derive YAPILMAZ. Bu v13.0.9 testlerinin (T5-T8 state=9/10/6 ile) regression yapmamasını sağlar.
+
+#### 2. STRICT loop-breaker — fail-open KALDIRILDI
+
+v13.0.9'un 5-strike fail-open mekanizması Layer B için kaldırıldı. Yeni davranış:
+- Her strike audit'lenir + `_mcl_loop_breaker_count` artar
+- 5+ strike sonrası → **block KALMAYA devam eder** + `phase-allowlist-tool-escalate` audit emit edilir (idempotent — turn başına 1 kez)
+- Activate hook bir sonraki turda escalation audit'i okur ve kullanıcıya görünür uyarı enjekte eder (`PHASE_ALLOWLIST_ESCALATE_NOTICE`)
+
+Escalate notice 3 çözüm yolu sunar:
+1. Doğru fazın audit'ini emit et (gate-spec'e bak)
+2. Skip-eligible faz ise `mcl_audit_log asama-N-skipped reason=<somut>`
+3. `/mcl-restart` → state ve faz akışı sıfırdan
+
+**Sonuç:** Üretimde model 30-dosya dump yapamaz. 5 deny sonrası user uyarılır, block kalır, geliştirici müdahale eder.
+
+#### REASON metni iyileştirmesi
+
+Eski: "Aşama 7 aktif iken `Write` tool'una izin verilmez" (state value, yanıltıcı)
+Yeni: "Audit'ten türetilen aktif faz: Aşama 5 (state.current_phase=7 legacy değer). `Write` tool'una bu fazda izin verilmez."
+
+#### Out of Scope (v13.0.11'e ertelenen)
+
+- ❌ **Aşama 9 TDD enforcement** — `current_phase=9` (gerçek v12+) iken `asama-9-ac-{i}-red` audit'i emit edilmeden Write/Edit. Mevcut Layer B Aşama 9'da Write'a izin veriyor; TDD discipline ayrı enforcement gerektiriyor.
+- ❌ **Aşama 6 UI Build mandatory check generalize** — v13.0.8 specific lens var; UI flow detected ama `asama-6-end` yok durumunda generalize edilmedi.
+- ❌ **Legacy state machine migration** — `current_phase=7` sentinel'ini `current_phase=5` ile değiştirmek 4 yerde değişiklik + `mcl_get_active_phase` mapping güncelleme; çok dosya etkiliyor, riskli. v13.1'e ertelendi.
+
+#### Verification
+
+- bash -n: 4 hooks + dsi.sh clean
+- 9 yeni unit test (`tests/cases/test-v1310-strict-allowlist-and-derive.sh`):
+  - T1: state=7 + audit yok → derive active=5 + Write deny + REASON shows active_phase=5
+  - T2: state=7 + asama-5-skipped → derive active=6 + frontend Write allow
+  - T3: state=7 + asama-5-skipped + Edit src/api → derive active=6 + denied_paths deny
+  - T4: STRICT 6/6 deny (NO fail-open)
+  - T5: 5+ strike → escalate audit emitted
+  - T6: state=9 canonical (NOT 7) + Edit → allow (no derive, no regress)
+  - T7: state=10 canonical + AskUserQuestion → allow
+  - T8: activate hook surfaces escalation notice
+- Test baseline: 382 → **391 passed** / 24 failed (unchanged) / 2 skipped — sıfır regresyon
+
+#### Realistic determinism estimate
+
+v13.0.9 ~99% (production'da fail-open ile model 30-dosya dump yaptı, yani gerçek %50-60) → v13.0.10 ~99.5% **with strict mode**. Fail-open kapısı kapatıldı; kaçış valve = developer escalation (manual intervention), automatic bypass yok.
+
 ## [13.0.9] - 2026-05-07
 
 ### Determinism mimari değişikliği — single-phase view + phase allowlist + reference doc

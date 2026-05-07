@@ -880,12 +880,16 @@ if [ -z "$REASON" ] && [ "$SPEC_APPROVED" = "true" ] && command -v python3 >/dev
       _PA_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
       if [ -n "$_PA_PHASE" ] && [ "$_PA_PHASE" -ge 1 ] 2>/dev/null && [ "$_PA_PHASE" -le 22 ] 2>/dev/null; then
         _PA_GATE_SPEC="${MCL_GATE_SPEC:-${HOME}/.claude/skills/my-claude-lang/gate-spec.json}"
+        _PA_AUDIT_PATH="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+        _PA_TRACE_PATH="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
         if [ -f "$_PA_GATE_SPEC" ]; then
           _PA_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c "
-import json, re, sys, fnmatch
+import json, re, sys, fnmatch, os
 spec_path = '$_PA_GATE_SPEC'
-phase = '$_PA_PHASE'
+state_phase = '$_PA_PHASE'
 tool = '$TOOL_NAME'
+audit_path = '$_PA_AUDIT_PATH'
+trace_path = '$_PA_TRACE_PATH'
 try:
     obj = json.loads(sys.stdin.read())
     tin = obj.get('tool_input') or {}
@@ -894,37 +898,103 @@ except Exception:
 file_path = tin.get('file_path') or tin.get('notebook_path') or ''
 try:
     spec = json.load(open(spec_path))
-    pspec = spec['phases'][phase]
 except Exception:
     print('allow|'); sys.exit(0)
+
+# v13.0.10: audit-derived active phase resolver. Legacy code sets
+# state.current_phase=7 after asama-4-complete (catch-all sentinel for
+# 'post spec approval'). v12+ canonical splits this into 5,6,7,8,9.
+# When state=7 (or any \\\"post-approval\\\" value), derive the ACTUAL active
+# phase from audit.log: walk phases 5..22, find first incomplete phase.
+session_ts = ''
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, 'r', encoding='utf-8', errors='replace'):
+            if '| session_start |' in line:
+                session_ts = line.split('|', 1)[0].strip()
+except Exception:
+    pass
+
+audit_lines = []
+try:
+    if os.path.isfile(audit_path):
+        for line in open(audit_path, 'r', encoding='utf-8', errors='replace'):
+            ts = line.split('|', 1)[0].strip()
+            if session_ts and ts < session_ts:
+                continue
+            audit_lines.append(line)
+except Exception:
+    pass
+
+def has_audit_marker(needle):
+    return any(f'| {needle} |' in l for l in audit_lines) or any(f'| {needle}' in l for l in audit_lines)
+
+def phase_complete_basic(p_str):
+    p = spec['phases'].get(p_str, {})
+    if has_audit_marker(f'asama-{p_str}-complete'): return True
+    if 'required_audits_any' in p:
+        return any(has_audit_marker(a) for a in p['required_audits_any'])
+    if 'required_audits' in p:
+        return all(has_audit_marker(a) for a in p['required_audits'])
+    if 'required_sections' in p:
+        return all(has_audit_marker(a) for a in p['required_sections'])
+    return False
+
+# Derive active phase. Only walk audit log when state=7 (legacy
+# post-approval catch-all sentinel that v10/v11 progression code uses).
+# Other state values (1-6, 8-22) are treated as canonical v12+ phase
+# numbers and used directly.
+sp = int(state_phase)
+if sp == 7:
+    # Legacy sentinel — derive from audit. Walk 5..22, first incomplete.
+    derived = None
+    for p in range(5, 23):
+        if not phase_complete_basic(str(p)):
+            derived = p
+            break
+    if derived is None:
+        derived = 22
+    active_phase = str(derived)
+elif sp >= 1 and sp <= 22:
+    active_phase = str(sp)
+else:
+    print('allow|'); sys.exit(0)
+
+try:
+    pspec = spec['phases'][active_phase]
+except Exception:
+    print('allow|'); sys.exit(0)
+
 allowed = pspec.get('allowed_tools', None)
-# If allowed_tools field missing entirely (legacy spec), allow (no enforcement).
 if allowed is None:
     print('allow|'); sys.exit(0)
 if tool not in allowed:
-    print(f'deny:tool|tool={tool} phase={phase} allowed={\",\".join(allowed) if allowed else \"none\"}')
+    print(f'deny:tool|tool={tool} state_phase={state_phase} active_phase={active_phase} allowed={\",\".join(allowed) if allowed else \"none\"}')
     sys.exit(0)
 denied = pspec.get('denied_paths', [])
 if denied and file_path:
     norm = file_path.replace('\\\\\\\\', '/').lstrip('./')
     for pat in denied:
         if fnmatch.fnmatch(norm, pat) or fnmatch.fnmatch('/' + norm, pat) or fnmatch.fnmatch(norm, pat.lstrip('*/').lstrip('/')):
-            print(f'deny:path|path={file_path} pattern={pat} phase={phase}')
+            print(f'deny:path|path={file_path} pattern={pat} active_phase={active_phase}')
             sys.exit(0)
 print('allow|')
 " 2>/dev/null)"
+          # Extract derived active_phase from verdict detail for accurate REASON.
+          _PA_ACTIVE="$(printf '%s' "$_PA_VERDICT" | grep -oE 'active_phase=[0-9]+' | head -1 | cut -d= -f2)"
+          [ -z "$_PA_ACTIVE" ] && _PA_ACTIVE="$_PA_PHASE"
           case "${_PA_VERDICT%%|*}" in
             deny:tool)
               _PA_DETAIL="${_PA_VERDICT#deny:tool|}"
-              REASON="MCL PHASE ALLOWLIST (v13.0.9 Layer B) — Aşama ${_PA_PHASE} aktif iken \`${TOOL_NAME}\` tool'una izin verilmez. ${_PA_DETAIL}. Mevcut faz için izinli mutating tool'lar gate-spec.json'da. Faz tamamlanınca \`asama-${_PA_PHASE}-complete\` audit emit edilirse otomatik bir sonraki faza geçer + onun allowed_tools listesi devreye girer. Read/Glob/Grep/LS/WebFetch/WebSearch/Task/Skill/Bash her fazda izinli (investigation + audit-emit valve)."
+              REASON="MCL PHASE ALLOWLIST (v13.0.10 Layer B STRICT) — Audit'ten türetilen aktif faz: Aşama ${_PA_ACTIVE} (state.current_phase=${_PA_PHASE} legacy değer). \`${TOOL_NAME}\` tool'una bu fazda izin verilmez. ${_PA_DETAIL}. Aşama ${_PA_ACTIVE}'in izinli tool'ları gate-spec.json'da. \`asama-${_PA_ACTIVE}-complete\` veya \`asama-${_PA_ACTIVE}-skipped\` audit emit edilirse otomatik bir sonraki faza geçer. Read/Glob/Grep/LS/WebFetch/WebSearch/Task/Skill/Bash her fazda izinli (investigation + audit-emit valve). KATI MOD (v13.0.10): fail-open YOK; 5 strike sonrası user'a escalate audit emit edilir, block kalkmaz."
               REASON_KIND="phase-allowlist-tool"
-              mcl_audit_log "phase-allowlist-tool-block" "pre-tool" "tool=${TOOL_NAME} phase=${_PA_PHASE}"
+              mcl_audit_log "phase-allowlist-tool-block" "pre-tool" "tool=${TOOL_NAME} state_phase=${_PA_PHASE} active_phase=${_PA_ACTIVE}"
               ;;
             deny:path)
               _PA_DETAIL="${_PA_VERDICT#deny:path|}"
-              REASON="MCL PHASE PATH-LOCK (v13.0.9 Layer B) — Aşama ${_PA_PHASE} aktif iken bu yol yasak. ${_PA_DETAIL}. Aşama ${_PA_PHASE}'ın denied_paths listesi gate-spec.json'da. Örnek: Aşama 6 (UI Build) backend yollarını (\`src/api/**\`, \`prisma/**\`, ...) yasaklar — backend Aşama 9 TDD veya Aşama 8 DB Design'da yazılır."
+              REASON="MCL PHASE PATH-LOCK (v13.0.10 Layer B STRICT) — Audit'ten türetilen aktif faz: Aşama ${_PA_ACTIVE} (state.current_phase=${_PA_PHASE}). Bu yol yasak. ${_PA_DETAIL}. Örnek: Aşama 6 (UI Build) backend yollarını (\`src/api/**\`, \`prisma/**\`, ...) yasaklar — backend Aşama 9 TDD veya Aşama 8 DB Design'da yazılır. KATI MOD: fail-open YOK."
               REASON_KIND="phase-allowlist-path"
-              mcl_audit_log "phase-allowlist-path-block" "pre-tool" "phase=${_PA_PHASE}"
+              mcl_audit_log "phase-allowlist-path-block" "pre-tool" "state_phase=${_PA_PHASE} active_phase=${_PA_ACTIVE}"
               ;;
           esac
         fi
@@ -1182,18 +1252,26 @@ if [ -n "$REASON" ]; then
     fi
   elif [ "$REASON_KIND" = "phase-allowlist-tool" ] \
        || [ "$REASON_KIND" = "phase-allowlist-path" ]; then
-    # v13.0.9 Layer B — phase allowlist hard gate. Loop-breaker (5 strike)
-    # to allow recovery if model genuinely cannot advance phase. Logs each
-    # strike for /mcl-checkup visibility.
+    # v13.0.10 STRICT — phase allowlist hard gate. NO fail-open.
+    # Each strike logged for /mcl-checkup visibility. After 5 strikes,
+    # an escalation audit is emitted (mcl-activate.sh injects user-visible
+    # warning notice on next turn — developer must intervene). Block STAYS.
+    # Rationale: v13.0.9 had 5-strike fail-open which let 30-file dump
+    # through after model exhausted strikes. STRICT mode forces developer
+    # intervention rather than silent escape.
     _PA_LB_COUNT="$(_mcl_loop_breaker_count "${REASON_KIND}" 2>/dev/null || echo 0)"
+    DECISION="deny"
+    mcl_audit_log "${REASON_KIND}" "pre-tool" "tool=${TOOL_NAME} strike=$((_PA_LB_COUNT + 1))"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "${REASON_KIND}" "$((_PA_LB_COUNT + 1))"
     if [ "${_PA_LB_COUNT:-0}" -ge 5 ]; then
-      mcl_audit_log "${REASON_KIND}-loop-broken" "pre-tool" "count=${_PA_LB_COUNT} fail-open"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "${REASON_KIND}_loop_broken" "${_PA_LB_COUNT}"
-      DECISION="allow"
-    else
-      DECISION="deny"
-      mcl_audit_log "${REASON_KIND}" "pre-tool" "tool=${TOOL_NAME} strike=$((_PA_LB_COUNT + 1))"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "${REASON_KIND}" "$((_PA_LB_COUNT + 1))"
+      # Escalation audit — surfaced by activate hook as a user-visible
+      # notice. NOT fail-open; block continues.
+      _PA_ESC_AUDIT="${REASON_KIND}-escalate"
+      _PA_ESC_SEEN="$(_mcl_audit_emitted_in_session "$_PA_ESC_AUDIT" "" 2>/dev/null || echo 0)"
+      if [ "${_PA_ESC_SEEN:-0}" != "1" ]; then
+        mcl_audit_log "$_PA_ESC_AUDIT" "pre-tool" "count=${_PA_LB_COUNT} tool=${TOOL_NAME}"
+        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "${REASON_KIND}_escalate" "${_PA_LB_COUNT}"
+      fi
     fi
   fi
 
