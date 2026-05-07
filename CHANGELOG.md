@@ -7,6 +7,55 @@
 
 ## [Unreleased]
 
+## [13.0.6] - 2026-05-07
+
+### Aşama 6 server-without-browser STRICT lens (post-hoc — single targeted exception)
+
+**Real-world failure trigger:** Production session — model `node server.js` ile sunucu başlattı, ardından "Sunucu çalışıyor. Tarayıcıyı açıyorum:" yazıp **durdu**. Tool çağrısı yapmadı. Pre-hoc fiziksel olarak yakalayamaz: PreToolUse model'in çağırmadığı tool'a fire etmez.
+
+**Mimari değişiklik:** v13.0.2'deki "post-hoc gerekmesin" direktifi **bu spesifik pattern için** yumuşatıldı. Kullanıcı kararı: "minimal stop hook lens ama katı olsun." Tek targeted post-hoc lens, başka pattern eklenmedi.
+
+#### Mekanizma
+
+`hooks/mcl-stop.sh` yeni helper `_mcl_asama_6_server_browser_check`:
+- Transcript'in son assistant turundaki Bash tool_use komutlarını tarar
+- **Server-start regex** (yaygın stack'ler): `npm/pnpm/yarn (run )?(dev|start|serve)`, `node server/index/app/dist/...`, `nodemon`, `deno`, `bun`, `python -m http.server/flask/manage.py runserver/uvicorn`, `flask run`, `fastapi dev`, `uvicorn`, `gunicorn`, `php -S`, `php artisan serve`, `rails server`, `dotnet run/watch`, `go run`, `cargo run`, `mvn spring-boot:run`, `gradle bootRun`
+- **Browser-open regex**: `open <url>` (macOS), `xdg-open <url>` (Linux), `start <url>` (Windows), `cmd /c start`, `powershell Start-Process`, `python -m webbrowser`, `google-chrome <url>`, `firefox <url>`
+- Server detected, browser absent → return "block"
+
+Main flow branch (mcl-stop.sh:642 öncesi):
+- Tetiklenir: `current_phase=6` OR `ui_sub_phase=BUILD_UI`
+- Bypass: `asama-6-end` / `asama-6-skipped` / `asama-6-complete` audit'lerinden biri current session'da emit edilmişse
+- Block decision: `decision:block` + REASON model'e adım adım talimat (open komutu + asama-6-end audit + Aşama 7 askq)
+
+#### STRICT mode
+
+**Loop-breaker yok. Fail-open yok.** Diğer benzer block mekanizmaları (UI review skip, quality review pending, open-severity) 3 strike sonrası fail-open yapar; bu lens **kasıtlı olarak yapmaz**. Kullanıcı direktifi: "katı olsun". Model browser açmadıkça veya `asama-6-skipped` audit emit etmedikçe block kalkmaz. Test T9 5 ardışık stop ile bunu doğrular.
+
+#### Out of Scope (kasıtlı)
+
+- ❌ Diğer mid-task abandonment pattern'leri (server start ≠ tek failure mode'u — model "test çalıştırıyorum:" deyip durabilir, "deploy ediyorum:" deyip durabilir vb.) — her biri ayrı targeted lens gerektirir, blanket lens yapılmaz
+- ❌ PostToolUse-time enjeksiyon (server start sonrası "şimdi de browser aç" notice) — Stop hook block daha güçlü
+- ❌ Loop-breaker ekleme — strict directive'e aykırı; model browser açana dek block sürdürülür
+
+#### Verification
+
+- bash -n: 4 hook clean
+- 12 yeni unit test (`tests/cases/test-v1306-asama6-server-browser.sh`):
+  - T1-T2: server-only block, server+browser bypass
+  - T3: chained `node server.js & sleep 2 && open <url>` aynı Bash içinde
+  - T4: Linux `xdg-open` variant
+  - T5-T6: `asama-6-end` / `asama-6-skipped` audit bypass
+  - T7: phase=9 (Aşama 6 değil) → dormant
+  - T8: legacy `ui_sub_phase=BUILD_UI` (current_phase başka) → fires
+  - T9: **STRICT** 5 ardışık stop, hepsi block (fail-open yok)
+  - T10-T12: edge cases (ls only, flask, pnpm)
+- Test baseline: 335 → **347 passed** / 24 failed (unchanged) / 2 skipped — sıfır regresyon
+
+#### Realistic determinism estimate
+
+v13.0.5 ~96-98% (pre-hoc) → v13.0.6 ~98-99% (Aşama 6 mid-task gap kapatıldı). Diğer mid-task abandonment patterns hâlâ açık. Her biri için ayrı lens kararı kullanıcıya kalmış (LLM instruction-following ceiling realistic'tir).
+
 ## [13.0.5] - 2026-05-07
 
 ### 3-Layer pre-hoc deterministic enforcement — fast-skip / spec-skip protection

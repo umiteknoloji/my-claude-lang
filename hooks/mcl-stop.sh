@@ -1,4 +1,5 @@
 #!/bin/bash
+_BT='`'  # literal backtick for embedding in double-quoted strings without command substitution
 # MCL Stop Hook — parse Claude's final assistant message, detect the
 # `📋 Spec:` block, compute sha256 over a normalized body, and update
 # `.mcl/state.json` accordingly.
@@ -217,6 +218,99 @@ for block in last_assistant_blocks:
             # Once Edit fires, freeze spec_seen_before_edit
             break
 print("warn" if (edit_called and not spec_seen_before_edit) else "ok")
+PYEOF
+}
+
+# --- Aşama 6 server-without-browser strict check (v13.0.6) ---
+# Returns one of: "block" (server started, browser not opened),
+# "ok" (browser opened OR no server started OR Aşama 6 not active),
+# "skip" (Aşama 6 already complete or skipped).
+# STRICT: no loop-breaker — every stop in current_phase=6 + server-without-browser
+# triggers block until model runs `open <url>` in same turn.
+_mcl_asama_6_server_browser_check() {
+  local transcript="${1:-}"
+  [ -n "$transcript" ] && [ -f "$transcript" ] || { echo "ok"; return 0; }
+  command -v python3 >/dev/null 2>&1 || { echo "ok"; return 0; }
+  python3 - "$transcript" 2>/dev/null <<'PYEOF' || echo "ok"
+import json, re, sys
+path = sys.argv[1]
+SERVER_RE = re.compile(
+    r"(?:^|\s|;|&&|\|\|)("
+    r"(?:npm|pnpm|yarn)\s+(?:run\s+)?(?:dev|start|serve)"
+    r"|node\s+(?:server|index|app|dist|src/|bin/|backend/)"
+    r"|nodemon\s+"
+    r"|deno\s+(?:run|task)"
+    r"|bun\s+(?:run|dev|start)"
+    r"|python3?\s+(?:-m\s+)?(?:http\.server|flask|manage\.py\s+runserver|uvicorn)"
+    r"|flask\s+run"
+    r"|fastapi\s+(?:run|dev)"
+    r"|uvicorn\s+"
+    r"|gunicorn\s+"
+    r"|php\s+(?:-S|artisan\s+serve)"
+    r"|rails\s+(?:server|s)\b"
+    r"|bundle\s+exec\s+rails"
+    r"|dotnet\s+(?:run|watch)"
+    r"|go\s+run"
+    r"|cargo\s+run"
+    r"|mvn\s+(?:spring-boot:run|jetty:run|tomcat:run)"
+    r"|gradle\s+bootRun"
+    r")", re.IGNORECASE,
+)
+BROWSER_RE = re.compile(
+    r"(?:^|\s|;|&&|\|\|)("
+    r"open\s+[\"']?(?:https?://|localhost|127\.0\.0\.1|0\.0\.0\.0)"
+    r"|xdg-open\s+[\"']?(?:https?://|localhost|127\.0\.0\.1)"
+    r"|start\s+[\"']?(?:https?://|localhost|127\.0\.0\.1)"
+    r"|cmd(?:\.exe)?\s+/c\s+start\s+(?:https?://|localhost)"
+    r"|powershell\s+.*Start-Process"
+    r"|python3?\s+-m\s+webbrowser"
+    r"|google-chrome\s+(?:https?://|localhost)"
+    r"|firefox\s+(?:https?://|localhost)"
+    r")", re.IGNORECASE,
+)
+last_assistant_blocks = None
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            msg = obj.get("message") or obj
+            if not isinstance(msg, dict):
+                continue
+            if msg.get("role") == "assistant":
+                content = msg.get("content")
+                if isinstance(content, list):
+                    last_assistant_blocks = content
+except Exception:
+    print("ok"); sys.exit(0)
+if not last_assistant_blocks:
+    print("ok"); sys.exit(0)
+server_started = False
+browser_opened = False
+for block in last_assistant_blocks:
+    if not isinstance(block, dict):
+        continue
+    if block.get("type") != "tool_use":
+        continue
+    name = block.get("name") or ""
+    if name != "Bash":
+        continue
+    cmd = ((block.get("input") or {}).get("command") or "")
+    if SERVER_RE.search(cmd):
+        server_started = True
+    if BROWSER_RE.search(cmd):
+        browser_opened = True
+if server_started and not browser_opened:
+    print("block")
+elif server_started and browser_opened:
+    print("ok-with-browser")
+else:
+    print("ok")
 PYEOF
 }
 
@@ -543,6 +637,62 @@ _mcl_is_vision_request_option() {
 # existing spec/askq transition branches.
 mcl_state_init
 CURRENT_PHASE="$(mcl_state_get current_phase)"
+
+# --- Aşama 6 server-without-browser STRICT lens (v13.0.6) ---
+# Real-world failure: model runs `npm run dev` then says "Tarayıcıyı açıyorum:"
+# and stops without actually running `open <url>`. Aşama 6 spec explicitly
+# requires "Proje otomatik olarak tarayıcıda açılır". This lens fires when:
+#   - current_phase=6 OR ui_sub_phase=BUILD_UI
+#   - asama-6-end / asama-6-skipped not yet in audit (this session)
+#   - Last assistant turn ran a server-start Bash command
+#   - Last assistant turn did NOT run a browser-open Bash command
+# STRICT — no loop-breaker, no fail-open. User directive: "katı olsun".
+# Bypass only via emitting asama-6-end or asama-6-skipped audit.
+_A6_PHASE_FOR_LENS="$(mcl_state_get current_phase 2>/dev/null)"
+_A6_UISUB_FOR_LENS="$(mcl_state_get ui_sub_phase 2>/dev/null)"
+if [ "$_A6_PHASE_FOR_LENS" = "6" ] || [ "$_A6_UISUB_FOR_LENS" = "BUILD_UI" ]; then
+  _A6_AUDIT_PATH="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  _A6_TRACE_PATH="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  _A6_ALREADY_DONE="$(python3 - "$_A6_AUDIT_PATH" "$_A6_TRACE_PATH" 2>/dev/null <<'PYEOF' || echo "no"
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+done = False
+try:
+    if os.path.isfile(audit_path):
+        for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+            ts = line.split("|", 1)[0].strip()
+            if session_ts and ts < session_ts:
+                continue
+            if "| asama-6-end |" in line or "| asama-6-skipped |" in line or "| asama-6-complete |" in line:
+                done = True; break
+except Exception:
+    pass
+print("yes" if done else "no")
+PYEOF
+)"
+  if [ "$_A6_ALREADY_DONE" = "no" ] && \
+     [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+    _A6_LENS="$(_mcl_asama_6_server_browser_check "$TRANSCRIPT_PATH" 2>/dev/null || echo "ok")"
+    if [ "$_A6_LENS" = "block" ]; then
+      mcl_audit_log "asama-6-server-without-browser-block" "stop" "phase=${_A6_PHASE_FOR_LENS} ui_sub=${_A6_UISUB_FOR_LENS}"
+      command -v mcl_trace_append >/dev/null 2>&1 && \
+        mcl_trace_append asama_6_server_without_browser_block "${_A6_PHASE_FOR_LENS}/${_A6_UISUB_FOR_LENS}"
+      printf '%s\n' "{
+  \"decision\": \"block\",
+  \"reason\": \"⛔ MCL AŞAMA 6 EKSİK — Sunucu başlatıldı (npm run dev / node server / flask run / vb.) AMA tarayıcı açılmadı. Aşama 6 spec'i açıkça şöyle der: 'Proje otomatik olarak tarayıcıda açılır.' Tarayıcı açma komutu çalıştırılmadan Aşama 6 tamamlanmış sayılmaz.\n\nBu turda eksiksiz şu adımları yap:\n1. Bash ile tarayıcıyı aç. macOS: ${_BT}open http://localhost:<port>${_BT}. Linux: ${_BT}xdg-open http://localhost:<port>${_BT}. Windows: ${_BT}start http://localhost:<port>${_BT}. Port'u sunucu çıktısından oku (genelde 3000 / 5173 / 8000 / 5000).\n2. Aşama 6 audit emit et: ${_BT}bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-6-end mcl-stop \\\"server_started=true browser_opened=true\\\"'${_BT}\n3. Aşama 7 (UI Review) AskUserQuestion'a geç: prefix ${_BT}MCL ${INSTALLED_VERSION} | Faz 7 — UI onayı:${_BT}, options 'Onayla' / 'Revize' / 'Sen de bak ve raporla' / 'İptal'.\n\nKATI MOD: bu lens loop-breaker yok — fail-open yok. Tarayıcı açma komutu çalıştırılmadan veya asama-6-skipped audit'i emit edilmeden block kalkmaz. Server-without-browser spec ihlalidir.\"
+}"
+      exit 0
+    fi
+  fi
+fi
 
 # --- Aşama 8 / 4.6 / 5 review enforcement (since 7.1.3) ---
 #
