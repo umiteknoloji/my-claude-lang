@@ -11,7 +11,7 @@ Bu bir çevirmen değil. Çevirmenler kelimeleri çevirir. my-claude-lang **anla
 
 ### 5.0.0'dan itibaren — Evrensel Aktivasyon
 
-my-claude-lang artık sadece İngilizce bilmeyenler için değil. MCL **her** mesajda devreye giriyor — İngilizce dahil — çünkü anlam doğrulama, kıdemli mühendis kalitesinde spec üretimi ve anti-yalakalık, kaynak dilden bağımsız olarak değerli. İngilizce bilmeyen kullanıcı için çeviri köprüsü de çalışmaya devam ediyor; İngilizce kullanıcı için çeviri katmanı identity'ye düşüyor, ama diğer tüm katmanlar (aşama kapıları, öz-eleştiri, disambiguation, Aşama 11 doğrulama) tamamen çalışıyor.
+my-claude-lang artık sadece İngilizce bilmeyenler için değil. MCL **her** mesajda devreye giriyor — İngilizce dahil — çünkü anlam doğrulama, kıdemli mühendis kalitesinde spec üretimi ve anti-yalakalık, kaynak dilden bağımsız olarak değerli. İngilizce bilmeyen kullanıcı için çeviri köprüsü de çalışmaya devam ediyor; İngilizce kullanıcı için çeviri katmanı identity'ye düşüyor, ama diğer tüm katmanlar (aşama kapıları, öz-eleştiri, disambiguation, Aşama 20 doğrulama) tamamen çalışıyor.
 
 ---
 
@@ -148,8 +148,8 @@ Aşama 22: Tamlık Denetimi — `.mcl/audit.log` okunup her fazın
 
 ### AskUserQuestion ile Onaylar (6.0.0'dan itibaren)
 
-Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 4 spec onayı, her Aşama 8
-risk, her Aşama 10 etki, plugin onayı, git-init onayı, drift çözümü,
+Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 4 spec onayı, her Aşama 10
+risk, her Aşama 19 etki, plugin onayı, git-init onayı, drift çözümü,
 `/mcl-update` / `/mcl-finish` / yapıştırılan-CLI onayı) yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
 `MCL 13.0.2 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
@@ -164,30 +164,31 @@ onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
 Her yanıt `🌐 MCL 13.0.2` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
-### UI Build / Review Alt-Fazları (6.2.0'dan itibaren)
+### UI Build / Review Fazları
 
-Görevin bir UI yüzeyi olduğunda (her projede varsayılan), Aşama 6 üç
-alt-faza ayrılıyor — böylece MCL değiştirmek istediğin bir UI'ın
+Görevin bir UI yüzeyi olduğunda (her projede varsayılan), MCL UI
+işini iki ayrı faza bölüyor — böylece değiştirmek istediğin bir UI'ın
 üstüne backend yazarken seyretmek zorunda kalmıyorsun:
 
-1. **Aşama 6a (BUILD_UI)** — MCL sadece dummy data ile çalıştırılabilir
+1. **Aşama 6 (UI Build)** — MCL sadece dummy data ile çalıştırılabilir
    bir frontend yazıyor. Stack'ine göre React / Vue / Svelte / statik
    HTML. Çalıştırma komutu veriyor (`npm run dev` vb.); MCL
    tarayıcıyı otomatik açar, sen incelersin.
-2. **Aşama 6b (UI_REVIEW)** — MCL backend'e geçmeden önce UI doğru
+2. **Aşama 7 (UI Review)** — MCL backend'e geçmeden önce UI doğru
    mu diye soruyor. Dört seçenek: onay / revize / **sen de bak ve
    raporla** / iptal. "Sen de bak ve raporla" opt-in bir boru hattı:
    Playwright + screenshot + Claude'un multimodal görüsü ile MCL
    kendi yazdığı UI'a gerçekten bakıp ne gördüğünü anlatıyor —
    `playwright` kurulu olmasını gerektirir, asla otomatik kurmaz.
-3. **Aşama 6c (BACKEND)** — ancak onayladıktan sonra MCL dummy
-   fixture'ları gerçek API çağrılarına dönüştürüyor, data layer'ı
-   yazıyor, error ve loading state'lerini gerçek async'e bağlıyor.
+3. **Aşama 9 backend wiring** — ancak Aşama 7 onayından sonra MCL
+   dummy fixture'ları gerçek API çağrılarına dönüştürüyor, data
+   layer'ı yazıyor, error ve loading state'lerini gerçek async'e
+   bağlıyor. Bu UI alt-fazı değil, TDD fazının bir adımı.
 
-Aşama 1 özet onayında "onay, UI atlayacağız" seçersen Aşama 7
-ayrılmadan çalışır (6.1.1 davranışının aynısı). UI default ON çünkü
-projelerin çoğunun UI yüzeyi var; bash script'leri ve yalnızca-backend
-değişiklikleri tek tıkla opt-out yapıyor.
+Aşama 1 özet onayında "onay, UI atlayacağız" seçersen Aşama 6 ve 7
+tamamen atlanır. UI default ON çünkü projelerin çoğunun UI yüzeyi
+var; bash script'leri ve yalnızca-backend değişiklikleri tek tıkla
+opt-out yapıyor.
 
 ---
 
@@ -339,20 +340,20 @@ Sayacı sıfırlamak için: `rm .mcl/cost.json`
 
 ## Oturumlar Arası Bitirme Modu — `/mcl-finish`
 
-Aşama 10 execution sırasında downstream etkileri teker teker yüzeye çıkarır. Bu etkilerin çoğu "haftaya bir kontrol edeyim" türünden gerçek maddelerdir — tek bir oturuma sığmayan, ileri tarihli kontroller.
+Aşama 19 execution sırasında downstream etkileri teker teker yüzeye çıkarır. Bu etkilerin çoğu "haftaya bir kontrol edeyim" türünden gerçek maddelerdir — tek bir oturuma sığmayan, ileri tarihli kontroller.
 
 `/mcl-finish` bu maddeleri oturumlar arasında taşıyan checkpoint mekanizmasıdır.
 
-Her Aşama 11 Doğrulama Raporu, bu komuta işaret eden senin dilinde bir hatırlatıcı satırla biter. Hazır olduğunda mesaj olarak sadece `/mcl-finish` yaz ve MCL şunları yapar:
+Her Aşama 20 Doğrulama Raporu, bu komuta işaret eden senin dilinde bir hatırlatıcı satırla biter. Hazır olduğunda mesaj olarak sadece `/mcl-finish` yaz ve MCL şunları yapar:
 
-1. Son checkpoint'ten bu yana `.mcl/impact/` dizinine yazılmış tüm Aşama 10 etkilerini toplar
+1. Son checkpoint'ten bu yana `.mcl/impact/` dizinine yazılmış tüm Aşama 19 etkilerini toplar
 2. Desteklenen stack'lerde full-project Semgrep taraması çalıştırır (desteklenmeyenlerde sessizce atlanır)
 3. Senin dilinde proje seviyesi bir bitirme raporu emit eder
 4. `.mcl/finish/NNNN-YYYY-MM-DD.md` olarak yeni bir checkpoint yazar
 
 Bir sonraki `/mcl-finish` bu checkpoint'ten itibaren yeni bir pencere açar — kapanan etkiler arşivde kalır, yeniler bir sonraki pass için birikmeye başlar. Git commit yok, remote push yok, external reporting yok — tamamen yerel state.
 
-Aşama 8 riskleri biriktirilmez: onlar oturum içinde çözülür.
+Aşama 10 riskleri biriktirilmez: onlar oturum içinde çözülür.
 
 ---
 
