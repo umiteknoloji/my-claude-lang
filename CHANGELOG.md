@@ -7,6 +7,55 @@
 
 ## [Unreleased]
 
+## [13.0.4] - 2026-05-07
+
+### Dynamic Status Injection (DSI) — focused per-turn phase status
+
+v13.0.2 PHASE SCRIPT extension model'e tüm 22 fazı her turda gösteriyordu (uzun, generic). Model bunu re-parse etmek zorunda; cognitive load yüksek. **DSI bu sorunu çözer:** her UserPromptSubmit'te `mcl-activate.sh` mevcut faz durumunu dinamik olarak çıkarıp focused notice inject eder ("şu anda Aşama N'desin, şu kaldı, bu turda şunu emit et").
+
+**Mimari:** Pre-hoc prompt-time injection — tool/stop time müdahale yok, kullanıcının "pre-hoc %100, post-hoc gerekmesin" direktifiyle uyumlu.
+
+**Sınırsız-soru bölümleri için kritik (Aşama 10, 19):** risk/impact sayısı baştan bilinmez. `asama-10-items-declared count=K` audit'i K'yı sabitler. DSI K eksikse **MANDATORY directive** emit eder ("K bilinmeden dialog başlayamaz"). K varsa M/K progress + current pointer + next item audit name dinamik gösterir. Pointer = `max(resolved indices) + 1` audit-derived (state.json pointer carry yok, single source of truth = audit.log).
+
+#### Yeni dosyalar
+
+- **`hooks/lib/mcl-dsi.sh`** — Read-only Python helper. CLI-testable: `bash mcl-dsi.sh --cli --phase N --audit <log> --spec <json> --lang tr|en`. 6 gate type için ayrı renderer (single, section, list, iterative, substep, self-check). Fail-open: helper crash → tek satırlık diagnostic, hook hata vermez.
+- **`tests/cases/test-v1304-dsi.sh`** — 26 unit test (T1-T14). Sınırsız-soru handling kritik: T3 (K missing → MANDATORY), T4 (K=8/0 → '#1'), T5 (K=8/4 → '#5'), T6 (K=8/8 → completed), T14 (K extension via re-emit).
+
+#### Değişen dosyalar
+
+- **`hooks/mcl-activate.sh`** — `DSI_NOTICE` block generation (line 1005 öncesi); FULL_CONTEXT chain'ine eklenir. Resolution chain: `$REPO_LIB/mcl-dsi.sh` → `$(dirname $0)/lib/mcl-dsi.sh`. Aşama 1-4 için minimal mode (cognitive overhead düşük), Aşama 5+ için full DSI. Partial spec recovery override: `state.partial_spec=true` → tüm faz status suspend.
+- **VERSION** 13.0.3 → **13.0.4**, banner refs synced.
+
+#### Per-phase rendering format
+
+| Phase type | Format örneği |
+|---|---|
+| single (5/8/21) | "Bu turun zorunlu çıktısı: asama-5-skipped ya da asama-5-complete" |
+| section (15-18/20) | "Bu turun zorunlu çıktısı: asama-15-end-green" |
+| list (10/19) | "3/8 resolved, 5 pending. Şu anda görüşülen: #4. Bu turun zorunlu çıktısı: asama-10-item-4-resolved" |
+| iterative (11-14) | "Scan: 3 issue → Fixed: 2/3 → Rescan due. Bu turun zorunlu çıktısı: asama-11-issue-3-fixed" |
+| substep (9) | "AC 1/3: red ✓ green ✓ refactor ✗. Bu turun zorunlu çıktısı: asama-9-ac-1-refactor" |
+| self-check (22) | "20/21 phases verified, 1 missing. Bu turun zorunlu çıktısı: deep-dive Aşama 21" |
+
+#### Hard-enforce semantiği
+
+Plan'da Q1 = hard onaylanmıştı. **Hard-enforce DSI'nin MANDATORY directive'iyle pre-hoc sağlanır** — PreToolUse deny eklenmedi. Gerekçe: tool-time deny post-hoc safety net, kullanıcı direktifine aykırı. DSI prompt-time mesajı yeterince prominent (ilk satır, ZORUNLU prefix, ne emit edileceği literal).
+
+#### Out of Scope (kasıtlı)
+
+- ❌ PreToolUse deny on Aşama 10/19 askq when items-declared missing — post-hoc, skip
+- ❌ Tool whitelisting per phase — v13.1
+- ❌ 14 dilli label tablosu (şu an sadece TR + EN; diğerleri EN fallback) — v13.1
+- ❌ Multi-model verification subagent — v13.2 (eğer DSI yetersiz kalırsa)
+
+#### Verification
+
+- bash -n: 4 hook + dsi.sh clean
+- 26 yeni unit test PASS
+- Test baseline: 292 → **317 passed** / 24 failed (unchanged) / 2 skipped — zero regression
+- Smoke: Aşama 10 K=8/3 → DSI block doğru render; total prompt 54266 chars (+184 vs v13.0.3)
+
 ## [13.0.3] - 2026-05-07
 
 ### Doc/spec sync — align all reference files with MCL_Pipeline.md (canonical 22-phase architecture)
