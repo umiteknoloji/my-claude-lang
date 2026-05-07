@@ -168,7 +168,7 @@ Phase 22: Completeness Audit — `.mcl/audit.log` is read and
 ### Approvals via AskUserQuestion (since 6.0.0)
 
 Every closed-ended gate (Aşama 1 summary, Aşama 4 spec approval, each
-Aşama 8 risk, each Aşama 10 impact, plugin consent, git-init consent,
+Aşama 10 risk, each Aşama 19 impact, plugin consent, git-init consent,
 drift resolution, `/mcl-update` / `/mcl-finish` / pasted-CLI confirmation)
 arrives as a native Claude Code `AskUserQuestion` prompt with the
 question prefix `MCL 13.0.2 | `. You pick an option in the UI — no typing
@@ -182,31 +182,31 @@ re-approve the new body or revert to the approved one.
 
 Every response starts with `🌐 MCL 13.0.2` so you always know the bridge is active.
 
-### UI Build / Review Sub-Phases (since 6.2.0)
+### UI Build / Review Phases
 
-When a task has a UI surface (default for every project), Aşama 6
-splits into three sub-phases so you never watch MCL build the backend
-on top of a UI you wanted to change:
+When a task has a UI surface (default for every project), MCL splits
+the UI work across two dedicated phases so you never watch MCL build
+the backend on top of a UI you wanted to change:
 
-1. **Aşama 6a (BUILD_UI)** — MCL writes a runnable frontend with
+1. **Aşama 6 (UI Build)** — MCL writes a runnable frontend with
    dummy data only. React / Vue / Svelte / static HTML depending on
    your stack. You get a run command (`npm run dev` etc.); MCL
    auto-opens it in your browser.
-2. **Aşama 6b (UI_REVIEW)** — MCL asks whether the UI is right
+2. **Aşama 7 (UI Review)** — MCL asks whether the UI is right
    before moving on. Four options: approve / revise / **see it
    yourself and report** / cancel. "See it yourself" is an opt-in
    pipeline that uses Playwright + screenshots + Claude's
    multimodal vision to actually look at the UI it built and
    describe what it sees — requires `playwright` installed, never
    auto-installs.
-3. **Aşama 6c (BACKEND)** — only after you approve, MCL swaps dummy
-   fixtures for real API calls, writes the data layer, wires error
-   and loading states to real async behavior.
+3. **Aşama 9 backend wiring** — only after Aşama 7 approval, MCL
+   swaps dummy fixtures for real API calls, writes the data layer,
+   wires error and loading states to real async behavior. This is
+   folded into the TDD phase, not a separate UI sub-phase.
 
-At Aşama 1's summary confirm, pick "approve, skip UI" to run Aşama 7
-without the split (same behavior as 6.1.1). UI is default ON because
-most projects have a UI surface; bash scripts and backend-only
-changes opt out in one click.
+At Aşama 1's summary confirm, pick "approve, skip UI" to skip Aşama 6
+and 7 entirely. UI is default ON because most projects have a UI
+surface; bash scripts and backend-only changes opt out in one click.
 
 ---
 
@@ -358,20 +358,20 @@ To reset the counter: `rm .mcl/cost.json`
 
 ## Cross-Session Finish Mode — `/mcl-finish`
 
-Aşama 10 surfaces downstream impacts one at a time during execution. Many of those impacts are genuine "I'll verify this next week" items — they belong to a horizon that doesn't fit inside a single session.
+Aşama 19 surfaces downstream impacts one at a time during execution. Many of those impacts are genuine "I'll verify this next week" items — they belong to a horizon that doesn't fit inside a single session.
 
 `/mcl-finish` is the checkpoint that carries them across.
 
-Every Aşama 11 Verification Report ends with a localized reminder line pointing at the command. When you're ready, type the literal message `/mcl-finish` and MCL will:
+Every Aşama 20 Verification Report ends with a localized reminder line pointing at the command. When you're ready, type the literal message `/mcl-finish` and MCL will:
 
-1. Aggregate every Aşama 10 impact written to `.mcl/impact/` since the last checkpoint
+1. Aggregate every Aşama 19 impact written to `.mcl/impact/` since the last checkpoint
 2. Run a full-project Semgrep rescan on supported stacks (silently skipped on unsupported ones)
 3. Emit a project-level finish report in your language
 4. Write a new checkpoint to `.mcl/finish/NNNN-YYYY-MM-DD.md`
 
 The next `/mcl-finish` starts a fresh window from that checkpoint — closed impacts stay in the archive, new ones pile up for the next pass. No git commits, no remote pushes, no external reporting — pure local state.
 
-Aşama 8 risks are NOT accumulated: they're resolved in-session.
+Aşama 10 risks are NOT accumulated: they're resolved in-session.
 
 ---
 
