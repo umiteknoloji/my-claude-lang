@@ -7,6 +7,67 @@
 
 ## [Unreleased]
 
+## [13.0.3] - 2026-05-07
+
+### Doc/spec sync — align all reference files with MCL_Pipeline.md (canonical 22-phase architecture)
+
+`MCL_Pipeline.md` is the canonical source-of-truth for the phase
+pipeline (22 phases since v12.0). Reference files had drifted:
+- `skills/my-claude-lang.md` was stuck on v10/v11 numbering with
+  duplicate `Aşama 8` headers and an obsolete `v11 # | v10 #`
+  migration table
+- `README.md` / `README.tr.md` had downstream prose still using
+  pre-v11 phase numbers (`Aşama 6a/6b/6c`, `Aşama 8 risk`,
+  `Aşama 10 impact`, `Aşama 11 verification`)
+- `FEATURES.md` top function-model diagram listed only 12 phases
+- User-facing hook strings (`REASON=`, `mcl-update` notice)
+  surfaced old phase numbers to the developer
+
+#### Changes
+
+- **`skills/my-claude-lang.md`** — full 22-phase rewrite:
+  function model 12 → 22, section headers retitled (`Aşama 6 UI Build`,
+  `Aşama 7 UI Review`, `Aşama 8 DB Design`, `Aşama 9 TDD`,
+  `Aşama 10 Risk`, `Aşama 11–18 Quality+Tests`, `Aşama 19 Etki`,
+  `Aşama 20 Verify`, `Aşama 21 Localized`, `Aşama 22 Completeness`).
+  Removed `v11 # | v10 # | sub-step` dual-numbering migration table.
+- **`README.md` / `README.tr.md`** — downstream prose aligned
+  (`Aşama 6a/6b/6c` UI sub-phase split → `Aşama 6 / 7 + Aşama 9
+  backend wiring`; gate references `8 risk → 10 risk`,
+  `10 impact → 19 impact`, `11 verify → 20 verify`)
+- **`FEATURES.md`** — top function-model diagram regenerated;
+  section headers retitled; inline rewrites for current behavior
+  (Pattern Matching feeds Aşama 9 TDD; risk/impact dialog described
+  with `asama-N-items-declared` audit-emit pattern; phase_review_state
+  lifecycle clarified as Aşama 10/19 dialog gate)
+- **`hooks/mcl-pre-tool.sh`** — pattern-scan REASON now references
+  `Aşama 9 TDD`; scope-guard REASON now suggests `Aşama 10 risk`
+- **`hooks/mcl-activate.sh`** — `mcl-update` notice now refers
+  generically to `any of Aşama 1–22` (future-proof)
+- **VERSION** 13.0.2 → **13.0.3**, banner refs synced
+
+#### Out of Scope (kasıtlı)
+
+- ❌ Internal hook comments referring to historical `Aşama 7+ TodoWrite`
+  etc. (describe codebase history, not user-facing) — defer to v13.1
+- ❌ `asama9-execute.md` / `asama9-tdd.md` consolidation — both files
+  are complementary (execute discipline vs TDD cycle mechanics),
+  intentional dual-file design
+- ❌ Adding dedicated `Aşama 21` and `Aşama 22` sections to FEATURES.md
+  body — function-model diagram + skill files cover them; deferred to
+  doc-completion pass (v13.1)
+
+#### Verification
+
+- bash -n: 4 hook files clean
+- Phase numbering grep: zero occurrences of `Aşama 6a/6b/6c`,
+  `Aşama 7 — Kod`, `Aşama 8 — Risk`, `Aşama 10 — Etki`,
+  `Aşama 11 — Doğrulama`, `Aşama 12 — Lokalize`, `Aşama 13 — Tam`
+  in any of: README.md, README.tr.md, FEATURES.md,
+  skills/my-claude-lang.md
+- All H2/H3 phase headers (1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+  11–18, 19, 20, 21, 22) match MCL_Pipeline.md ordering
+
 ## [13.0.2] - 2026-05-07
 
 ### Pre-hoc PHASE SCRIPT extension — Aşama 5–22 explicit blocks + NO MID-PIPELINE STOP
