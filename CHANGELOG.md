@@ -7,6 +7,50 @@
 
 ## [Unreleased]
 
+## [13.0.2] - 2026-05-07
+
+### Pre-hoc PHASE SCRIPT extension — Aşama 5–22 explicit blocks + NO MID-PIPELINE STOP
+
+v13.0/0.1'de model Aşama 5'ten sonra "kod yazdım, bitti" diyerek Aşama 6–22'yi atlayabiliyordu — activate hook PHASE SCRIPT Aşama 5+'ı tek paragrafta ad-listesi olarak veriyordu, görev direktifi/emit pattern/skip koşulu yoktu.
+
+**Mimari karar (kullanıcı direktifi):** Pre-hoc katmanı %100 — post-hoc Stop hook block-on-incomplete safety net **kasıtlı olarak yok**. Prompt'un kendisi her fazın görevini, audit emit pattern'ini ve "Aşama 22'ye kadar STOP YOK" direktifini içeriyor.
+
+#### Changes
+
+**`hooks/mcl-activate.sh` STATIC_CONTEXT — PHASE SCRIPT genişletmesi:**
+- Mevcut "Aşama 5+ — Execute" tek paragrafı **17 ayrı faz bloğuna** dönüştürüldü.
+- Her blok: `━━━ Aşama N — <name> ━━━` başlık + skill file path + 1-2 satır görev + emit pattern + skip koşulu + sonraki faz direktifi.
+- TOP-LEVEL DİREKTİF: `🛑 NO MID-PIPELINE STOP RULE` — Aşama 4 spec onayından sonra Aşama 22 tamamlanana kadar pipeline ortasında durmak yasak. AskUserQuestion gate'leri (Faz 7/10/19) doğal stop; diğerleri auto-progress.
+
+**`hooks/mcl-activate.sh` — yeni `<mcl_constraint name="no-mid-pipeline-stop">`:**
+- Constraint block PHASE SCRIPT'in TOP-LEVEL DİREKTİF'ini reinforces — `Kod bitti` / `test yazdım` / `review tamam` diyerek bitirmek = phase skip = quality regression.
+
+**`hooks/mcl-activate.sh` self-critique constraint — 6. soru:**
+- Mevcut 5 soruluk loop'a Aşama 5–22 için 6. soru eklendi: "Bu turun sonunda mevcut fazın gate-spec audit'i emit edildi mi? Bir sonraki fazın başlangıcı yapıldı mı?"
+- AskUserQuestion turn'lerinde fire etmez (doğal stop).
+- Aşama 1-4'te fire etmez (spec-approval gate yeterli).
+
+#### Out of Scope (kasıtlı)
+
+- ❌ **Stop hook block-on-incomplete enforcement.** Pre-hoc %100 hedefi — post-hoc fallback eklenirse pre-hoc'a güvensizlik sinyali olur. Kullanıcı direktifi.
+- ❌ Skill MD migrations (Faz 11-14 scan/rescan emit'leri vs.) — v13.1
+- ❌ Hard deny on `asama-N-complete` model emit — v13.1
+- ❌ Test suite v12-era audit name güncellemeleri — v13.0.3
+
+#### Verification
+
+- bash -n: 5 hook clean
+- Prompt content smoke: 24/24 markers (`━━━ Aşama 5..22 —`, NO MID-PIPELINE STOP, asama-N-skipped reason, asama-9-ac-, asama-10-items-declared, asama-11-rescan, asama-22-complete) + 4/4 new constraint markers
+- tests/run-tests.sh: **292/24/2** baseline tutuldu (yeni test eklenmedi — sadece prompt değişti, davranışsal pre-hoc katman; runtime testleri etkilenmez)
+
+#### Risks
+
+- **LLM prompt instruction-following degrade** — uzun prompt instruction following oranını düşürebilir. Mitigation: TOP-LEVEL DİREKTİF prompt'un başına yakın yerleştirildi; her faz bloğu kısa (1-2 satır görev).
+- **Token cost artışı** — ~5 KB ek per UserPromptSubmit. Mitigation: skill detayları skill dosyalarında kaldı; PHASE SCRIPT sadece "ne emit, ne sonra" iskeleti.
+- **gate-spec.json ↔ PHASE SCRIPT senkronizasyon riski** — iki kaynak. Mitigation: emit pattern'leri gate-spec.json'dan birebir referans alındı.
+
+Banner: MCL 13.0.1 → **MCL 13.0.2**.
+
 ## [13.0.1] - 2026-05-07
 
 ### Faz 2 conditional auto-complete — handles "no GATE questions" path
