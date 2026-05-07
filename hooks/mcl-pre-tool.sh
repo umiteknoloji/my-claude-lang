@@ -826,7 +826,7 @@ if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "7" ]; then
   _PS_DUE_PT="$(mcl_state_get pattern_scan_due 2>/dev/null)"
   if [ "$_PS_DUE_PT" = "true" ]; then
     _PAT_FILES_PT="$(mcl_state_get pattern_files 2>/dev/null)"
-    REASON="MCL PHASE 3.5 — Pattern scan pending. Before writing any Aşama 7 code, read the existing sibling files listed in the PATTERN_MATCHING_NOTICE to extract naming, error handling, import style, and test structure patterns. Write nothing this turn — use Read tool on each listed file, note the patterns, then end the turn. Writes will unblock automatically on the next turn."
+    REASON="MCL PHASE 5 — Pattern scan pending. Before writing any Aşama 9 TDD code, read the existing sibling files listed in the PATTERN_MATCHING_NOTICE to extract naming, error handling, import style, and test structure patterns. Write nothing this turn — use Read tool on each listed file, note the patterns, then end the turn. Writes will unblock automatically on the next turn."
     mcl_audit_log "pattern-scan-block" "pre-tool" "tool=${TOOL_NAME}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append pattern_scan_block
   fi
@@ -908,7 +908,7 @@ print("allow")
 ' 2>/dev/null || echo "allow")"
   if [ "${_SCOPE_VERDICT%%|*}" = "deny" ]; then
     _SCOPE_DENIED_PATH="${_SCOPE_VERDICT#deny|}"
-    REASON="MCL SCOPE GUARD (Rule 2 — File Scope) — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. This also likely violates Rule 1 (Spec-Only): if this file needs changes, it should have been in the spec. Options: (A) surface as a Aşama 8 risk and request scope extension; (B) if genuinely required now, ask the developer via AskUserQuestion BEFORE writing — never silently touch out-of-scope files."
+    REASON="MCL SCOPE GUARD (Rule 2 — File Scope) — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. This also likely violates Rule 1 (Spec-Only): if this file needs changes, it should have been in the spec. Options: (A) surface as a Aşama 10 risk and request scope extension; (B) if genuinely required now, ask the developer via AskUserQuestion BEFORE writing — never silently touch out-of-scope files."
     mcl_audit_log "scope-guard-block" "pre-tool" "path=${_SCOPE_DENIED_PATH} tool=${TOOL_NAME}"
     command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_block "${_SCOPE_DENIED_PATH}"
   fi
