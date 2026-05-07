@@ -10,21 +10,28 @@
 MCL her geliştirici mesajını sıralı fazlardan geçirir. Bir faz eksik parametre olmadan ilerlemez.
 
 ```
-Aşama 1   → Anlama (intent, constraints, success_criteria, context)
-Aşama 2 → Precision Audit (7 core boyut + stack add-on; SILENT-ASSUME / SKIP-MARK / GATE)
-Aşama 3 → Engineering Brief (8.4.0+ upgrade-translator: çeviri + vague verb → surgical verb)
-Aşama 4   → Spec üretimi
-Aşama 4   → Spec doğrulama + geliştirici onayı
-Aşama 5 → Pattern Matching (proje kodu okunur, convention çıkarılır)
-Aşama 7   → Kod yazımı (TDD ile)
-  Aşama 6a → BUILD_UI  — dummy data ile çalışan frontend
-  Aşama 6b → UI_REVIEW — geliştirici UI'ı tarayıcıda görür, onaylar
-  Aşama 6c → BACKEND   — gerçek API/veri katmanı
-Aşama 8 → Risk incelemesi
-Aşama 10 → Etki analizi
-Aşama 11   → Doğrulama raporu
-Aşama 12 → Lokalize rapor (EN → geliştirici dili çevirisi)
-Aşama 13 → Tamlık denetimi (her fazın gerçekten tamamlandığını audit.log'dan doğrular; Aşama 7 TDD ve Aşama 9 sub-step deep-dive)
+Aşama 1  → Anlama (intent, constraints, success_criteria, context)
+Aşama 2  → Precision Audit (7 core boyut + stack add-on; SILENT-ASSUME / SKIP-MARK / GATE)
+Aşama 3  → Engineering Brief (upgrade-translator: çeviri + vague verb → surgical verb)
+Aşama 4  → Spec üretimi + doğrulama + geliştirici onayı (tek AskUserQuestion)
+Aşama 5  → Pattern Matching (proje kodu okunur, convention çıkarılır; greenfield'de skip)
+Aşama 6  → UI Build — dummy data ile çalışan frontend, otomatik tarayıcı açılışı
+Aşama 7  → UI Review — geliştirici UI'ı tarayıcıda inceler, AskUserQuestion ile onaylar
+Aşama 8  → DB Design — normalization + index strategy + query plan (DB scope yoksa skip)
+Aşama 9  → TDD execute — her AC için RED → GREEN → REFACTOR
+Aşama 10 → Risk incelemesi (sıralı interactive dialog, her risk için askq)
+Aşama 11 → Code review (auto-fix, scan/rescan loop)
+Aşama 12 → Simplify (auto-fix)
+Aşama 13 → Performance (auto-fix)
+Aşama 14 → Security (whole-project, semgrep + auto-fix)
+Aşama 15 → Unit tests (write-and-verify until green)
+Aşama 16 → Integration tests
+Aşama 17 → E2E tests
+Aşama 18 → Load tests
+Aşama 19 → Etki analizi (sıralı interactive dialog, her impact için askq)
+Aşama 20 → Doğrulama raporu + Spec Coverage tablosu + mock cleanup
+Aşama 21 → Lokalize rapor (EN → geliştirici dili çevirisi; English source'da skip)
+Aşama 22 → Tamlık denetimi (audit.log okunur; Aşama 9 TDD + Aşama 11-18 pipeline deep-dive)
 ```
 
 ### Dil Köprüsü
@@ -37,7 +44,7 @@ Aşama 13 → Tamlık denetimi (her fazın gerçekten tamamlandığını audit.l
 |---|---|---|
 | `mcl-activate.sh` | Her `UserPromptSubmit` | STATIC_CONTEXT + durum bildirimleri inject eder |
 | `mcl-stop.sh` | Her `Stop` | Faz geçişlerini yönetir, session log yazar |
-| `mcl-pre-tool.sh` | Her `PreToolUse` | Aşama 8 state advance, respec koruması, hook dominance blokları |
+| `mcl-pre-tool.sh` | Her `PreToolUse` | Faz state advance, respec koruması, hook dominance blokları, plan critique gate |
 | `mcl-post-tool.sh` | Her `PostToolUse` | Session diary — her araç çağrısı için tek satır log |
 
 **Hook Dominance İlkesi** (8.0.x)
@@ -45,8 +52,8 @@ Behavioral kurallar yerine hook kararları (`decision:block`) tercih edilir — 
 
 | Blok | Koşul |
 |---|---|
-| `TodoWrite` | Aşama 1-3'te (Aşama 7+ serbest) |
-| `Task` → Aşama 8/4.6/5 | description'da faz anahtar kelimeleri varsa |
+| `TodoWrite` | Aşama 1-3'te (Aşama 9+ serbest) |
+| `Task` → Aşama 10 (Risk) / 19 (Impact) sub-agent dispatch | description'da faz anahtar kelimeleri varsa |
 | `Bash` → `.mcl/state.json` yazımı | Her zaman (state yalnızca hook sistemine ait) |
 
 ---
@@ -92,7 +99,7 @@ Aşama 1 "completeness" sağlar; Aşama 2 "precision" sağlar. Aşama 1 onayı s
 - **Domain-shape (içerik tabanlı, dil değil):** cli, data-pipeline (Airflow/dbt/Prefect/Dagster + Beam/Spark), ml-inference (model artifact / torch/tensorflow/scikit-learn/mlflow). 8.4.1'de `mcl-stack-detect.sh` heuristik tespit eder; daha önce TODO idi.
 - Her add-on 2-5 delta boyut içerir. Solid/Angular/Qwik ve kotlin-mobile vs kotlin-backend ayrımı gelecek genişleme için TODO.
 
-İngilizce session'da skip — audit entry yine emit edilir (`skipped=true`) detection control olarak. **Hard enforcement (8.3.2):** `mcl-stop.sh` Aşama 1→2 transition'ında audit'te `precision-audit` entry yoksa hem `precision-audit-skipped-warn` (8.3.0 detection signal, backward compat) hem `precision-audit-block` audit'leri yazar VE `decision:block` JSON döndürür — Aşama 1→2 transition rewind edilir, Claude aynı response içinde Aşama 2'i çalıştırıp spec'i yeniden emit etmek zorunda. Aşama 8 ile aynı tier. İngilizce session safety valve: `skipped=true` audit emit edildiğinde block fire etmez.
+İngilizce session'da skip — audit entry yine emit edilir (`skipped=true`) detection control olarak. **Hard enforcement (8.3.2):** `mcl-stop.sh` Aşama 1→2 transition'ında audit'te `precision-audit` entry yoksa hem `precision-audit-skipped-warn` (8.3.0 detection signal, backward compat) hem `precision-audit-block` audit'leri yazar VE `decision:block` JSON döndürür — Aşama 1→2 transition rewind edilir, Claude aynı response içinde Aşama 2'i çalıştırıp spec'i yeniden emit etmek zorunda. Aşama 10 risk-review ile aynı enforcement tier. İngilizce session safety valve: `skipped=true` audit emit edildiğinde block fire etmez.
 
 **Deterministic gate (10.1.14):** Aşama 2 dimension scan + GATE cevapları toplandıktan sonra **closing AskUserQuestion** zorunludur. Title prefix: `MCL <ver> | Faz 2 — Precision-audit niyet onayı:` (TR / kalibrasyon dili) — `Precision-audit` sabit MCL teknik token'ı (her dilde literal kalır, `MCL` / `Spec` / `GATE` / `Faz N` ile aynı konvansiyon). Geliştirici approve-family seçince `mcl-stop.sh` `asama-2-complete | stop | selected=<option>` audit'i emit eder. Bu **tek audit** Aşama 4 SPEC emit'ini unblock eder; `summary-confirm-approve`, `precision-audit`, `asama-1-complete` artık tek başına yetersiz (v10.1.14'ten önce OR-list idi). Geçerli `asama-2-complete` audit'i, Aşama 1'in de çalıştığını implicitly kanıtlar (faz zinciri canonical). İngilizce session: dimension scan skipped olsa da closing askq yine zorunlu (tek satırlık onay) — determinism principle, dile bağlı muafiyet yok. Recovery hatch: `bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-2-complete mcl-stop "params=precision-audit-confirmed"'`.
 
@@ -108,11 +115,11 @@ Surgical verb'lerin **standart teknik default'ları** `[default: X, changeable]`
 **Hallucination koruması (3 katmanlı):**
 - Skill dosyasında Allowed/Forbidden boundary + 13 calibration example
 - **Aşama 4 Scope Changes Callout:** kullanıcı kendi dilinde tüm upgrade'leri görür ve "edit" seçeneğiyle düzeltebilir
-- **Aşama 8 Lens (e) Brief-Phase-1 Scope Drift:** implementation Aşama 1 confirmed parametrelere izlenebilir mi kontrol; izlenemeyen + `[default]` marker'sız scope risk olarak surface
+- **Aşama 10 Lens (e) Brief-Phase-1 Scope Drift:** implementation Aşama 1 confirmed parametrelere izlenebilir mi kontrol; izlenemeyen + `[default]` marker'sız scope risk olarak surface
 
-**Audit signal:** `engineering-brief | phase1-5 | lang=<...> skipped=<...> retries=<N> clarification=<...> upgraded=<bool> verbs_upgraded=<count>`. `upgraded=true` olduğunda Aşama 4 callout ve Aşama 8 Lens (e) zorunlu.
+**Audit signal:** `engineering-brief | phase1-5 | lang=<...> skipped=<...> retries=<N> clarification=<...> upgraded=<bool> verbs_upgraded=<count>`. `upgraded=true` olduğunda Aşama 4 callout ve Aşama 10 Lens (e) zorunlu.
 
-**Aşama 12 simetrisi:** asimetrik kabul edildi — input upgrade (1.5), output faithful (5.5). Geri çeviride teknik kelime kaybı olabilir; spec/audit trail surgical İngilizce'de korunur.
+**Aşama 21 simetrisi:** asimetrik kabul edildi — input upgrade (Aşama 3), output faithful (Aşama 21). Geri çeviride teknik kelime kaybı olabilir; spec/audit trail surgical İngilizce'de korunur.
 
 ### Aşama 4 — Spec Üretimi
 
@@ -152,19 +159,33 @@ Tüm kapalı uçlu MCL etkileşimleri `MCL X.Y.Z | ` prefix'li native `AskUserQu
 
 
 **Aşama 5 Pattern Matching** (8.0.7, derinleşti 8.1.1)
-Spec onayı sonrası Aşama 7 başlamadan önce mevcut sibling dosyalar okunur:
+Spec onayı sonrası Aşama 9 TDD başlamadan önce mevcut sibling dosyalar okunur:
 - **Naming Convention**, **Error Handling Pattern**, **Test Pattern** — 3 zorunlu başlık
 - 4 seviyeli cascade: sibling → proje geneli → ekosistem standardı → kullanıcıya sor
-- Sonuçlar Aşama 7 boyunca `PATTERN_RULES_NOTICE` olarak context'te tutulur
+- Sonuçlar Aşama 9 boyunca `PATTERN_RULES_NOTICE` olarak context'te tutulur
 
-### Aşama 7 — Kod Yazımı
+### Aşama 6 — UI Build (conditional)
+
+UI surface tespit edildiğinde MCL dummy data ile runnable frontend yazar; build config dosyaları (vite/tailwind/tsconfig) önce yazılır, ardından `npm install && npm run dev` çalıştırılır, tarayıcı otomatik açılır. `vite.config.*`, `next.config.*`, `nuxt.config.*` backend path listesinde DEĞİLDİR — bunlar olmadan dev sunucu kalkmaz (7.9.6'dan beri). UI surface yoksa `asama-6-skipped reason=no-ui-flow` audit emit edilir, Aşama 8'e geçilir.
+
+### Aşama 7 — UI Review (developer-verified)
+
+Geliştirici tarayıcıda UI'ı inceler, AskUserQuestion ile onaylar (approve / revise / see-it-yourself / cancel). Opt-in: Playwright + screenshot ile MCL kendi UI'a bakıp multimodal rapor verir (`playwright` kurulu olmasını gerektirir, asla otomatik kurmaz). Revise → Aşama 6'ya döner, see-it-yourself → opt-in inspection. Aşama 6 atlandığında Aşama 7 de atlanır (`asama-7-skipped`).
+
+### Aşama 8 — DB Design (since v12.0)
+
+Spec persistent data içerdiğinde MCL şemayı normalization kurallarına uygun (genellikle 3NF; denormalization gerekçeli olarak documented) ve forward-compatible şekilde tasarlar. Index strategy query-pattern-driven covering indexes ile, query plan ise anticipated hot queries için planned access path ile yazılır. DB scope yoksa `asama-8-not-applicable reason=no-db-in-scope` audit emit edilir; Aşama 9'a geçilir.
+
+### Aşama 9 — TDD Execute (Code Writing)
 
 **Incremental TDD** (7.3.1)
-Batch TDD yerine gerçek red-green-refactor döngüsü:
-1. Bir Acceptance Criterion için tek test yaz → RED verify
-2. Minimum kodu yaz → GREEN verify
-3. Refactor (DRY, naming, dead code temizliği) → GREEN verify
+Batch TDD yerine gerçek red-green-refactor döngüsü, **her AC için**:
+1. Bir Acceptance Criterion için tek test yaz → RED verify (`asama-9-ac-{i}-red`)
+2. Minimum kodu yaz → GREEN verify (`asama-9-ac-{i}-green`)
+3. Refactor (DRY, naming, dead code temizliği) → GREEN verify (`asama-9-ac-{i}-refactor`)
 4. Sonraki criterion
+
+Sonda tam suite tekrar koşulur. UI flow active olduğunda backend wiring (gerçek API çağrıları, veri katmanı, async state) bu fazın Step 5'inde fold edilir — ayrı bir UI-6c alt fazı YOKTUR.
 
 **Test Komutu Çözümü** (STEP-24)
 Öncelik sırası: config dosyası → auto-detect → spec'ten çıkarım → geliştirici sorusu
@@ -173,31 +194,22 @@ Batch TDD yerine gerçek red-green-refactor döngüsü:
 Spec onaylandıktan sonra yeni `📋 Spec:` bloğu veya spec onay sorusu yasaktır.
 
 **Kod Tasarım İlkeleri** (7.9.7)
-Aşama 7'te yazılan tüm kodda zorunlu:
+Aşama 9'da yazılan tüm kodda zorunlu:
 - Composition over inheritance
 - SOLID (Single Responsibility, Open/Closed, Liskov, Interface Segregation, Dependency Inversion)
 - Extension over modification
 - Design pattern yalnızca gerçek problemi çözdüğünde
 
-**UI Build/Review Sub-Phases** (6.2.0+, auto-detect 6.5.2+)
-UI surface tespit edildiğinde Aşama 7 üç alt faza bölünür:
-- **4a BUILD_UI** — build config dosyaları (vite/tailwind/tsconfig) önce yazılır, sonra dummy data ile çalışan frontend. `npm install && npm run dev` çalıştırılır, tarayıcı otomatik açılır.
-- **4b UI_REVIEW** — geliştirici tarayıcıda UI'ı inceler, AskUserQuestion ile onaylar. Opt-in: Playwright + screenshot ile MCL kendi bakıp rapor verir.
-- **4c BACKEND** — UI onayı sonrası gerçek API çağrıları, veri katmanı, async state.
+### Aşama 10 — Risk İncelemesi
 
-**Aşama 6a Build Config Fix** (7.9.6)
-`vite.config.*`, `next.config.*`, `nuxt.config.*` artık backend path listesinde değil — bunlar olmadan `npm run dev` çalışmaz.
-
-### Aşama 8 — Risk İncelemesi
-
-**Sıralı Diyalog**
-Tüm riskler birer birer AskUserQuestion ile sunulur. Her risk için: skip / fix uygula / kural yap.
+**Sıralı Diyalog (sınırsız soru sayısı)**
+Tüm riskler birer birer AskUserQuestion ile sunulur. Risk sayısı baştan bilinmez — `asama-10-items-declared count=K` audit'i ile sayı sabitlenir, sonra her risk için `asama-10-item-{n}-resolved`. Her risk için: skip / fix uygula / kural yap.
 
 **4 Lens Kalitesi Tarama**
-Eş zamanlı çalışır: (a) Code Review, (b) Simplify, (c) Performance, (d) Security. Semgrep SAST HIGH/MEDIUM bulguları otomatik uygulanır.
+Eş zamanlı çalışır: (a) Code Review, (b) Simplify, (c) Performance, (d) Security. Bu tarama Aşama 11-14 quality pipeline'ına kaynak besler. Semgrep SAST HIGH/MEDIUM bulguları otomatik uygulanır.
 
 **Spec Compliance Pre-Check**
-Aşama 7 kodunun her MUST/SHOULD'u karşılayıp karşılamadığı kontrol edilir.
+Aşama 9 kodunun her MUST/SHOULD'u karşılayıp karşılamadığı kontrol edilir.
 
 **TDD Re-verify + Test Coverage**
 Tüm riskler çözüldükten sonra tam suite çalıştırılır.
@@ -214,25 +226,44 @@ TDD green-verify GREEN + son yazımdan sonra → Regression Guard suite koşmaz.
 `last_write_ts` ve `tdd_last_green` state'e yazılır; ikisi birlikte kontrol edilir.
 
 **Session Recovery** (7.4.0)
-Aşama 8 yarıda kesilebilir. `.mcl/risk-session.md` her karar sonrası güncellenir.
+Aşama 10 yarıda kesilebilir. `.mcl/risk-session.md` her karar sonrası güncellenir.
 
 **Plugin Dispatch Audit** (7.9.5)
-Aşama 8 çalışırken her turda `trace.log` kontrol edilir:
+Aşama 10 çalışırken her turda `trace.log` kontrol edilir:
 - `pr-review-toolkit:*` veya `code-review:*` sub-agent dispatch'i var mı?
 - `semgrep_ran` trace eventi var mı? (stack destekleniyorsa)
-- Eksik varsa `PLUGIN_MISS_NOTICE` enjekte edilir → Aşama 10/5'e geçiş engellenir
+- Eksik varsa `PLUGIN_MISS_NOTICE` enjekte edilir → quality pipeline'a (Aşama 11+) geçiş engellenir
 - Dispatch gerçekleşince notice otomatik temizlenir
 
-### Aşama 10 — Etki Analizi
+### Aşama 11-18 — Quality + Tests Pipeline (auto-fix, no dialog)
+
+8 dedicated sequential phase, scan→fix→rescan loop ile çalışır; AskUserQuestion YOKTUR.
+
+| Aşama | Phase | Audit emit pattern |
+|---|---|---|
+| 11 | Code review | `asama-11-scan count=K` → `asama-11-issue-{n}-fixed` → `asama-11-rescan count=0` |
+| 12 | Simplify | `asama-12-*` (aynı pattern) |
+| 13 | Performance | `asama-13-*` |
+| 14 | Security (whole-project, semgrep) | `asama-14-*` |
+| 15 | Unit tests | `asama-15-end-green` |
+| 16 | Integration tests | `asama-16-end-green` |
+| 17 | E2E tests | `asama-17-end-green` |
+| 18 | Load tests | `asama-18-end-target-met` |
+
+Code shape uygun değilse her faz `asama-N-not-applicable reason=<why>` audit'i ile sessiz skip yapar (load test for calculator, E2E for CLI vb.). Quality fazları auto-fix yapar; test fazları eksik testleri yazıp green yapana kadar sürer.
+
+### Aşama 19 — Etki Analizi (sınırsız soru sayısı)
 
 Yeni yazılan kodun projenin BAŞKA bölümlerine gerçek etkileri:
 - Import eden dosyalar, shared utility davranış değişikliği, API/contract kırılması
 - Schema/migration etkileri, build/toolchain/dependency değişimleri
 
+Risk dialog'u gibi sıralı, sınırsız sayıda askq: `asama-19-items-declared count=K` ile sayı sabitlenir, her impact için `asama-19-item-{n}-resolved`.
+
 **Plugin Çatışması — Provenance-First** (7.5.0)
 İki plugin çelişen hüküm verirse `[PLUGIN CONFLICT]` formatıyla her iki gerekçe gösterilir, geliştirici karar verir.
 
-### Aşama 11 — Doğrulama Raporu
+### Aşama 20 — Doğrulama Raporu (+ mock cleanup)
 
 **Spec Coverage Tablosu** (7.6.0)
 `| Requirement | Test | Status |` — tüm MUST/SHOULD satırları (✅/⚠️/❌).
@@ -240,8 +271,8 @@ Yeni yazılan kodun projenin BAŞKA bölümlerine gerçek etkileri:
 **Automation Barriers** (7.6.0)
 Call-graph tabanlı "gerçekten otomatize edilemeyen" liste. Hiçbiri tetiklenmezse omit edilir.
 
-**Aşama 11 Skip Detection** (8.2.7)
-`mcl-stop.sh` her stop'ta `phase_review_state` kontrol eder. State `running` ise ve bu turda MCL prefix'li AskUserQuestion çalışmamışsa (Aşama 8/4.6 dialog bitmiş ama Aşama 11 state'i temizlememiş), audit'e `phase5-skipped-warn` yazılır. `mcl-activate.sh` bir sonraki turda `PHASE5_SKIP_NOTICE` enjekte eder — Claude'a Aşama 11 raporunu çalıştırmasını söyler.
+**Aşama 20 Skip Detection** (8.2.7, fazlar yeniden numaralandı v11+)
+`mcl-stop.sh` her stop'ta `phase_review_state` kontrol eder. State `running` ise ve bu turda MCL prefix'li AskUserQuestion çalışmamışsa (Aşama 10/19 dialog bitmiş ama Aşama 20 state'i temizlememiş), audit'e ilgili skipped-warn yazılır. `mcl-activate.sh` bir sonraki turda Aşama 20 verify rapor uyarısı enjekte eder.
 
 **Hook Health Check** (8.2.7)
 Dört MCL hook'u (stop / activate / pre_tool / post_tool) son başarılı çalışma timestamp'ini `.mcl/hook-health.json`'a yazar. `mcl check-up` (STEP-61) eksik veya 24 saatten eski bir alan bulursa WARN üretir — hook'un kayıt dışı kaldığını veya sessizce başarısız olduğunu yakalar.
@@ -273,10 +304,10 @@ Write/Edit çağrıları credential ve secret taramasından geçer:
 - Tier 3: Yüksek entropi assignment (Shannon ≥ 3.5, uzunluk ≥ 20)
 
 **Scope Guard** (8.0.6)
-Aşama 7'te Write/Edit sadece spec'te bildirilen dosya yollarına izin verir. Glob pattern desteği (`src/auth/*.ts`).
+Aşama 9'da Write/Edit sadece spec'te bildirilen dosya yollarına izin verir. Glob pattern desteği (`src/auth/*.ts`).
 
 **Scope Discipline** (8.1.2)
-Her Aşama 7 turunda üç kural:
+Her Aşama 9 turunda üç kural:
 - Rule 1 SPEC-ONLY: spec'in MUST/SHOULD'larında olmayan hiçbir şey yapılmaz
 - Rule 2 FILE SCOPE: sadece spec'te geçen dosyalar değiştirilir
 - Rule 3 ROOT CAUSE: semptomu değil sebebi düzelt
@@ -310,7 +341,7 @@ Geliştirici açık karar verdikten sonra (ret, seçim, risk kabulü) MCL konuyu
 Mimari GATE cevabı alındıktan sonra teknik tutarlılık kontrolü. Bkz. Aşama 1 bölümü.
 
 ### Proje Hafızası (7.3.0)
-`.mcl/project.md` — proje bilgi tabanı. Aşama 11 sonrası güncellenir.
+`.mcl/project.md` — proje bilgi tabanı. Aşama 20 sonrası güncellenir.
 
 ---
 
@@ -322,7 +353,7 @@ Mimari GATE cevabı alındıktan sonra teknik tutarlılık kontrolü. Bkz. Aşam
 | `/mcl-version` | Kurulu sürümü gösterir |
 | `/mcl-update` | MCL'yi git pull + setup.sh ile günceller |
 | `/mcl-restart` | Tüm faz ve spec state'ini sıfırlar; aynı session'da JIT promote'un eski askq'leri yeniden onaylamasını engellemek için `restart_turn_ts` damgası yazar (8.2.13) |
-| `/mcl-finish` | Birikmiş Aşama 10 etkilerini özetler + Semgrep taraması |
+| `/mcl-finish` | Birikmiş Aşama 19 etkilerini özetler + Semgrep taraması |
 | `/mcl-doctor` | Token & maliyet raporu |
 | `/mcl-checkup` | Sağlık kontrolü — tüm STEP'ler değerlendirilir |
 | `/mcl-self-q` | O yanıt için self-critique sürecini görünür yapar (inline, per-message) |
@@ -348,9 +379,9 @@ Tüm state field'larını (`current_phase`, `spec_approved`, `phase_review_state
 
 `phase_review_state` lifecycle:
 ```
-null → "pending" (Aşama 7 kodu yazıldı, 4.5 başlamadı)
-     → "running"  (Aşama 8 AskUserQuestion ilk çağrıldı)
-     → null       (Aşama 10/5 tamamlandı)
+null → "pending" (Aşama 9 TDD kodu yazıldı, Aşama 10 risk-review başlamadı)
+     → "running"  (Aşama 10 AskUserQuestion ilk çağrıldı; aynı state Aşama 19 için de kullanılır)
+     → null       (Aşama 10 / 19 tamamlandı)
 ```
 
 ### Session Log (`.mcl/log/*.md`)
@@ -368,7 +399,7 @@ Her Stop hook'unda tur özeti: `Bu tur tamamlandı. | Tur: X token | Bağlam: Y 
 **Hook Dominance** (8.0.x)
 `mcl-pre-tool.sh` şu araç çağrılarını bloke eder:
 - `TodoWrite` Aşama 1-3 → MCL state.json ile yönetiyor
-- `Task` → Aşama 8/4.6/5 dispatch → bu fazlar sub-agent'a devredilemez
+- `Task` → Aşama 10 (Risk) / 19 (Impact) dispatch → bu fazlar sub-agent'a devredilemez
 - `Bash` → `.mcl/state.json` yazımı → state yalnızca hook sistemine ait
 
 **No Re-spec After Approval**
@@ -404,7 +435,7 @@ Kaynak: [code.claude.com/docs/en/hooks.md](https://code.claude.com/docs/en/hooks
 
 **Etki seviyesi: düşük-orta.**
 - `last_write_ts` kaybı → regression-guard smart-skip yanlış değerlendirir → gereksiz suite re-run (perf only, korrektlik etkisi yok)
-- `regression_block_active=false` kaybı → Aşama 8 BLOCK kalkmaz görünür ama `mcl-stop.sh` regression-guard'ı re-evaluate eder, sonraki turda kapanır (gecikmeli ama eventual consistency)
+- `regression_block_active=false` kaybı → Aşama 10 risk-review BLOCK kalkmaz görünür ama `mcl-stop.sh` regression-guard'ı re-evaluate eder, sonraki turda kapanır (gecikmeli ama eventual consistency)
 
 **Mitigasyon kasıtlı eklenmedi.** Seçenekler:
 - `flock` etrafında `mcl_state_set` — ek bağımlılık (POSIX flock veya Linux/macOS fcntl), shell wrapper karmaşıklığı
