@@ -15,7 +15,7 @@ description: >
 
 MCL activates **automatically on every developer message — in every
 language including English.** There is no language precondition and no
-opt-out. The framework runs Aşama 1 → 12 for every request, responding
+opt-out. The framework runs Aşama 1 → 22 for every request, responding
 in the developer's detected language.
 
 Explicit trigger `/mcl` remains valid but is not required.
@@ -84,13 +84,23 @@ asama2_precision_audit(parameters)          → audited_parameters [hard-enforce
 asama3_translator(audited)                  → english_brief
 asama4_spec_and_verify(brief)               → approved_spec
 asama5_pattern_match()                      → naming, error_handling, test_pattern
-asama6_ui_flow(spec, patterns)              → ui_built (when ui_flow_active)
-asama7_code_tdd(spec, patterns)             → code [TDD red-green-refactor per criterion]
-asama8_risk_review(code)                    → resolved_risks [interactive dialog]
-asama9_quality_tests(code)                  → quality_fixed, tests_written [auto-fix, no dialog]
-asama10_impact_review(code)                 → resolved_impacts [interactive dialog]
-asama11_verify_report(code, decisions)      → spec_coverage_report
-asama12_translate(report)                   → localized_report
+asama6_ui_build(spec, patterns)             → ui_built (when ui_flow_active)
+asama7_ui_review(ui_built)                  → approved_ui [interactive AskUserQuestion]
+asama8_db_design(spec)                      → db_schema, indexes, query_plan (when db in scope)
+asama9_tdd(spec, patterns, db)              → code [TDD red-green-refactor per criterion]
+asama10_risk_review(code)                   → resolved_risks [interactive dialog]
+asama11_code_review(changed_files)          → code_review_fixed [auto-fix]
+asama12_simplify(changed_files)             → simplified [auto-fix]
+asama13_performance(changed_files)          → perf_fixed [auto-fix]
+asama14_security(whole_project)             → security_fixed [auto-fix]
+asama15_unit_tests(changed_files)           → unit_tests_green
+asama16_integration_tests(changed_files)    → integration_tests_green
+asama17_e2e_tests(changed_files)            → e2e_tests_green
+asama18_load_tests(changed_files)           → load_target_met
+asama19_impact_review(code)                 → resolved_impacts [interactive dialog]
+asama20_verify_report(code, decisions)      → spec_coverage_report + mock_cleanup
+asama21_localized_report(report)            → localized_report
+asama22_completeness_audit()                → audit_summary [reads audit.log]
 ```
 
 Missing, invalid, or contradictory parameter → keep gathering. Do NOT
@@ -234,46 +244,75 @@ code is consistent with the existing codebase. 3-level fallback:
 PATTERN_SUMMARY (3 lines, one rule each) is captured to state and
 injected into every Aşama 7 turn.
 
-## Aşama 6: UI Flow (conditional)
+## Aşama 6: UI Build (conditional — runnable frontend with dummy data)
 
-For full Aşama 6 rules:
-- Aşama 6 BUILD_UI: read `my-claude-lang/asama6-ui-build.md`
-- Aşama 7 UI_REVIEW: read `my-claude-lang/asama7-ui-review.md`
+For full Aşama 6 rules, read `my-claude-lang/asama6-ui-build.md`
 
 UI flow activates automatically when `mcl_is_ui_capable` returns true
 at session start (heuristic: `package.json` + components/pages/views,
 Django + templates, root `index.html`, etc.).
 
-When `ui_flow_active = true`:
-- **Aşama 6 (BUILD_UI)** — runnable frontend with dummy data only,
-  emits run snippet, transitions to Aşama 7. Backend writes BLOCKED.
-- **Aşama 7 (UI_REVIEW)** — AskUserQuestion: "approve / revise /
-  see-it-yourself / cancel". Revise → loop to Aşama 6.
-  See-it-yourself → opt-in Playwright + screenshot + multimodal Read.
-- **Backend wiring** — folded into the TDD execute phase
-  (`asama9-tdd.md` Step 5; will be renamed `asama9-tdd.md` in v11
-  R3). Path lock lifts on `ui_sub_phase="BACKEND"`. No longer a
-  separate Aşama 6c skill file as of v10.1.18.
+When `ui_flow_active = true`: MCL builds a runnable frontend with
+**dummy data only**, brings up the project and all dependencies, opens
+it automatically in the browser, emits a run snippet, then transitions
+to Aşama 7. Backend writes BLOCKED during Aşama 6 (path-lock).
 
-When `ui_flow_active = false`, Aşama 6 and Aşama 7 are skipped
-entirely; the TDD execute phase runs the standard code flow.
+When `ui_flow_active = false`: emits `asama-6-skipped reason=no-ui-flow`,
+proceeds to Aşama 8.
 
-## Aşama 8: Code + TDD (was Aşama 7 in v10 architecture)
+## Aşama 7: UI Review (developer-verified)
+
+For full Aşama 7 rules, read `my-claude-lang/asama7-ui-review.md`
+
+Developer inspects the running UI in the browser. AskUserQuestion:
+"approve / revise / see-it-yourself / cancel".
+- **Revise** → loop back to Aşama 6 with the requested change
+- **See-it-yourself** → opt-in Playwright + screenshot + multimodal Read
+  (cost warning shown beforehand)
+- **Approve** → emit `asama-7-complete`, advance to Aşama 8
+
+When Aşama 6 was skipped, Aşama 7 also emits `asama-7-skipped`.
+
+⛔ STOP RULE: Do NOT advance to Aşama 8 until UI is approved (or Aşama 6
+was skipped).
+
+## Aşama 8: DB Design (since v12.0)
+
+For full Aşama 8 rules, read `my-claude-lang/asama8-db-design.md`
+
+When the spec involves persistent data, MCL designs the database to
+normalization rules and forward-compatible patterns:
+- **Schema** — entities, relations, normalization (typically 3NF unless
+  documented denormalization with reason)
+- **Index strategy** — query-pattern-driven covering indexes
+- **Query plan** — anticipated hot queries with their planned access path
+
+Emits `asama-8-end` on completion or `asama-8-not-applicable reason=no-db-in-scope`
+when no persistent data is in scope.
+
+⛔ STOP RULE: Do NOT advance to Aşama 9 (TDD) until DB design exists or
+not-applicable audit is emitted.
+
+## Aşama 9: Code + TDD (RED → GREEN → REFACTOR per criterion)
 
 For full execution rules, read `my-claude-lang/asama9-execute.md`
 For incremental TDD rules, read `my-claude-lang/asama9-tdd.md`
-(also includes Step 5 backend wiring — folded from the v10
-Aşama 6c skill file in v10.1.18.)
 
 On every approval the Stop hook auto-saves the spec body to
-`.mcl/specs/NNNN-slug.md`. Code-writing aşama with kademeli TDD:
-RED → GREEN → refactor per acceptance criterion; full suite at end.
+`.mcl/specs/NNNN-slug.md`. Code-writing aşama with strict TDD discipline:
+for **every acceptance criterion** — failing test (RED), minimum
+production code that passes it (GREEN), refactor. Full test suite runs
+at the end. "Write code first then add tests" is forbidden — real TDD.
+
+Per AC i, emits `asama-9-ac-{i}-red`, `asama-9-ac-{i}-green`,
+`asama-9-ac-{i}-refactor`. Backend wiring (when UI flow was active)
+folded into Step 5 of this phase.
 
 All code in English. All communication in developer's language.
 Inter-tool status lines, progress updates, closing sentences, and
-release summaries are rendered in the developer's language.
-English-only survives ONLY in file paths, commit SHAs, command
-names, code fragments, fixed technical tokens.
+release summaries are rendered in the developer's language. English-only
+survives ONLY in file paths, commit SHAs, command names, code fragments,
+fixed technical tokens.
 
 When Claude Code asks a question during execution, MCL adds context:
 WHY it's asking + WHAT each answer changes (Gate 3).
@@ -283,107 +322,104 @@ WHY it's asking + WHAT each answer changes (Gate 3).
 containing them). `git rm` is a git subcommand, NOT shell `rm` —
 proceeds silently. All other actions proceed silently.
 
-## Aşama 8: Risk Review (interactive dialog)
+## Aşama 10: Risk Review (interactive dialog)
 
-For full Aşama 8 rules, read `my-claude-lang/asama10-risk-review.md`
+For full Aşama 10 rules, read `my-claude-lang/asama10-risk-review.md`
 
-After Aşama 7 writes code but BEFORE Aşama 9 (auto-fix pipeline).
+After Aşama 9 writes code but BEFORE the auto-fix pipeline (Aşama 11–18).
 Sequential, one-risk-per-turn AskUserQuestion dialog.
 
-What Aşama 8 reviews:
+What Aşama 10 reviews:
 1. **Spec Compliance Pre-Check** — every MUST/SHOULD verified, with
    particular focus on the spec's security/performance decisions
 2. **Missed-Risk Scan** — edge cases, regressions, data integrity,
    error handling, UX, concurrency, observability gaps
 3. **Brief-Aşama-1 Scope Drift (Lens (e))** — when `engineering-brief`
-   audit shows `upgraded=true`, walk Aşama 7 code for elements that
+   audit shows `upgraded=true`, walk Aşama 9 code for elements that
    lack both Aşama 1 traceability AND a `[default]` marker → flag as
    hallucinated scope
 
 Per risk, developer replies: skip / specific fix / make rule (Rule
 Capture). HEAD-based dedup via `.mcl/risk-session.md`.
 
-**Hard-enforced:** Stop hook blocks session-end after Aşama 7 code if
+After risk fixes, the TDD test suite is re-run: all green → pass; red
+→ fix the offending code; conflict → developer decides.
+
+**Hard-enforced:** Stop hook blocks session-end after Aşama 9 code if
 `risk_review_state ≠ complete`. After 3 consecutive blocks → fail-open
 (loop-breaker).
 
-⛔ STOP RULE: Do NOT emit Aşama 9 until Aşama 8 is complete.
+⛔ STOP RULE: Do NOT emit Aşama 11 until Aşama 10 is complete.
 
-## Aşama 10–17: Quality + Tests pipeline (split into 8 dedicated phases in v11.0 R5)
+## Aşama 11–18: Quality + Tests pipeline (auto-fix, no dialog)
 
-**v11.0 architecture (since v10.1.21):** the v10 monolithic Aşama 9
-sub-steps `9.1`–`9.8` are now 8 top-level dedicated phases, each
-with its own skill file. The pipeline still runs sequentially with
-no AskUserQuestion (auto-fix only); only the addressing changes —
-each phase has a top-level audit identity instead of a shared
-`asama-9-N-*` namespace.
+Eight dedicated sequential phases on the new/changed file set; each
+runs scan → fix → rescan loop with no AskUserQuestion. Quality phases
+auto-fix; test phases write missing tests until all are green.
 
-| v11 # | v10 # | Phase | What it does | Skill file |
-|---|---|---|---|---|
-| Aşama 10 | 9.1 | Code review | Correctness, dead code, validations | `asama11-code-review.md` |
-| Aşama 11 | 9.2 | Simplify | Premature abstraction, duplicate logic | `asama12-simplify.md` |
-| Aşama 12 | 9.3 | Performance | N+1, unbounded loops, blocking calls | `asama13-performance.md` |
-| Aşama 13 | 9.4 | Security | Semgrep + injection / auth / CSRF / secrets (whole-project scope in v11) | `asama14-security.md` |
-| Aşama 14 | 9.5 | Unit + TDD tests | One per new function/class/module | `asama15-unit-tests.md` |
-| Aşama 15 | 9.6 | Integration tests | Cross-module, API endpoints, DB | `asama16-integration-tests.md` |
-| Aşama 16 | 9.7 | E2E tests | UI active + new user flows | `asama17-e2e-tests.md` |
-| Aşama 17 | 9.8 | Load tests | Throughput-sensitive paths | `asama18-load-tests.md` |
+| Aşama | Phase | What it does | Skill file |
+|---|---|---|---|
+| 11 | Code review | Correctness, dead code, validations, naming | `asama11-code-review.md` |
+| 12 | Simplify | Premature abstraction, duplicate logic, complexity | `asama12-simplify.md` |
+| 13 | Performance | N+1, unbounded loops, blocking calls | `asama13-performance.md` |
+| 14 | Security | Semgrep + injection / auth / CSRF / secrets — **whole-project scope** | `asama14-security.md` |
+| 15 | Unit tests | One per new function/class/module + TDD verification | `asama15-unit-tests.md` |
+| 16 | Integration tests | Cross-module, API endpoints, DB | `asama16-integration-tests.md` |
+| 17 | E2E tests | UI active + new user flows | `asama17-e2e-tests.md` |
+| 18 | Load tests | Throughput-sensitive paths | `asama18-load-tests.md` |
 
-**Soft applicability ("yumuşak katılık"):** when not applicable for
-the current code shape (load test for calculator, E2E for CLI), each
-phase writes its own `asama-N-not-applicable | reason=<why>` audit
-and skips silently. Backward-compat aliases (`asama-9-N-*`) are
-also emitted by each phase during the v10.1.21 → v11.0.0 bridge
-period; R8 cutover removes the v10 alias emits.
+Quality phases (11–14) emit `asama-N-scan count=K`, then per-issue
+`asama-N-issue-{n}-fixed`, then `asama-N-rescan count=0` when stable.
+Test phases (15–18) emit `asama-N-end-green` (or `asama-N-end-target-met`
+for load tests). When not applicable to the current code shape, each
+phase writes `asama-N-not-applicable reason=<why>` and skips silently.
 
-Each phase writes start/end audit entries (skip-detection control)
-plus the v10 alias for hook compatibility.
+## Aşama 19: Impact Review (interactive dialog)
 
-## Aşama 10: Impact Review (interactive dialog)
+For full Aşama 19 rules, read `my-claude-lang/asama19-impact-review.md`
 
-For full Aşama 10 rules, read `my-claude-lang/asama19-impact-review.md`
-
-After Aşama 9 auto-fix complete. Sequential, one-impact-per-turn
-AskUserQuestion dialog. An "impact" is a real downstream effect on
-something OTHER than the changed code itself: importers, shared
-utilities whose behavior shifted, API/contract breakage, shared
-state/cache invalidation, schema/migration effects, configuration
-changes affecting other components.
+After Aşama 18. Sequential, one-impact-per-turn AskUserQuestion dialog.
+An "impact" is a real downstream effect on something OTHER than the
+changed code itself: importers, shared utilities whose behavior shifted,
+API/contract breakage, shared state/cache invalidation, schema/migration
+effects, configuration changes affecting other components.
 
 Per impact, developer replies: skip / specific fix / make rule.
 
-⛔ STOP RULE: Do NOT emit Aşama 11 until Aşama 10 is complete.
+⛔ STOP RULE: Do NOT emit Aşama 20 until Aşama 19 is complete.
 
-## Aşama 11: Verify Report
+## Aşama 20: Verify Report (+ mock cleanup)
 
 For full rules, read `my-claude-lang/asama20-verify-report.md`
 
 Spec Coverage table — every MUST/SHOULD requirement linked to the test
 that covers it: ✅ file:line / ⚠️ partial / ❌ no test written.
+**Mock data is removed from the project** as part of this phase
+(`asama-20-mock-cleanup-resolved`).
 
 ⛔ STOP RULE: Do NOT write "all steps completed" or "done" without
-producing the Verification Report after Aşama 10 finishes.
+producing the Verification Report after Aşama 19 finishes.
 
-## Aşama 12: Translate Report
+## Aşama 21: Localized Report
 
-For full Aşama 12 rules, read `my-claude-lang/asama21-localized-report.md`
+For full Aşama 21 rules, read `my-claude-lang/asama21-localized-report.md`
 
-The full English Aşama 11 report is translated EN → user_lang via
+The full English Aşama 20 report is translated EN → user_lang via
 strict translator pass. No interpretation, no addition, no omission.
 Technical tokens (file paths, test names, timestamps, CLI flags) stay
 verbatim. Skipped silently when source language is English.
 
-## Aşama 13: Completeness Audit
+## Aşama 22: Completeness Audit
 
-For full Aşama 13 rules, read `my-claude-lang/asama22-completeness.md`
+For full Aşama 22 rules, read `my-claude-lang/asama22-completeness.md`
 
 Last phase before session close. Reads `.mcl/audit.log` + `state.json`
-+ `trace.log` and renders a machine-verifiable summary of which
-phases 1-12 actually completed end-to-end. Two mandatory deep dives:
-**Aşama 7** (was test-first applied? was test_command run GREEN?) and
-**Aşama 9** (did each sub-step 9.1–9.8 start, end, and apply auto-fix?).
-Skips with non-✓ verdicts surface as Open Issues. Emits
-`asama-13-complete` audit on completion.
++ `trace.log` and renders a machine-verifiable summary of which phases
+1–21 actually completed end-to-end. Two mandatory deep dives: **Aşama 9**
+(was test-first applied? was test_command run GREEN per AC?) and the
+**quality+tests pipeline 11–18** (did each phase scan, fix, and rescan
+to zero?). Skips with non-✓ verdicts surface as Open Issues. Emits
+`asama-22-complete` on completion.
 
 ---
 
@@ -394,7 +430,8 @@ For the MCL step catalog, read `my-claude-lang/all-mcl.md`
 
 The developer types `/mcl-checkup` to evaluate whether every MCL aşama
 ran correctly. READ-ONLY — never modifies state, never triggers
-AskUserQuestion, never runs Aşama 8/9/10/11.
+AskUserQuestion, never runs Aşama 10 / 19 / 20 / 22 (the gate / report
+phases).
 
 Status codes: ✅ PASS / ❌ FAIL / ⚠️ WARN / ⏭️ SKIP / ❓ UNKNOWN
 
@@ -407,7 +444,7 @@ Bypasses the normal pipeline.
 
 ## Project Memory — `.mcl/project.md`
 
-MCL writes/updates `.mcl/project.md` at every Aşama 11 finish. File
+MCL writes/updates `.mcl/project.md` at every Aşama 20 finish. File
 contains:
 - **Mimari** — durable architectural decisions
 - **Teknik Borç** — `[ ]` open / `[x] (date)` resolved checklist
@@ -421,7 +458,7 @@ documented.
 
 For full rules, read `my-claude-lang/mcl-finish.md`
 
-Aggregates Aşama 10 impacts accumulated since the last checkpoint and
+Aggregates Aşama 19 impacts accumulated since the last checkpoint and
 emits a project-level finish report. Bypasses the normal pipeline.
 
 ## Partial Spec Recovery
@@ -438,7 +475,7 @@ raised, the Stop hook IGNORES any AskUserQuestion approval.
 
 For full rules, read `my-claude-lang/rule-capture.md`
 
-During Aşama 8 (or anywhere a generalizable pattern appears), the
+During Aşama 10 (or anywhere a generalizable pattern appears), the
 developer may ask MCL to turn a fix into a durable rule. MCL asks for
 scope (once / project / all projects), shows exact English text +
 localized version, writes only on explicit approval to
@@ -475,10 +512,12 @@ never ask multiple questions at once.
 
 ## Mandatory Aşama Execution
 
-ALL aşamas MUST be executed. No aşama can be skipped (except those
-with explicit skip conditions: Aşama 2 for English source, Aşama 3
-for English source, Aşama 5 for empty+no-stack, Aşama 6 when no UI
-detected, Aşama 12 for English source). Skipping any other aşama
+ALL 22 aşamas MUST be executed. No aşama can be skipped (except those
+with explicit skip conditions: Aşama 2 / 3 for English source, Aşama 5
+when project is greenfield or empty+no-stack, Aşama 6 / 7 when no UI
+detected, Aşama 8 when no DB in scope, Aşama 21 for English source, and
+quality/test phases (11–18) when not-applicable to the current code
+shape — each emitting its own skip audit). Skipping any other aşama
 breaks the entire bridge.
 
 The three-way communication (User ↔ MCL ↔ Claude Code) only works
