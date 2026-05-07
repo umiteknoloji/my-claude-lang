@@ -7,6 +7,84 @@
 
 ## [Unreleased]
 
+## [13.0.0] - 2026-05-07
+
+### Universal deterministic gate engine — v13.0 groundwork release
+
+v13.0 introduces the **gate-spec engine**: a centralized state-machine
+spec (`gate-spec.json`) + universal hook engine (`hooks/lib/mcl-gate.sh`)
+that decides phase completeness from audit-log signals. Stop hook now
+runs a **universal completeness loop** that walks `current_phase`
+forward and auto-emits `asama-N-complete` + `phase_transition` when the
+gate criteria for phase N are met. Pre-tool hook gains a **soft deny**
+on model-emitted `phase_transition` and `asama-N-progression-from-emit`
+(model can still emit `asama-N-complete` during the v13.0 bridge — full
+hardening lands in v13.1 once skill MD migrations complete).
+
+#### What's in v13.0
+
+- **`skills/my-claude-lang/gate-spec.json`** — 22-phase spec with 6 gate
+  types: `single`, `section`, `list`, `iterative`, `substep` (Faz 9
+  TDD), `self-check` (Faz 22). Faz 6/7 corrected to `single-or-skip`
+  (matches v12.0.0 file structure; brief's section interpretation
+  rejected because v11.0.0 R1 had already collapsed 6a/6b/6c).
+- **`hooks/lib/mcl-gate.sh`** — universal `_mcl_gate_check <phase>`
+  function. Reads gate-spec, scans audit.log for required signals,
+  returns `complete | incomplete | skipped`. Includes legacy v12
+  fallback (any `asama-N-complete` audit triggers complete) so existing
+  skill files keep working through the bridge.
+- **`hooks/mcl-stop.sh`** — universal completeness loop replaces the
+  hardcoded asama-8/9/10/11/12 progression blocks (v11/v12 era). Walks
+  current_phase forward up to 22 iterations, auto-emits per-phase
+  complete + phase_transition + state advance.
+- **`hooks/mcl-pre-tool.sh`** — soft deny on `phase_transition` and
+  `asama-N-progression-from-emit` model emits. `asama-N-complete` model
+  emits remain ALLOWED in v13.0 (legacy bridge).
+- **`tests/cases/test-v13-gate-spec.sh`** — 19 unit tests covering all
+  6 gate types. New baseline: 289/24/2 (v12.0.0 was 270/24/2 — net +19
+  passes, 0 new failures).
+
+#### What's NOT in v13.0 (deferred)
+
+- **Skill MD migrations to new emit patterns.** Faz 4
+  (`asama-4-ac-count`), Faz 9 (RED/GREEN/REFACTOR triples), Faz 10/19
+  (`items-declared` + per-item-resolved), Faz 11-14 (scan +
+  issue-fixed + rescan): documented in gate-spec.json BUT skill files
+  still emit legacy `asama-N-complete`. Gate engine handles via legacy
+  fallback. Full migration → v13.1.
+- **Hard deny on `asama-N-complete`.** v13.1 hardens once all skill
+  MDs have migrated.
+- **Test suite v13 audit name updates.** ~24 pre-existing failures
+  unchanged. v13.0.1 cleanup release.
+- **`risk_review_state` / `quality_review_state` removal.** Fields
+  remain in state schema as deprecated/unused. v13.2 cleanup.
+
+#### Bridge guarantees
+
+1. **Existing v12 sessions continue to work.** Legacy `asama-N-complete`
+   model emits remain valid; gate engine accepts them via fallback.
+2. **Universal loop is idempotent.** If `asama-N-complete` already
+   exists, hook skips re-emit (state still advances).
+3. **Soft deny does not block legitimate flows.** Only `phase_transition`
+   and `asama-N-progression-from-emit` are denied — model never had a
+   reason to emit these directly.
+
+#### Smoke verification
+
+- `bash -n` clean across 4 modified hooks + new mcl-gate.sh
+- `python3 -c "import json; json.load(open('skills/my-claude-lang/gate-spec.json'))"` valid
+- `bash tests/cases/test-v13-gate-spec.sh` → 19/19 PASS
+- End-to-end: state.current_phase=1 + summary-confirm-approve audit →
+  stop hook auto-emits `asama-1-complete` → state advances to 2 → trace
+  logs `phase_transition 1 2`. Verified.
+
+#### Plan reference
+
+`~/.claude/plans/g-zel-bi-plan-yap-iridescent-star.md` (v13.0 plan).
+Brief: `MCL_v13_brief.md` (repo root).
+
+Banner: MCL 12.0.1 → **MCL 13.0.0**.
+
 ## [12.0.0] - 2026-05-05
 
 ### v12.0 cutover — 22-phase pipeline with new Aşama 8 (DB design)
