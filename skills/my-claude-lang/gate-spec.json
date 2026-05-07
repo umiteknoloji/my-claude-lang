@@ -3,7 +3,7 @@
   "_comment": "Universal deterministic gate spec. Hook reads this to decide phase completeness. Model emits per-item / per-section / scan-rescan / triple audits ONLY; *-complete and phase_transition are hook-emitted via lib/mcl-gate.sh.",
   "phases": {
     "1":  {"type": "single",    "required_audits": ["summary-confirm-approve"]},
-    "2":  {"type": "single",    "required_audits": ["asama-2-complete"]},
+    "2":  {"type": "single",    "required_audits": ["asama-2-complete"], "auto_complete_audit": "precision-audit", "auto_complete_check": "no_gates_or_skipped"},
     "3":  {"type": "single",    "required_audits": ["asama-3-complete"]},
     "4":  {"type": "single",    "required_audits": ["asama-4-complete", "asama-4-ac-count"]},
     "5":  {"type": "single",    "required_audits_any": ["asama-5-complete", "asama-5-skipped"]},

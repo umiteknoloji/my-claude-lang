@@ -90,13 +90,43 @@ if has_audit(f"asama-{phase}-complete"):
 t = pspec["type"]
 
 # ── single ────────────────────────────────────────────────────────
+# Optional auto-complete branch (since v13.0.1):
+# When required_audits[_any] not satisfied, fall back to a named check
+# against an auxiliary audit's payload. Used by Faz 2 to handle the
+# "all SILENT-ASSUME, no GATE questions, no AskUserQuestion" path
+# where asama-2-complete never fires but the precision-audit emit
+# already proves the phase ran with zero gates.
+def _named_check(check_name, audit_name):
+    if check_name == "no_gates_or_skipped":
+        # Read last precision-audit-style emit; passes when
+        # core_gates+stack_gates == 0 OR skipped=true.
+        needle = f"| {audit_name} |"
+        last_line = None
+        for l in audit_lines:
+            if needle in l:
+                last_line = l
+        if last_line is None:
+            return False
+        m_skipped = re.search(r"\bskipped=(true|false)\b", last_line)
+        if m_skipped and m_skipped.group(1) == "true":
+            return True
+        m_core = re.search(r"\bcore_gates=(\d+)", last_line)
+        m_stack = re.search(r"\bstack_gates=(\d+)", last_line)
+        core = int(m_core.group(1)) if m_core else 0
+        stack = int(m_stack.group(1)) if m_stack else 0
+        return (core + stack) == 0
+    return False
+
 if t == "single":
     if "required_audits_any" in pspec:
         if any(has_audit(n) for n in pspec["required_audits_any"]):
             print("complete"); sys.exit(0)
-        print("incomplete"); sys.exit(0)
-    if "required_audits" in pspec:
+    elif "required_audits" in pspec:
         if all(has_audit(n) for n in pspec["required_audits"]):
+            print("complete"); sys.exit(0)
+    # Auto-complete fallback (v13.0.1)
+    if "auto_complete_audit" in pspec and "auto_complete_check" in pspec:
+        if _named_check(pspec["auto_complete_check"], pspec["auto_complete_audit"]):
             print("complete"); sys.exit(0)
     print("incomplete"); sys.exit(0)
 
