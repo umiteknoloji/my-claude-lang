@@ -151,14 +151,19 @@ else
   FAIL=$((FAIL+1)); printf '  FAIL: T9: strict mode — 5 stops, expected all block, got %d block %d not-block\n' "$_strict_pass" "$_strict_fail"
 fi
 
-# ════════ T10: only Bash other than server (e.g., ls) → no block ════════
+# ════════ T10: only Bash other than server (v13.0.8 STRICT: block:neither) ════════
+# v13.0.6 expected "no block" (lens only fired on server-without-browser).
+# v13.0.8 hardened — Aşama 6 invariant requires BOTH server AND browser.
+# When neither present at Aşama 6 active → block (matches user-reported gap
+# where model does npm install + node -e tests but never starts server).
+_a6_state 6 "BUILD_UI"
 _reset
 cat > "$_dir/transcript.jsonl" <<'EOF'
 {"role":"user","content":"x"}
 {"role":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"ls -la"}}]}}
 EOF
 out="$(_run_stop "$_dir/transcript.jsonl")"
-_assert "T10: ls only (no server) → no block" "$(_decision "$out")" "none"
+_assert "T10: no server + no browser at Aşama 6 → block (v13.0.8 strict)" "$(_decision "$out")" "block"
 
 # ════════ T11: Python flask, no browser → block ════════
 _reset
@@ -177,5 +182,41 @@ cat > "$_dir/transcript.jsonl" <<'EOF'
 EOF
 out="$(_run_stop "$_dir/transcript.jsonl")"
 _assert "T12: pnpm dev + open chained → no block" "$(_decision "$out")" "none"
+
+# ════════ T13 (v13.0.8): real-world failure — npm install + node -e + summary, NO server start → block ════════
+# Mirror of user-reported production session where model wrote files,
+# ran npm install (package install ≠ server start), ran node -e tests,
+# said "Tamamlandı", and stopped. v13.0.6 missed this case (server_started=false
+# meant lens didn't fire). v13.0.8 catches it.
+_a6_state 6 "BUILD_UI"
+_reset
+cat > "$_dir/transcript.jsonl" <<'EOF'
+{"role":"user","content":"build app"}
+{"role":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":"app.js"}},{"type":"tool_use","name":"Bash","input":{"command":"npm install"}},{"type":"tool_use","name":"Bash","input":{"command":"node -e 'console.log(1)'"}},{"type":"text","text":"Tamamlandı"}]}}
+EOF
+out="$(_run_stop "$_dir/transcript.jsonl")"
+_assert "T13: real-world npm install + node -e + 'Tamamlandı' → block (v13.0.8)" "$(_decision "$out")" "block"
+reason="$(printf '%s' "$out" | python3 -c "import json,sys;print(json.loads(sys.stdin.read()).get('reason') or '')" 2>/dev/null)"
+if [[ "$reason" == *"Ne sunucu başlatıldı ne tarayıcı açıldı"* ]]; then
+  PASS=$((PASS+1)); printf '  PASS: T13: block:neither REASON yields specific message\n'
+else
+  FAIL=$((FAIL+1)); printf '  FAIL: T13: block:neither REASON missing specific message\n'
+fi
+audit_grep="$(grep -E 'asama-6-server-and-browser-missing-block|asama-6-server-not-started-block' "$_dir/.mcl/audit.log" 2>/dev/null | head -1)"
+if [ -n "$audit_grep" ]; then
+  PASS=$((PASS+1)); printf '  PASS: T13: distinct audit tag emitted\n'
+else
+  FAIL=$((FAIL+1)); printf '  FAIL: T13: distinct audit tag missing\n'
+fi
+
+# ════════ T14 (v13.0.8): node ./src/index.js path → matches server regex ════════
+_a6_state 6 "BUILD_UI"
+_reset
+cat > "$_dir/transcript.jsonl" <<'EOF'
+{"role":"user","content":"x"}
+{"role":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"node ./src/index.js"}},{"type":"tool_use","name":"Bash","input":{"command":"open http://localhost:3000"}}]}}
+EOF
+out="$(_run_stop "$_dir/transcript.jsonl")"
+_assert "T14: node ./src/index.js + open → no block (path prefix coverage)" "$(_decision "$out")" "none"
 
 cleanup_test_dir "$_dir"

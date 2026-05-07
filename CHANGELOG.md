@@ -7,6 +7,66 @@
 
 ## [Unreleased]
 
+## [13.0.8] - 2026-05-07
+
+### Aşama 6 lens hardened — full invariant enforcement (block:neither + path-aware regex)
+
+**Real-world failure (kullanıcı raporu):** Production session — model frontend dosyalarını yazdı, `npm install` (paket kurulumu) çalıştırdı, `node -e 'console.log(...)'` test komutu çalıştırdı, "Tamamlandı" deyip durdu. **Sunucuyu hiç başlatmadı, tarayıcıyı hiç açmadı.** v13.0.6 lens'i sadece "server STARTED + browser MISSING" durumunu yakalıyordu; "neither" durumunu yakalamıyordu.
+
+**Aşama 6 spec (MCL_Pipeline.md):**
+> "Front-end dummy data ile yapılır. Proje ve tüm bağımlılıkları **ayağa kaldırılır**. Proje **otomatik olarak tarayıcıda açılır**."
+
+3 invariant: (a) frontend yazıldı, (b) sunucu çalıştırıldı, (c) tarayıcı açıldı. v13.0.6 sadece (b)→(c) bağımlılığı zorluyordu; v13.0.8 hem (b) hem (c) varlığını zorluyor.
+
+#### Mekanizma
+
+`_mcl_asama_6_server_browser_check` (mcl-stop.sh) güncellemeleri:
+- **Scan scope**: last-assistant-turn → **session-wide** (tüm assistant turn'leri session_start'tan beri). Multi-turn workflow'ları desteklemek için (turn 1 kod yaz, turn 2 install, turn 3 server+browser).
+- **Output artırıldı** 4 değere:
+  - `ok` — server + browser her ikisi de session içinde mevcut
+  - `block:no-server` — browser açıldı ama server hiç başlatılmadı (yeni)
+  - `block:no-browser` — server başlatıldı ama browser açılmadı (v13.0.6'dan)
+  - `block:neither` — her ikisi de eksik (yeni — kullanıcının senaryosu)
+- **Server regex path-aware**: `node\s+(?:[\w./\-]*/)?(?:server|index|app|...)` — `node ./src/index.js`, `node backend/main.js` gibi path-prefixed varyantları kapsıyor (eski regex sadece direct keyword'leri yakalıyordu).
+- **Branch'e göre özel REASON**: 3 ayrı block kindi için ayrı talimat (no-server / no-browser / neither). Audit tag'leri de farklı: `asama-6-server-not-started-block`, `asama-6-server-without-browser-block`, `asama-6-server-and-browser-missing-block`.
+
+`block:neither` REASON model'e şunu söyler:
+- `npm install` paket kurulumu — sunucu BAŞLATMAZ
+- `node -e` test komutu — sunucu DEĞİL
+- Sunucu çalıştır: `npm run dev` / `node server.js` / `flask run` / vb. (run_in_background:true)
+- Sleep + `open http://localhost:<port>` (macOS) / `xdg-open` (Linux)
+- `asama-6-end` audit emit
+- Aşama 7 askq
+
+#### STRICT mode preserved
+
+Loop-breaker yok. Fail-open yok. Aşama 6 active iken her stop'ta:
+- BOTH server + browser cumulative session'da mevcut DEĞİLSE → block
+- `asama-6-end` veya `asama-6-skipped` audit emit edilmediyse block
+- Test T9 (5 ardışık stop) hâlâ doğrular
+
+#### Out of Scope (kasıtlı)
+
+- ❌ "Sunucu çalışıp çalışmadığını network probe ile doğrulama" — model'in çalıştırdığı komutu güveniyoruz, network probe overhead/complexity
+- ❌ Diğer Aşama'lar için benzer "evidence required" lens — v13.0.6 single targeted exception'ı genişletmiyoruz, başka mid-task abandonment pattern'leri ayrı kararlar gerektirir
+
+#### Verification
+
+- bash -n: 4 hook + dsi.sh clean
+- 14 unit test (test-v1306 dosyasına T13+T14 eklendi):
+  - T13: real-world npm install + node -e + "Tamamlandı" → block:neither + spesifik REASON + distinct audit tag
+  - T14: node ./src/index.js path-form → server regex doğru match
+- T10 v13.0.6 davranışından v13.0.8 strict davranışa güncellendi (no-server-no-browser → block, intentional)
+- Test baseline: 357 → **361 passed** / 24 failed (unchanged) / 2 skipped — sıfır regresyon
+
+#### Production simulation (kullanıcı senaryosu)
+
+User session: backoffice projesi, model dosyaları yazdı + npm install + node -e tests + "Tamamlandı" → durdu.
+
+v13.0.6'da: lens fire etmedi (server_started=false, "block" sadece server-started+no-browser durumunda).
+
+v13.0.8'de: lens `block:neither` döndürür → Stop hook decision:block + REASON model'e tam talimat verir → model bir sonraki turda `npm run dev` + `open http://localhost:3000` + `asama-6-end` audit emit etmek zorunda. Audit emit edilmezse hâlâ block.
+
 ## [13.0.7] - 2026-05-07
 
 ### Aşama 2 zero-gate synthesis — auto-complete when nothing to ask

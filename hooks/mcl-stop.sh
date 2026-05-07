@@ -221,12 +221,24 @@ print("warn" if (edit_called and not spec_seen_before_edit) else "ok")
 PYEOF
 }
 
-# --- Aşama 6 server-without-browser strict check (v13.0.6) ---
-# Returns one of: "block" (server started, browser not opened),
-# "ok" (browser opened OR no server started OR Aşama 6 not active),
-# "skip" (Aşama 6 already complete or skipped).
-# STRICT: no loop-breaker — every stop in current_phase=6 + server-without-browser
-# triggers block until model runs `open <url>` in same turn.
+# --- Aşama 6 server-without-browser strict check (v13.0.6, hardened v13.0.8) ---
+# Aşama 6 spec (MCL_Pipeline.md): "Front-end dummy data ile yapılır. Proje ve
+# tüm bağımlılıkları ayağa kaldırılır. Proje otomatik olarak tarayıcıda
+# açılır." → 3 invariants:
+#   (a) frontend code written
+#   (b) server brought up
+#   (c) browser auto-opened
+# v13.0.6 only enforced (b)→(c). v13.0.8 enforces BOTH (b) AND (c) at stop:
+#   - missing server-start → block "start server first"
+#   - missing browser-open → block "open browser"
+#   - both present → ok
+# Scan SCOPE: session-wide (all assistant turns since session_start), not
+# just last turn — accommodates multi-turn workflows (write code in turn 1,
+# install deps in turn 2, start server + open browser in turn 3).
+# Returns: "block:no-server" | "block:no-browser" | "block:neither" | "ok".
+# STRICT: no loop-breaker — every stop in current_phase=6 with missing
+# evidence triggers block until model emits both commands or `asama-6-end` /
+# `asama-6-skipped` audit.
 _mcl_asama_6_server_browser_check() {
   local transcript="${1:-}"
   [ -n "$transcript" ] && [ -f "$transcript" ] || { echo "ok"; return 0; }
@@ -237,11 +249,11 @@ path = sys.argv[1]
 SERVER_RE = re.compile(
     r"(?:^|\s|;|&&|\|\|)("
     r"(?:npm|pnpm|yarn)\s+(?:run\s+)?(?:dev|start|serve)"
-    r"|node\s+(?:server|index|app|dist|src/|bin/|backend/)"
+    r"|node\s+(?:[\w./\-]*/)?(?:server|index|app|dist|src|bin|backend|main)"
     r"|nodemon\s+"
     r"|deno\s+(?:run|task)"
     r"|bun\s+(?:run|dev|start)"
-    r"|python3?\s+(?:-m\s+)?(?:http\.server|flask|manage\.py\s+runserver|uvicorn)"
+    r"|python3?\s+(?:-m\s+)?(?:http\.server|flask|manage\.py\s+runserver|uvicorn|fastapi)"
     r"|flask\s+run"
     r"|fastapi\s+(?:run|dev)"
     r"|uvicorn\s+"
@@ -268,7 +280,8 @@ BROWSER_RE = re.compile(
     r"|firefox\s+(?:https?://|localhost)"
     r")", re.IGNORECASE,
 )
-last_assistant_blocks = None
+server_started = False
+browser_opened = False
 try:
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
@@ -282,35 +295,33 @@ try:
             msg = obj.get("message") or obj
             if not isinstance(msg, dict):
                 continue
-            if msg.get("role") == "assistant":
-                content = msg.get("content")
-                if isinstance(content, list):
-                    last_assistant_blocks = content
+            if msg.get("role") != "assistant":
+                continue
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") != "tool_use":
+                    continue
+                if (block.get("name") or "") != "Bash":
+                    continue
+                cmd = ((block.get("input") or {}).get("command") or "")
+                if SERVER_RE.search(cmd):
+                    server_started = True
+                if BROWSER_RE.search(cmd):
+                    browser_opened = True
 except Exception:
     print("ok"); sys.exit(0)
-if not last_assistant_blocks:
-    print("ok"); sys.exit(0)
-server_started = False
-browser_opened = False
-for block in last_assistant_blocks:
-    if not isinstance(block, dict):
-        continue
-    if block.get("type") != "tool_use":
-        continue
-    name = block.get("name") or ""
-    if name != "Bash":
-        continue
-    cmd = ((block.get("input") or {}).get("command") or "")
-    if SERVER_RE.search(cmd):
-        server_started = True
-    if BROWSER_RE.search(cmd):
-        browser_opened = True
-if server_started and not browser_opened:
-    print("block")
-elif server_started and browser_opened:
-    print("ok-with-browser")
-else:
+if server_started and browser_opened:
     print("ok")
+elif server_started and not browser_opened:
+    print("block:no-browser")
+elif not server_started and browser_opened:
+    print("block:no-server")
+else:
+    print("block:neither")
 PYEOF
 }
 
@@ -681,13 +692,28 @@ PYEOF
   if [ "$_A6_ALREADY_DONE" = "no" ] && \
      [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
     _A6_LENS="$(_mcl_asama_6_server_browser_check "$TRANSCRIPT_PATH" 2>/dev/null || echo "ok")"
-    if [ "$_A6_LENS" = "block" ]; then
-      mcl_audit_log "asama-6-server-without-browser-block" "stop" "phase=${_A6_PHASE_FOR_LENS} ui_sub=${_A6_UISUB_FOR_LENS}"
+    case "$_A6_LENS" in
+      block:no-server)
+        _A6_AUDIT_TAG="asama-6-server-not-started-block"
+        _A6_REASON_BODY="⛔ MCL AŞAMA 6 EKSİK — Sunucu hiç başlatılmadı. Aşama 6 spec'i (MCL_Pipeline.md) şu üçünü zorunlu kılar:\n  (1) Frontend dummy data ile yazıldı ✓\n  (2) Proje ve bağımlılıkları **ayağa kaldırıldı** ✗\n  (3) Proje **otomatik olarak tarayıcıda açıldı** ✗\n\n${_BT}npm install${_BT} paket kurulumu — sunucuyu başlatmaz. ${_BT}node -e ${_BT} test komutu da değil. Sunucuyu çalıştır:\n  - Vite/React/Vue: ${_BT}npm run dev${_BT}\n  - Express/Node API: ${_BT}node server.js${_BT} veya ${_BT}npm start${_BT}\n  - Flask: ${_BT}flask run${_BT}\n  - Django: ${_BT}python manage.py runserver${_BT}\n  - vb.\n\nSunucu run_in_background:true ile başlatılmalı (bloklamasın). Sonra kısa sleep + tarayıcı aç:\n  ${_BT}sleep 2 && open http://localhost:<port>${_BT} (macOS) / ${_BT}xdg-open${_BT} (Linux)\n\nAşama 6 audit'i: ${_BT}bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-6-end mcl-stop \\\"server_started=true browser_opened=true\\\"'${_BT}\n\nKATI MOD: fail-open yok. Sunucu + tarayıcı + audit zinciri tamamlanmadan stop kalkmaz."
+        ;;
+      block:no-browser)
+        _A6_AUDIT_TAG="asama-6-server-without-browser-block"
+        _A6_REASON_BODY="⛔ MCL AŞAMA 6 EKSİK — Sunucu başlatıldı AMA tarayıcı açılmadı. Aşama 6 spec'i: 'Proje otomatik olarak tarayıcıda açılır.' Tarayıcı açma komutu çalıştırılmadan Aşama 6 tamamlanmış sayılmaz.\n\nBu turda yap:\n1. Tarayıcıyı aç. macOS: ${_BT}open http://localhost:<port>${_BT}. Linux: ${_BT}xdg-open http://localhost:<port>${_BT}. Windows: ${_BT}start http://localhost:<port>${_BT}. Port'u sunucu çıktısından oku.\n2. Aşama 6 audit: ${_BT}bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-6-end mcl-stop \\\"server_started=true browser_opened=true\\\"'${_BT}\n3. Aşama 7 (UI Review) AskUserQuestion: prefix ${_BT}MCL ${INSTALLED_VERSION} | Faz 7 — UI onayı:${_BT}.\n\nKATI MOD: fail-open yok."
+        ;;
+      block:neither)
+        _A6_AUDIT_TAG="asama-6-server-and-browser-missing-block"
+        _A6_REASON_BODY="⛔ MCL AŞAMA 6 TAMAMLANMADI — Ne sunucu başlatıldı ne tarayıcı açıldı. Aşama 6 invariant'ları (MCL_Pipeline.md):\n  (1) Frontend dummy data ile yazıldı ✓ (kod yazıldı)\n  (2) Proje ayağa kaldırıldı ✗\n  (3) Tarayıcıda açıldı ✗\n\n'Tamamlandı' demek yetmez — sunucu ve tarayıcı ÇALIŞTIRILMALI. Bu turda:\n1. ${_BT}npm install${_BT} (gerekirse — paket kurulumu)\n2. Sunucuyu başlat (background): ${_BT}npm run dev${_BT} / ${_BT}node server.js${_BT} / ${_BT}flask run${_BT} run_in_background:true\n3. Sleep + tarayıcı aç: ${_BT}sleep 2 && open http://localhost:<port>${_BT}\n4. Audit emit: ${_BT}bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-6-end mcl-stop \\\"server_started=true browser_opened=true\\\"'${_BT}\n5. Aşama 7 (UI Review) askq.\n\nProje 'kullanılabilir hale gelmeden' Aşama 6 bitmez. UI flow yoksa: ${_BT}mcl_audit_log asama-6-skipped mcl-stop \\\"reason=no-ui-flow\\\"${_BT}.\n\nKATI MOD: fail-open yok."
+        ;;
+      *) _A6_AUDIT_TAG=""; _A6_REASON_BODY="" ;;
+    esac
+    if [ -n "$_A6_AUDIT_TAG" ]; then
+      mcl_audit_log "$_A6_AUDIT_TAG" "stop" "phase=${_A6_PHASE_FOR_LENS} ui_sub=${_A6_UISUB_FOR_LENS} verdict=${_A6_LENS}"
       command -v mcl_trace_append >/dev/null 2>&1 && \
-        mcl_trace_append asama_6_server_without_browser_block "${_A6_PHASE_FOR_LENS}/${_A6_UISUB_FOR_LENS}"
+        mcl_trace_append asama_6_block "${_A6_LENS}"
       printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⛔ MCL AŞAMA 6 EKSİK — Sunucu başlatıldı (npm run dev / node server / flask run / vb.) AMA tarayıcı açılmadı. Aşama 6 spec'i açıkça şöyle der: 'Proje otomatik olarak tarayıcıda açılır.' Tarayıcı açma komutu çalıştırılmadan Aşama 6 tamamlanmış sayılmaz.\n\nBu turda eksiksiz şu adımları yap:\n1. Bash ile tarayıcıyı aç. macOS: ${_BT}open http://localhost:<port>${_BT}. Linux: ${_BT}xdg-open http://localhost:<port>${_BT}. Windows: ${_BT}start http://localhost:<port>${_BT}. Port'u sunucu çıktısından oku (genelde 3000 / 5173 / 8000 / 5000).\n2. Aşama 6 audit emit et: ${_BT}bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-6-end mcl-stop \\\"server_started=true browser_opened=true\\\"'${_BT}\n3. Aşama 7 (UI Review) AskUserQuestion'a geç: prefix ${_BT}MCL ${INSTALLED_VERSION} | Faz 7 — UI onayı:${_BT}, options 'Onayla' / 'Revize' / 'Sen de bak ve raporla' / 'İptal'.\n\nKATI MOD: bu lens loop-breaker yok — fail-open yok. Tarayıcı açma komutu çalıştırılmadan veya asama-6-skipped audit'i emit edilmeden block kalkmaz. Server-without-browser spec ihlalidir.\"
+  \"reason\": \"${_A6_REASON_BODY}\"
 }"
       exit 0
     fi
