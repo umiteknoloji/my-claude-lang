@@ -583,10 +583,12 @@ print(json.dumps({
   fi
 fi
 
-# Fast-path: non-mutating tool → allow.
+# Fast-path: non-mutating, non-gated tool → allow.
 # Skill, TodoWrite, and Task MCL-specific blocks run BEFORE this fast-path.
+# v13.0.9: AskUserQuestion + TodoWrite must proceed past fast-path so the
+# Layer B phase allowlist branch (line ~875) can check them per gate-spec.
 case "$TOOL_NAME" in
-  Write|Edit|MultiEdit|NotebookEdit) ;;
+  Write|Edit|MultiEdit|NotebookEdit|AskUserQuestion|TodoWrite) ;;
   *) exit 0 ;;
 esac
 
@@ -856,6 +858,81 @@ PYEOF
   REASON_KIND="spec-approval"
 fi
 
+# -------- Branch: phase allowlist (v13.0.9 Layer B — hard gate) --------
+# Reads gate-spec.json for current_phase's `allowed_tools` + `denied_paths`.
+# Read/Glob/Grep/LS/WebFetch/WebSearch/Task/Skill always allowed (investigation
+# valves). Bash always allowed (audit-emit + investigation; Layer C/D handles
+# Bash content-level checks). TodoWrite is explicit per gate-spec.json
+# (currently allowed at phases 6+ where execution work happens).
+#
+# When TOOL_NAME is in {Write, Edit, MultiEdit, NotebookEdit, AskUserQuestion,
+# TodoWrite}, check if it's in the active phase's allowed_tools list.
+# If not → deny + REASON "Aşama N bu tool'a izin vermez".
+# Then if denied_paths is set, check tool's file_path against globs.
+# Match → deny + REASON "Aşama N denied_paths kuralı: <path> yasak".
+#
+# Skipped when spec_approved=false (MCL LOCK already denies; no need for
+# double layer). Skipped when current_phase is empty/invalid.
+if [ -z "$REASON" ] && [ "$SPEC_APPROVED" = "true" ] && command -v python3 >/dev/null 2>&1; then
+  case "$TOOL_NAME" in
+    Read|Glob|Grep|LS|WebFetch|WebSearch|Task|Skill|Bash) : ;;  # always allowed
+    Write|Edit|MultiEdit|NotebookEdit|AskUserQuestion|TodoWrite)
+      _PA_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
+      if [ -n "$_PA_PHASE" ] && [ "$_PA_PHASE" -ge 1 ] 2>/dev/null && [ "$_PA_PHASE" -le 22 ] 2>/dev/null; then
+        _PA_GATE_SPEC="${MCL_GATE_SPEC:-${HOME}/.claude/skills/my-claude-lang/gate-spec.json}"
+        if [ -f "$_PA_GATE_SPEC" ]; then
+          _PA_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c "
+import json, re, sys, fnmatch
+spec_path = '$_PA_GATE_SPEC'
+phase = '$_PA_PHASE'
+tool = '$TOOL_NAME'
+try:
+    obj = json.loads(sys.stdin.read())
+    tin = obj.get('tool_input') or {}
+except Exception:
+    print('allow|'); sys.exit(0)
+file_path = tin.get('file_path') or tin.get('notebook_path') or ''
+try:
+    spec = json.load(open(spec_path))
+    pspec = spec['phases'][phase]
+except Exception:
+    print('allow|'); sys.exit(0)
+allowed = pspec.get('allowed_tools', None)
+# If allowed_tools field missing entirely (legacy spec), allow (no enforcement).
+if allowed is None:
+    print('allow|'); sys.exit(0)
+if tool not in allowed:
+    print(f'deny:tool|tool={tool} phase={phase} allowed={\",\".join(allowed) if allowed else \"none\"}')
+    sys.exit(0)
+denied = pspec.get('denied_paths', [])
+if denied and file_path:
+    norm = file_path.replace('\\\\\\\\', '/').lstrip('./')
+    for pat in denied:
+        if fnmatch.fnmatch(norm, pat) or fnmatch.fnmatch('/' + norm, pat) or fnmatch.fnmatch(norm, pat.lstrip('*/').lstrip('/')):
+            print(f'deny:path|path={file_path} pattern={pat} phase={phase}')
+            sys.exit(0)
+print('allow|')
+" 2>/dev/null)"
+          case "${_PA_VERDICT%%|*}" in
+            deny:tool)
+              _PA_DETAIL="${_PA_VERDICT#deny:tool|}"
+              REASON="MCL PHASE ALLOWLIST (v13.0.9 Layer B) — Aşama ${_PA_PHASE} aktif iken \`${TOOL_NAME}\` tool'una izin verilmez. ${_PA_DETAIL}. Mevcut faz için izinli mutating tool'lar gate-spec.json'da. Faz tamamlanınca \`asama-${_PA_PHASE}-complete\` audit emit edilirse otomatik bir sonraki faza geçer + onun allowed_tools listesi devreye girer. Read/Glob/Grep/LS/WebFetch/WebSearch/Task/Skill/Bash her fazda izinli (investigation + audit-emit valve)."
+              REASON_KIND="phase-allowlist-tool"
+              mcl_audit_log "phase-allowlist-tool-block" "pre-tool" "tool=${TOOL_NAME} phase=${_PA_PHASE}"
+              ;;
+            deny:path)
+              _PA_DETAIL="${_PA_VERDICT#deny:path|}"
+              REASON="MCL PHASE PATH-LOCK (v13.0.9 Layer B) — Aşama ${_PA_PHASE} aktif iken bu yol yasak. ${_PA_DETAIL}. Aşama ${_PA_PHASE}'ın denied_paths listesi gate-spec.json'da. Örnek: Aşama 6 (UI Build) backend yollarını (\`src/api/**\`, \`prisma/**\`, ...) yasaklar — backend Aşama 9 TDD veya Aşama 8 DB Design'da yazılır."
+              REASON_KIND="phase-allowlist-path"
+              mcl_audit_log "phase-allowlist-path-block" "pre-tool" "phase=${_PA_PHASE}"
+              ;;
+          esac
+        fi
+      fi
+      ;;
+  esac
+fi
+
 # -------- Branch: UI flow path-exception (Aşama 6a BUILD_UI / 4b REVIEW) --------
 # When UI flow is active AND we're in BUILD_UI or REVIEW sub-phase, only
 # frontend paths + .mcl/ internals are writeable. Backend paths stay
@@ -1102,6 +1179,21 @@ if [ -n "$REASON" ]; then
       DECISION="deny"
       mcl_audit_log "asama-${_SKIP_PH_NUM}-skip-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SK_LB_COUNT + 1))"
       command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "asama_${_SKIP_PH_NUM}_skip_block" "$((_SK_LB_COUNT + 1))"
+    fi
+  elif [ "$REASON_KIND" = "phase-allowlist-tool" ] \
+       || [ "$REASON_KIND" = "phase-allowlist-path" ]; then
+    # v13.0.9 Layer B — phase allowlist hard gate. Loop-breaker (5 strike)
+    # to allow recovery if model genuinely cannot advance phase. Logs each
+    # strike for /mcl-checkup visibility.
+    _PA_LB_COUNT="$(_mcl_loop_breaker_count "${REASON_KIND}" 2>/dev/null || echo 0)"
+    if [ "${_PA_LB_COUNT:-0}" -ge 5 ]; then
+      mcl_audit_log "${REASON_KIND}-loop-broken" "pre-tool" "count=${_PA_LB_COUNT} fail-open"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "${REASON_KIND}_loop_broken" "${_PA_LB_COUNT}"
+      DECISION="allow"
+    else
+      DECISION="deny"
+      mcl_audit_log "${REASON_KIND}" "pre-tool" "tool=${TOOL_NAME} strike=$((_PA_LB_COUNT + 1))"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "${REASON_KIND}" "$((_PA_LB_COUNT + 1))"
     fi
   fi
 
