@@ -7,6 +7,71 @@
 
 ## [Unreleased]
 
+## [13.0.1] - 2026-05-07
+
+### Faz 2 conditional auto-complete — handles "no GATE questions" path
+
+v13.0.0 cutover'da Faz 2'nin "tüm boyutlar SILENT-ASSUME, hiç GATE sorusu
+yok" path'i stuck kalıyordu: AskUserQuestion atlanıyor → `asama-2-complete`
+audit hiç emit edilmiyor → gate engine `incomplete` döndürüyor. v13.0
+legacy fallback ile çalışıyordu (model `asama-2-complete` direkt emit
+edebilir) ama v13.1 hard cutover'da fallback kalkar → kırılır.
+
+#### Fix
+
+Mevcut `precision-audit | asama2 | core_gates=N stack_gates=M ... skipped=<bool>`
+audit'inin payload'ını parse et, conditional auto-complete uygula. Yeni
+audit ismi YOK (yön tartışmasında "yeni precision-audit-no-gates audit'i"
+yerine bu yol seçildi — daha temiz, deny exception gerekmiyor, tek kaynak).
+
+#### Changes
+
+**`hooks/lib/mcl-gate.sh`** — `single` evaluator'a iki opsiyonel field
+desteği:
+- `auto_complete_audit` — bakılacak audit ismi (örn. `precision-audit`)
+- `auto_complete_check` — named check identifier
+
+Mantık: önce `required_audits[_any]` kontrolü; complete dönmezse
+`auto_complete_audit` payload'ını parse + named check çalıştır; check
+geçerse complete.
+
+İlk named check: `no_gates_or_skipped` — payload'ta `core_gates+stack_gates==0`
+VEYA `skipped=true` ise true döner. Gelecek fazlar (Faz 5 pattern-skip,
+Faz 8 db-skip) için kütüphane genişletilebilir.
+
+**`skills/my-claude-lang/gate-spec.json`** — Faz 2 entry:
+```json
+"2": {
+  "type": "single",
+  "required_audits": ["asama-2-complete"],
+  "auto_complete_audit": "precision-audit",
+  "auto_complete_check": "no_gates_or_skipped"
+}
+```
+
+**`tests/cases/test-v13-gate-spec.sh`** — 3 yeni test case:
+- core_gates=0 stack_gates=0 → complete (Türkçe oturum, all SILENT-ASSUME)
+- skipped=true → complete (English session safety valve)
+- core_gates>0 + no asama-2-complete → incomplete (negative)
+
+Hepsi PASS. Test baseline: v13.0.0 289/24/2 → v13.0.1 **292/24/2** (+3 PASS, 0 regression).
+
+#### Smoke
+
+- `bash -n hooks/lib/mcl-gate.sh` clean
+- `python3 -c "import json; json.load(...)"` valid
+- `bash tests/run-tests.sh` 292/24/2
+
+#### Etkilenmeyen
+
+- `required_audits` kontrolü hâlâ önce çalışır — `asama-2-complete` zaten
+  emit edilmişse auto-complete dalı hiç çalışmaz, çakışma yok
+- Faz 1, 3, 4, 5, 6, 7, 8 vb. diğer `single` faz'lar değişmedi
+  (auto_complete_audit field'ı yoksa ek logic devreye girmez)
+- v12 legacy fallback hâlâ aktif
+
+Banner: MCL 13.0.0 → **MCL 13.0.1**.
+
 ## [13.0.0] - 2026-05-07
 
 ### Universal deterministic gate engine — v13.0 groundwork release
