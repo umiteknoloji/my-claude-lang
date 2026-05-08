@@ -7,6 +7,73 @@
 
 ## [Unreleased]
 
+## [13.0.17] - 2026-05-08
+
+### Spec-approve chain auto-fill — developer onayı = retroactive trust signal
+
+**Üretim raporu (v13.0.16 testi):** Kullanıcı backoffice projesinde test etti. Manifesto ÇALIŞTI: model Aşama 1 → 2 → 3 → 4'ü doğru sırayla yaptı, precision audit yaptı, brief üretti, spec emit etti, askq spec onayı verildi. Ama spec onayından sonra `Write(package.json)` hâlâ block:
+
+```
+spec-approve-chain-incomplete  missing=summary-confirm-approve,asama-2-complete,asama-3-complete
+spec-approval-block tool=Write
+```
+
+Spec onaylandı ama audit chain BOŞ. v13.0.14'te eklediğim chain check, audit'lerin **dolduğunu varsayıyordu** — gerçekte:
+1. `summary-confirm-approve` → Stop hook line 2154'te emit ediliyor ama Aşama 1 askq turn sonrası Stop fire olmadığında atlanıyor
+2. `asama-2-complete` → Aşama 2 closing askq emit edilmesini bekliyor; model bu askq'yı sıklıkla atlıyor (precision audit prose'unu tabloyla bitirip direkt Aşama 3'e geçiyor)
+3. `asama-3-complete` → Hiç implement edilmemiş (Aşama 3 silent phase, askq yok)
+
+Model deadlock'a düşünce **bypass** girişiminde bulundu: `Bash mcl_audit_log "asama-2-complete"`. mcl-state.sh auth check (`unauthorized caller: _mcl_state_write_raw`) şans eseri engelledi.
+
+**Kullanıcı framing:** "spec onayına audit ten bakıyordur" — yani spec onayı = developer trust signal, chain'i otomatik doldur.
+
+#### Çözüm — auto-fill at spec-approve advance
+
+Pre-tool ve Stop hook'taki spec-approve advance branch'lerine **auto-fill** mantığı eklendi:
+
+```bash
+if chain_incomplete:
+  for missing_audit in (summary-confirm-approve, asama-2-complete, asama-3-complete):
+    mcl_audit_log "$missing_audit" "<hook>" "auto-fill-spec-approve"
+  re-check chain  # should be ok now
+  proceed with state advance
+```
+
+**İlke:** Developer spec'e "Onayla" demişse, MCL kabul eder ki önceki fazlar conceptually tamamlandı (Aşama 1 özet developer onaylı, Aşama 2 prose ve Aşama 3 brief render edildi). Audit'ler retroactively emit edilir, `auto-fill-spec-approve` markıyla devtime debug için ayırt edilebilir.
+
+v13.0.16'da burada **block** vardı; gerçek üretim senaryosu (model askq atlama + Aşama 3 silent audit eksik) chain'i hiç doldurmuyor → advance imkansız, model bypass'a yöneliyordu. Auto-fill bu deadlock'u kırar.
+
+#### Değişen dosyalar
+
+- `hooks/mcl-pre-tool.sh:713-731`: askq-advance-jit spec-approve branch'inde auto-fill loop
+- `hooks/mcl-stop.sh:1947-1980`: spec-approve advance branch'inde auto-fill loop (block YERİNE)
+
+İki taraf paralel — pre-tool önce çalışır (model'in bir sonraki tool çağrısı geldiğinde), Stop hook backup (turn sonu).
+
+#### Audit log signature
+
+Auto-fill devreye girdiğinde:
+
+```
+spec-approve-chain-autofill | <hook> | missing=summary-confirm-approve,asama-2-complete,asama-3-complete
+summary-confirm-approve | <hook> | auto-fill-spec-approve
+asama-2-complete | <hook> | auto-fill-spec-approve
+asama-3-complete | <hook> | auto-fill-spec-approve
+askq-advance-jit | <hook> | hash=... phase=4->5
+```
+
+Devtime debug: `auto-fill-spec-approve` arandığında hangi session'larda chain incomplete olarak gelmiş görülür.
+
+#### Test
+
+Mevcut test-v1314-spec-approve-chain.sh helper function `_mcl_pre_spec_audit_chain_status`'ü test ediyor (library function, hook integration değil) → değişikliklerden etkilenmedi. Baseline 302 passed, 0 failed, 2 skipped korundu.
+
+#### Out of scope (v13.0.18+)
+
+- Aşama 2 closing askq atlamasını **erken yakalama** (model'i askq'ya zorlama, prose'tan sonra direkt Aşama 3'e geçişi block etme)
+- Aşama 3 silent audit auto-emit (engineering brief detect → asama-3-complete)
+- Bash `mcl_audit_log` model bypass guard (model'in audit fake girişimini pre-tool'da explicit deny)
+
 ## [13.0.16] - 2026-05-08
 
 ### Persuasion manifesto — `<mcl_core>` opening, model'i ikna edici çerçeveleme

@@ -1941,22 +1941,44 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     mcl_audit_log "askq-ignored-no-spec" "stop" "phase=${CURRENT_PHASE}"
     mcl_debug_log "stop" "askq-ignored-no-spec" "phase=${CURRENT_PHASE}"
   elif [ "$CURRENT_PHASE" = "4" ] || [ "$CURRENT_PHASE" = "3" ]; then
-    # v13.0.16 — Hard enforce sıralılık: spec-approve advance hakkı için
+    # v13.0.17 — Hard enforce sıralılık: spec-approve advance hakkı için
     # Aşama 1, 2, 3 audit'leri tam olmalı. Eksikse atlama tespit edildi —
     # state advance YAPILMAZ + decision:block + REASON.
     _CHAIN_STATUS="$(_mcl_pre_spec_audit_chain_status 2>/dev/null || echo ok)"
     if [ -n "$_CHAIN_STATUS" ] && [ "$_CHAIN_STATUS" != "ok" ]; then
-      mcl_audit_log "spec-approve-chain-incomplete" "stop" "missing=${_CHAIN_STATUS}"
+      # v13.0.17 — Auto-fill: developer's spec-approve onayı = retroactive
+      # trust signal. Eksik chain audit'lerini "auto-fill-spec-approve"
+      # markıyla emit et, advance'i fire ettir. v13.0.17'da burada block
+      # vardı; gerçek üretim senaryosu (model Aşama 2 closing askq atlıyor,
+      # Aşama 3 silent audit hiç emit edilmiyor) chain'i hiç doldurmuyor →
+      # advance imkânsız, model bypass'a yöneliyordu. Auto-fill bu deadlock'u
+      # kırar; Stop hook tarafı block ETMEZ, audit log devtime debug için
+      # auto-fill caller'ı kaydeder.
+      mcl_audit_log "spec-approve-chain-autofill" "stop" "missing=${_CHAIN_STATUS}"
       command -v mcl_trace_append >/dev/null 2>&1 && \
-        mcl_trace_append spec_approve_chain_incomplete "${_CHAIN_STATUS}"
-      _CHAIN_REASON="$(_mcl_runtime_reason \
-        "MCL ASAMA SIRALILIK IHLALI (v13.0.16) — Spec-approve askq onayı geldi AMA Aşama 1/2/3 audit zinciri eksik. Eksik audit'ler: ${_CHAIN_STATUS}. State advance YAPILMADI. Sıralılık invariantı: Aşama 4 onayı verilebilmesi için 1, 2, 3 fazlarının audit'leri zincirde bulunmalı. Recovery: her eksik audit için bash recovery hatch kullan: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log <name> <caller> \"<details>\"'. Eksik audit'ler: summary-confirm-approve (Aşama 1 onayı), asama-2-complete (Aşama 2 precision-audit kapanışı), asama-3-complete (Aşama 3 engineering brief). Bunlar emit edildikten sonra spec-approve advance otomatik gerçekleşir." \
-        "Aşama atlandı: spec onayı verildi ama Aşama 1/2/3 audit'leri eksik (${_CHAIN_STATUS}). Bu fazları sırasıyla tamamla, sonra spec onayı geçerli olur.")"
-      printf '%s\n' "{
+        mcl_trace_append spec_approve_chain_autofill "${_CHAIN_STATUS}"
+      IFS=',' read -ra _MISSING_ARR <<< "$_CHAIN_STATUS"
+      for _miss in "${_MISSING_ARR[@]}"; do
+        case "$_miss" in
+          summary-confirm-approve|asama-2-complete|asama-3-complete)
+            mcl_audit_log "$_miss" "stop" "auto-fill-spec-approve"
+            mcl_debug_log "stop" "auto-fill-spec-approve" "audit=${_miss}"
+            ;;
+        esac
+      done
+      # Re-check chain — advance fires only when ok.
+      _CHAIN_STATUS="$(_mcl_pre_spec_audit_chain_status 2>/dev/null || echo ok)"
+      if [ -n "$_CHAIN_STATUS" ] && [ "$_CHAIN_STATUS" != "ok" ]; then
+        mcl_audit_log "spec-approve-chain-incomplete" "stop" "missing=${_CHAIN_STATUS}"
+        _CHAIN_REASON="$(_mcl_runtime_reason \
+          "MCL ASAMA SIRALILIK IHLALI — Spec-approve askq onayı geldi, auto-fill denendi AMA chain hâlâ eksik: ${_CHAIN_STATUS}. Beklenmeyen durum (whitelist dışı audit). Recovery: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log <name> <caller> \"<details>\"' ile manuel emit." \
+          "Aşama atlandı: chain hâlâ eksik (${_CHAIN_STATUS}). Audit'leri kontrol et.")"
+        printf '%s\n' "{
   \"decision\": \"block\",
   \"reason\": \"${_CHAIN_REASON}\"
 }"
-      exit 0
+        exit 0
+      fi
     fi
     mcl_state_set spec_approved true
     mcl_state_set current_phase 5

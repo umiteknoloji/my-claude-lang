@@ -705,18 +705,38 @@ except Exception:
          && [ "$STATE_SPEC_HASH" = "$JIT_SPEC_HASH" ]; then
         mcl_debug_log "pre-tool" "askq-jit-idempotent" "hash=${JIT_SPEC_HASH:0:12}"
       else
-        # v13.0.16 — Hard enforce sıralılık (parite Stop hook ile):
+        # v13.0.17 — Hard enforce sıralılık (parite Stop hook ile):
         # Spec-approve advance YAPILMAZ eğer Aşama 1/2/3 audit zinciri eksikse.
         # Stop hook zaten decision:block veriyor (asıl enforce noktası);
         # burada sadece state advance no-op + warn audit (tool çağrısını
         # engellemeden state'i ileri atmamak — Stop tarafı block görsün).
         _JIT_CHAIN="$(_mcl_pre_spec_audit_chain_status 2>/dev/null || echo ok)"
         if [ -n "$_JIT_CHAIN" ] && [ "$_JIT_CHAIN" != "ok" ]; then
+          # v13.0.17 — Auto-fill missing chain audits. Developer's
+          # spec-approve askq onayı = retroactive trust signal: if
+          # the chain is incomplete (Aşama 2 closing askq atlandı,
+          # Aşama 3 silent audit emit edilmedi, vs.) MCL kabul eder
+          # ve eksik audit'leri "auto-fill-spec-approve" markıyla
+          # emit eder. Block YOK — chain dolduğu için advance fire eder.
+          mcl_audit_log "spec-approve-chain-autofill-jit" "pre-tool" "missing=${_JIT_CHAIN}"
+          IFS=',' read -ra _MISSING_ARR <<< "$_JIT_CHAIN"
+          for _miss in "${_MISSING_ARR[@]}"; do
+            case "$_miss" in
+              summary-confirm-approve|asama-2-complete|asama-3-complete)
+                mcl_audit_log "$_miss" "pre-tool" "auto-fill-spec-approve"
+                mcl_debug_log "pre-tool" "auto-fill-spec-approve" "audit=${_miss}"
+                ;;
+            esac
+          done
+          # Now re-check chain — should be ok after fill.
+          _JIT_CHAIN="$(_mcl_pre_spec_audit_chain_status 2>/dev/null || echo ok)"
+        fi
+        if [ -n "$_JIT_CHAIN" ] && [ "$_JIT_CHAIN" != "ok" ]; then
           mcl_audit_log "spec-approve-chain-incomplete-jit" "pre-tool" "missing=${_JIT_CHAIN}"
           command -v mcl_trace_append >/dev/null 2>&1 && \
             mcl_trace_append spec_approve_chain_incomplete_jit "${_JIT_CHAIN}"
           mcl_debug_log "pre-tool" "spec-approve-chain-incomplete" "missing=${_JIT_CHAIN}"
-          # State advance YAPMA — Stop hook'a bırak (decision:block oradan döner).
+          # Auto-fill başarısız (örn. unrecognized audit) — Stop hook'a bırak.
         else
         mcl_state_set spec_hash "\"$JIT_SPEC_HASH\""
         mcl_state_set spec_approved true
@@ -753,7 +773,7 @@ except Exception:
         CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
         SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
         PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
-        fi  # v13.0.16 — closes _JIT_CHAIN incomplete check
+        fi  # v13.0.17 — closes _JIT_CHAIN incomplete check
       fi
     elif [ "$JIT_INTENT" = "summary-confirm" ] \
          && _mcl_pre_is_approve_option "$JIT_SELECTED" \
