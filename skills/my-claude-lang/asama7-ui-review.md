@@ -14,6 +14,26 @@ The state flags are unchanged (`ui_sub_phase = "BUILD_UI"`,
 `ui_reviewed = false`) until the developer's reply is interpreted
 and acted on.
 
+## Narration Rule (since 13.0.15)
+
+Aşama 7 deferred olsa bile narration'dan **asla atlanmaz**. Aşama 4
+spec onayı sonrası (veya herhangi bir pipeline özet listesi
+yazıldığında) faz sıralaması gösterirken Aşama 7 daima görünür kalır:
+
+- Yasak: `Aşama 5 → 6 → 8 → 9 başlıyor` (Aşama 7 düşürülmüş)
+- Doğru: `Aşama 5 → 6 → 7 (deferred — Aşama 6 dev server sonrası
+  geliştirici cevabıyla başlar) → 8 → 9 başlıyor`
+
+**Deferred ≠ skipped.** Deferred sadece "bu turn'da değil, bir
+sonraki turn'da başlar" demek; pipeline'dan çıkarılmaz. Aşama 7
+narration'dan SADECE Aşama 6 atlandığında çıkar (no-ui-flow,
+`asama-7-skipped reason=asama-6-skipped`) — o da explicit
+`(atlandı — Aşama 6 atladığı için)` notuyla işaretlenir, sessizce
+düşürülmez.
+
+Geliştiricinin "7 nereye gitti?" sorusu narration eksikliğinden
+doğmamalıdır; bu kural görünürlük kontratının parçasıdır.
+
 ## Core Intent
 
 Block every backend write (`mcl-pre-tool.sh` UI-BUILD lock is still

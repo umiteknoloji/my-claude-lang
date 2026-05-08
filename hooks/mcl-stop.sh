@@ -1941,7 +1941,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     mcl_audit_log "askq-ignored-no-spec" "stop" "phase=${CURRENT_PHASE}"
     mcl_debug_log "stop" "askq-ignored-no-spec" "phase=${CURRENT_PHASE}"
   elif [ "$CURRENT_PHASE" = "4" ] || [ "$CURRENT_PHASE" = "3" ]; then
-    # v13.0.14 — Hard enforce sıralılık: spec-approve advance hakkı için
+    # v13.0.15 — Hard enforce sıralılık: spec-approve advance hakkı için
     # Aşama 1, 2, 3 audit'leri tam olmalı. Eksikse atlama tespit edildi —
     # state advance YAPILMAZ + decision:block + REASON.
     _CHAIN_STATUS="$(_mcl_pre_spec_audit_chain_status 2>/dev/null || echo ok)"
@@ -1950,7 +1950,7 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
       command -v mcl_trace_append >/dev/null 2>&1 && \
         mcl_trace_append spec_approve_chain_incomplete "${_CHAIN_STATUS}"
       _CHAIN_REASON="$(_mcl_runtime_reason \
-        "MCL ASAMA SIRALILIK IHLALI (v13.0.14) — Spec-approve askq onayı geldi AMA Aşama 1/2/3 audit zinciri eksik. Eksik audit'ler: ${_CHAIN_STATUS}. State advance YAPILMADI. Sıralılık invariantı: Aşama 4 onayı verilebilmesi için 1, 2, 3 fazlarının audit'leri zincirde bulunmalı. Recovery: her eksik audit için bash recovery hatch kullan: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log <name> <caller> \"<details>\"'. Eksik audit'ler: summary-confirm-approve (Aşama 1 onayı), asama-2-complete (Aşama 2 precision-audit kapanışı), asama-3-complete (Aşama 3 engineering brief). Bunlar emit edildikten sonra spec-approve advance otomatik gerçekleşir." \
+        "MCL ASAMA SIRALILIK IHLALI (v13.0.15) — Spec-approve askq onayı geldi AMA Aşama 1/2/3 audit zinciri eksik. Eksik audit'ler: ${_CHAIN_STATUS}. State advance YAPILMADI. Sıralılık invariantı: Aşama 4 onayı verilebilmesi için 1, 2, 3 fazlarının audit'leri zincirde bulunmalı. Recovery: her eksik audit için bash recovery hatch kullan: bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log <name> <caller> \"<details>\"'. Eksik audit'ler: summary-confirm-approve (Aşama 1 onayı), asama-2-complete (Aşama 2 precision-audit kapanışı), asama-3-complete (Aşama 3 engineering brief). Bunlar emit edildikten sonra spec-approve advance otomatik gerçekleşir." \
         "Aşama atlandı: spec onayı verildi ama Aşama 1/2/3 audit'leri eksik (${_CHAIN_STATUS}). Bu fazları sırasıyla tamamla, sonra spec onayı geçerli olur.")"
       printf '%s\n' "{
   \"decision\": \"block\",

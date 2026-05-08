@@ -373,7 +373,7 @@ PHASE_META = {
     "4":  {"name_tr": "Spec + Verify",           "name_en": "Spec + Verify",        "skill": "asama4-spec.md",            "task_tr": "📋 Spec: bloğu emit et (Objective, MUST/SHOULD, AC, Edge Cases, Technical Approach, Out of Scope). Geliştirici diline özet. AskUserQuestion ile onay. asama-4-ac-count must=N should=M emit ZORUNLU.", "emit_tr": "asama-4-ac-count must=N should=M | asama-4-complete (askq onayı sonrası)", "skip_tr": ""},
     "5":  {"name_tr": "Pattern Matching",        "name_en": "Pattern Matching",     "skill": "asama5-pattern-matching.md","task_tr": "Mevcut sibling dosyaları oku, naming + error handling + test pattern çıkar. Greenfield ise atla.", "emit_tr": "pattern-summary-stored | asama-5-complete | asama-5-skipped reason=greenfield", "skip_tr": "Greenfield veya empty+no-stack"},
     "6":  {"name_tr": "UI Build",                "name_en": "UI Build",             "skill": "asama6-ui-build.md",        "task_tr": "Frontend dummy data ile yaz, npm install + npm run dev (run_in_background:true), sleep + tarayıcıyı OTOMATİK aç. denied_paths: backend (src/api/**, prisma/**, ...).", "emit_tr": "asama-6-end server_started=true browser_opened=true | asama-6-skipped reason=no-ui-flow", "skip_tr": "UI flow yoksa"},
-    "7":  {"name_tr": "UI Review",               "name_en": "UI Review",            "skill": "asama7-ui-review.md",       "task_tr": "AskUserQuestion ile geliştirici UI onayı. Options: Onayla / Revize / Sen de bak ve raporla / İptal.", "emit_tr": "asama-7-complete (askq onayı sonrası) | asama-7-skipped (Aşama 6 atlandıysa)", "skip_tr": "Aşama 6 atlandıysa"},
+    "7":  {"name_tr": "UI Review",               "name_en": "UI Review",            "skill": "asama7-ui-review.md",       "task_tr": "AskUserQuestion ile geliştirici UI onayı. Options: Onayla / Revize / Sen de bak ve raporla / İptal.", "emit_tr": "asama-7-complete (askq onayı sonrası) | asama-7-skipped (Aşama 6 atlandıysa)", "skip_tr": "Aşama 6 atlandıysa", "narration_tr": "Deferred — Aşama 6 dev server sonrası geliştirici cevabıyla başlar. Faz listesinde DAİMA görünür kalır: '... → 6 → 7 (deferred) → 8 ...'. Sessizce düşürmek yasak; sadece Aşama 6 atlanırsa '(atlandı — Aşama 6)' notuyla işaretle.", "narration_en": "Deferred — starts on developer's reply after Aşama 6 dev server. ALWAYS visible in phase list: '... → 6 → 7 (deferred) → 8 ...'. Silent omission forbidden; only when Aşama 6 is skipped, mark '(skipped — Aşama 6)'."},
     "8":  {"name_tr": "DB Design",               "name_en": "DB Design",            "skill": "asama8-db-design.md",       "task_tr": "Schema (3NF), index strategy, query plan. Migration files yaz.", "emit_tr": "asama-8-end | asama-8-not-applicable reason=no-db-in-scope", "skip_tr": "DB scope yoksa"},
     "9":  {"name_tr": "TDD Execute",             "name_en": "TDD Execute",          "skill": "asama9-tdd.md",             "task_tr": "Her AC için RED (failing test) → GREEN (minimum kod) → REFACTOR. asama-4-ac-count'tan must+should toplamı kadar üçlü.", "emit_tr": "asama-9-ac-{i}-red, asama-9-ac-{i}-green, asama-9-ac-{i}-refactor (her AC için)", "skip_tr": ""},
     "10": {"name_tr": "Risk Review",             "name_en": "Risk Review",          "skill": "asama10-risk-review.md",    "task_tr": "Spec compliance pre-check + missed-risk scan. asama-10-items-declared count=K emit ZORUNLU. Sonra her risk için sıralı AskUserQuestion (skip / fix / rule).", "emit_tr": "asama-10-items-declared count=K | her item için asama-10-item-{n}-resolved", "skip_tr": ""},
@@ -404,7 +404,7 @@ L = {
         "current_marker": "← AKTİF",
         "skip_marker": "(skip-eligible)",
         "unknown_phase": "AKTİF FAZ: bilinmiyor",
-        "header_directive": "🛑 NO MID-PIPELINE STOP RULE — Aşama 4 spec onayından sonra Aşama 22 tamamlanana kadar pipeline ortasında durmak yasak. Bu turun sonunda mevcut fazın audit'i emit edilmeli + bir sonraki fazın başlangıcı yapılmalı. Yalnızca AskUserQuestion gate'lerinde dur (Faz 7, 10-her-risk, 19-her-impact). 'Kod yazdım, bitti' diyerek faz ortasında durmak yasak.",
+        "header_directive": "🛑 NO MID-PIPELINE STOP RULE — Aşama 4 spec onayından sonra Aşama 22 tamamlanana kadar pipeline ortasında durmak yasak. Bu turun sonunda mevcut fazın audit'i emit edilmeli + bir sonraki fazın başlangıcı yapılmalı. Yalnızca AskUserQuestion gate'lerinde dur (Faz 7, 10-her-risk, 19-her-impact). 'Kod yazdım, bitti' diyerek faz ortasında durmak yasak.\n📋 NARRATION RULE — Faz listesi yazarken (örn. 'Aşama 5 → 6 → ...') Aşama 7 DAİMA görünür kalır. Deferred ≠ skipped: Aşama 7 deferred olsa bile (Aşama 6 dev-server sonrası geliştirici cevabıyla başlar) listeden ASLA düşürülmez. Yasak: 'Aşama 5 → 6 → 8 → 9'. Doğru: 'Aşama 5 → 6 → 7 (deferred) → 8 → 9'. Sadece Aşama 6 atlandıysa '(atlandı — Aşama 6)' notuyla.",
     },
     "en": {
         "active_label": "ACTIVE PHASE",
@@ -418,7 +418,7 @@ L = {
         "current_marker": "← ACTIVE",
         "skip_marker": "(skip-eligible)",
         "unknown_phase": "ACTIVE PHASE: unknown",
-        "header_directive": "🛑 NO MID-PIPELINE STOP RULE — Between Aşama 4 spec approval and Aşama 22 completion, mid-pipeline stops are forbidden. End of every turn must emit current phase's audit + start the next phase. Only AskUserQuestion gates pause (Faz 7, 10 per-risk, 19 per-impact). 'Wrote code, done' mid-phase = forbidden.",
+        "header_directive": "🛑 NO MID-PIPELINE STOP RULE — Between Aşama 4 spec approval and Aşama 22 completion, mid-pipeline stops are forbidden. End of every turn must emit current phase's audit + start the next phase. Only AskUserQuestion gates pause (Faz 7, 10 per-risk, 19 per-impact). 'Wrote code, done' mid-phase = forbidden.\n📋 NARRATION RULE — When writing phase lists (e.g. 'Aşama 5 → 6 → ...') Aşama 7 ALWAYS stays visible. Deferred ≠ skipped: even when Aşama 7 is deferred (starts on developer's reply after Aşama 6 dev-server), it is NEVER dropped from the list. Forbidden: 'Aşama 5 → 6 → 8 → 9'. Correct: 'Aşama 5 → 6 → 7 (deferred) → 8 → 9'. Only when Aşama 6 is skipped, mark '(skipped — Aşama 6)'.",
     },
 }
 labels = L.get(lang, L["en"])
@@ -426,6 +426,7 @@ name_key = "name_tr" if lang == "tr" else "name_en"
 task_key = "task_tr"  # tasks always TR for now (calibration); skill files have full multilingual content
 emit_key = "emit_tr"
 skip_key = "skip_tr"
+narration_key = "narration_tr" if lang == "tr" else "narration_en"
 
 if phase not in PHASE_META:
     print(labels["unknown_phase"])
@@ -445,6 +446,8 @@ print(f"{labels['task_label']}: {meta[task_key]}")
 print(f"{labels['emit_label']}: {meta[emit_key]}")
 if meta.get(skip_key):
     print(f"{labels['skip_label']}: {meta[skip_key]}")
+if meta.get(narration_key):
+    print(f"📋 {meta[narration_key]}")
 
 # Next phase preview
 if phase_int < 22:

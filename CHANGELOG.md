@@ -7,6 +7,78 @@
 
 ## [Unreleased]
 
+## [13.0.15] - 2026-05-08
+
+### Aşama 7 deferred narration rule — "deferred ≠ skipped" görünürlük kontratı
+
+**Üretim raporu:** Kullanıcı v13.0.14 testinde gözlemledi: model spec onayı sonrası şu narration'u yazdı:
+
+```
+Spec onaylandı. Aşama 5 → 6 → 8 → 9 başlıyor.
+```
+
+Aşama 7 listede yok. Ne audit'te skip işareti var, ne narration'da deferred notu — sessizce düşürüldü.
+
+**Kullanıcı direktifi:** "7 yok. sebebini araştır."
+
+#### Kök sebep — skill semantics + narration omission
+
+`skills/my-claude-lang/asama7-ui-review.md` Entry Condition (line 7-11):
+> "Aşama 7 is **deferred** since 6.5.0. Aşama 6 now auto-starts the dev server and opens the browser, then STOPS. Aşama 7 only begins when the developer returns on their own — i.e. on the developer's NEXT turn."
+
+Model bu kuraldan **"deferred = bu turn'da yok = listemden çıkar"** çıkarımını yaptı. Skill kuralı *narrate etme* talimatına bağlı değildi — sadece *davranış* tanımıydı (askq emit etme, developer'ın cevabını bekle). State machine doğru: `PHASE_META[7].skip_tr = "Aşama 6 atlandıysa"` (yalnızca cascade-skip). Ama model deferred ≠ skipped ayrımını yapamadan listeden tamamen çıkardı.
+
+#### Çözüm — 3 katmanlı narration enforcement
+
+**Katman 1: Skill file Narration Rule section** (`skills/my-claude-lang/asama7-ui-review.md`):
+
+Entry Condition'dan sonra yeni section eklendi:
+
+> "Aşama 7 deferred olsa bile narration'dan **asla atlanmaz**. ... Yasak: `Aşama 5 → 6 → 8 → 9`. Doğru: `Aşama 5 → 6 → 7 (deferred — Aşama 6 dev server sonrası geliştirici cevabıyla başlar) → 8 → 9`."
+
+**Katman 2: PHASE_META[7] narration field** (`hooks/lib/mcl-dsi.sh`):
+
+```python
+"7": {..., "narration_tr": "Deferred — Aşama 6 dev server sonrası geliştirici cevabıyla başlar. Faz listesinde DAİMA görünür kalır...", "narration_en": "..."}
+```
+
+DSI render fonksiyonu, phase 7 aktif olduğunda active block'a `📋 <narration>` satırı ekler.
+
+**Katman 3: header_directive global reminder** (TR + EN):
+
+Mevcut "🛑 NO MID-PIPELINE STOP RULE" header'ına ek ikinci kural:
+
+> "📋 NARRATION RULE — Faz listesi yazarken Aşama 7 DAİMA görünür kalır. Deferred ≠ skipped... Yasak: 'Aşama 5 → 6 → 8 → 9'. Doğru: 'Aşama 5 → 6 → 7 (deferred) → 8 → 9'."
+
+Her DSI render'da prompt'a inject edilir → her aktif faz turn'ünde model'in attention'ında.
+
+#### Test
+
+`tests/cases/test-v1315-asama7-narration-rule.sh` — 14 assertion:
+
+- T1-T4: TR header NARRATION RULE içerir + yasak/doğru örnekler
+- T5-T7: TR PHASE_META[7] narration_tr active block'unda render
+- T8-T11: EN render aynı kuralı içerir
+- T12-T13: Phase 6/4 aktif iken de header'da NARRATION RULE görünür (cross-phase reminder)
+- T14: Phase 8 aktif iken phase 7 narration cue active block'a sızmaz
+
+Sonuç: 14/14 PASS. Baseline 302 passed, 0 failed, 2 skipped korundu.
+
+#### Why this is enforcement, not just documentation
+
+Captured rule (CLAUDE.md): *"Always implement behavioral MCL features as dedicated phase/skill/hook artifacts."*
+
+- ✅ Skill file (dedicated phase artifact)
+- ✅ DSI hook injection (her render'da prompt'a yazılır → hook enforcement)
+- ✅ Test coverage (14 assertion)
+
+Detection control (model'in narration'ını parse edip Aşama 7 omission yakalama) v13.0.16'a bırakıldı — şu anki üç katman görünürlük kontratını kuruyor.
+
+#### Out of scope (v13.1+ candidate)
+
+- Detection control: Stop hook'ta son assistant text'te "Aşama N → N+2" pattern (audit'te skipped emit'i yoksa) → block + REASON
+- Narration violation audit emit (`asama-7-narration-omitted`)
+
 ## [13.0.14] - 2026-05-08
 
 ### Spec-approve advance hard enforce — audit chain incomplete ise advance YOK
