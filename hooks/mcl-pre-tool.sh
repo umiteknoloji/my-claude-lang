@@ -744,15 +744,18 @@ except Exception:
     elif [ "$JIT_INTENT" = "summary-confirm" ] \
          && _mcl_pre_is_approve_option "$JIT_SELECTED" \
          && [ "$CURRENT_PHASE" = "1" ]; then
-      # Phase-1 → Phase-2 advance. Does NOT unlock mutating tools
-      # (still phase<4) but keeps audit/trace parity with Stop.
-      mcl_state_set current_phase 4
-      mcl_state_set phase_name '"SPEC_REVIEW"'
+      # Phase-1 → Phase-2 advance (Precision Audit). Does NOT unlock
+      # mutating tools (still phase<4) but keeps audit/trace parity
+      # with Stop. v13.0.11 fix: previously set current_phase=4 +
+      # phase_name=SPEC_REVIEW (legacy 1→4 jump that skipped Aşama
+      # 2 and 3). Now correctly 1→2.
+      mcl_state_set current_phase 2
+      mcl_state_set phase_name '"PRECISION_AUDIT"'
       mcl_audit_log "askq-advance-jit" "pre-tool" "summary-confirm phase=1->2"
       mcl_debug_log "pre-tool" "askq-advance-jit" "summary-confirm phase=1->2"
       command -v mcl_trace_append >/dev/null 2>&1 && {
         mcl_trace_append summary_confirmed approved
-        mcl_trace_append phase_transition 1 4
+        mcl_trace_append phase_transition 1 2
       }
       CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
       PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
