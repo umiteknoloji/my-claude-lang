@@ -1899,12 +1899,9 @@ PYEOF
         fi
       fi
 
-      # v13.0.11 — A-2 fix: Aşama 1'de spec emit'i sıralılık ihlali.
-      # Önceden bu blok durumu zorla 4'e atıyordu (legacy 1→4 atlama).
-      # Sıralılık disiplini gereği state advance KALDIRILDI — durum 1'de kalır.
-      # Universal completeness döngüsü (stop hook sonunda) audit log'u okur:
-      # `summary-confirm-approve` varsa otomatik 1→2 ilerletir, audit chain
-      # tamsa 2→3→4 zincirini izler. Hook artık sıralılığı zorla atlamaz.
+      # Aşama 1'de spec emit'i sıralılık ihlali. Hook state'i ileri
+      # atlatmaz — durum 1'de kalır. Universal completeness döngüsü
+      # (stop hook sonunda) audit log'u okur ve tamsa sıralı ilerletir.
       # spec_hash kaydı da kaldırıldı: durum 1'de spec hash'i tutmak yanlış
       # sinyal verir (üst blokta precision-audit-block zaten gerekli kontrolü
       # yapıyor; eğer geçerse universal loop spec emit'ini doğal yolla işler).

@@ -383,17 +383,17 @@ MCL Kuş Bakışı — Sözde Kod
   Amaç:
      Yeni veya değişen dosyalar için eksik testleri yazmak. Her faz
      test takımı YEŞİL olana kadar sürer.
-
+↓ (sıralı)
   Aşama 15 — Birim Testler:
      Her yeni fonksiyon/sınıf/modül için unit test. Aşama 9 TDD
      testlerini de doğrular.
-
+↓ (sıralı)
   Aşama 16 — Entegrasyon Testleri:
      Modüller arası akışlar, API endpoint'leri, veritabanı katmanı.
-
+↓ (sıralı)
   Aşama 17 — Uçtan-uca Testler (E2E):
      UI varsa Playwright/Cypress headless ile gerçek kullanıcı akışları.
-
+↓ (sıralı)
   Aşama 18 — Yük Testleri:
      Throughput-hassas yollar için k6/locust/ab. Spec NFR hedefini
      karşıladığı doğrulanır.

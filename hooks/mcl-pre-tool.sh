@@ -780,9 +780,7 @@ except Exception:
          && [ "$CURRENT_PHASE" = "1" ]; then
       # Phase-1 → Phase-2 advance (Precision Audit). Does NOT unlock
       # mutating tools (still phase<4) but keeps audit/trace parity
-      # with Stop. v13.0.11 fix: previously set current_phase=4 +
-      # phase_name=SPEC_REVIEW (legacy 1→4 jump that skipped Aşama
-      # 2 and 3). Now correctly 1→2.
+      # with Stop.
       mcl_state_set current_phase 2
       mcl_state_set phase_name '"PRECISION_AUDIT"'
       mcl_audit_log "askq-advance-jit" "pre-tool" "summary-confirm phase=1->2"
@@ -1001,22 +999,11 @@ def phase_complete_basic(p_str):
         return all(has_audit_marker(a) for a in p['required_sections'])
     return False
 
-# Derive active phase. Only walk audit log when state=7 (legacy
-# post-approval catch-all sentinel that v10/v11 progression code uses).
-# Other state values (1-6, 8-22) are treated as canonical v12+ phase
-# numbers and used directly.
+# Active phase = state.current_phase (canonical 1..22).
+# v13.0.11+ state hep gerçek değer tutar; legacy v10/v11 state=7
+# sentinel ve audit-derive resolver kaldırıldı.
 sp = int(state_phase)
-if sp == 7:
-    # Legacy sentinel — derive from audit. Walk 5..22, first incomplete.
-    derived = None
-    for p in range(5, 23):
-        if not phase_complete_basic(str(p)):
-            derived = p
-            break
-    if derived is None:
-        derived = 22
-    active_phase = str(derived)
-elif sp >= 1 and sp <= 22:
+if sp >= 1 and sp <= 22:
     active_phase = str(sp)
 else:
     print('allow|'); sys.exit(0)
