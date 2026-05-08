@@ -699,14 +699,16 @@ except Exception:
        && [ "$PARTIAL_NOW" != "true" ] \
        && _mcl_pre_is_approve_option "$JIT_SELECTED"; then
       # Idempotency: if state already matches this approval, skip.
-      if [ "$SPEC_APPROVED" = "true" ] && [ "$CURRENT_PHASE" -ge 7 ] 2>/dev/null \
+      # v13.0.11: post-spec-approval canonical phase is 5 (Pattern Matching).
+      # Universal completeness loop advances 5→6→...→9 as audits emit.
+      if [ "$SPEC_APPROVED" = "true" ] && [ "$CURRENT_PHASE" -ge 5 ] 2>/dev/null \
          && [ "$STATE_SPEC_HASH" = "$JIT_SPEC_HASH" ]; then
         mcl_debug_log "pre-tool" "askq-jit-idempotent" "hash=${JIT_SPEC_HASH:0:12}"
       else
         mcl_state_set spec_hash "\"$JIT_SPEC_HASH\""
         mcl_state_set spec_approved true
-        mcl_state_set current_phase 7
-        mcl_state_set phase_name '"EXECUTE"'
+        mcl_state_set current_phase 5
+        mcl_state_set phase_name '"PATTERN_MATCHING"'
         # UI intent scan mirrors stop.sh: bootstrap projects whose
         # file-system UI signals fired `false` at session start still
         # enter BUILD_UI if the approved spec has UI-framework markers.
@@ -725,11 +727,11 @@ except Exception:
           mcl_state_set ui_sub_phase '"BUILD_UI"'
           mcl_audit_log "ui-flow-enter-build" "pre-tool" "hash=${JIT_SPEC_HASH:0:12}"
         fi
-        mcl_audit_log "askq-advance-jit" "pre-tool" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->7 ui_flow=${UI_FLOW_ON}"
-        mcl_debug_log "pre-tool" "askq-advance-jit" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->7"
+        mcl_audit_log "askq-advance-jit" "pre-tool" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->5 ui_flow=${UI_FLOW_ON}"
+        mcl_debug_log "pre-tool" "askq-advance-jit" "hash=${JIT_SPEC_HASH:0:12} phase=${CURRENT_PHASE}->5"
         command -v mcl_trace_append >/dev/null 2>&1 && {
           mcl_trace_append spec_approved "${JIT_SPEC_HASH:0:12}"
-          mcl_trace_append phase_transition "$CURRENT_PHASE" 7
+          mcl_trace_append phase_transition "$CURRENT_PHASE" 5
           [ "$UI_FLOW_ON" = "true" ] && mcl_trace_append ui_flow_enabled
           mcl_trace_append askq_advance_jit "${JIT_SPEC_HASH:0:12}"
         }
@@ -800,10 +802,10 @@ PYEOF
 )"
   if [ "${_PRE_A4_HIT:-0}" = "1" ]; then
     mcl_state_set spec_approved true
-    mcl_state_set current_phase 7
-    mcl_state_set phase_name '"EXECUTE"'
+    mcl_state_set current_phase 5
+    mcl_state_set phase_name '"PATTERN_MATCHING"'
     mcl_audit_log "asama-4-progression-from-emit" "pre-tool" "via-asama-4-complete-bash-emit"
-    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 4 7
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 4 5
     SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
     CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
     PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
