@@ -1069,11 +1069,12 @@ print("allow|")
   fi
 fi
 
-# -------- Branch: Pattern Matching guard (Aşama 5) --------
-# When pattern_scan_due=true, Claude must read existing sibling files before
-# writing anything. One-turn grace: after the first Aşama 7 turn the stop
-# hook clears the flag and writes are unblocked.
-if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "7" ]; then
+# -------- Branch: Pattern Matching guard (fires at Aşama 9 TDD) --------
+# v13.0.11: phase number updated 7→9 (v12+ canonical). When
+# pattern_scan_due=true, Claude must read existing sibling files before
+# writing TDD code. One-turn grace: after the first Aşama 9 turn the
+# stop hook clears the flag and writes are unblocked.
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "9" ]; then
   _PS_DUE_PT="$(mcl_state_get pattern_scan_due 2>/dev/null)"
   if [ "$_PS_DUE_PT" = "true" ]; then
     _PAT_FILES_PT="$(mcl_state_get pattern_files 2>/dev/null)"
@@ -1083,11 +1084,12 @@ if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "7" ]; then
   fi
 fi
 
-# -------- Branch: Scope Guard (Aşama 7) --------
-# When scope_paths is non-empty (spec listed explicit file paths / globs),
+# -------- Branch: Scope Guard (fires at Aşama 9 TDD) --------
+# v13.0.11: phase number updated 7→9 (v12+ canonical). When
+# scope_paths is non-empty (spec listed explicit file paths / globs),
 # block writes to paths that don't match any declared pattern.
 # Empty scope_paths = spec had no explicit paths = no restriction.
-if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "7" ] && command -v python3 >/dev/null 2>&1; then
+if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "9" ] && command -v python3 >/dev/null 2>&1; then
   _SCOPE_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json, fnmatch, os, sys
 
