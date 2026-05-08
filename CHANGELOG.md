@@ -7,6 +7,75 @@
 
 ## [Unreleased]
 
+## [13.0.18] - 2026-05-08
+
+### Layer B (phase allowlist) artık her zaman fire eder — Aşama 5 Write deliği kapatıldı
+
+**Üretim raporu:** Kullanıcı v13.0.17 testinde gözlemledi. Auto-fill ÇALIŞTI ✅, model Aşama 1-4'ü doğru sırayla yaptı, spec onayı verildi. AMA spec onayından sonra:
+
+```
+15:11:52  spec_approved=true, current_phase=5  (auto-fill OK)
+15:11:53  ilk Write GEÇTİ (tdd-prod-write database.js)
+15:12:03+ 11 prod kod yazımı (Aşama 5 hâlâ aktif!)
+```
+
+`gate-spec.json` Phase 5 → `allowed_tools=[]` (Pattern Matching read-only). Layer B Write'ı block etmeliydi. Etmedi.
+
+**Kullanıcı framing:** "bütün adımları atlanamaz yap." + "B'ye gerek yok — bütün aşamalar sıra sıra ilerlemeli, geriye dönüp bakmasına gerek olmamalı."
+
+#### Kök sebep — REASON koşulu Layer B'yi atlatıyor
+
+Layer B (line 933) koşulu: `if [ -z "$REASON" ] && [ "$SPEC_APPROVED" = "true" ]`. Pre-tool akışında Layer B'den ÖNCE çalışan branch'lerden biri REASON setlerse, Layer B fire ETMİYOR. Plus: gate-spec.json'da phase için `allowed_tools` field yoksa Python script `allow|` döndürüyor (fail-open) — eski setup.sh kalıntısı veya gate-spec eksiği durumunda mutating tool sızıyor.
+
+Local test'te v13.0.17 kodu Aşama 5 Write'ı doğru block ediyordu. Production'daysa REASON pre-set + race condition kombinasyonu Layer B'yi atlattı.
+
+#### Çözüm — sequential gate'i fiziksel olarak garantile
+
+Kullanıcının insight'ına uyumlu: sıralı zorunluluk **tasarım** meselesi, post-hoc chain check değil. Layer B = her tool çağrısının ilk geçmesi gereken kapı.
+
+**Üç defansif fix:**
+
+1. **REASON koşulu kaldırıldı** (`hooks/mcl-pre-tool.sh:933`):
+   ```bash
+   # Eski: if [ -z "$REASON" ] && [ "$SPEC_APPROVED" = "true" ]
+   # Yeni: if [ "$SPEC_APPROVED" = "true" ]
+   ```
+   Layer B her durumda fire eder. Phase allowlist ihlali = REASON öncelikli, override eder.
+
+2. **Fail-closed allowlist** (Python script, line 1026):
+   ```python
+   if allowed is None:
+       # Eski: print('allow|'); sys.exit(0)
+       # Yeni: deny + reason=allowlist-undefined-fail-closed
+   ```
+   Gate-spec eksikse veya field yoksa, mutating tool DENY. Eski setup.sh kalıntısı sızdırma yapamaz.
+
+3. **Debug audit her fire'da** (`hooks/mcl-pre-tool.sh:1052`):
+   ```
+   phase-allowlist-check | pre-tool | tool=<X> phase=<N> active=<M> verdict=<deny:tool|deny:path|allow>
+   ```
+   Production'da Layer B'nin çalışıp çalışmadığını audit log'dan tespit edilebilir. Atlama varsa neden atlandığı görülür.
+
+#### Sonuç
+
+- Aşama 5 (Pattern Matching) read-only → Write/Edit/MultiEdit/NotebookEdit/AskUserQuestion/TodoWrite hepsi DENY
+- Aşama 6 (UI Build) → Write/Edit/MultiEdit/NotebookEdit/TodoWrite ALLOW (UI dosyaları yazılır, browser açılır → asama-6-end audit emit → state→7)
+- Aşama 7 (UI Review) → sadece AskUserQuestion ALLOW (developer onayı askq) → asama-7-complete → state→8
+- Aşama 8 (DB Design) → Write/Edit/MultiEdit/TodoWrite ALLOW (schema dosyaları)
+- Aşama 9 (TDD) → Write/Edit/MultiEdit/NotebookEdit/TodoWrite ALLOW (kod + test)
+
+Model fiziksel olarak atlayamaz. Aşama 5'te takılırsa kodu yazamaz, çare = Aşama 5 işini yap (Read pattern files, audit emit) → state→6 otomatik geçer.
+
+#### Test
+
+Local repro: `state=5, spec_approved=true, Write` → `phase-allowlist-tool-block` deny + `phase-allowlist-check` debug audit. Baseline 302 passed, 0 failed, 2 skipped korundu.
+
+#### Out of scope (v13.0.19+)
+
+- TDD anti-pattern detect: post-tool'da `tdd-prod-write` Aşama 9'dan ÖNCE gelirse audit + block (RED→GREEN→REFACTOR sıralılığı)
+- Aşama 5 audit auto-emit (greenfield veya empty project tespitiyle `asama-5-skipped reason=greenfield`)
+- Aşama 6 dev server start + browser open enforcement (mevcut Aşama 6 lens'i kullanır, model bypass'a yelteniyorsa block)
+
 ## [13.0.17] - 2026-05-08
 
 ### Spec-approve chain auto-fill — developer onayı = retroactive trust signal
