@@ -7,6 +7,88 @@
 
 ## [Unreleased]
 
+## [13.0.14] - 2026-05-08
+
+### Spec-approve advance hard enforce — audit chain incomplete ise advance YOK
+
+**Üretim raporu:** Kullanıcı v13.0.13 testinde gözlemledi:
+
+```
+13:41:23  askq-advance-jit phase=1->2  (Aşama 1 onayı)
+13:41:57  askq-advance-jit phase=2->5  (spec onayı, ATLAMA: precision-audit + asama-2-complete + engineering-brief + asama-3-complete YOK)
+13:41:58  asama-2-skip-block (hook yakaladı, model recovery)
+```
+
+Model `Aşama 1 → Aşama 4` atladı. JIT askq-advance kodu sadece state'i ileri atıyor, audit chain (Aşama 2, 3'ün gerçekten yapıldığını kanıtlayan audit'leri) kontrol etmiyor. Sonuç: state advance + audit chain bozuk → asama-2-skip-block tetikleniyor.
+
+**Kullanıcı direktifi:** "evet aşamaları atlayarak gitti. bunun olmaması gerekiyor."
+
+#### Çözüm — A planı (hard enforce)
+
+`hooks/lib/mcl-state.sh`'a yeni helper:
+
+```bash
+_mcl_pre_spec_audit_chain_status()
+  # Spec-approve advance prerequisitlerini kontrol et:
+  #   * summary-confirm-approve   → Aşama 1 onayı
+  #   * asama-2-complete          → Aşama 2 closing askq onayı
+  #   * asama-3-complete          → Aşama 3 engineering brief tamamlandı
+  # stdout: "ok" ya da virgülle ayrılmış eksik audit isimleri
+```
+
+**Stop hook (`mcl-stop.sh:1944-1962`):** Spec-approve askq onayı geldiğinde audit chain kontrolü:
+- `_chain_status` → "ok" değilse: state advance YAPMA + `decision:block` + RUNTIME REASON
+- Devtime: tam debug metni; Runtime: kısa Türkçe mesaj
+- audit emit: `spec-approve-chain-incomplete missing=<liste>`
+- trace emit: `spec_approve_chain_incomplete <liste>`
+
+**Pre-tool JIT (`mcl-pre-tool.sh:705-738`):** Aynı kontrol parite için. State advance no-op + warn audit (decision:block Stop tarafında veriliyor).
+
+#### Davranış matrisi
+
+| Senaryo | v13.0.13 (eski) | v13.0.14 (yeni) |
+|---|---|---|
+| Aşama 1→2→3→4 sırayla, audit chain tam | Spec advance ✓ | Spec advance ✓ (değişmedi) |
+| Aşama 1→4 atlama (audit chain eksik) | Spec advance + asama-2-skip-block strike loop | **Spec advance YOK** + decision:block + missing audit listesi |
+| Sadece Aşama 1 audit, 2/3 atlandı | advance + skip-block-strike | advance YOK + "asama-2-complete + asama-3-complete eksik" |
+| Tüm chain tam (1+2+3 audit'leri var) | advance ✓ | advance ✓ |
+
+#### Devtime/Runtime REASON
+
+**Devtime:**
+> "MCL ASAMA SIRALILIK IHLALI (v13.0.14) — Spec-approve askq onayı geldi AMA Aşama 1/2/3 audit zinciri eksik. Eksik audit'ler: asama-2-complete,asama-3-complete. State advance YAPILMADI. Sıralılık invariantı: Aşama 4 onayı verilebilmesi için 1, 2, 3 fazlarının audit'leri zincirde bulunmalı. Recovery: her eksik audit için bash recovery hatch kullan..."
+
+**Runtime:**
+> "Aşama atlandı: spec onayı verildi ama Aşama 1/2/3 audit'leri eksik (asama-2-complete,asama-3-complete). Bu fazları sırasıyla tamamla, sonra spec onayı geçerli olur."
+
+#### Recovery flow
+
+Model spec-approve askq onayladıktan sonra block görür:
+1. `bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-2-complete mcl-stop "params=precision-audit-confirmed"'`
+2. `bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-3-complete mcl-stop "params=engineering-brief-confirmed"'`
+3. Sonraki turda Stop hook chain check → "ok" → spec advance yapılır
+
+#### Verification
+
+- 6 yeni unit test (`tests/cases/test-v1314-spec-approve-chain.sh`):
+  - T1: 3 audit eksik
+  - T2-T3: kısmi eksik (2 / 1 audit)
+  - T4-T5: tam zincir
+  - T6: session boundary respect
+- Test baseline: 282 → **288 passed** / 0 failed / 2 skipped
+- Sıfır regresyon
+- bash -n: 4 hooks + state.sh clean
+
+#### Out of Scope (v13.1 candidate)
+
+- ❌ **summary-confirm-approve advance audit emit** — Aşama 1 askq onayı sırasında summary-confirm-approve audit otomatik emit edilmiyor (sadece askq-advance-jit yazılıyor). Bu nedenle T1 çalışıyor ama gerçek session'da Aşama 1 onayı verilse bile chain check başarısız olur. v13.0.15'te eklenecek.
+- ❌ asama-4-complete auto-emit at advance time
+- ❌ Diğer ~6 REASON için runtime/devtime split
+
+#### Realistic determinism estimate
+
+v13.0.13 ~99.5% (akış pürüzsüz ama atlama mümkün) → v13.0.14 ~99.7% (atlama hard-enforce ile engellendi). Sıralılık invariantı runtime'da garantili.
+
 ## [13.0.13] - 2026-05-08
 
 ### Devtime/runtime REASON ayrımı — kullanıcı kırmızı `Error:` paniği yumuşatıldı

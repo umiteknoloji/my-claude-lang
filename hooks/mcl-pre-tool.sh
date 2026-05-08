@@ -705,6 +705,19 @@ except Exception:
          && [ "$STATE_SPEC_HASH" = "$JIT_SPEC_HASH" ]; then
         mcl_debug_log "pre-tool" "askq-jit-idempotent" "hash=${JIT_SPEC_HASH:0:12}"
       else
+        # v13.0.14 — Hard enforce sıralılık (parite Stop hook ile):
+        # Spec-approve advance YAPILMAZ eğer Aşama 1/2/3 audit zinciri eksikse.
+        # Stop hook zaten decision:block veriyor (asıl enforce noktası);
+        # burada sadece state advance no-op + warn audit (tool çağrısını
+        # engellemeden state'i ileri atmamak — Stop tarafı block görsün).
+        _JIT_CHAIN="$(_mcl_pre_spec_audit_chain_status 2>/dev/null || echo ok)"
+        if [ -n "$_JIT_CHAIN" ] && [ "$_JIT_CHAIN" != "ok" ]; then
+          mcl_audit_log "spec-approve-chain-incomplete-jit" "pre-tool" "missing=${_JIT_CHAIN}"
+          command -v mcl_trace_append >/dev/null 2>&1 && \
+            mcl_trace_append spec_approve_chain_incomplete_jit "${_JIT_CHAIN}"
+          mcl_debug_log "pre-tool" "spec-approve-chain-incomplete" "missing=${_JIT_CHAIN}"
+          # State advance YAPMA — Stop hook'a bırak (decision:block oradan döner).
+        else
         mcl_state_set spec_hash "\"$JIT_SPEC_HASH\""
         mcl_state_set spec_approved true
         mcl_state_set current_phase 5
@@ -740,6 +753,7 @@ except Exception:
         CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
         SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
         PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
+        fi  # v13.0.14 — closes _JIT_CHAIN incomplete check
       fi
     elif [ "$JIT_INTENT" = "summary-confirm" ] \
          && _mcl_pre_is_approve_option "$JIT_SELECTED" \

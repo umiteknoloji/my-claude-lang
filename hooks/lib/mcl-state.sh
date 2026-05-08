@@ -301,6 +301,53 @@ _mcl_runtime_reason() {
   fi
 }
 
+_mcl_pre_spec_audit_chain_status() {
+  # v13.0.14 — Spec-approve advance prerequisitlerini kontrol eder.
+  # Aşama 4 spec onayı askq'si onaylandığında, Aşama 1, 2, 3'ün gerçekten
+  # tamamlandığını kanıtlayan audit'ler audit.log'da bulunmalı. Eksikse
+  # spec-approve advance hakkı kazanılmamış demektir (atlama tespit).
+  #
+  # Kontrol edilen audit'ler (canonical sıra):
+  #   * summary-confirm-approve   → Aşama 1 onayı
+  #   * asama-2-complete          → Aşama 2 closing askq onayı
+  #   * asama-3-complete          → Aşama 3 engineering brief tamamlandı
+  #
+  # Stdout: ya "ok" ya da virgülle ayrılmış eksik audit isimleri listesi.
+  # (Boş çıktı = uygunsuz girdi / hata, defansif olarak "ok" kabul edilir.)
+  command -v python3 >/dev/null 2>&1 || { echo "ok"; return 0; }
+  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
+  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
+  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo "ok"
+import os, sys
+audit_path, trace_path = sys.argv[1], sys.argv[2]
+session_ts = ""
+try:
+    if os.path.isfile(trace_path):
+        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
+            if "| session_start |" in line:
+                session_ts = line.split("|", 1)[0].strip()
+except Exception:
+    pass
+
+required = ["summary-confirm-approve", "asama-2-complete", "asama-3-complete"]
+seen = set()
+try:
+    if os.path.isfile(audit_path):
+        for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
+            ts = line.split("|", 1)[0].strip()
+            if session_ts and ts < session_ts:
+                continue
+            for req in required:
+                if f"| {req} |" in line:
+                    seen.add(req)
+except Exception:
+    print("ok"); sys.exit(0)
+
+missing = [r for r in required if r not in seen]
+print("ok" if not missing else ",".join(missing))
+PYEOF
+}
+
 _mcl_audit_emitted_in_session() {
   # Returns 1 if `event_name` audit fired in current session, else 0.
   # Optional `idem_marker` (arg 2): if that marker is also present in
