@@ -157,6 +157,11 @@ Tüm kapalı uçlu MCL etkileşimleri `MCL X.Y.Z | ` prefix'li native `AskUserQu
 - "Devam etmek için bir mesaj gönderin" ve tüm dil eşdeğerleri yasaklı
 - `.mcl/hooks/*.sh` dosyaları debug amaçlı okunamaz
 
+**Spec-Approve Audit Chain** (13.0.14 + 13.0.17 auto-fill)
+- Aşama 4 spec-approve advance için audit zinciri şart: `summary-confirm-approve + asama-2-complete + asama-3-complete`
+- v13.0.17: developer "Onayla" demişse chain incomplete olsa bile MCL eksik audit'leri `auto-fill-spec-approve` markıyla emit eder, advance fire eder. Deadlock kırma — model bypass'a yelteniyordu.
+- Auto-fill audit signature: `spec-approve-chain-autofill | <hook> | missing=...` + her audit `auto-fill-spec-approve` notuyla.
+
 
 **Aşama 5 Pattern Matching** (8.0.7, derinleşti 8.1.1)
 Spec onayı sonrası Aşama 9 TDD başlamadan önce mevcut sibling dosyalar okunur:
@@ -172,7 +177,9 @@ UI surface tespit edildiğinde MCL dummy data ile runnable frontend yazar; build
 
 Geliştirici tarayıcıda UI'ı inceler, AskUserQuestion ile onaylar (approve / revise / see-it-yourself / cancel). Opt-in: Playwright + screenshot ile MCL kendi UI'a bakıp multimodal rapor verir (`playwright` kurulu olmasını gerektirir, asla otomatik kurmaz). Revise → Aşama 6'ya döner, see-it-yourself → opt-in inspection. Aşama 6 atlandığında Aşama 7 de atlanır (`asama-7-skipped`).
 
-**Narration rule (since 13.0.18):** Aşama 7 deferred (Aşama 6 dev server sonrası developer'ın cevabıyla başlar) olsa bile faz listesinde DAİMA görünür kalır — `Aşama 5 → 6 → 7 (deferred) → 8 → 9` formatında. Sessizce düşürmek yasak (`Aşama 5 → 6 → 8 → 9` yanlış). Sadece Aşama 6 atlandığında `(atlandı — Aşama 6)` notuyla işaretlenir. Kural skill file + DSI header_directive + PHASE_META[7] üç katmanından enforce edilir.
+**Narration rule (since 13.0.15):** Aşama 7 deferred (Aşama 6 dev server sonrası developer'ın cevabıyla başlar) olsa bile faz listesinde DAİMA görünür kalır — `Aşama 5 → 6 → 7 (deferred) → 8 → 9` formatında. Sessizce düşürmek yasak (`Aşama 5 → 6 → 8 → 9` yanlış). Sadece Aşama 6 atlandığında `(atlandı — Aşama 6)` notuyla işaretlenir. Kural skill file + DSI header_directive + PHASE_META[7] üç katmanından enforce edilir.
+
+**Deferred semantics (since 6.5.0):** Aşama 6 dev server + browser auto-open ile biter ve STOP. Aşama 7 askq önceden AÇILMAZ — geliştiricinin bir sonraki turn'undaki free-form cevabı intent classification ile yorumlanır (approve / revise / cancel cue'ları 14 dilde). Sadece ambiguous (boş, tek emoji) ise fallback askq açılır.
 
 ### Aşama 8 — DB Design (since v12.0)
 
@@ -316,6 +323,15 @@ Her Aşama 9 turunda üç kural:
 
 **Rollback Checkpoint** (8.0.9)
 Spec onayında `git rev-parse HEAD` → `state.rollback_sha`. Her turda SHA ve `git reset --hard` komutu gösterilir (ilk tur, `/mcl-rollback` ile yeniden).
+
+**Layer B Phase Allowlist** (13.0.9 → 13.0.18 always-fire)
+Her tool çağrısında aktif fazın `allowed_tools` listesi kontrol edilir; izinli değilse `phase-allowlist-tool-block` deny + REASON. v13.0.10 KATI mod (otomatik açılma yok). v13.0.18: REASON koşulu kaldırıldı — Layer B her tool çağrısında fire eder, allowlist ihlali pre-set REASON'ı override eder. Fail-closed: gate-spec'te `allowed_tools` field yoksa mutating tool DENY (eski varsayılan: allow, sızıntı kapısıydı). Debug audit her fire'da: `phase-allowlist-check | tool=<X> phase=<N> verdict=<deny:tool|deny:path|allow>`.
+
+**Persuasion Manifesto** (13.0.16)
+`<mcl_core>` açılışında "WHY THESE 22 PHASES — this pipeline works WITH you, not against you" başlıklı 8 satırlık ikna bloğu. Her atlamanın modele *maliyetini* (rewrite, retry) somut örneklerle anlatır. Negative framing yerine positive incentive. İngilizce (model ağırlıkları İngilizce daha güçlü çalışır).
+
+**Devtime/Runtime REASON Split** (13.0.13)
+Hook block REASON'ları iki dilde tutulur: devtime (uzun İngilizce debug — MCL geliştirenler) + runtime (kısa Türkçe — son kullanıcı). `_mcl_is_devtime` helper `CLAUDE_PROJECT_DIR`'a göre seçer. Production'da kırmızı "Error:" panik yumuşatılır.
 
 ---
 

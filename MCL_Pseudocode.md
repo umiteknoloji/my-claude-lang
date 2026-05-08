@@ -241,25 +241,32 @@ MCL Kuş Bakışı — Sözde Kod
 
   ↓ (sıralı)
   ────────────────────────────────────────────────────────────────────
-  Aşama 7: UI İncelemesi (atlanabilir)
+  Aşama 7: UI İncelemesi (deferred — atlanabilir)
   ────────────────────────────────────────────────────────────────────
   Amaç:
      Geliştiricinin UI'ı tarayıcıda görüp onaylaması. Yanlışsa Aşama
      6'ya geri sarma şansı — backend yazılmadan önce.
 
-  Ne yapar:
-     askq ile 4 seçenek sunar:
-       * Onayla       → Aşama 8'e geç
-       * Revize       → Aşama 6'ya geri dön, geri bildirimle yeniden yaz
-       * Sen-de-bak   → opt-in Playwright + screenshot + multimodal Claude
-                       UI'a kendi gözüyle bakar, ne gördüğünü anlatır
-       * İptal        → pipeline durur
+  Ne yapar (6.5.0'dan beri DEFERRED):
+     Aşama 6 dev server + browser auto-open ile biter ve STOP. Aşama 7
+     askq önceden AÇILMAZ — geliştiricinin bir sonraki turn'undaki
+     free-form cevabı intent classification ile yorumlanır:
+       * approve cue'ları (14 dilde) → asama-7-complete, Aşama 8'e geç
+       * revise cue'ları → Aşama 6'ya geri dön, geri bildirimle yeniden yaz
+       * cancel cue'ları → pipeline durur
+       * approve + revise birlikte (örn. "güzel ama büyüt") → revise kazanır
+       * boş / tek emoji / ambiguous → fallback askq açılır (4 seçenek:
+         Onayla / Revize / Sen-de-bak (opt-in Playwright + screenshot +
+         multimodal Claude UI'a bakar) / İptal)
+
+  Narration kuralı (v13.0.15):
+     Aşama 7 deferred ≠ skipped. Faz listesi yazılırken DAİMA görünür
+     kalır: "Aşama 5 → 6 → 7 (deferred) → 8 → 9". Sadece Aşama 6
+     atlandığında "(atlandı — Aşama 6)" notuyla işaretlenir.
 
   Atlama:
-     Aşama 6 atlandıysa otomatik atlanır.
-
-  askq:
-     "MCL X.Y.Z | Faz 7 — UI onayı"
+     Aşama 6 atlandıysa otomatik atlanır (asama-7-skipped reason=
+     asama-6-skipped).
 
   Çıktı:
      asama-7-complete | asama-7-skipped
@@ -538,11 +545,31 @@ MCL Kuş Bakışı — Sözde Kod
 
   DSI (Dynamic Status Injection):
      Her turun başında aktif faz odağını gönderir — model "ortada kaybolma"
-     yaşamasın
+     yaşamasın. PHASE_META'dan aktif faz görev/emit/skip cue'ları + faz
+     index tablosu render edilir.
 
-  Katman B (Faz İzin Listesi):
-     Her fazda sadece o fazın "allowed_tools" listesi izinli
-     v13.0.10 KATI: otomatik açılma YOK, 5+ red sonrası kullanıcıya iletilir
+  Persuasion Manifesto (v13.0.16):
+     <mcl_core> açılışında "WHY THESE 22 PHASES — this pipeline works WITH
+     you, not against you" başlıklı 8 satırlık ikna bloğu. Her atlamanın
+     modele *maliyetini* (rewrite, retry) somut örneklerle anlatır. Negative
+     framing yerine positive incentive — model train data'sındaki "niyet
+     anlaşıldı → kod yaz" priorını dengeler. İngilizce (model ağırlıkları
+     İngilizce daha güçlü çalışır).
+
+  Katman B (Faz İzin Listesi) — v13.0.18 always-fire:
+     Her fazda sadece o fazın "allowed_tools" listesi izinli. v13.0.18:
+     REASON koşulu kaldırıldı — Layer B her tool çağrısında fire eder, allowlist
+     ihlali pre-set REASON'ı override eder. Fail-closed: gate-spec'te
+     allowed_tools field yoksa mutating tool DENY (eski varsayılan: allow,
+     sızıntı kapısıydı). Debug audit her fire'da: phase-allowlist-check |
+     tool=X phase=N verdict=<deny:tool|deny:path|allow>.
+
+  Spec-Approve Audit Chain (v13.0.14 + v13.0.17 auto-fill):
+     Aşama 4 spec-approve advance için audit zinciri şart:
+     summary-confirm-approve + asama-2-complete + asama-3-complete. v13.0.17:
+     developer "Onayla" demişse chain incomplete olsa bile MCL eksik
+     audit'leri "auto-fill-spec-approve" markıyla emit eder, advance fire
+     eder (deadlock kırma — model bypass'a yelteniyordu).
 
   Universal Completeness Loop:
      Stop kancasında gate-spec'e göre sıralı faz ilerletme
@@ -556,6 +583,11 @@ MCL Kuş Bakışı — Sözde Kod
   Aşama 6 Sunucu-Tarayıcısız Merceği (v13.0.6/0.8):
      KATI — sunucu başlatıldıysa tarayıcı açma zorunlu, otomatik açılma yok
 
+  Aşama 7 Deferred Narration Rule (v13.0.15):
+     Aşama 7 deferred olsa bile faz listesinden ASLA atlanmaz. Skill +
+     DSI header_directive + PHASE_META[7].narration üç katmandan enforce.
+     Yasak: "Aşama 5 → 6 → 8 → 9". Doğru: "Aşama 5 → 6 → 7 (deferred) → 8".
+
   Spec Varlık Denetimi:
      Edit/Write/MultiEdit çağrıldı ama assistant mesajında 📋 Spec: bloğu
      yok → Stop kancası spec-required-warn audit yazar
@@ -565,6 +597,12 @@ MCL Kuş Bakışı — Sözde Kod
      Post-tool tdd-test-write + tdd-prod-write olaylarını sayar; testin
      üretim kodundan önce yazılma oranını state.tdd_compliance_score'a
      yazar (0-100). Aşama 22 denetiminde değerlendirilir.
+
+  Devtime/Runtime REASON Split (v13.0.13):
+     Hook block REASON'ları iki dilde tutulur: devtime (uzun İngilizce
+     debug — MCL geliştirenler için) + runtime (kısa Türkçe — son
+     kullanıcı için). _mcl_is_devtime helper CLAUDE_PROJECT_DIR'a göre
+     seçer. Production session'da kırmızı "Error:" panik yumuşatılır.
 
   Plugin Orkestrasyon (Kural A / B / C):
      A: Yerel git deposu güvencesi (ilk açılışta git init onayı)
@@ -597,8 +635,9 @@ MCL Kuş Bakışı — Sözde Kod
      Token & maliyet raporu (cost.json okur).
 
   6. Loop-breaker:
-     Bazı engellerde 3 ardışık reddetme → otomatik açılma + audit uyarısı (eski).
-     v13.0.10 Katman B: otomatik açılma YOK, kullanıcıya iletilir.
+     Bazı engellerde 3 ardışık reddetme → otomatik açılma + audit uyarısı
+     (eski mekanizma). v13.0.18 sonrası Katman B'de otomatik açılma YOK —
+     blok kalkmaz, audit uyarısı kullanıcıya iletilir.
 
   7. /mcl-checkup:
      Tüm fazların durumunu salt-okunur rapor olarak göster.
@@ -606,6 +645,13 @@ MCL Kuş Bakışı — Sözde Kod
   8. /mcl-finish:
      Birikmiş Aşama 19 etkilerini bir kontrol noktasında topla, proje
      düzeyinde bitirme raporu üret.
+
+  9. Diğer slash komutları:
+     /mcl-cost, /mcl-dispatch, /mcl-dsi, /mcl-log, /mcl-plugin,
+     /mcl-rollback, /mcl-self, /mcl-semgrep, /mcl-stack, /mcl-state,
+     /mcl-tag, /mcl-test, /mcl-trace — her biri activate hook'ta
+     PROMPT_NORM string match ile yakalanır, faza özel kısa cevaplar
+     veya state inceleme amaçlıdır.
 
   7. Tek Cümleyle MCL
 
