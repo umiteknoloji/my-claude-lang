@@ -1,19 +1,29 @@
 <mcl_phase name="asama9-tdd">
 
-# Aşama 9 TDD: incremental red-green-refactor
+# Aşama 9: TDD Yürütme (Test-First Development)
 
-Aşama 8 normally writes production code immediately after the spec
-is approved. This overlay turns that into an **incremental TDD cycle**:
-for each Acceptance Criterion, one test → RED → minimum code → GREEN
-→ refactor — then move to the next criterion. The full cycle happens
-entirely inside Aşama 8; the next phase (Risk Review), Aşama 10
-(Impact Review in v10 numbering), and Aşama 11 (Verification Report
-in v10 numbering) run afterward as usual.
+Spec onayı (Aşama 4) sonrası çalışır. Her Acceptance Criterion için
+**incremental TDD cycle** uygulanır: tek test → RED → minimum kod →
+GREEN → REFACTOR — sonra bir sonraki kriter. Aşama 9 GREEN-verified
+olduktan sonra Aşama 10 (Risk Review) çalışır.
 
-TDD is **mandatory** — it runs on every Aşama 8 execution. There
-is no opt-in flag. The only path that skips TDD is when the test
-command cannot be resolved even after auto-detection and the
-developer explicitly declines to provide one (see Step 1).
+## Akış Çatallanması (since MCL 6.2.0)
+
+`ui_flow_active`'a göre Aşama 9 davranışı çatallanır:
+
+- **`ui_flow_active = true`**: Aşama 9, UI fazlarından (Aşama 6 UI Build
+  ve Aşama 7 UI Review) sonra çalışır. TDD execute body + Step 5 backend
+  wiring birlikte yürür. Backend wiring, Aşama 6'daki dummy fixtures'ı
+  gerçek API/DB çağrılarına çevirir.
+- **`ui_flow_active = false`**: TDD doğrudan çalışır, Step 5 atlanır.
+
+Sub-phase state'i (`spec_approved`, `current_phase`, `ui_sub_phase`)
+`hooks/lib/mcl-state.sh` tarafından yönetilir. Sub-phase prose ile
+geçiş yapılmaz — Stop hook tek otorite.
+
+TDD **mandatory** — her Aşama 9 yürütmesinde çalışır. Atlama yolu
+sadece: test komutu çözülemediği VE geliştirici açıkça kabul ettiği
+durum (bkz. Step 1).
 
 <mcl_constraint name="tdd-incremental-flow">
 
@@ -280,9 +290,10 @@ silently change the type.
 
 ### Phase Behavior Notes
 
-- This step inherits all of `asama9-execute.md` discipline (English
+- This step inherits MCL'in genel disiplinini (English
   code/comments/commits, dev-language communication, Gate 1/2/3,
-  deletion-only execution-plan rule, scope-creep handling).
+  deletion-only execution-plan rule, scope-creep handling) — bu
+  kurallar STATIC_CONTEXT'te ve ilgili constraint'lerde tanımlı.
 - This step does NOT re-implement those rules — it is Aşama 7
   execution with the UI already committed. Think of it as the
   second half of the `ui_flow_active = true` execution pair.
@@ -312,6 +323,36 @@ test-run | runner | label=green-verify  result=GREEN exit=0 ...
 ```
 
 Refactor-confirm runs (no label) are not audited unless they fail.
+
+</mcl_constraint>
+
+<mcl_constraint name="spec-history">
+
+## Spec History — automatic feature ledger
+
+On every AskUserQuestion approve-family tool_result that transitions
+phase to EXECUTE (audit event `approve-via-askuserquestion`), the Stop
+hook writes the full spec body to `.mcl/specs/NNNN-slug.md` with YAML
+frontmatter (spec_id, approved_at, spec_hash, branch, head_at_approval,
+completion_commit=null, status=active). `.mcl/specs/INDEX.md` is
+regenerated as a pipe-table sorted newest-first.
+
+This is a background mechanism — Aşama 9 prose flow does NOT change.
+MCL does NOT need to announce the save in every turn. Mention it only
+when:
+
+- The developer explicitly asks where specs are stored, or
+- A drift-reapproval landed and the developer asks why a new file
+  appeared, or
+- Completion: when the developer ships the feature, remind them that
+  they should update the frontmatter's `completion_commit` + `status:
+  shipped` fields in the matching `NNNN-slug.md` file.
+
+Specs dir is part of the project — it should be checked into git as
+living documentation. Slug is derived from the spec's Objective line;
+when derivation fails, fallback `spec-NNNN` is used. Idempotency: a
+second approval of the same spec body (identical hash) is a no-op —
+duplicate file is not produced.
 
 </mcl_constraint>
 

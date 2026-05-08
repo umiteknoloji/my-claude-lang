@@ -295,8 +295,7 @@ not-applicable audit is emitted.
 
 ## Aşama 9: Code + TDD (RED → GREEN → REFACTOR per criterion)
 
-For full execution rules, read `my-claude-lang/asama9-execute.md`
-For incremental TDD rules, read `my-claude-lang/asama9-tdd.md`
+For full Aşama 9 rules, read `my-claude-lang/asama9-tdd.md`
 
 On every approval the Stop hook auto-saves the spec body to
 `.mcl/specs/NNNN-slug.md`. Code-writing aşama with strict TDD discipline:

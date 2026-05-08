@@ -13,7 +13,7 @@ Aşama 6 starts automatically when ALL of these hold after spec approval:
 - `ui_sub_phase = "BUILD_UI"` (set by stop hook on spec-approve)
 
 When `ui_flow_active = false` (developer picked "Onay, UI atlayacağız" at
-Aşama 1) — Aşama 6 is SKIPPED. Jump straight to `asama9-execute.md`.
+Aşama 1) — Aşama 6 is SKIPPED. Jump straight to `asama9-tdd.md`.
 
 ## Core Intent
 
