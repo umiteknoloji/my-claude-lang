@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 13.0.15
+**Güncel sürüm:** 13.0.16
 
 ---
 
@@ -172,7 +172,7 @@ UI surface tespit edildiğinde MCL dummy data ile runnable frontend yazar; build
 
 Geliştirici tarayıcıda UI'ı inceler, AskUserQuestion ile onaylar (approve / revise / see-it-yourself / cancel). Opt-in: Playwright + screenshot ile MCL kendi UI'a bakıp multimodal rapor verir (`playwright` kurulu olmasını gerektirir, asla otomatik kurmaz). Revise → Aşama 6'ya döner, see-it-yourself → opt-in inspection. Aşama 6 atlandığında Aşama 7 de atlanır (`asama-7-skipped`).
 
-**Narration rule (since 13.0.15):** Aşama 7 deferred (Aşama 6 dev server sonrası developer'ın cevabıyla başlar) olsa bile faz listesinde DAİMA görünür kalır — `Aşama 5 → 6 → 7 (deferred) → 8 → 9` formatında. Sessizce düşürmek yasak (`Aşama 5 → 6 → 8 → 9` yanlış). Sadece Aşama 6 atlandığında `(atlandı — Aşama 6)` notuyla işaretlenir. Kural skill file + DSI header_directive + PHASE_META[7] üç katmanından enforce edilir.
+**Narration rule (since 13.0.16):** Aşama 7 deferred (Aşama 6 dev server sonrası developer'ın cevabıyla başlar) olsa bile faz listesinde DAİMA görünür kalır — `Aşama 5 → 6 → 7 (deferred) → 8 → 9` formatında. Sessizce düşürmek yasak (`Aşama 5 → 6 → 8 → 9` yanlış). Sadece Aşama 6 atlandığında `(atlandı — Aşama 6)` notuyla işaretlenir. Kural skill file + DSI header_directive + PHASE_META[7] üç katmanından enforce edilir.
 
 ### Aşama 8 — DB Design (since v12.0)
 

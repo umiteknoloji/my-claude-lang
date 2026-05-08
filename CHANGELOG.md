@@ -7,6 +7,94 @@
 
 ## [Unreleased]
 
+## [13.0.16] - 2026-05-08
+
+### Persuasion manifesto — `<mcl_core>` opening, model'i ikna edici çerçeveleme
+
+**Üretim raporu:** v13.0.15 sonrası kullanıcı backoffice testinde gözlemledi:
+
+```
+14:32:59  askq-advance-jit phase=1->2  (Aşama 1 onayı)
+14:34:22  spec-approve-chain-incomplete  missing=summary-confirm-approve,asama-2-complete,asama-3-complete
+14:34:22  spec-approval-block tool=Write strike=1
+```
+
+Model Aşama 1 askq onayı sonrası Aşama 2-3-4'ü tamamen atladı, kendisini "Aşama 6 — UI Build" sandı, mkdir + Write çağırdı. v13.0.14 audit chain check Write'ı doğru block etti — ama POST-HOC. Block doğru, yönlendirme yetersiz.
+
+**Kullanıcı framing:** "model bize karşı koymaya çalışıyor sanırım. onu ilk promptu yazdığımda 22 aşamayı sıra sıra ilerleteceğimize ikna etmeliyiz."
+
+#### Kök sebep — otoriter prompt + model bias
+
+Mevcut activate hook'taki dil:
+- "FOLLOW these rules for every developer message — no exceptions"
+- "Do NOT invent your own phase labels"
+- "STOP. Do NOT proceed..."
+
+Bu **compliance dili** — negation-heavy, ceza odaklı. Model train data'sındaki "niyet anlaşıldı → kod yaz" priorı bu kuralları geçici sınırlama olarak okuyor. Precision audit / engineering brief gibi soyut aşamalar atlamaya yatkın çünkü **modelin perspektifinden yarar açıklanmamış**.
+
+#### Çözüm — opening persuasion manifesto
+
+`<mcl_core>` açılışına 8 satırlık ikna bloğu eklendi (`FOLLOW these rules` direktifinden ÖNCE):
+
+```
+🤝 WHY THESE 22 PHASES — this pipeline works WITH you, not against you.
+
+Each phase's output is the next phase's input. Skipping creates an
+information gap → hallucination → retry. Cost to YOU when phases
+are skipped:
+  • Aşama 2 skip → no precision audit → spec missing a gate →
+    developer says "you also should have asked X" → rewrite from scratch.
+  • Aşama 4 skip → no spec approval → "this isn't what I asked for"
+    → all code discarded.
+  • Aşama 9 skip → no tests → debug hours later, often after the
+    developer has shipped.
+
+Mechanical blocks (audit chain check, allowlist deny, REASON) catch
+violations AFTER the fact — but then you do double work: once forward,
+once back. Shortest path: walk sequentially. Aşama N → N+1, no jumps,
+deferred ≠ skipped, summary-confirm-approve ≠ spec-approve.
+
+The 22 phases are not gates against you — they are the structure that
+lets you finish in one pass with the developer satisfied. Each phase
+you skip is a retry you owe later. Each phase you complete is a retry
+you avoid.
+```
+
+İlke değişiklikleri:
+- **Negative → positive framing**: "Don't skip" değil "skipping costs you"
+- **Constraint → incentive**: kurallara uymak modelin yararına (less retry, less rework)
+- **Concrete cost examples**: Aşama 2/4/9 atlanırsa ne olacağı somut maliyet
+- **"WITH you, not against you"** — adversarial framing'i çürütür
+- **Engl
+
+ish-only**: model ağırlıkları İngilizce; davranış-shaping prompt İngilizce daha güçlü çalışır
+
+Token cost: ~700 char, sadece UserPromptSubmit'te bir kez render — re-render her turn ama session start cache hit'te kalır.
+
+#### Yer
+
+`hooks/mcl-activate.sh:217` STATIC_CONTEXT bloğunun en başı, `<mcl_core>\n` ile `FOLLOW these rules` arasında. Modelin attention'ında ilk girdi.
+
+#### Test
+
+Smoke render: `MCL_DEVTIME=1 ... bash mcl-activate.sh` → additionalContext'in başında manifesto görünür. `bash -n hooks/*.sh` clean. Baseline 302 passed, 0 failed, 2 skipped korundu (mevcut testler hâlâ geçer).
+
+#### Why this is enforcement, not just decoration
+
+Captured rule: *"Always implement behavioral MCL features as dedicated phase/skill/hook artifacts."*
+
+- ✅ Hook injection (mcl-activate.sh STATIC_CONTEXT — her UserPromptSubmit'te)
+- ✅ Conscious framing decision (positive incentives, ölçülebilir)
+- Detection control: v13.0.14 audit chain check (manifesto'ya rağmen atlama olursa hâlâ block)
+
+Manifesto pre-hoc steering; chain check post-hoc safety net. İkisi katmanlı.
+
+#### Out of scope (v13.0.17+)
+
+- Pre-tool askq-advance sonrası aktif faz directive **eş zamanlı re-inject** (gap kapama: state advance ile prompt güncellemesi arasındaki delik)
+- Block REASON Türkçe ve eksik faz spesifik (`"Aşama 2 yapılmadı"` vs `"spec onayı gerekli"`)
+- summary-confirm-approve audit auto-emit at askq advance (v13.0.14 not'ta candidate)
+
 ## [13.0.15] - 2026-05-08
 
 ### Aşama 7 deferred narration rule — "deferred ≠ skipped" görünürlük kontratı
