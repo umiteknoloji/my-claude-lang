@@ -1028,12 +1028,16 @@ _A4_EMITTED="$(_mcl_asama_4_complete_emitted 2>/dev/null || echo 0)"
 if [ "${_A4_EMITTED:-0}" = "1" ]; then
   _A4_SA="$(mcl_state_get spec_approved 2>/dev/null)"
   _A4_PH="$(mcl_state_get current_phase 2>/dev/null)"
-  if [ "$_A4_SA" != "true" ] || [ "$_A4_PH" != "7" ]; then
+  # v13.0.11: post-spec-approval canonical phase is 5 (Pattern Matching).
+  # Universal completeness loop below advances 5→6→...→9 as audits emit.
+  # Guard with `-lt 5` so we don't pull state BACKWARD if the loop has
+  # already advanced beyond Aşama 5 (e.g., asama-5-skipped already emitted).
+  if [ "$_A4_SA" != "true" ] || [ "${_A4_PH:-0}" -lt 5 ] 2>/dev/null; then
     mcl_state_set spec_approved true >/dev/null 2>&1 || true
-    mcl_state_set current_phase 7 >/dev/null 2>&1 || true
-    mcl_state_set phase_name '"EXECUTE"' >/dev/null 2>&1 || true
+    mcl_state_set current_phase 5 >/dev/null 2>&1 || true
+    mcl_state_set phase_name '"PATTERN_MATCHING"' >/dev/null 2>&1 || true
     mcl_audit_log "asama-4-progression-from-emit" "stop" "prev_approved=${_A4_SA:-null} prev_phase=${_A4_PH:-null}"
-    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 4 7
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 4 5
   fi
 fi
 
