@@ -214,7 +214,7 @@ MCL Kuş Bakışı — Sözde Kod
 
   ↓ (sıralı)
   ────────────────────────────────────────────────────────────────────
-  Aşama 6: UI Yapımı (atlanabilir)
+  Aşama 6: UI Yapımı (UI yoksa atlanır)
   ────────────────────────────────────────────────────────────────────
   Amaç:
      Kullanıcı arayüzünü gerçek API/veritabanı bağlanmadan, sahte
@@ -241,7 +241,7 @@ MCL Kuş Bakışı — Sözde Kod
 
   ↓ (sıralı)
   ────────────────────────────────────────────────────────────────────
-  Aşama 7: UI İncelemesi (deferred — atlanabilir)
+  Aşama 7: UI İncelemesi (deferred — Aşama 6'ya bağlı)
   ────────────────────────────────────────────────────────────────────
   Amaç:
      Geliştiricinin UI'ı tarayıcıda görüp onaylaması. Yanlışsa Aşama
@@ -273,7 +273,7 @@ MCL Kuş Bakışı — Sözde Kod
 
   ↓ (sıralı)
   ────────────────────────────────────────────────────────────────────
-  Aşama 8: Veritabanı Tasarımı (atlanabilir)
+  Aşama 8: Veritabanı Tasarımı (DB yoksa atlanır)
   ────────────────────────────────────────────────────────────────────
   Amaç:
      Veriyi normalleştirme kurallarına uygun ve ileriye dönük sorun
