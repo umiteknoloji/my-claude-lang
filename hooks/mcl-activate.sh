@@ -15,7 +15,7 @@ _MCL_CWD_REAL="$(cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" 2>/dev/null && pwd || true)"
 _MCL_REPO_REAL="$(cd "$MCL_REPO_PATH" 2>/dev/null && pwd || true)"
 if [ -n "$_MCL_REPO_REAL" ] && [ "$_MCL_CWD_REAL" = "$_MCL_REPO_REAL" ]; then
   cat >/dev/null 2>&1 || true  # drain stdin
-  printf '{"hookSpecificOutput":{"additionalContext":""}}'
+  printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":""}}'
   exit 0
 fi
 

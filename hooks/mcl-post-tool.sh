@@ -4,6 +4,15 @@
 
 set -u
 
+# Self-project guard: MCL must not process its own repo (recursive friction).
+_MCL_REPO_PATH_SG="${MCL_REPO_PATH:-$HOME/my-claude-lang}"
+_MCL_CWD_SG="$(cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" 2>/dev/null && pwd || true)"
+_MCL_REPO_SG="$(cd "$_MCL_REPO_PATH_SG" 2>/dev/null && pwd || true)"
+if [ -n "$_MCL_REPO_SG" ] && [ "$_MCL_CWD_SG" = "$_MCL_REPO_SG" ]; then
+  cat >/dev/null 2>&1 || true
+  exit 0
+fi
+
 # Hook health timestamp (since 8.2.7) — writes hook_last_run_ts to
 # .mcl/hook-health.json so `mcl check-up` can detect an unregistered or
 # silently broken hook (no recent timestamp = WARN).
