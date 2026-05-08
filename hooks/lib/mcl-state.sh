@@ -461,39 +461,6 @@ print(count)
 PYEOF
 }
 
-mcl_get_active_phase() {
-  # Returns the active aşama string (1..22, v12+ canonical).
-  #
-  # v13.0.11 migration: legacy 1/4/7/11 sentinel logic dropped.
-  # State now holds the real phase number directly (1..22 canonical), so
-  # this helper is essentially identity — but keeps validity bounds and
-  # graceful fallback (missing state file → "1"; corrupt → "?").
-  #
-  # Optional arg: path to state.json (default: $MCL_STATE_FILE)
-  local state_file="${1:-${MCL_STATE_FILE}}"
-  [ -f "$state_file" ] || { echo "1"; return 0; }
-
-  python3 - "$state_file" 2>/dev/null <<'PYEOF'
-import json, sys
-
-try:
-    obj = json.loads(open(sys.argv[1]).read())
-except Exception:
-    print("?"); sys.exit(0)
-
-try:
-    phase = int(obj.get("current_phase") or 1)
-except Exception:
-    print("?"); sys.exit(0)
-
-# v12+ canonical: 1..22 are valid phase numbers. Out-of-range → "?".
-if 1 <= phase <= 22:
-    print(str(phase)); sys.exit(0)
-
-print("?")
-PYEOF
-}
-
 # CLI dispatch — only when invoked directly, not when sourced.
 # READ-ONLY from CLI. All write operations (set/init/reset) are gated by
 # `_mcl_state_auth_check` and will be denied from this entry point —

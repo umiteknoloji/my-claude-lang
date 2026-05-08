@@ -78,14 +78,12 @@ except Exception:
     pass
 ' 2>/dev/null)"
 
-# -------- Branch: v13.0 Universal Model Emit Denylist (soft) --------
-# v13.0 BRIDGE: deny sadece `phase_transition` ve `asama-N-progression-from-emit`
-# için aktif. `asama-N-complete` model tarafından emit edilebilir (legacy v12
-# pattern); gate engine bunu legacy fallback ile algılar. v13.1 hard cutover'da
-# `asama-N-complete` model emit'i de yasaklanır — o zaman tüm 24 skill MD dosyası
-# yeni emit pattern'lerine (items-declared/scan/triple) geçmiş olmalı.
-# Deny scope dar (Risk #2): TOOL_NAME=Bash AND command body içinde mcl_audit_log
-# veya mcl_trace_append çağrısı varsa.
+# -------- Branch: Phase transition emit denylist --------
+# Model `phase_transition` veya `asama-N-progression-from-emit` audit emit
+# edemez — bunlar yalnızca universal completeness loop tarafından yazılır.
+# `asama-N-complete` ise pseudocode'da bazı fazlarda kullanılan meşru pattern
+# (Aşama 5, 7, 21, 22), yasaklanmaz. Deny scope dar: TOOL_NAME=Bash AND
+# command body içinde mcl_audit_log/mcl_trace_append çağrısı + yasak token.
 if [ "$TOOL_NAME" = "Bash" ]; then
   _BASH_CMD="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json, sys

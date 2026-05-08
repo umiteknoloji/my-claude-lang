@@ -383,7 +383,7 @@ fi
 # backstop; this dynamic notice is the per-turn enforcement signal.
 RESPEC_GUARD_NOTICE=""
 if [ -f "$STATE_FILE" ] && command -v python3 >/dev/null 2>&1; then
-  _RG_EFF_PHASE="$(mcl_get_active_phase "$STATE_FILE" 2>/dev/null)"
+  _RG_EFF_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
   _RG_ACTIVE="false"
   if echo "$_RG_EFF_PHASE" | grep -qE '^(4|4a|4b|4c|4\.5|3\.5)$'; then
     _RG_ACTIVE="true"

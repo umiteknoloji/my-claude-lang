@@ -751,7 +751,7 @@ fi
 _PR_GUARD="$_MCL_HOOK_DIR/lib/mcl-phase-review-guard.py"
 if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
-  _PR_ACTIVE_PHASE="$(mcl_get_active_phase 2>/dev/null)"
+  _PR_ACTIVE_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
   _PR_REVIEW_STATE="$(mcl_state_get risk_review_state 2>/dev/null)"
 
   # Aşama 5/6a/6b/6c/7 means approved and executing (pattern + UI sub-phases + code).
@@ -1176,69 +1176,9 @@ if [ -f "$_MCL_HOOK_DIR/lib/mcl-gate.sh" ]; then
   done
 fi
 
-# --- Legacy: Aşama 9 auto-complete (since v10.1.11) — kept for v12 fallback ---
-# v13.0 universal loop (above) is primary. This block remains for v12.x
-# audit format detection (asama-N-N-end pattern). Sunset v13.1.
-# Real-world failure mode (grom backoffice): all 8 sub-step audits
-# (asama-9-N-start/end OR asama-9-N-not-applicable) fired correctly
-# but model forgot to emit the final `asama-10-complete` summary
-# audit. Result: trace.log missed `phase_transition 9 10`, Aşama 11
-# Process Trace appeared to skip Aşama 9, developer concluded the
-# phase was atlanmış even though every sub-step actually ran.
-#
-# Fix: when Stop sees all 8 sub-step completion signals AND
-# `asama-10-complete` is missing, auto-emit it. Existing v10.1.5
-# progression scanner (below) then promotes quality_review_state to
-# complete normally. The auto-emit is logged with caller=mcl-stop-auto
-# so it's distinguishable from a model-generated emit during forensics.
-_mcl_asama_9_substeps_complete() {
-  local audit_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/audit.log"
-  local trace_file="${MCL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.mcl}/trace.log"
-  if [ ! -f "$audit_file" ]; then echo "0|0"; return; fi
-  python3 - "$audit_file" "$trace_file" 2>/dev/null <<'PYEOF' || echo "0|0"
-import os, sys
-audit_path, trace_path = sys.argv[1], sys.argv[2]
-session_ts = ""
-try:
-    if os.path.isfile(trace_path):
-        for line in open(trace_path, "r", encoding="utf-8", errors="replace"):
-            if "| session_start |" in line:
-                session_ts = line.split("|", 1)[0].strip()
-except Exception:
-    pass
-done = {n: False for n in range(10, 18)}
-try:
-    for line in open(audit_path, "r", encoding="utf-8", errors="replace"):
-        ts = line.split("|", 1)[0].strip()
-        if session_ts and ts < session_ts:
-            continue
-        # v11 (since v11.0.0): scan asama-10..17 (the dedicated quality
-        # phases). Either asama-N-end (phase ran) OR asama-N-not-applicable
-        # (phase soft-skipped with reason) counts as completion. Pre-v11
-        # this scanned asama-9-1..9-8 sub-steps; the rename matches the
-        # v11 architecture's flat phase numbering.
-        for n in range(10, 18):
-            if (f"| asama-{n}-end |" in line or
-                f"| asama-{n}-not-applicable |" in line):
-                done[n] = True
-except Exception:
-    pass
-all_done = all(done.values())
-done_count = sum(1 for v in done.values() if v)
-print(f"{done_count}|{1 if all_done else 0}")
-PYEOF
-}
-
-_A9_SUB_RESULT="$(_mcl_asama_9_substeps_complete 2>/dev/null || echo "0|0")"
-_A9_SUB_DONE_COUNT="${_A9_SUB_RESULT%%|*}"
-_A9_SUB_ALL_DONE="${_A9_SUB_RESULT##*|}"
-if [ "${_A9_SUB_ALL_DONE:-0}" = "1" ]; then
-  _A9_HAS_COMPLETE="$(_mcl_audit_emitted_in_session "asama-10-complete" "" 2>/dev/null || echo 0)"
-  if [ "${_A9_HAS_COMPLETE:-0}" != "1" ]; then
-    mcl_audit_log "asama-10-complete" "mcl-stop-auto" "substeps_done=8 (auto-emitted; model forgot summary)"
-    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append asama_9_auto_complete "8/8"
-  fi
-fi
+# Aşama 10-17 quality pipeline auto-complete (legacy v10.1.11) kaldırıldı.
+# Universal completeness loop (yukarıda) gate-spec'e göre faz tamamlanma
+# audit'lerini zaten yazıyor — duplikasyon kalktı.
 
 # --- Audit-driven Aşama 8 progression (since v10.1.5, PILOT) ---
 # When the model emits an explicit `asama-8-complete` audit at the end
@@ -1771,7 +1711,7 @@ fi
 # Must run before the spec/askq gate below because the Aşama 5 turn has
 # no spec block and no AskUQ — the early exit would skip this otherwise.
 _PS_DUE_EARLY="$(mcl_state_get pattern_scan_due 2>/dev/null)"
-_PS_ACTIVE_PHASE_EARLY="$(mcl_get_active_phase 2>/dev/null)"
+_PS_ACTIVE_PHASE_EARLY="$(mcl_state_get current_phase 2>/dev/null)"
 if [ "$_PS_DUE_EARLY" = "true" ] && echo "$_PS_ACTIVE_PHASE_EARLY" | grep -qE '^(4|4a|4b|4c|3\.5)$' \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   _PS_SUMMARY_EARLY="$(python3 - "$TRANSCRIPT_PATH" << 'PYPS_EARLY'
@@ -2229,7 +2169,7 @@ fi
 # Handles the case where pattern_scan_due=true but a Write call happened in the
 # same turn — the early block above ran, so this is now a no-op guard.
 _PS_DUE="$(mcl_state_get pattern_scan_due 2>/dev/null)"
-_PS_ACTIVE_PHASE="$(mcl_get_active_phase 2>/dev/null)"
+_PS_ACTIVE_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
 if [ "$_PS_DUE" = "true" ] && echo "$_PS_ACTIVE_PHASE" | grep -qE '^(4|4a|4b|4c|3\.5)$' && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   _PS_SUMMARY="$(python3 - "$TRANSCRIPT_PATH" << 'PYPS'
 import json, re, sys
