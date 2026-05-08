@@ -249,44 +249,10 @@ if [ "$TOOL_NAME" = "TodoWrite" ]; then
   exit 0
 fi
 
-# -------- Branch: block Task dispatch of Aşama 8/10/5 as sub-agent --------
-# sub-agent-phase-discipline: Aşama 8 (Risk Review), 4.6 (Impact Review),
-# and Aşama 11 (Verification Report) MUST run in the main MCL session as
-# interactive AskUserQuestion dialogs. Sub-agents cannot substitute them.
-if [ "$TOOL_NAME" = "Task" ] && command -v python3 >/dev/null 2>&1; then
-  _TASK_DESC="$(printf '%s' "$RAW_INPUT" | python3 -c '
-import json, sys, re
-try:
-    obj = json.loads(sys.stdin.read())
-    tin = obj.get("tool_input") or {}
-    desc = (tin.get("description") or tin.get("prompt") or "").lower()
-    # Check for Aşama 8/10/5 keywords indicating sub-agent substitution
-    patterns = [
-        r"phase\s*4\.5", r"phase\s*4\.6", r"phase\s*5",
-        r"risk\s+review", r"impact\s+review", r"verification\s+report",
-        r"phase\s+review", r"spec.compliance.review",
-    ]
-    for pat in patterns:
-        if re.search(pat, desc):
-            print("block:" + desc[:80])
-            sys.exit(0)
-except Exception:
-    pass
-print("")
-' 2>/dev/null)"
-  if printf '%s' "$_TASK_DESC" | grep -q "^block:"; then
-    _MATCHED="${_TASK_DESC#block:}"
-    mcl_audit_log "block-task-phase-dispatch" "pre-tool" "desc=${_MATCHED}"
-    python3 -c '
-import json, sys
-print(json.dumps({
-    "decision": "approve",
-    "reason": "MCL SUB-AGENT DISCIPLINE — Aşama 8 (Risk Review), Aşama 10 (Impact Review), and Aşama 11 (Verification Report) cannot be dispatched to sub-agents. These phases require the main MCL session to run the interactive AskUserQuestion dialog directly with the developer. Run them in this session after all code sub-agents complete."
-}))
-' 2>/dev/null
-    exit 0
-  fi
-fi
+# Sub-agent phase discipline kuralı STATIC_CONTEXT'te
+# <mcl_constraint name="sub-agent-phase-discipline">'a bırakıldı; hook
+# kontrolü kaldırıldı (duplikasyon).
+
 # -------- Branch: Aşama 4 spec-approval askq requires precision-audit (since v13.0.5) --------
 # Layer 2 of v13.0.5 deterministic enforcement. The Aşama 2 skip-block at
 # line ~1028 fires AFTER spec is approved (post-hoc detection). This earlier
@@ -1137,88 +1103,9 @@ if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "9" ]; then
   fi
 fi
 
-# -------- Branch: Scope Guard (fires at Aşama 9 TDD) --------
-# v13.0.11: phase number updated 7→9 (v12+ canonical). When
-# scope_paths is non-empty (spec listed explicit file paths / globs),
-# block writes to paths that don't match any declared pattern.
-# Empty scope_paths = spec had no explicit paths = no restriction.
-if [ -z "$REASON" ] && [ "$CURRENT_PHASE" = "9" ] && command -v python3 >/dev/null 2>&1; then
-  _SCOPE_VERDICT="$(printf '%s' "$RAW_INPUT" | python3 -c '
-import json, fnmatch, os, sys
+# Scope guard kuralı STATIC_CONTEXT'te <mcl_constraint name="spec-approval-discipline">'e
+# bırakıldı; hook seviyesindeki spec-only path kontrolü kaldırıldı.
 
-try:
-    obj = json.loads(sys.stdin.read())
-except Exception:
-    print("allow"); sys.exit(0)
-
-tin = obj.get("tool_input") or {}
-# Write/Edit use file_path; MultiEdit uses file_path[]; NotebookEdit uses notebook_path
-paths_to_check = []
-fp = tin.get("file_path") or tin.get("notebook_path")
-if fp:
-    paths_to_check.append(str(fp))
-# MultiEdit: edits is a list of {file_path: ...}
-edits = tin.get("edits")
-if isinstance(edits, list):
-    for e in edits:
-        if isinstance(e, dict) and e.get("file_path"):
-            paths_to_check.append(str(e["file_path"]))
-
-if not paths_to_check:
-    print("allow"); sys.exit(0)
-
-# Read scope_paths from state.json directly
-import os
-state_file = os.path.join(os.getcwd(), ".mcl", "state.json")
-try:
-    with open(state_file, encoding="utf-8") as sf:
-        state = json.load(sf)
-    scope_paths = state.get("scope_paths") or []
-    if not isinstance(scope_paths, list):
-        scope_paths = []
-except Exception:
-    scope_paths = []
-
-if not scope_paths:
-    print("allow"); sys.exit(0)  # No declared paths — no restriction
-
-def matches(file_abs, patterns):
-    """True if file_abs matches any pattern (relative glob or absolute)."""
-    file_abs = os.path.normpath(file_abs)
-    for pat in patterns:
-        pat = pat.lstrip("./")
-        if not pat:
-            continue
-        # Absolute match
-        if fnmatch.fnmatch(file_abs, pat):
-            return True
-        # Suffix match: pattern relative to any parent dir
-        if fnmatch.fnmatch(file_abs, "*/" + pat):
-            return True
-        # Exact suffix without glob
-        if file_abs.endswith("/" + pat) or file_abs == pat:
-            return True
-    return False
-
-# Check all paths; report the first out-of-scope path
-for p in paths_to_check:
-    if not matches(p, scope_paths):
-        # Skip .mcl/ internals and temp files — always allowed
-        norm = p.replace("\\\\", "/")
-        if "/.mcl/" in norm or norm.endswith("/.mcl") or "/tmp/" in norm:
-            continue
-        print("deny|" + p)
-        sys.exit(0)
-
-print("allow")
-' 2>/dev/null || echo "allow")"
-  if [ "${_SCOPE_VERDICT%%|*}" = "deny" ]; then
-    _SCOPE_DENIED_PATH="${_SCOPE_VERDICT#deny|}"
-    REASON="MCL SCOPE GUARD (Rule 2 — File Scope) — \`${_SCOPE_DENIED_PATH}\` is not in the spec's declared file scope. This also likely violates Rule 1 (Spec-Only): if this file needs changes, it should have been in the spec. Options: (A) surface as a Aşama 10 risk and request scope extension; (B) if genuinely required now, ask the developer via AskUserQuestion BEFORE writing — never silently touch out-of-scope files."
-    mcl_audit_log "scope-guard-block" "pre-tool" "path=${_SCOPE_DENIED_PATH} tool=${TOOL_NAME}"
-    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append scope_guard_block "${_SCOPE_DENIED_PATH}"
-  fi
-fi
 
 # -------- Branch: Aşama 2 skip-block (since v10.1.14) --------
 # Replaces the v10.1.12 Aşama 1 OR-list check. Per the deterministic-

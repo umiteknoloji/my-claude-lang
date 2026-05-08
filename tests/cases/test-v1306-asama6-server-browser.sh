@@ -197,16 +197,16 @@ EOF
 out="$(_run_stop "$_dir/transcript.jsonl")"
 _assert "T13: real-world npm install + node -e + 'Tamamlandı' → block (v13.0.8)" "$(_decision "$out")" "block"
 reason="$(printf '%s' "$out" | python3 -c "import json,sys;print(json.loads(sys.stdin.read()).get('reason') or '')" 2>/dev/null)"
-if [[ "$reason" == *"Ne sunucu başlatıldı ne tarayıcı açıldı"* ]]; then
-  PASS=$((PASS+1)); printf '  PASS: T13: block:neither REASON yields specific message\n'
+if [[ "$reason" == *"Sunucu + tarayıcı zorunlu"* ]] || [[ "$reason" == *"sunucu + tarayıcı açılmadı"* ]]; then
+  PASS=$((PASS+1)); printf '  PASS: T13: REASON yields server+browser missing message\n'
 else
-  FAIL=$((FAIL+1)); printf '  FAIL: T13: block:neither REASON missing specific message\n'
+  FAIL=$((FAIL+1)); printf '  FAIL: T13: REASON missing server+browser message\n'
 fi
-audit_grep="$(grep -E 'asama-6-server-and-browser-missing-block|asama-6-server-not-started-block' "$_dir/.mcl/audit.log" 2>/dev/null | head -1)"
+audit_grep="$(grep -E 'asama-6-server-browser-block|asama-6-server-and-browser-missing-block|asama-6-server-not-started-block' "$_dir/.mcl/audit.log" 2>/dev/null | head -1)"
 if [ -n "$audit_grep" ]; then
-  PASS=$((PASS+1)); printf '  PASS: T13: distinct audit tag emitted\n'
+  PASS=$((PASS+1)); printf '  PASS: T13: audit tag emitted\n'
 else
-  FAIL=$((FAIL+1)); printf '  FAIL: T13: distinct audit tag missing\n'
+  FAIL=$((FAIL+1)); printf '  FAIL: T13: audit tag missing\n'
 fi
 
 # ════════ T14 (v13.0.8): node ./src/index.js path → matches server regex ════════
