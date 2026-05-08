@@ -1893,12 +1893,15 @@ PYEOF
         fi
       fi
 
-      mcl_state_set current_phase 4
-      mcl_state_set phase_name '"SPEC_REVIEW"'
-      mcl_state_set spec_hash "\"$SPEC_HASH\""
-      mcl_debug_log "stop" "transition-1-to-2" "hash=${SPEC_HASH:0:12}"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append phase_transition 1 4
-      command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Faz 1 → 2 geçişi (spec algılandı)."
+      # v13.0.11 — A-2 fix: Aşama 1'de spec emit'i sıralılık ihlali.
+      # Önceden bu blok durumu zorla 4'e atıyordu (legacy 1→4 atlama).
+      # Sıralılık disiplini gereği state advance KALDIRILDI — durum 1'de kalır.
+      # Universal completeness döngüsü (stop hook sonunda) audit log'u okur:
+      # `summary-confirm-approve` varsa otomatik 1→2 ilerletir, audit chain
+      # tamsa 2→3→4 zincirini izler. Hook artık sıralılığı zorla atlamaz.
+      # spec_hash kaydı da kaldırıldı: durum 1'de spec hash'i tutmak yanlış
+      # sinyal verir (üst blokta precision-audit-block zaten gerekli kontrolü
+      # yapıyor; eğer geçerse universal loop spec emit'ini doğal yolla işler).
       ;;
     2|3)
       if [ "$CURRENT_HASH" != "$SPEC_HASH" ]; then

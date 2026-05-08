@@ -389,26 +389,12 @@ PYEOF
 }
 
 mcl_get_active_phase() {
-  # Returns the active aşama string (1..12 today; will widen to 1..21
-  # after the v11 migration completes — see plan R4-R8 for the bucket
-  # remapping. The integer bucket in state.json is 1, 4, 7, 11 today;
-  # the returned string is the documented phase number for that bucket.
+  # Returns the active aşama string (1..22, v12+ canonical).
   #
-  # Mapping rules:
-  #   current_phase == 1  AND precision_audit_done == false → "1" (gather)
-  #   current_phase == 1  AND precision_audit_done == true  → "2" (audit just done; brief is transient)
-  #                                                            (Aşama 3 translator is single-turn, never persisted)
-  #   current_phase == 7  AND spec_hash set, spec_approved == false → "4" (spec review)
-  #   current_phase == 7  AND pattern_scan_due == true  → "5" (pattern matching)
-  #   current_phase == 7  AND ui_flow_active == true    → "6"|"7"|"8" by ui_sub_phase
-  #                                                       (v11 numbering — see R1/R2/R3
-  #                                                       in v11 plan; v10 had 6a/6b/6c)
-  #   current_phase == 7  AND risk_review_state == running    → "9" (was "8" pre-R4)
-  #   current_phase == 7  AND quality_review_state == running → "9" coarse (R5
-  #                                                       splits into 10..17 sub-phases)
-  #   current_phase == 7  AND otherwise → "8" (code+TDD; was "7" pre-R3)
-  #   current_phase == 11 → "19" (verify report; was "11" pre-R6)
-  #   (Aşama 18 impact + Aşama 20 translation are transient single-turn states)
+  # v13.0.11 migration: legacy 1/4/7/11 sentinel logic dropped.
+  # State now holds the real phase number directly (1..22 canonical), so
+  # this helper is essentially identity — but keeps validity bounds and
+  # graceful fallback (missing state file → "1"; corrupt → "?").
   #
   # Optional arg: path to state.json (default: $MCL_STATE_FILE)
   local state_file="${1:-${MCL_STATE_FILE}}"
@@ -422,37 +408,14 @@ try:
 except Exception:
     print("?"); sys.exit(0)
 
-phase       = int(obj.get("current_phase") or 1)
-approved    = obj.get("spec_approved") is True
-spec_hash   = obj.get("spec_hash")
-precision_done = obj.get("precision_audit_done") is True
-ui_active   = obj.get("ui_flow_active") is True
-ui_sub      = obj.get("ui_sub_phase") or ""
-scan_due    = obj.get("pattern_scan_due") is True
-risk_state  = obj.get("risk_review_state") or ""
-qual_state  = obj.get("quality_review_state") or ""
+try:
+    phase = int(obj.get("current_phase") or 1)
+except Exception:
+    print("?"); sys.exit(0)
 
-if phase <= 1:
-    print("2" if precision_done else "1"); sys.exit(0)
-
-if phase == 4:
-    print("4"); sys.exit(0)
-
-if phase == 7:
-    if scan_due:
-        print("5"); sys.exit(0)
-    if ui_active:
-        sub_map = {"BUILD_UI": "6a", "REVIEW": "6b", "BACKEND": "6c"}
-        if ui_sub in sub_map:
-            print(sub_map[ui_sub]); sys.exit(0)
-    if risk_state == "running":
-        print("8"); sys.exit(0)
-    if qual_state == "running":
-        print("9"); sys.exit(0)
-    print("7"); sys.exit(0)
-
-if phase == 11:
-    print("11"); sys.exit(0)
+# v12+ canonical: 1..22 are valid phase numbers. Out-of-range → "?".
+if 1 <= phase <= 22:
+    print(str(phase)); sys.exit(0)
 
 print("?")
 PYEOF
