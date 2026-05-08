@@ -7,6 +7,88 @@
 
 ## [Unreleased]
 
+## [13.0.11] - 2026-05-08
+
+### Sıralılık disiplini — tüm faz atlamaları kaldırıldı + kalıcı kural
+
+**Kullanıcı direktifi (kalıcı kural):** "Sıralılık ihlali MCL genelinde yasak. 4'ten sonra 5 gelir. Her şey sıralı olacak."
+
+v10/v11 dönemi MCL state machine 6 yerde **faz atlatıyordu**: `summary-confirm-approve` audit'i sonrası state=4'e atlama (Aşama 2 ve 3 atlanıyordu), `asama-4-complete` audit'i sonrası state=7'ye atlama (Aşama 5/6/7/8 atlanıyordu). Bu legacy sentinel sistem v12+ canonical 1-22 sıralı numaralandırmasıyla uyumsuzdu — production'da model'in faz atlamasını **ödüllendiren** mimari.
+
+#### Pattern A — 1→4 atlama (2 yer)
+
+- **A-1: `pre-tool:752`** — JIT askq summary-confirm onayı sonrası `current_phase=4` + `phase_name='SPEC_REVIEW'` atılıyordu. Yorum/log/debug zaten `1→2` diyordu, sadece state-set yanlıştı. Düzeltildi: `current_phase=2` + `phase_name='PRECISION_AUDIT'`.
+- **A-2: `stop:1896`** — Aşama 1'de spec block emit edildiğinde state=4'e force-advance yapan blok. **Tamamen silindi**. Aşama 1'de spec yazılması zaten sıralılık ihlali; hook bunu ödüllendirmemeli. Universal completeness döngüsü audit log'u okuyup sıralı ilerletir.
+
+#### Pattern B — 4→7 atlama (4 yer)
+
+Hepsi `asama-4-complete` audit'i tetikleyicili. Hepsinde `current_phase=7` + `phase_name='EXECUTE'` → `current_phase=5` + `phase_name='PATTERN_MATCHING'`:
+
+- **B-1: `pre-tool:710`** — JIT spec-approval askq onayı (idempotency `-ge 7` → `-ge 5`)
+- **B-2: `pre-tool:808`** — Bash mcl_audit_log recovery hatch
+- **B-3: `stop:1037`** — Stop hook audit detect (guard `!= 7` → `-lt 5` ile geri-çekilme önlendi)
+- **B-4: `stop:1939`** — Stop hook askq processing (7 satır tutarlı: state + audit + trace + log)
+
+#### Helper temizlik — `mcl_get_active_phase`
+
+`hooks/lib/mcl-state.sh:391` legacy 1/4/7/11 sentinel mapping logic'inde idi. State=7 görünce ek alanlara bakıp gerçek fazı türetiyordu (eski v10/v11 era). Yeni state'te gerçek değer var (1-22), helper kimlik fonksiyonu oldu: `1 <= phase <= 22 → str(phase)`, dışarısı `?`. ~50 satır legacy mapping kodu silindi.
+
+#### İki guard yanlış fazda fire ediyordu
+
+- **`pre-tool:1076` Pattern Matching guard** — `pattern_scan_due=true` iken kod yazımını bloke ediyordu. `state=7` (legacy) yerine `state=9` (TDD) kontrolüne taşındı. User'ın belirttiği gibi "her zaman açık olmalı, çok önemli bir iş yapıyor" — guard korundu, sadece doğru faza taşındı.
+- **`pre-tool:1090` Scope Guard** — `scope_paths` listesinin dışına yazmayı engelliyor. Aynı şekilde `state=7` → `state=9`.
+
+#### Kalıcı kural — `CLAUDE.md` rule capture
+
+```
+- Always advance MCL phase state strictly sequentially: each transition
+  increments current_phase by exactly one, or relies on the universal
+  completeness loop's audit-driven walk. Never use direct state setters
+  that skip phases (e.g. 1→4, 4→7). Hook code that detects phase
+  progression must defer to the universal completeness loop, not force-
+  advance the state to a downstream sentinel value. Sequence violations
+  are forbidden across MCL — head/tail jumps reward model misbehavior
+  and break audit-driven invariants.
+```
+
+Bu kural gelecekte aynı pattern'in tekrar girmesini önler.
+
+#### Eski test dosyaları silindi
+
+13 v10/v11 era test dosyası tamamen silindi — bunlar legacy state=7 sentinel + Aşama 7=code/Aşama 8=risk/Aşama 9=quality semantiğini test ediyordu, v12+ canonical'da geçerli değil:
+
+- `test-v10-1-7-herta-scenario-e2e.sh`
+- `test-v10-1-7-spec-approval-block.sh`
+- `test-v10-1-10-asama13-completeness.sh`
+- `test-v10-1-10-asama22-completeness.sh`
+- `test-v10-1-11-asama9-and-ui-fixes.sh`
+- `test-v10-1-12-asama1-skip-block.sh`
+- `test-v10-1-5-asama-8-progression-pilot.sh`
+- `test-v10-1-5-asama-9-progression-pilot.sh`
+- `test-v10-1-6-asama-4-progression.sh`
+- `test-v10-1-6-integration-progression.sh`
+- `test-v10-1-6-phase-progressions.sh`
+- `test-v10-1-7-tool-coverage.sh`
+- `test-v10-1-8-skip-block.sh`
+
+Test baseline: **391 / 24 / 2** → **262 / 0 / 2**. Net 129 PASS test silindi (legacy), 24 FAIL temizlendi → temiz baseline. Tüm v12+ canonical testler korundu (test-v13*, test-v1304, test-v1306, test-v1307, test-v1309, test-v1310).
+
+#### Verification
+
+- bash -n: 4 hooks + dsi.sh + mcl-state.sh clean
+- Sıfır regresyon (262/0/2 her commit'te korundu)
+- Smoke: state=2 / 5 / 22 / 7 / 99 senaryolarında `mcl_get_active_phase` doğru cevap döndürüyor
+
+#### Production etkisi
+
+v13.0.10'da kullanıcı şikayeti: spec onayı sonrası model 30 dosya yazdı, Aşama 5/6/7/8 atlandı. Kök sebep: state=7 sentinel + Layer B'nin `state=7` semantiğini "Aşama 7=UI Review askq only" olarak yorumlaması → 5 strike sonrası fail-open → unbounded writes.
+
+v13.0.11'de:
+- State artık gerçek faz değeri tutuyor (5, 6, 7, 8, 9 ardışık)
+- Layer B her gerçek fazın `allowed_tools` listesini doğru uyguluyor
+- Universal completeness döngüsü audit-driven sıralı ilerleme
+- Faz atlama mimarsı seviyede yasaklandı
+
 ## [13.0.10] - 2026-05-07
 
 ### Layer B STRICT mode + audit-derived active phase (legacy state=7 sentinel fix)
