@@ -335,12 +335,12 @@ PYEOF
 )"
     if [ "$_A4_PRECISION" = "missing" ]; then
       mcl_audit_log "asama-4-askq-gate-block" "pre-tool" "no-precision-audit"
-      python3 -c '
+      _A4_REASON="$(_mcl_runtime_reason \
+        "MCL ASAMA 4 ASKQ GATE (v13.0.5) — Aşama 4 spec onay AskUserQuestion'i acilamaz: bu oturumda asama-2-complete ya da precision-audit audit i yok. Spec tum 7 boyutluk precision audit ten gecmemis parametreler uzerine kurulu olur — yanlis kod riski. Onceki spec emisyonunu unut. Sirayla: (1) Asama 2 (skills/my-claude-lang/asama2-precision-audit.md) 7 boyutu walk et SILENT-ASSUME / SKIP-MARK / GATE classification yap; (2) Closing AskUserQuestion \`MCL <ver> | Faz 2 — Precision-audit niyet onayi:\` ile niyet onayi al; (3) Asama 3 brief uret; (4) Sonra Asama 4 spec emit + onay askq." \
+        "Spec onayı için önce Aşama 2 (precision audit) tamamlanmalı. Aşama 2'yi yap, sonra spec onay askq açılır.")"
+      printf '%s' "$_A4_REASON" | python3 -c '
 import json, sys
-print(json.dumps({
-    "decision": "block",
-    "reason": "MCL ASAMA 4 ASKQ GATE (v13.0.5) — Aşama 4 spec onay AskUserQuestion'"'"'i acilamaz: bu oturumda asama-2-complete ya da precision-audit audit i yok. Spec tum 7 boyutluk precision audit ten gecmemis parametreler uzerine kurulu olur — yanlis kod riski. Onceki spec emisyonunu unut. Sirayla: (1) Asama 2 (skills/my-claude-lang/asama2-precision-audit.md) 7 boyutu walk et SILENT-ASSUME / SKIP-MARK / GATE classification yap; (2) Closing AskUserQuestion `MCL <ver> | Faz 2 — Precision-audit niyet onayi:` ile niyet onayi al; (3) Asama 3 brief uret; (4) Sonra Asama 4 spec emit + onay askq."
-}))
+print(json.dumps({"decision": "block", "reason": sys.stdin.read()}))
 '
       exit 0
     fi
@@ -870,9 +870,13 @@ PYEOF
 )"
   fi
   if [ "$_MCLLOCK_HAS_A1" = "absent" ]; then
-    REASON="MCL LOCK — spec_approved=false (yeni oturum, hicbir Asama 1-4 audit i yok). Mutating tool \`${TOOL_NAME}\` blocked. ASLA kod yazma, ASLA spec emit etme. Sirayla yap: (1) Asama 1 — gelistiricinin niyetini anla, tek soru sor (one-question-at-a-time) VEYA tum parametreler net ise SILENT-ASSUME path le ozet uret + summary-confirm-approve audit emit. (2) Asama 2 — 7 boyutluk precision audit (skills/my-claude-lang/asama2-precision-audit.md) walk et + closing AskUserQuestion ile asama-2-complete audit. (3) Asama 3 — engineering brief (audit: engineering-brief). (4) Asama 4 — spec emit + AskUserQuestion onay askq. Mutating tools yalnizca asama-4-complete audit i emit edildikten sonra acilir. Recovery: spec onayindan kacis yok — pipeline sirasini izle."
+    REASON="$(_mcl_runtime_reason \
+      "MCL LOCK — spec_approved=false (yeni oturum, hicbir Asama 1-4 audit i yok). Mutating tool \`${TOOL_NAME}\` blocked. ASLA kod yazma, ASLA spec emit etme. Sirayla yap: (1) Asama 1 — gelistiricinin niyetini anla, tek soru sor (one-question-at-a-time) VEYA tum parametreler net ise SILENT-ASSUME path le ozet uret + summary-confirm-approve audit emit. (2) Asama 2 — 7 boyutluk precision audit (skills/my-claude-lang/asama2-precision-audit.md) walk et + closing AskUserQuestion ile asama-2-complete audit. (3) Asama 3 — engineering brief (audit: engineering-brief). (4) Asama 4 — spec emit + AskUserQuestion onay askq. Mutating tools yalnizca asama-4-complete audit i emit edildikten sonra acilir. Recovery: spec onayindan kacis yok — pipeline sirasini izle." \
+      "Önce spec onayı gerekli. Aşama 1 (niyet) → 2 (kontrol) → 3 (brief) → 4 (spec onayı) sırasıyla ilerle. Spec onaylanınca \`${TOOL_NAME}\` otomatik açılır.")"
   else
-    REASON="MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked (since v10.1.7 — real block, not advisory). Recovery options: (A) re-emit AskUserQuestion with prefix \`MCL <ver> | \` for spec approval; (B) if developer already approved but classifier missed, run: \`bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-4-complete mcl-stop \"spec_hash=<H> approver=user\"'\` to force-progress state; (C) loop-breaker fail-open after 3 consecutive blocks."
+    REASON="$(_mcl_runtime_reason \
+      "MCL LOCK — spec_approved=false. Mutating tool \`${TOOL_NAME}\` is blocked (since v10.1.7 — real block, not advisory). Recovery options: (A) re-emit AskUserQuestion with prefix \`MCL <ver> | \` for spec approval; (B) if developer already approved but classifier missed, run: \`bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log asama-4-complete mcl-stop \"spec_hash=<H> approver=user\"'\` to force-progress state; (C) loop-breaker fail-open after 3 consecutive blocks." \
+      "Spec henüz onaylanmadı. Önce Aşama 4 askq'sini onayla, sonra \`${TOOL_NAME}\` açılır.")"
   fi
   REASON_KIND="spec-approval"
 fi
@@ -1005,13 +1009,17 @@ print('allow|')
           case "${_PA_VERDICT%%|*}" in
             deny:tool)
               _PA_DETAIL="${_PA_VERDICT#deny:tool|}"
-              REASON="MCL PHASE ALLOWLIST (v13.0.10 Layer B STRICT) — Audit'ten türetilen aktif faz: Aşama ${_PA_ACTIVE} (state.current_phase=${_PA_PHASE} legacy değer). \`${TOOL_NAME}\` tool'una bu fazda izin verilmez. ${_PA_DETAIL}. Aşama ${_PA_ACTIVE}'in izinli tool'ları gate-spec.json'da. \`asama-${_PA_ACTIVE}-complete\` veya \`asama-${_PA_ACTIVE}-skipped\` audit emit edilirse otomatik bir sonraki faza geçer. Read/Glob/Grep/LS/WebFetch/WebSearch/Task/Skill/Bash her fazda izinli (investigation + audit-emit valve). KATI MOD (v13.0.10): fail-open YOK; 5 strike sonrası user'a escalate audit emit edilir, block kalkmaz."
+              REASON="$(_mcl_runtime_reason \
+                "MCL PHASE ALLOWLIST (v13.0.10 Layer B STRICT) — Audit'ten türetilen aktif faz: Aşama ${_PA_ACTIVE} (state.current_phase=${_PA_PHASE} legacy değer). \`${TOOL_NAME}\` tool'una bu fazda izin verilmez. ${_PA_DETAIL}. Aşama ${_PA_ACTIVE}'in izinli tool'ları gate-spec.json'da. \`asama-${_PA_ACTIVE}-complete\` veya \`asama-${_PA_ACTIVE}-skipped\` audit emit edilirse otomatik bir sonraki faza geçer. Read/Glob/Grep/LS/WebFetch/WebSearch/Task/Skill/Bash her fazda izinli (investigation + audit-emit valve). KATI MOD (v13.0.10): fail-open YOK; 5 strike sonrası user'a escalate audit emit edilir, block kalkmaz." \
+                "Aşama ${_PA_ACTIVE}'de \`${TOOL_NAME}\` aracı kullanılamaz. Önce bu fazı tamamla, sonraki fazda otomatik açılır.")"
               REASON_KIND="phase-allowlist-tool"
               mcl_audit_log "phase-allowlist-tool-block" "pre-tool" "tool=${TOOL_NAME} state_phase=${_PA_PHASE} active_phase=${_PA_ACTIVE}"
               ;;
             deny:path)
               _PA_DETAIL="${_PA_VERDICT#deny:path|}"
-              REASON="MCL PHASE PATH-LOCK (v13.0.10 Layer B STRICT) — Audit'ten türetilen aktif faz: Aşama ${_PA_ACTIVE} (state.current_phase=${_PA_PHASE}). Bu yol yasak. ${_PA_DETAIL}. Örnek: Aşama 6 (UI Build) backend yollarını (\`src/api/**\`, \`prisma/**\`, ...) yasaklar — backend Aşama 9 TDD veya Aşama 8 DB Design'da yazılır. KATI MOD: fail-open YOK."
+              REASON="$(_mcl_runtime_reason \
+                "MCL PHASE PATH-LOCK (v13.0.10 Layer B STRICT) — Audit'ten türetilen aktif faz: Aşama ${_PA_ACTIVE} (state.current_phase=${_PA_PHASE}). Bu yol yasak. ${_PA_DETAIL}. Örnek: Aşama 6 (UI Build) backend yollarını (\`src/api/**\`, \`prisma/**\`, ...) yasaklar — backend Aşama 9 TDD veya Aşama 8 DB Design'da yazılır. KATI MOD: fail-open YOK." \
+                "Bu yol Aşama ${_PA_ACTIVE}'de yasak. Aşama 6 (UI yapımı) backend yollarına yazmaz; backend Aşama 8/9'da yazılır.")"
               REASON_KIND="phase-allowlist-path"
               mcl_audit_log "phase-allowlist-path-block" "pre-tool" "state_phase=${_PA_PHASE} active_phase=${_PA_ACTIVE}"
               ;;

@@ -4,6 +4,13 @@
 
 set -eo pipefail
 
+# v13.0.13 — Tests always run in devtime mode (full debug REASON text).
+# Without this, tests run in /tmp/<random> dirs which don't match the
+# 'my-claude-lang' path heuristic — _mcl_is_devtime returns false and
+# REASON metins use the short Turkish runtime variant, breaking tests
+# that assert against the long debug strings.
+export MCL_DEVTIME=1
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PASS=0
 FAIL=0

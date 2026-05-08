@@ -7,6 +7,84 @@
 
 ## [Unreleased]
 
+## [13.0.13] - 2026-05-08
+
+### Devtime/runtime REASON ayrımı — kullanıcı kırmızı `Error:` paniği yumuşatıldı
+
+**Üretim raporu (kullanıcı):** "`Error:` ile başlayan kırmızı yazılar kullanıcıyı korkutur. Sadece devtime'da çıksın."
+
+Claude Code `decision: "block"` hook output'unu kırmızı `Error:` ile gösteriyor — UI default'u, hook bunu değiştiremez. Yapabileceğimiz: REASON metnini kısalt + Türkçe + dostça (runtime). Devtime'da tam debug metni kalsın.
+
+#### Mekanizma
+
+`hooks/lib/mcl-state.sh`'a 2 helper eklendi:
+
+```bash
+_mcl_is_devtime() {
+  # Devtime: CLAUDE_PROJECT_DIR'da 'my-claude-lang' geçiyor (MCL repo'su)
+  #          VEYA MCL_DEVTIME=1 env var manuel override.
+  # Runtime: kullanıcının kendi projesi.
+  [ "${MCL_DEVTIME:-0}" = "1" ] && return 0
+  case "${CLAUDE_PROJECT_DIR:-$(pwd)}" in
+    *my-claude-lang*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_mcl_runtime_reason() {
+  # Helper: REASON metni için devtime/runtime ayrımı.
+  # Kullanım:
+  #   REASON="$(_mcl_runtime_reason "uzun debug" "kısa Türkçe")"
+  if _mcl_is_devtime; then
+    printf '%s' "$1"
+  else
+    printf '%s' "$2"
+  fi
+}
+```
+
+#### 4 sık görünen REASON güncellendi (Scope B)
+
+1. **MCL LOCK** (mutating tool spec_approved=false) — `hooks/mcl-pre-tool.sh:837-844`
+2. **Phase Allowlist deny:tool** — `hooks/mcl-pre-tool.sh:982`
+3. **Phase Allowlist deny:path** — `hooks/mcl-pre-tool.sh:990`
+4. **Aşama 4 askq gate** (precision-audit eksik) — `hooks/mcl-pre-tool.sh:339`
+5. **Aşama 6 server-without-browser** (3 varyant: no-server / no-browser / neither) — `hooks/mcl-stop.sh:696-708`
+
+#### Etki
+
+| Senaryo | Devtime | Runtime |
+|---|---|---|
+| Aşama 1 + Write | 744 char İngilizce + recovery commands | **143 char Türkçe**: "Önce spec onayı gerekli. Aşama 1 (niyet) → 2 (kontrol) → 3 (brief) → 4 (spec onayı) sırasıyla ilerle." |
+| Aşama 9 + askq | 600+ char "MCL PHASE ALLOWLIST (v13.0.10 Layer B STRICT) — Audit'ten türetilen aktif faz..." | "Aşama 9'de \`AskUserQuestion\` aracı kullanılamaz. Önce bu fazı tamamla, sonraki fazda otomatik açılır." |
+| Aşama 6 server eksik | Çok satır npm install/run dev/open komutları + audit recovery | "Aşama 6 eksik: sunucu başlatılmadı. \`npm run dev\` çalıştır + tarayıcı aç." |
+
+5x daralma + Türkçe + dostça ton.
+
+#### Test infra güncellemesi
+
+`tests/run-tests.sh`'a `export MCL_DEVTIME=1` eklendi. Tests `/tmp/<random>` dizininde koşuyor (path'te `my-claude-lang` yok), bu yüzden default tespit runtime moduna düşüyordu — uzun debug string'lerini bekleyen testler kırılıyordu. Şimdi test environment her zaman devtime modunda.
+
+#### Verification
+
+- 13 yeni unit test (`tests/cases/test-v1313-runtime-reason.sh`):
+  - T1-T2: MCL LOCK runtime kısa / devtime uzun
+  - T3-T4: Phase Allowlist runtime kısa / devtime uzun
+  - T5: Path-lock runtime kısa
+  - T6-T8: `_mcl_is_devtime` helper (path-based + env override)
+- Test baseline: 269 → **282 passed** / 0 failed / 2 skipped
+- Sıfır regresyon
+- bash -n: 4 hooks + state.sh clean
+
+#### Out of Scope (kasıtlı)
+
+- ❌ **Diğer ~6 REASON** (Aşama 2 skip-block, Pattern Matching guard, Scope Guard, secret scan, vb.) — Scope B "sık görünenler" anlaşması; v13.1'de geri kalanlar.
+- ❌ **Kırmızı `Error:` prefix'i kaldırma** — Claude Code UI özelliği, hook erişimi yok.
+
+#### Realistic determinism estimate
+
+v13.0.12 ~99.5% (akış temiz) → v13.0.13 ~99.5% (davranış aynı, UX iyileştirildi). Kullanıcının "kırmızı yazılar korkutur" şikayeti adresleniyor; runtime'da artık kısa + dostça mesajlar, devtime'da tam debug metni korunuyor.
+
 ## [13.0.12] - 2026-05-08
 
 ### Chicken-and-egg deadlock fix — MCL LOCK darasildi (sadece mutating tool'lar)

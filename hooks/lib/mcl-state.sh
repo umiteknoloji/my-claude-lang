@@ -275,6 +275,32 @@ mcl_audit_log() {
     >> "$dir/audit.log" 2>/dev/null || true
 }
 
+_mcl_is_devtime() {
+  # v13.0.13 — Devtime / runtime ayrımı.
+  # Devtime: CLAUDE_PROJECT_DIR yolunda 'my-claude-lang' geçiyor (MCL'in
+  # kendi geliştirme repo'su) VEYA MCL_DEVTIME=1 env var manuel olarak set.
+  # Runtime: kullanıcının kendi projesi.
+  # Devtime'da REASON metinleri uzun + İngilizce + tam debug.
+  # Runtime'da REASON metinleri kısa + Türkçe + dostça (kullanıcı korkmasın).
+  [ "${MCL_DEVTIME:-0}" = "1" ] && return 0
+  case "${CLAUDE_PROJECT_DIR:-$(pwd)}" in
+    *my-claude-lang*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_mcl_runtime_reason() {
+  # Helper: REASON metni için devtime/runtime ayrımı.
+  # Kullanım:
+  #   REASON="$(_mcl_runtime_reason "long debug text" "kısa Türkçe mesaj")"
+  # Devtime → 1. argüman; runtime → 2. argüman.
+  if _mcl_is_devtime; then
+    printf '%s' "$1"
+  else
+    printf '%s' "$2"
+  fi
+}
+
 _mcl_audit_emitted_in_session() {
   # Returns 1 if `event_name` audit fired in current session, else 0.
   # Optional `idem_marker` (arg 2): if that marker is also present in
