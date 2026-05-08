@@ -601,36 +601,30 @@ if [ "$_A6_PHASE" = "6" ] || [ "$_A6_UISUB" = "BUILD_UI" ]; then
 fi
 
 
-# --- Aşama 8 / 4.6 / 5 review enforcement (since 7.1.3) ---
+# --- Aşama 10 / 19 / 20 review enforcement ---
 #
-# Core invariant: after Aşama 7 code is written, Claude MUST run Aşama 8
-# Risk Review, Aşama 10 Impact Review, and Aşama 11 Verification Report before
-# the session can end. This is enforced via `decision: block` — Claude Code
-# refuses to close the turn until Claude starts Aşama 8.
+# Pseudocode invariant: Aşama 9 TDD code yazımından sonra Aşama 10 Risk
+# Review, Aşama 19 Impact Review, Aşama 20 Verify Report yapılmadan session
+# kapanmaz. `decision: block` ile zorlanır.
 #
-# State machine (stored in risk_review_state):
-#   null / absent — Aşama 7 hasn't written code yet (no enforcement needed)
-#   "pending"     — code was written, Aşama 8 not yet started → BLOCK
-#   "running"     — Aşama 8/10 dialog is in progress → allow through
+# State machine (risk_review_state):
+#   null/absent — Aşama 9 kod yazmadı, enforcement yok
+#   "pending"   — kod yazıldı, Aşama 10 başlamadı → BLOCK
+#   "running"   — Aşama 10 askq dialog aktif → allow
 #
 # Transitions:
-#   code_written=true AND askuq=false         → pending  (block)
-#   code_written=true AND askuq=true          → running  (Aşama 8 fix + next-risk)
-#   code_written=false AND askuq=true         → running  (pure dialog turn)
-#   pending AND code_written=false AND askuq=false → pending  (sticky — re-block)
-#   Session boundary resets state to null (mcl-activate.sh).
-#
-# "pending" is STICKY: once set, the BLOCK re-fires on every subsequent turn
-# until askuq=true clears it. This prevents a Bash-only or text-only follow-up
-# turn from silently escaping the enforcement gate.
+#   code_written=true + askuq=false → pending (block)
+#   askuq=true                      → running (dialog turn)
+#   pending + askuq=false           → pending (sticky re-block)
+#   Session boundary state'i sıfırlar (mcl-activate.sh).
 _PR_GUARD="$_MCL_HOOK_DIR/lib/mcl-phase-review-guard.py"
 if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
    && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   _PR_ACTIVE_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
   _PR_REVIEW_STATE="$(mcl_state_get risk_review_state 2>/dev/null)"
 
-  # Aşama 5/6a/6b/6c/7 means approved and executing (pattern + UI sub-phases + code).
-  if echo "$_PR_ACTIVE_PHASE" | grep -qE '^(5|6a|6b|6c|7)$'; then
+  # Aşama 6 (UI Build) ve 9 (TDD) kod yazma fazları — enforcement tetiği.
+  if echo "$_PR_ACTIVE_PHASE" | grep -qE '^(6|9)$'; then
     _PR_JSON="$(python3 "$_PR_GUARD" "$TRANSCRIPT_PATH" 2>/dev/null)"
     _PR_CODE="$(printf '%s' "$_PR_JSON" | python3 -c \
       'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("code_written") else "false")' 2>/dev/null)"
@@ -750,7 +744,7 @@ PYEOF
       # Return decision:block so Claude is forced to continue.
       printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL PHASE REVIEW ENFORCEMENT (mandatory, non-skippable)\n\nAşama 7 code was written but Aşama 8 Risk Review has NOT been started. You have two valid responses:\n\n(A) IF Aşama 6c BACKEND is NOT yet fully complete:\n    Continue writing the remaining code. State explicitly which files still need to be written. The enforcement block will repeat on each code-write turn until Aşama 8 starts.\n\n(B) IF ALL Aşama 7 code is NOW complete:\n    Start Aşama 8 Risk Review IMMEDIATELY in this response. Do NOT delay, do NOT summarize what you built, do NOT ask the developer a question unrelated to risks. Begin Aşama 8 now:\n    1. Review the code you just wrote for: security vulnerabilities (injection, auth bypass, XSS, CSRF, insecure defaults), performance bottlenecks (N+1, unbounded queries, missing indexes), edge cases (null/empty/overflow inputs), data integrity issues (missing transactions, inconsistent state), race conditions, regression surfaces.\n    2. Present ONE risk at a time via AskUserQuestion with prefix MCL ${INSTALLED_VERSION} |\n    3. After ALL Aşama 8 risks are resolved → run Aşama 10 Impact Review.\n    4. After Aşama 10 → run Aşama 11 Verification Report.\n\nAşama 8 → 4.6 → 5 are MANDATORY. Skipping them violates the MCL contract.\"
+  \"reason\": \"⚠️ MCL AŞAMA 10 RISK REVIEW ZORUNLU\n\nAşama 9 kod yazıldı ama Aşama 10 Risk Review başlamadı. İki seçenek:\n\n(A) Aşama 9 TDD eksikse: kalan kodu yaz. Bu block her kod-yazma turunda tekrar tetiklenir.\n\n(B) Aşama 9 tamamsa: Aşama 10'u BU response'da başlat. Yazdığın kodu güvenlik (injection, auth, XSS, CSRF), performans (N+1, unbounded), edge case (null/empty), data integrity, race condition açılarından gözden geçir. Her risk için TEK askq, prefix ${_BT}MCL ${INSTALLED_VERSION} |${_BT}. Aşama 10 → 19 (impact) → 20 (verify) sıralı yürür.\n\nPseudocode invariant: Aşama 10/19/20 zorunlu, atlanmaz.\"
 }"
       exit 0
       fi
