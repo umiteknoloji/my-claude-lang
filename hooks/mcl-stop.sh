@@ -1926,15 +1926,15 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
   elif ! _mcl_is_approve_option "$ASKQ_SELECTED"; then
     mcl_audit_log "askq-non-approve" "stop" "phase=${CURRENT_PHASE} selected=${ASKQ_SELECTED}"
     mcl_debug_log "stop" "askq-non-approve" "phase=${CURRENT_PHASE} selected=${ASKQ_SELECTED}"
-  elif [ "$SPEC_APPROVED" = "true" ] || [ "$CURRENT_PHASE" -ge 7 ] 2>/dev/null; then
+  elif [ "$SPEC_APPROVED" = "true" ] || [ "$CURRENT_PHASE" -ge 5 ] 2>/dev/null; then
     mcl_debug_log "stop" "askq-idempotent" "phase=${CURRENT_PHASE} approved=${SPEC_APPROVED}"
   elif [ -z "$CURRENT_HASH" ]; then
     mcl_audit_log "askq-ignored-no-spec" "stop" "phase=${CURRENT_PHASE}"
     mcl_debug_log "stop" "askq-ignored-no-spec" "phase=${CURRENT_PHASE}"
   elif [ "$CURRENT_PHASE" = "4" ] || [ "$CURRENT_PHASE" = "3" ]; then
     mcl_state_set spec_approved true
-    mcl_state_set current_phase 7
-    mcl_state_set phase_name '"EXECUTE"'
+    mcl_state_set current_phase 5
+    mcl_state_set phase_name '"PATTERN_MATCHING"'
     UI_FLOW_ON="$(mcl_state_get ui_flow_active 2>/dev/null)"
     # Spec-body UI intent detection (since 6.5.4). Bootstrap / scaffold
     # sessions have no file-system UI signals at session start, so the
@@ -1959,14 +1959,14 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
       mcl_state_set ui_sub_phase '"BUILD_UI"'
       mcl_audit_log "ui-flow-enter-build" "stop" "hash=${CURRENT_HASH:0:12}"
     fi
-    mcl_audit_log "approve-via-askuserquestion" "stop" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->7 ui_flow=${UI_FLOW_ON}"
-    mcl_debug_log "stop" "approve-via-askuserquestion" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->7"
+    mcl_audit_log "approve-via-askuserquestion" "stop" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->5 ui_flow=${UI_FLOW_ON}"
+    mcl_debug_log "stop" "approve-via-askuserquestion" "hash=${CURRENT_HASH:0:12} phase=${CURRENT_PHASE}->5"
     command -v mcl_trace_append >/dev/null 2>&1 && {
       mcl_trace_append spec_approved "${CURRENT_HASH:0:12}"
-      mcl_trace_append phase_transition "$CURRENT_PHASE" 7
+      mcl_trace_append phase_transition "$CURRENT_PHASE" 5
       [ "$UI_FLOW_ON" = "true" ] && mcl_trace_append ui_flow_enabled
     }
-    command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Spec onaylandı. Faz ${CURRENT_PHASE} → 4 geçişi."
+    command -v mcl_log_append >/dev/null 2>&1 && mcl_log_append "Spec onaylandı. Faz ${CURRENT_PHASE} → 5 geçişi."
     bash "$_MCL_HOOK_DIR/lib/mcl-spec-save.sh" "$TRANSCRIPT_PATH" "$CURRENT_HASH" 2>/dev/null || true
     # Rollback checkpoint — record HEAD SHA before any Aşama 7 writes.
     # Stored once; never overwritten on subsequent turns in the same session.
