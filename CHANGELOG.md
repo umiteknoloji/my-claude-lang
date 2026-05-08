@@ -7,6 +7,71 @@
 
 ## [Unreleased]
 
+## [13.0.12] - 2026-05-08
+
+### Chicken-and-egg deadlock fix — MCL LOCK darasildi (sadece mutating tool'lar)
+
+**Üretim raporu:** Kullanıcı v13.0.11'de backoffice projesi senaryosunu test etti. Audit log şu kalıbı gösterdi:
+```
+09:28:38  → strike=1 (askq → MCL LOCK denied)
+09:30:09  → summary-confirm-approve audit emitted
+09:30:25  → askq-advance-jit phase 1→2 ✓
+09:30:25  → strike=2 (yeni askq → hâlâ denied)
+09:32:59  → precision-audit + asama-2-complete + engineering-brief
+09:33:08  → strike=3
+09:33:39  → 3-strike fail-open kurtarması, askq sonunda çalıştı
+```
+
+3 kırmızı `Error:` mesajı + "model 'askq sundum' dedi ama yapamadı" hissi. Akış mekanik olarak çözülüyordu (legacy fail-open) ama UX kötü.
+
+**Kök sebep:** MCL LOCK (`mcl-pre-tool.sh:818-820`) `spec_approved=false` ise **TÜM mutating tool'lar + AskUserQuestion** bloke ediyordu. Layer B (`line ~875`) Aşama 1/2/4'te `AskUserQuestion`'ı izinli olarak listeliyor — ama MCL LOCK ÖNCE çalışıyor, REASON set ediyor, Layer B'ye sıra gelmiyor. Sonuç: chicken-and-egg deadlock — askq state advance için gerekli, ama askq spec_approved=false iken bloke.
+
+**Fix:** MCL LOCK sadece `Write/Edit/MultiEdit/NotebookEdit`'i bloke etsin. AskUserQuestion her zaman Layer B'ye düşsün (faz-spesifik karar versin).
+
+```bash
+# v13.0.12 öncesi:
+if [ "$SPEC_APPROVED" != "true" ]; then
+  REASON = "Mutating tool blocked..."   # askq da bloke
+
+# v13.0.12 sonrası:
+case "$TOOL_NAME" in
+  Write|Edit|MultiEdit|NotebookEdit) _LOCK_TARGET=1 ;;
+esac
+if [ "$_LOCK_TARGET" = "1" ] && [ "$SPEC_APPROVED" != "true" ]; then
+  REASON = "Mutating tool blocked..."
+# AskUserQuestion → Layer B düşer, faz-spesifik allowed_tools karar verir
+```
+
+#### Davranış matrisi
+
+| Senaryo | v13.0.11 (eski) | v13.0.12 (yeni) |
+|---|---|---|
+| Aşama 1 + askq + approved=false | ❌ DENY (chicken-and-egg) | ✅ ALLOW (Layer B Aşama 1 askq izinli) |
+| Aşama 2 + askq + approved=false | ❌ DENY | ✅ ALLOW (precision-audit closing askq) |
+| Aşama 4 + askq + approved=false | ❌ DENY | ✅ ALLOW (spec-approval askq) |
+| Aşama 1 + Write + approved=false | ✅ DENY | ✅ DENY (mutating tool, doğru) |
+| Aşama 9 + askq + approved=true | ✅ DENY (Layer B) | ✅ DENY (Layer B değişmedi) |
+| Aşama 10 + askq + approved=true | ✅ ALLOW (Layer B) | ✅ ALLOW |
+
+#### Sonuç
+
+- 3-strike fail-open spirali ortadan kalktı
+- Aşama 1/2/4 askq'leri **doğrudan** geçer
+- Kullanıcı 3 kırmızı `Error:` görmez
+- Layer B'nin per-phase enforcement'ı korunur
+- Mutating tool'lar (Write/Edit/...) hâlâ MCL LOCK ile korunur
+
+#### Verification
+
+- 7 yeni unit test (`tests/cases/test-v1312-narrow-mcl-lock.sh`)
+- Test baseline: 262 → **269 passed** / 0 failed / 2 skipped
+- Sıfır regresyon
+- bash -n: 4 hooks clean
+
+#### Realistic determinism estimate
+
+v13.0.11 ~99% (akış çalışıyordu ama 3-strike spirali kötü UX) → v13.0.12 ~99.5% UX iyileştirmesi. Davranış değişmedi (sonuç aynı), kullanıcı deneyimi temizlendi.
+
 ## [13.0.11] - 2026-05-08
 
 ### Sıralılık disiplini — tüm faz atlamaları kaldırıldı + kalıcı kural

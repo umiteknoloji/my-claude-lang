@@ -817,7 +817,21 @@ fi
 
 REASON=""
 REASON_KIND=""
-if [ "$SPEC_APPROVED" != "true" ]; then
+# v13.0.12: MCL LOCK now narrowed to MUTATING tools only.
+# AskUserQuestion is the canonical state-advance channel — Aşama 1 summary,
+# Aşama 2 precision-audit closing, Aşama 4 spec-approval — all use askq to
+# transition state. Blocking askq at spec_approved=false creates a
+# chicken-and-egg deadlock: askq is the way TO get spec_approved=true, but
+# MCL LOCK blocks the askq itself. Pre-v13.0.12 behavior caused 3-strike
+# fail-open spirals (audit-driven evidence: 09:28→09:30→09:33 example with
+# strike=1/2/3). Layer B (line ~875) already enforces phase-specific
+# allowed_tools — askq is allowed at Aşama 1/2/4/7/10/19, denied at others.
+# Let askq fall through to Layer B; MCL LOCK only blocks Write/Edit/etc.
+_LOCK_TARGET=0
+case "$TOOL_NAME" in
+  Write|Edit|MultiEdit|NotebookEdit) _LOCK_TARGET=1 ;;
+esac
+if [ "$_LOCK_TARGET" = "1" ] && [ "$SPEC_APPROVED" != "true" ]; then
   # v13.0.5: When the session has zero Aşama 1-4 audit evidence, the model
   # is attempting a fast-skip (Write/Edit before any phase). Surface a
   # directive that walks Aşama 1 → 2 → 3 → 4 sequentially. When at least
