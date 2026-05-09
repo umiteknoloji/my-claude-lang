@@ -1,0 +1,48 @@
+{
+  "version": "1.0.0",
+  "_meta": {
+    "description": "Aşama 4 spec bloğundan MUST_1..MUST_N parametrelerini çıkarmak için pattern. lib/spec_must.py bunu okur, spec body'sini tarar, MUST/SHOULD listesini etiketler."
+  },
+  "patterns": {
+    "must_section_header": {
+      "regex": "^[ \\t]*(?:#+[ \\t]+)?(?:MUST|MUST Requirements|MUST'lar|Zorunlu|Mandatory)[ \\t]*:?[ \\t]*$",
+      "flags": "MULTILINE | IGNORECASE",
+      "captures": "section start"
+    },
+    "should_section_header": {
+      "regex": "^[ \\t]*(?:#+[ \\t]+)?(?:SHOULD|SHOULD Requirements|SHOULD'lar|Önerilen|Recommended)[ \\t]*:?[ \\t]*$",
+      "flags": "MULTILINE | IGNORECASE",
+      "captures": "section start"
+    },
+    "list_item": {
+      "regex": "^[ \\t]*(?:[-*+][ \\t]+|[0-9]+\\.[ \\t]+)(.+?)$",
+      "flags": "MULTILINE",
+      "captures": "single MUST or SHOULD item"
+    },
+    "must_inline_marker": {
+      "regex": "\\b(?:MUST|SHALL|REQUIRED)\\b\\s+(.+?)(?:\\.|$)",
+      "flags": "MULTILINE | IGNORECASE",
+      "notes": "Inline 'X MUST Y' kalıbı için fallback"
+    },
+    "should_inline_marker": {
+      "regex": "\\b(?:SHOULD|RECOMMENDED|OUGHT)\\b\\s+(.+?)(?:\\.|$)",
+      "flags": "MULTILINE | IGNORECASE",
+      "notes": "Inline 'X SHOULD Y' kalıbı için fallback"
+    },
+    "section_terminator": {
+      "regex": "^[ \\t]*(?:#+[ \\t]+|[A-Z][a-zA-Z ]+:[ \\t]*$)",
+      "flags": "MULTILINE",
+      "notes": "Yeni bölüm başlığı = MUST/SHOULD bölümünün sonu"
+    }
+  },
+  "extraction_strategy": {
+    "step_1_section": "Spec body içinde 'MUST'/'MUST Requirements' başlığı bul. Bulunursa o başlık altındaki list_item'ları oku, sonraki başlığa kadar.",
+    "step_2_inline_fallback": "Section bulunamazsa (free-form spec), must_inline_marker / should_inline_marker ile satır satır tara.",
+    "step_3_label": "Her item'a sırayla MUST_1, MUST_2, ... ve SHOULD_1, SHOULD_2, ... etiketi ata.",
+    "step_4_emit": "state.json'a `spec_must_list: [{id: 'MUST_1', text: '...'}, ...]` yaz. Audit: 'spec-must-extracted count={N}'."
+  },
+  "binding_audit_format": {
+    "description": "Sonraki fazlar audit'lerine 'covers=MUST_3,MUST_5' ekleyerek hangi MUST'u karşıladığını bildirir. Aşama 22 hook bu binding'leri toplar, kapsanmamış MUST'ları rapora yazar.",
+    "example": "asama-9-ac-3-green | mcl-stop | covers=MUST_2,MUST_4 spec_hash=ab12cd34"
+  }
+}

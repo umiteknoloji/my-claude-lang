@@ -1,0 +1,145 @@
+{
+  "version": "1.0.0",
+  "_meta": {
+    "description": "Faz metadataları — DSI render, ASCII pipeline glyph'i, narration cue'ları. Pseudocode §3'teki her fazın görünür yüzü."
+  },
+  "ascii_glyph_done": "✅",
+  "ascii_glyph_active": "⏳",
+  "ascii_glyph_pending": " ",
+  "ascii_glyph_skipped": "↷",
+  "ascii_glyph_blocked": "❌",
+  "phases": {
+    "1": {
+      "directive_tr": "Aşama 1 — Niyet Toplama. Belirsizlik varsa tek soru sor; tüm parametreler net ise özet hazırlayıp `AskUserQuestion` ile onay al.",
+      "directive_en": "Phase 1 — Intent Gathering. If anything is ambiguous, ask one question; if all parameters are clear, prepare a summary and use `AskUserQuestion` to confirm.",
+      "narration_tr": "Aşama 1 (niyet)",
+      "narration_en": "Phase 1 (intent)"
+    },
+    "2": {
+      "directive_tr": "Aşama 2 — Hassasiyet Denetimi. 7 boyutu sırayla gözden geçir (yetki, hata modları, kapsam dışı, PII, audit, performans SLA, idempotency). Her boyut için SILENT-ASSUME / SKIP-MARK / GATE kararı ver. Closing `AskUserQuestion` ile niyet onayı al.",
+      "directive_en": "Phase 2 — Precision Audit. Walk seven dimensions in order (auth, error modes, out-of-scope, PII, audit, performance SLA, idempotency). For each: SILENT-ASSUME / SKIP-MARK / GATE. Close with `AskUserQuestion` for intent confirmation.",
+      "narration_tr": "Aşama 2 (kontrol)",
+      "narration_en": "Phase 2 (precision)"
+    },
+    "3": {
+      "directive_tr": "Aşama 3 — Mühendislik Özeti. SESSİZ faz (askq YOK). Onaylı niyeti İngilizce mühendislik diline çevir, belirsiz fiilleri cerrahi fiillere yükselt. Yeni varlık/özellik/auth ekleme YASAK. `engineering-brief` audit emit et.",
+      "directive_en": "Phase 3 — Engineering Brief. SILENT phase (no askq). Translate approved intent to English engineering language; promote vague verbs to surgical ones. NO adding new entities/features/auth. Emit `engineering-brief` audit.",
+      "narration_tr": "Aşama 3 (özet)",
+      "narration_en": "Phase 3 (brief)"
+    },
+    "4": {
+      "directive_tr": "Aşama 4 — Spec Yazımı + Onay. 15+ yıl deneyimli kıdemli mühendis kalitesinde `📋 Spec:` bloğu yaz. Zorunlu bölümler: Objective, MUST/SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope. MUST/SHOULD'ları MUST_1..MUST_N etiketle (parameter binding). 3-5 cümle Türkçe özet. Teknik sorun varsa ⚠️ tek satır uyarı. `AskUserQuestion` ile onay.",
+      "directive_en": "Phase 4 — Spec Writing + Approval. Produce a `📋 Spec:` block at senior-engineer (15+ yrs) quality. Required sections: Objective, MUST/SHOULD, Acceptance Criteria, Edge Cases, Technical Approach, Out of Scope. Tag MUSTs as MUST_1..MUST_N (parameter binding). 3-5 sentence Turkish summary. ⚠️ one-line warning if there's a technical concern. `AskUserQuestion` for approval.",
+      "narration_tr": "Aşama 4 (spec)",
+      "narration_en": "Phase 4 (spec)"
+    },
+    "5": {
+      "directive_tr": "Aşama 5 — Desen Eşleştirme. Spec'teki dosya yollarına benzer mevcut dosyaları okuyup üç deseni çıkar: naming convention, error handling, test pattern. Yeni proje (greenfield) ise atla — `asama-5-skipped reason=greenfield`.",
+      "directive_en": "Phase 5 — Pattern Matching. Read existing files similar to spec paths and extract three patterns: naming convention, error handling, test pattern. If greenfield, skip — `asama-5-skipped reason=greenfield`.",
+      "narration_tr": "Aşama 5 (desen)",
+      "narration_en": "Phase 5 (pattern)"
+    },
+    "6": {
+      "directive_tr": "Aşama 6 — UI Yapımı. Frontend dosyaları sahte veriyle yaz. Build config önce, sonra component'ler. `npm install` + `npm run dev` (background) → 2sn bekle → tarayıcıyı OTOMATİK aç. Backend yolları (src/api/**, prisma/**) YASAK. `asama-6-end server_started=true browser_opened=true` audit emit. UI yoksa atla.",
+      "directive_en": "Phase 6 — UI Build. Write frontend files with mock data. Build config first, then components. `npm install` + `npm run dev` (background) → wait 2s → AUTO-open browser. Backend paths (src/api/**, prisma/**) FORBIDDEN. Emit `asama-6-end server_started=true browser_opened=true`. Skip if no UI.",
+      "narration_tr": "Aşama 6 (UI)",
+      "narration_en": "Phase 6 (UI)"
+    },
+    "7": {
+      "directive_tr": "Aşama 7 — UI İncelemesi (deferred). Aşama 6 dev server + browser auto-open ile biter ve STOP. Geliştiricinin bir sonraki turn cevabı intent classification ile yorumlanır: approve / revise / cancel.",
+      "directive_en": "Phase 7 — UI Review (deferred). Phase 6 ends with dev server + browser auto-open and STOPs. The developer's next-turn free-form response is interpreted via intent classification: approve / revise / cancel.",
+      "narration_tr": "Aşama 7 (UI inceleme — deferred)",
+      "narration_en": "Phase 7 (UI review — deferred)"
+    },
+    "8": {
+      "directive_tr": "Aşama 8 — Veritabanı Tasarımı. Şema yaz (genellikle 3NF; denormalization gerekçeli). Sorgu desenlerinden index stratejisi. Sıcak sorgular için erişim yolu. ORM varsa migration dosyaları. DB kapsamda yoksa `asama-8-not-applicable` audit.",
+      "directive_en": "Phase 8 — Database Design. Write schema (typically 3NF; denormalization with rationale). Index strategy from query patterns. Access path for hot queries. Migration files if ORM is used. If DB out of scope, emit `asama-8-not-applicable`.",
+      "narration_tr": "Aşama 8 (DB)",
+      "narration_en": "Phase 8 (DB)"
+    },
+    "9": {
+      "directive_tr": "Aşama 9 — TDD Yürütme. Aşama 4'te sayılan her AC için sırayla: KIRMIZI (fail eden test) → YEŞİL (geçiren minimum kod) → REFAKTÖR (DRY, isimlendirme, ölü kod). Sonda tam test takımı yeniden çalıştır. UI flow varsa sahte→gerçek API geçişi burada.",
+      "directive_en": "Phase 9 — TDD Execution. For each AC counted in Phase 4, in order: RED (failing test) → GREEN (minimum passing code) → REFACTOR (DRY, naming, dead code). Run full suite at end. UI flow: mock→real API transition here.",
+      "narration_tr": "Aşama 9 (TDD)",
+      "narration_en": "Phase 9 (TDD)"
+    },
+    "10": {
+      "directive_tr": "Aşama 10 — Risk İncelemesi. Üç adım: spec uyum öncül kontrolü → atlanmış risk taraması (4 mercek: code review, simplify, performance, security; semgrep SAST otomatik) → TDD yeniden doğrulama. Her risk askq: skip / fix / rule.",
+      "directive_en": "Phase 10 — Risk Review. Three steps: spec-compliance pre-check → missed-risk scan (four lenses: code review, simplify, performance, security; semgrep SAST auto) → TDD re-verification. Each risk via askq: skip / fix / rule.",
+      "narration_tr": "Aşama 10 (risk)",
+      "narration_en": "Phase 10 (risk)"
+    },
+    "11": {
+      "directive_tr": "Aşama 11 — Kod İncelemesi. Auto-fix only — askq YOK. Doğruluk, mantık hataları, hata yakalama eksikliği, ölü kod, eksik validasyon, yanlış adlandırma. Tara → düzelt → yeniden tara (en fazla 5 yeniden tarama).",
+      "directive_en": "Phase 11 — Code Review. Auto-fix only — NO askq. Correctness, logic errors, missing error handling, dead code, missing validation, naming mistakes. Scan → fix → rescan (max 5 rescans).",
+      "narration_tr": "Aşama 11 (kod inceleme)",
+      "narration_en": "Phase 11 (code review)"
+    },
+    "12": {
+      "directive_tr": "Aşama 12 — Sadeleştirme. Auto-fix only. Erken soyutlama, gereksiz karmaşa, duplikat mantık, gereksiz pattern'ler, 'ileride lazım olur' kodu.",
+      "directive_en": "Phase 12 — Simplification. Auto-fix only. Premature abstraction, unnecessary complexity, duplicate logic, gratuitous patterns, 'might-need-later' code.",
+      "narration_tr": "Aşama 12 (sadeleştir)",
+      "narration_en": "Phase 12 (simplify)"
+    },
+    "13": {
+      "directive_tr": "Aşama 13 — Performans. Auto-fix only. N+1 sorgular, sınırsız döngüler, bloklayan I/O, bellek sızıntısı, gereksiz allocation.",
+      "directive_en": "Phase 13 — Performance. Auto-fix only. N+1 queries, unbounded loops, blocking I/O, memory leaks, unnecessary allocations.",
+      "narration_tr": "Aşama 13 (performans)",
+      "narration_en": "Phase 13 (performance)"
+    },
+    "14": {
+      "directive_tr": "Aşama 14 — Güvenlik (TÜM proje). Auto-fix. SQL injection, auth bypass, XSS, CSRF, hardcoded secret, sızıntı. semgrep SAST + paket audit otomatik. HIGH/MEDIUM Aşama 10'a escalate edilebilir.",
+      "directive_en": "Phase 14 — Security (PROJECT-WIDE). Auto-fix. SQL injection, auth bypass, XSS, CSRF, hardcoded secrets, leakage. semgrep SAST + package audit auto. HIGH/MEDIUM may escalate to Phase 10.",
+      "narration_tr": "Aşama 14 (güvenlik)",
+      "narration_en": "Phase 14 (security)"
+    },
+    "15": {
+      "directive_tr": "Aşama 15 — Birim Testler. Her yeni fonksiyon/sınıf/modül için unit test. Aşama 9 TDD testlerini de doğrular. Test takımı YEŞİL olana kadar.",
+      "directive_en": "Phase 15 — Unit Tests. Unit test for each new function/class/module. Validates Phase 9 TDD tests. Until suite is GREEN.",
+      "narration_tr": "Aşama 15 (birim test)",
+      "narration_en": "Phase 15 (unit tests)"
+    },
+    "16": {
+      "directive_tr": "Aşama 16 — Entegrasyon Testleri. Modüller arası akışlar, API endpoint'leri, veritabanı katmanı.",
+      "directive_en": "Phase 16 — Integration Tests. Cross-module flows, API endpoints, database layer.",
+      "narration_tr": "Aşama 16 (entegrasyon)",
+      "narration_en": "Phase 16 (integration)"
+    },
+    "17": {
+      "directive_tr": "Aşama 17 — Uçtan Uca Testler. UI varsa Playwright/Cypress headless ile gerçek kullanıcı akışları.",
+      "directive_en": "Phase 17 — End-to-End Tests. If UI exists, real user flows via Playwright/Cypress headless.",
+      "narration_tr": "Aşama 17 (E2E)",
+      "narration_en": "Phase 17 (E2E)"
+    },
+    "18": {
+      "directive_tr": "Aşama 18 — Yük Testleri. Throughput-hassas yollar için k6/locust/ab. Spec NFR hedefini karşıladığı doğrulanır.",
+      "directive_en": "Phase 18 — Load Tests. k6/locust/ab for throughput-sensitive paths. Verify spec NFR target is met.",
+      "narration_tr": "Aşama 18 (yük)",
+      "narration_en": "Phase 18 (load)"
+    },
+    "19": {
+      "directive_tr": "Aşama 19 — Etki İncelemesi. Yazılan kodun projenin DİĞER yerlerine downstream etkilerini bul: çağıranlar, davranışı değişen ortak yardımcılar, contract kırılması, şema/migration etkileri, config değişiklikleri, cache invalidation, build/dependency kayması. Her etki askq: skip/fix/rule.",
+      "directive_en": "Phase 19 — Impact Review. Find downstream effects of new code elsewhere in the project: callers, helpers with changed behavior, contract breakage, schema/migration effects, config changes, cache invalidation, build/dependency drift. Each impact via askq: skip/fix/rule.",
+      "narration_tr": "Aşama 19 (etki)",
+      "narration_en": "Phase 19 (impact)"
+    },
+    "20": {
+      "directive_tr": "Aşama 20 — Doğrulama Raporu + Sahte Veri Temizliği. Spec Coverage tablosu (her MUST/SHOULD ↔ test ↔ status). Otomasyon Bariyerleri bölümü. Process Trace bölümü (trace.log'dan). __fixtures__/ ve geçici sahte veri sil.",
+      "directive_en": "Phase 20 — Verification Report + Mock Cleanup. Spec Coverage table (each MUST/SHOULD ↔ test ↔ status). Automation Barriers section. Process Trace section (from trace.log). Delete __fixtures__/ and temporary mock data.",
+      "narration_tr": "Aşama 20 (doğrulama)",
+      "narration_en": "Phase 20 (verify)"
+    },
+    "21": {
+      "directive_tr": "Aşama 21 — Yerelleştirilmiş Rapor. Aşama 20 raporunu kullanıcının diline çevir (sıkı çevirmen — yorum yok, ekleme yok). İngilizce oturumda atla.",
+      "directive_en": "Phase 21 — Localized Report. Translate Phase 20 report to user's language (strict translator — no comments, no additions). Skip if English session.",
+      "narration_tr": "Aşama 21 (yerel rapor)",
+      "narration_en": "Phase 21 (localized)"
+    },
+    "22": {
+      "directive_tr": "Aşama 22 — Tamlık Denetimi. Hook .mcycl/audit.log, state.json, trace.log okur. 1-21 fazlarının audit'lerini denetler. Aşama 9 TDD (her AC × red/green/refactor) ve Aşama 11-18 boru hattı (start/end/rescan) zorunlu derin denetim. Atlanan/eksik fazlar 'Açık Konular'da. `asama-22-complete` audit'i HOOK yazar (model değil).",
+      "directive_en": "Phase 22 — Completeness Audit. Hook reads .mycl/audit.log, state.json, trace.log. Audits Phases 1-21. Mandatory deep checks: Phase 9 TDD (each AC × red/green/refactor) and Phases 11-18 (start/end/rescan). Skipped/missing phases listed under 'Open Items'. `asama-22-complete` audit written by HOOK (not model).",
+      "narration_tr": "Aşama 22 (tamlık)",
+      "narration_en": "Phase 22 (completeness)"
+    }
+  }
+}

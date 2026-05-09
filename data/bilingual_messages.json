@@ -1,0 +1,116 @@
+{
+  "version": "1.0.0",
+  "_meta": {
+    "description": "MyCL hook'larının user-facing mesajları. Tek noktadan TR+EN render. lib/bilingual.py render(key, **kwargs) ile çağırır → 'TR\\n\\nEN' verir. Yeni mesaj eklemek = burada satır eklemek (kod değişmez). Placeholder'lar: {phase} {phase_name} {tool} {audit} {strike}."
+  },
+  "messages": {
+    "phase_done_notification": {
+      "tr": "✅ Aşama {phase} ({phase_name}) tamamlandı. → Aşama {next_phase} başlıyor.",
+      "en": "✅ Phase {phase} ({phase_name}) complete. → Phase {next_phase} starting."
+    },
+    "phase_skipped_notification": {
+      "tr": "↷ Aşama {phase} atlandı ({reason}). → Aşama {next_phase} başlıyor.",
+      "en": "↷ Phase {phase} skipped ({reason}). → Phase {next_phase} starting."
+    },
+    "spec_approval_block": {
+      "tr": "MyCL kilidi — spec onayı yok. Mutating tool `{tool}` engellendi. Önce Aşama 1 (niyet) → 2 (kontrol) → 3 (özet) → 4 (spec onayı) sırasıyla ilerleyin. Spec onaylanınca `{tool}` otomatik açılır.",
+      "en": "MyCL lock — no spec approval. Mutating tool `{tool}` blocked. First proceed Phase 1 (intent) → 2 (precision) → 3 (brief) → 4 (spec approval). Once approved, `{tool}` opens automatically."
+    },
+    "spec_approval_escalation": {
+      "tr": "⚠️ Aşama 4 spec onayı 5+ strike — geliştirici müdahalesi gerekiyor. Pipeline hâlâ açılmıyor. AskUserQuestion ile spec onayı talep edin veya `mcl_audit_log asama-4-complete mcl-stop \"<detay>\"` ile manuel emit edin.",
+      "en": "⚠️ Phase 4 spec approval has hit 5+ strikes — developer intervention required. Pipeline remains closed. Re-emit AskUserQuestion for spec approval or manually emit via `mcl_audit_log asama-4-complete mcl-stop \"<detail>\"`."
+    },
+    "phase_allowlist_block": {
+      "tr": "Aşama {phase}'de `{tool}` tool'una izin verilmez. İzinli tool'lar: {allowed}. Bir sonraki faza geçmek için `asama-{phase}-complete` audit emit edilmeli.",
+      "en": "In Phase {phase}, tool `{tool}` is not permitted. Allowed: {allowed}. To advance, emit audit `asama-{phase}-complete`."
+    },
+    "phase_path_block": {
+      "tr": "Aşama {phase}'de bu yol yasak: `{path}`. Yasaklı yollar: {denied}. (Örnek: Aşama 6 UI Build, backend yollarını yasaklar — backend Aşama 8 veya 9'da yazılır.)",
+      "en": "In Phase {phase}, this path is forbidden: `{path}`. Denied paths: {denied}. (Example: Phase 6 UI Build forbids backend paths — backend goes to Phase 8 or 9.)"
+    },
+    "state_mutation_block": {
+      "tr": "MyCL STATE LOCK — `mcl_state_set` / `mcl_state_reset` Bash kanalından çağrılamaz. State faz mantığının iç invariantı; sadece hook'lar mutate eder. Recovery: `mcl_audit_log asama-N-complete mcl-stop \"<detay>\"` (legitim).",
+      "en": "MyCL STATE LOCK — `mcl_state_set` / `mcl_state_reset` cannot be called via the Bash channel. State is the inner invariant of phase logic; only hooks mutate it. Recovery: `mcl_audit_log asama-N-complete mcl-stop \"<detail>\"` (legitimate)."
+    },
+    "git_init_consent_request": {
+      "tr": "MyCL plugin orkestrasyonu için yerel `git init` çalıştırılsın mı? (Sadece yerel: remote eklenmez, push yapılmaz, otomatik commit atılmaz.)",
+      "en": "May MyCL run a local `git init` for plugin bookkeeping? (Local only: no remote, no push, no auto-commit.)"
+    },
+    "askq_prefix_phase_1": {
+      "tr": "MyCL {version} | Aşama 1 — Niyet özeti onayı",
+      "en": "MyCL {version} | Phase 1 — Intent summary confirmation"
+    },
+    "askq_prefix_phase_2": {
+      "tr": "MyCL {version} | Aşama 2 — Precision-audit niyet onayı",
+      "en": "MyCL {version} | Phase 2 — Precision-audit intent confirmation"
+    },
+    "askq_prefix_phase_4": {
+      "tr": "MyCL {version} | Aşama 4 — Spec onayı",
+      "en": "MyCL {version} | Phase 4 — Spec approval"
+    },
+    "askq_prefix_phase_7": {
+      "tr": "MyCL {version} | Aşama 7 — UI tasarım onayı",
+      "en": "MyCL {version} | Phase 7 — UI design approval"
+    },
+    "askq_prefix_phase_10": {
+      "tr": "MyCL {version} | Aşama 10 — Risk maddesi #{n}",
+      "en": "MyCL {version} | Phase 10 — Risk item #{n}"
+    },
+    "askq_prefix_phase_19": {
+      "tr": "MyCL {version} | Aşama 19 — Etki maddesi #{n}",
+      "en": "MyCL {version} | Phase 19 — Impact item #{n}"
+    },
+    "askq_option_approve": {
+      "tr": "Onayla",
+      "en": "Approve"
+    },
+    "askq_option_revise": {
+      "tr": "Revize",
+      "en": "Revise"
+    },
+    "askq_option_cancel": {
+      "tr": "İptal",
+      "en": "Cancel"
+    },
+    "askq_option_continue": {
+      "tr": "Devam et",
+      "en": "Continue"
+    },
+    "token_visibility": {
+      "tr": "Bu tur ~{turn_tokens} token, oturum toplamı ~{total_tokens} token.",
+      "en": "This turn ~{turn_tokens} tokens, session total ~{total_tokens} tokens."
+    },
+    "ascii_pipeline_header": {
+      "tr": "İlerleme:",
+      "en": "Progress:"
+    },
+    "self_critique_request": {
+      "tr": "Aşama {phase} tamamlanmadan önce: bu fazda eksik bıraktığın bir şey var mı? Cevap 'hayır' ise audit emit et; aksi halde önce eksiği gider.",
+      "en": "Before Phase {phase} is closed: is there anything you left incomplete? If 'no', emit the audit; otherwise resolve the gap first."
+    },
+    "pre_commitment_request": {
+      "tr": "Bu turda hangi fazı tamamlamayı planlıyorsun? Tek satır söz: 'Aşama X'i tamamlayacağım, çünkü ...'",
+      "en": "Which phase will you complete this turn? One-line commitment: 'I will complete Phase X because ...'"
+    },
+    "rationale_request": {
+      "tr": "Mutating tool öncesi 1 satır gerekçe: hangi MUST/SHOULD karşılanıyor? hangi dosya, neden?",
+      "en": "Pre-mutation 1-line rationale: which MUST/SHOULD is being satisfied? which file, why?"
+    },
+    "confidence_low_warning": {
+      "tr": "Confidence skorun düşük ({score}/100). AskUserQuestion ile geliştiriciye onay sorman önerilir.",
+      "en": "Your confidence score is low ({score}/100). It is recommended to ask the developer via AskUserQuestion."
+    },
+    "post_mortem_template": {
+      "tr": "5 strike escalation tetiklendi ({block_kind}). Lütfen 1 paragrafta yaz: (1) ne yapmaya çalıştın, (2) hook neden engelliyor, (3) doğru recovery adımı ne. Audit'e gömülecek.",
+      "en": "5-strike escalation triggered ({block_kind}). Please write 1 paragraph: (1) what you tried, (2) why the hook blocks, (3) correct recovery step. Will be embedded into audit."
+    },
+    "mid_pipeline_reconfirm": {
+      "tr": "MyCL {version} | Aşama {phase} ortası — hâlâ bu yönde mi ilerleyelim?",
+      "en": "MyCL {version} | Phase {phase} mid-checkpoint — should we still proceed in this direction?"
+    },
+    "completeness_report_header": {
+      "tr": "📋 Aşama 22 — Tamlık Raporu (hook tarafından oluşturuldu)",
+      "en": "📋 Phase 22 — Completeness Report (generated by hook)"
+    }
+  }
+}

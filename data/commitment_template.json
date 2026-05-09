@@ -1,0 +1,92 @@
+{
+  "version": "1.0.0",
+  "_meta": {
+    "description": "Pre-commitment + public commitment list şablonları. Faz başına özelleştirilmiş prompt'lar. lib/commitment.py bunları okur, model'den söz alır, hook stop'ta söz/sonuç eşleşmesini kontrol eder."
+  },
+  "pre_commitment": {
+    "tr": "MyCL pre-commitment: Bu turda Aşama {phase} ({phase_name}) için hangi adımları tamamlayacaksın? Tek paragraf, 2-3 cümle.",
+    "en": "MyCL pre-commitment: Which steps of Phase {phase} ({phase_name}) will you complete this turn? One paragraph, 2-3 sentences."
+  },
+  "public_commitment_list_open": {
+    "tr": "Aşama {phase} ({phase_name}) başlıyor. Bu fazda yapacağım şeyler:",
+    "en": "Phase {phase} ({phase_name}) starting. In this phase I will:"
+  },
+  "public_commitment_list_close": {
+    "tr": "Aşama {phase} ({phase_name}) tamamlandı. Söz verdiğim {count} maddenin gerçekleşme durumu:",
+    "en": "Phase {phase} ({phase_name}) complete. Status of the {count} items I committed to:"
+  },
+  "phase_specific_templates": {
+    "1": {
+      "tr_items": [
+        "Geliştirici niyetini netleştirmek için (a) tek soru sor VEYA (b) tüm parametreler net ise özet hazırla",
+        "Çelişki tespit ettiysen (örn. JWT + server-side state) yüzeye çıkar",
+        "AskUserQuestion ile niyet onayı al"
+      ],
+      "en_items": [
+        "Clarify developer intent by (a) asking one question OR (b) preparing a summary if all parameters are clear",
+        "Surface any contradiction you detect (e.g. JWT + server-side state)",
+        "Use AskUserQuestion to confirm intent"
+      ]
+    },
+    "2": {
+      "tr_items": [
+        "7 boyutu sırayla gözden geçir: yetki, hata modları, kapsam dışı, PII, audit, performans SLA, idempotency",
+        "Her boyut için SILENT-ASSUME / SKIP-MARK / GATE kararı",
+        "Closing AskUserQuestion ile precision-audit niyet onayı al"
+      ],
+      "en_items": [
+        "Walk seven dimensions in order: auth, error modes, out-of-scope, PII, audit, performance SLA, idempotency",
+        "For each: SILENT-ASSUME / SKIP-MARK / GATE decision",
+        "Close with AskUserQuestion for precision-audit intent confirmation"
+      ]
+    },
+    "4": {
+      "tr_items": [
+        "📋 Spec: bloğunu kıdemli mühendis kalitesinde yaz (Objective, MUST/SHOULD, AC, Edge Cases, Technical Approach, Out of Scope)",
+        "MUST_1...MUST_N etiketle (parameter binding için)",
+        "Kullanıcıya 3-5 cümle Türkçe özet ver",
+        "Teknik sorun varsa ⚠️ tek satır uyarı koy",
+        "AskUserQuestion ile spec onayı al"
+      ],
+      "en_items": [
+        "Write the 📋 Spec: block at senior-engineer quality (Objective, MUST/SHOULD, AC, Edge Cases, Technical Approach, Out of Scope)",
+        "Tag MUST_1...MUST_N (for parameter binding)",
+        "Provide 3-5 sentence Turkish summary to user",
+        "Add ⚠️ single-line warning if there's a technical concern",
+        "Use AskUserQuestion for spec approval"
+      ]
+    },
+    "9": {
+      "tr_items": [
+        "Aşama 4'teki her AC için sırayla TDD döngüsü yürüt",
+        "KIRMIZI: önce başarısız test yaz, çalıştır, fail gör",
+        "YEŞİL: testi geçirecek MİNİMUM kod yaz, çalıştır, pass gör",
+        "REFAKTÖR: kodu temizle (DRY, isimlendirme), testler hâlâ yeşil",
+        "Sonda tam test takımını çalıştır"
+      ],
+      "en_items": [
+        "Run TDD cycle in order for each AC from Phase 4",
+        "RED: write a failing test first, run, observe failure",
+        "GREEN: write MINIMUM code to pass, run, observe pass",
+        "REFACTOR: clean up (DRY, naming), tests still green",
+        "Run full test suite at the end"
+      ]
+    },
+    "10": {
+      "tr_items": [
+        "Spec uyum öncül kontrolü: her MUST/SHOULD karşılandı mı?",
+        "Atlanmış risk taraması: 4 mercek (code review, simplify, performance, security) eş zamanlı",
+        "Semgrep SAST otomatik tara, HIGH/MEDIUM bulguları işle",
+        "Her risk için TEK AskUserQuestion: skip / fix / rule",
+        "TDD yeniden doğrulama: tüm fix'ler sonrası tam test takımı"
+      ],
+      "en_items": [
+        "Spec-compliance pre-check: was each MUST/SHOULD satisfied?",
+        "Missed-risk scan: 4 lenses (code review, simplify, performance, security) concurrently",
+        "Run semgrep SAST auto, process HIGH/MEDIUM findings",
+        "For each risk a SINGLE AskUserQuestion: skip / fix / rule",
+        "TDD re-verification: full suite after all fixes"
+      ]
+    }
+  }
+}

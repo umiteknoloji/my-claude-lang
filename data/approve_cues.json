@@ -1,0 +1,96 @@
+{
+  "version": "1.0.0",
+  "_meta": {
+    "description": "AskUserQuestion intent classifier için TR + EN onay/revize/iptal sözcükleri. Eski MCL'in 14 dil setinden TR + EN'e indirildi (1.0.0 plan kararı). lib/askq.py classify() fonksiyonu bu listeyi okur."
+  },
+  "approve": {
+    "tr": [
+      "onayla",
+      "onaylıyorum",
+      "onayladım",
+      "evet",
+      "kabul",
+      "kabul ediyorum",
+      "tamam",
+      "olur",
+      "doğru",
+      "uygun",
+      "geç",
+      "devam",
+      "devam et",
+      "başla",
+      "yap"
+    ],
+    "en": [
+      "approve",
+      "approved",
+      "yes",
+      "ok",
+      "okay",
+      "confirm",
+      "confirmed",
+      "proceed",
+      "continue",
+      "go",
+      "go ahead",
+      "accept",
+      "accepted",
+      "right",
+      "correct",
+      "looks good",
+      "lgtm"
+    ]
+  },
+  "revise": {
+    "tr": [
+      "revize",
+      "düzelt",
+      "değiştir",
+      "değişiklik",
+      "yanlış",
+      "hatalı",
+      "eksik",
+      "tekrar",
+      "yeniden",
+      "farklı"
+    ],
+    "en": [
+      "revise",
+      "revision",
+      "change",
+      "changes",
+      "wrong",
+      "incorrect",
+      "missing",
+      "redo",
+      "again",
+      "different",
+      "fix",
+      "update"
+    ]
+  },
+  "cancel": {
+    "tr": [
+      "iptal",
+      "vazgeç",
+      "vazgeçtim",
+      "boşver",
+      "dur",
+      "durdur",
+      "yapma",
+      "kapat",
+      "çık"
+    ],
+    "en": [
+      "cancel",
+      "abort",
+      "stop",
+      "quit",
+      "exit",
+      "nevermind",
+      "never mind",
+      "drop it",
+      "discard"
+    ]
+  }
+}

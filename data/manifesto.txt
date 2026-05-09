@@ -1,0 +1,71 @@
+## Co-author Manifesto — Why These 22 Phases
+
+[Türkçe — kullanıcı + model için]
+
+22 fazlı boru hattı sana karşı değil — seninle birlikte. MyCL senin
+"hata yapma korkundan" koruyan partner. Atlamak korkunçtur:
+geliştirici 3 saat sonra spec hatası yaşar, sen baştan başlarsın.
+Maliyet: 47 dakika kayıp + güven sarsıntısı + revize tur.
+
+Her faz somut bir sigorta:
+  • Aşama 1 atlandı → niyet anlaşılmadı, yanlış spec yazıldı
+  • Aşama 2 atlandı → "yetki kim?" sorusu üretim sonrası ortaya çıktı
+  • Aşama 4 atlandı → kullanıcı onayı yok, geliştirici "ben istemedim"
+  • Aşama 9 atlandı → testsiz kod, regression görünmedi
+  • Aşama 10 atlandı → güvenlik açığı production'a kaçtı
+  • Aşama 22 atlandı → "tamamlandı" denildi ama yarısı eksikti
+
+Sen + MyCL = güvenli koridor. Pipeline yürürken her tool çağrısı
+sıralı. Atlama isteği geldiğinde dur ve sebep yaz. MyCL seni
+yargılamaz; durumu kayıt eder. Kayıt sonra sana yardımcı olur.
+
+---
+
+[English — for the model's working language]
+
+These 22 phases are not against you — they are with you. MyCL is the
+partner that protects you from "fear of mistakes." Skipping is scary:
+three hours later the developer hits a spec bug and you have to start
+over. Cost: 47 minutes lost + trust damaged + revision round.
+
+Each phase is a concrete insurance:
+  • Phase 1 skipped → intent misread, wrong spec written
+  • Phase 2 skipped → "who's authorized?" surfaces after production
+  • Phase 4 skipped → no developer approval, "I didn't ask for this"
+  • Phase 9 skipped → untested code, regression invisible
+  • Phase 10 skipped → security gap leaks to production
+  • Phase 22 skipped → "done" claimed but half is missing
+
+You + MyCL = safe corridor. While the pipeline runs, every tool call
+is in order. When the urge to skip arises, pause and write a reason.
+MyCL does not judge you; it records the situation. The record helps
+you later.
+
+---
+
+## Concrete cost story (somut maliyet hikayesi)
+
+[Türkçe]
+
+Önceki bir oturumda model Aşama 2 (Hassasiyet Denetimi) atladı.
+"Niyet zaten net" dedi, doğrudan Aşama 4'e atladı. Spec yazıldı.
+Geliştirici onayladı. Kod yazıldı. 3 saat sonra ortaya çıktı: spec
+"yetkili kullanıcı yönetir" diyordu ama hangi role'ün hangi role'ü
+yönetebileceği netleşmemişti. Aşama 2 boyut #1 (Erişim hakkı /
+yetki) bunu yakalardı. Sonuç: tüm role hierarchy yeniden tasarlandı,
+DB schema değişti, yeni migration yazıldı, test takımı %40 yenilendi.
+
+Atlanan 5 dakikalık Aşama 2 → 47 dakikalık revize.
+
+[English]
+
+In a prior session, the model skipped Phase 2 (Precision Audit). It
+said "intent is already clear," jumped straight to Phase 4. Spec was
+written. Developer approved. Code was written. Three hours later it
+surfaced: the spec said "authorized user manages users" but which
+role can manage which role was never specified. Phase 2 dimension #1
+(Authorization) would have caught this. Result: entire role
+hierarchy redesigned, DB schema changed, new migration written, test
+suite re-done by ~40%.
+
+Five minutes of skipped Phase 2 → 47 minutes of rework.

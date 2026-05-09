@@ -1,0 +1,339 @@
+{
+  "version": "1.0.0",
+  "_meta": {
+    "description": "MyCL Layer B kapı tanımı — 22 faz × tool izinleri. Pseudocode'un (MyCL_Pseudocode.md) §3 bölümü buradan veri olarak ifade edilir. Yeni edge case veri olarak girer; gate.py kodu sabit kalır.",
+    "fail_open_global": false
+  },
+  "_global_always_allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "LS",
+    "WebFetch",
+    "WebSearch",
+    "Task",
+    "Skill",
+    "TodoWrite"
+  ],
+  "_global_bash_audit_emit_allowed": true,
+  "_global_git_init_allowed": true,
+  "phases": {
+    "1": {
+      "name": "Niyet Toplama",
+      "name_en": "Intent Gathering",
+      "allowed_tools": ["AskUserQuestion"],
+      "denied_paths": [],
+      "required_audits_any": ["summary-confirm-approve", "asama-1-complete"],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false
+    },
+    "2": {
+      "name": "Hassasiyet Denetimi",
+      "name_en": "Precision Audit",
+      "allowed_tools": ["AskUserQuestion"],
+      "denied_paths": [],
+      "required_audits_any": ["asama-2-complete", "precision-audit"],
+      "fail_open": false,
+      "self_critique_required": true,
+      "public_commitment_required": false
+    },
+    "3": {
+      "name": "Mühendislik Özeti",
+      "name_en": "Engineering Brief",
+      "allowed_tools": [],
+      "denied_paths": [],
+      "required_audits_any": ["asama-3-complete", "engineering-brief"],
+      "fail_open": false,
+      "silent_phase": true,
+      "self_critique_required": false,
+      "public_commitment_required": false
+    },
+    "4": {
+      "name": "Spec Yazımı + Onay",
+      "name_en": "Spec Writing + Approval",
+      "allowed_tools": ["AskUserQuestion"],
+      "denied_paths": [],
+      "required_audits_any": ["asama-4-complete"],
+      "fail_open": false,
+      "self_critique_required": true,
+      "public_commitment_required": true,
+      "spec_block_required": true
+    },
+    "5": {
+      "name": "Desen Eşleştirme",
+      "name_en": "Pattern Matching",
+      "allowed_tools": [],
+      "denied_paths": [],
+      "required_audits_any": ["asama-5-complete", "pattern-summary-stored", "asama-5-skipped"],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "skippable": true,
+      "skip_reason": "greenfield"
+    },
+    "6": {
+      "name": "UI Yapımı",
+      "name_en": "UI Build",
+      "allowed_tools": ["Write", "Edit", "MultiEdit", "Bash", "AskUserQuestion"],
+      "denied_paths": [
+        "src/api/**",
+        "src/server/**",
+        "server/**",
+        "prisma/**",
+        "models/**",
+        "migrations/**",
+        "schema/**",
+        "db/**"
+      ],
+      "required_audits_any": [
+        "asama-6-complete",
+        "asama-6-skipped",
+        "asama-6-end"
+      ],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": true,
+      "skippable": true,
+      "skip_reason": "no-ui-flow",
+      "lens": "server_browser_check"
+    },
+    "7": {
+      "name": "UI İncelemesi",
+      "name_en": "UI Review (deferred)",
+      "allowed_tools": ["AskUserQuestion"],
+      "denied_paths": [],
+      "required_audits_any": ["asama-7-complete", "asama-7-skipped"],
+      "fail_open": false,
+      "deferred": true,
+      "self_critique_required": false,
+      "public_commitment_required": false
+    },
+    "8": {
+      "name": "Veritabanı Tasarımı",
+      "name_en": "Database Design",
+      "allowed_tools": ["Write", "Edit", "MultiEdit", "Bash"],
+      "denied_paths": ["src/components/**", "src/pages/**", "ui/**"],
+      "required_audits_any": [
+        "asama-8-end",
+        "asama-8-not-applicable",
+        "asama-8-complete"
+      ],
+      "fail_open": false,
+      "self_critique_required": true,
+      "public_commitment_required": true,
+      "skippable": true,
+      "skip_reason": "no-db-in-scope"
+    },
+    "9": {
+      "name": "TDD Yürütme",
+      "name_en": "TDD Execution",
+      "allowed_tools": ["Write", "Edit", "MultiEdit", "Bash", "AskUserQuestion"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-9-complete",
+        "asama-9-ac-{i}-red",
+        "asama-9-ac-{i}-green",
+        "asama-9-ac-{i}-refactor"
+      ],
+      "fail_open": false,
+      "self_critique_required": true,
+      "public_commitment_required": true,
+      "tdd_cycle_required": true
+    },
+    "10": {
+      "name": "Risk İncelemesi",
+      "name_en": "Risk Review",
+      "allowed_tools": ["AskUserQuestion", "Edit", "MultiEdit", "Write", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-10-complete",
+        "asama-10-items-declared",
+        "asama-10-item-{n}-resolved"
+      ],
+      "fail_open": false,
+      "self_critique_required": true,
+      "public_commitment_required": true,
+      "mid_pipeline_reconfirm": true,
+      "subagent_rubber_duck": true
+    },
+    "11": {
+      "name": "Kod İncelemesi",
+      "name_en": "Code Review",
+      "allowed_tools": ["Edit", "MultiEdit", "Write", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-11-complete",
+        "asama-11-scan",
+        "asama-11-rescan"
+      ],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "auto_fix_only": true
+    },
+    "12": {
+      "name": "Sadeleştirme",
+      "name_en": "Simplification",
+      "allowed_tools": ["Edit", "MultiEdit", "Write", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-12-complete",
+        "asama-12-scan",
+        "asama-12-rescan"
+      ],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "auto_fix_only": true
+    },
+    "13": {
+      "name": "Performans",
+      "name_en": "Performance",
+      "allowed_tools": ["Edit", "MultiEdit", "Write", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-13-complete",
+        "asama-13-scan",
+        "asama-13-rescan"
+      ],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "auto_fix_only": true
+    },
+    "14": {
+      "name": "Güvenlik",
+      "name_en": "Security",
+      "allowed_tools": ["Edit", "MultiEdit", "Write", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-14-complete",
+        "asama-14-scan",
+        "asama-14-rescan"
+      ],
+      "fail_open": false,
+      "self_critique_required": true,
+      "public_commitment_required": false,
+      "auto_fix_only": true,
+      "scope": "project_wide"
+    },
+    "15": {
+      "name": "Birim Testler",
+      "name_en": "Unit Tests",
+      "allowed_tools": ["Write", "Edit", "MultiEdit", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-15-end-green",
+        "asama-15-not-applicable",
+        "asama-15-complete"
+      ],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "skippable": true,
+      "skip_reason": "no-testable-code"
+    },
+    "16": {
+      "name": "Entegrasyon Testleri",
+      "name_en": "Integration Tests",
+      "allowed_tools": ["Write", "Edit", "MultiEdit", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-16-end-green",
+        "asama-16-not-applicable",
+        "asama-16-complete"
+      ],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "skippable": true,
+      "skip_reason": "no-integration-points"
+    },
+    "17": {
+      "name": "Uçtan Uca Testler",
+      "name_en": "End-to-End Tests",
+      "allowed_tools": ["Write", "Edit", "MultiEdit", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-17-end-green",
+        "asama-17-not-applicable",
+        "asama-17-complete"
+      ],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "skippable": true,
+      "skip_reason": "no-ui-flow"
+    },
+    "18": {
+      "name": "Yük Testleri",
+      "name_en": "Load Tests",
+      "allowed_tools": ["Write", "Edit", "MultiEdit", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-18-end-target-met",
+        "asama-18-not-applicable",
+        "asama-18-complete"
+      ],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "skippable": true,
+      "skip_reason": "no-throughput-sla"
+    },
+    "19": {
+      "name": "Etki İncelemesi",
+      "name_en": "Impact Review",
+      "allowed_tools": ["AskUserQuestion", "Edit", "MultiEdit", "Write", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-19-complete",
+        "asama-19-items-declared",
+        "asama-19-item-{n}-resolved"
+      ],
+      "fail_open": false,
+      "self_critique_required": true,
+      "public_commitment_required": true,
+      "mid_pipeline_reconfirm": true
+    },
+    "20": {
+      "name": "Doğrulama Raporu",
+      "name_en": "Verification Report",
+      "allowed_tools": ["Write", "Bash"],
+      "denied_paths": [],
+      "required_audits_any": [
+        "asama-20-complete",
+        "asama-20-mock-cleanup-resolved"
+      ],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "subagent_rubber_duck": true
+    },
+    "21": {
+      "name": "Yerelleştirilmiş Rapor",
+      "name_en": "Localized Report",
+      "allowed_tools": ["Write"],
+      "denied_paths": [],
+      "required_audits_any": ["asama-21-complete", "asama-21-skipped"],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "skippable": true,
+      "skip_reason": "english-session"
+    },
+    "22": {
+      "name": "Tamlık Denetimi",
+      "name_en": "Completeness Audit",
+      "allowed_tools": [],
+      "denied_paths": [],
+      "required_audits_any": ["asama-22-complete"],
+      "fail_open": false,
+      "self_critique_required": false,
+      "public_commitment_required": false,
+      "hook_writes_report": true,
+      "subagent_rubber_duck": true
+    }
+  }
+}
