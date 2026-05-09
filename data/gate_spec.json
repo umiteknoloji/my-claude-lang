@@ -300,8 +300,8 @@
       "mid_pipeline_reconfirm": true
     },
     "20": {
-      "name": "Doğrulama Raporu",
-      "name_en": "Verification Report",
+      "name": "Doğrulama Raporu + Sahte Veri Temizliği",
+      "name_en": "Verification Report + Mock Data Cleanup",
       "allowed_tools": ["Write", "Bash"],
       "denied_paths": [],
       "required_audits_any": [
