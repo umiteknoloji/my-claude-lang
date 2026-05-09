@@ -73,6 +73,7 @@ _mcl_state_default() {
   "last_write_ts": null,
   "plan_critique_done": false,
   "restart_turn_ts": null,
+  "git_init_consent": null,
   "last_update": ${now}
 }
 JSON

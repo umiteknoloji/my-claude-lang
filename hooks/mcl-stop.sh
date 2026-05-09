@@ -1913,6 +1913,62 @@ if [ "$ASKQ_INTENT" = "precision-confirm" ]; then
   fi
 fi
 
+# --- Git init consent (Plugin Kural A) ---
+# Activate hook'un GIT_INIT_NOTICE'ı ile sorulan askq'nın cevabını işle.
+# Question body "Git deposu kurulumu" içeren askq + selected → state set.
+# Sadece consent henüz null iken ve transcript okunabilirken çalışır.
+_GIT_CONSENT_NOW="$(mcl_state_get git_init_consent 2>/dev/null)"
+if { [ -z "$_GIT_CONSENT_NOW" ] || [ "$_GIT_CONSENT_NOW" = "null" ]; } \
+   && [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ] \
+   && command -v python3 >/dev/null 2>&1; then
+  _GIT_RESULT="$(python3 - "$TRANSCRIPT_PATH" 2>/dev/null <<'PYEOF'
+import json, sys
+path = sys.argv[1]
+last_q_id, last_decision = None, None
+try:
+    for line in open(path, encoding="utf-8", errors="replace"):
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        msg = obj.get("message") or obj
+        if not isinstance(msg, dict):
+            continue
+        for block in (msg.get("content") or []):
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_use" and block.get("name") == "AskUserQuestion":
+                q = ((block.get("input") or {}).get("question") or "")
+                if "Git deposu kurulumu" in q or "git init" in q.lower():
+                    last_q_id = block.get("id")
+            elif block.get("type") == "tool_result" and last_q_id and block.get("tool_use_id") == last_q_id:
+                content = block.get("content") or ""
+                if isinstance(content, list):
+                    content = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
+                content_lower = (content or "").lower()
+                if "evet" in content_lower or "kur" in content_lower or "yes" in content_lower:
+                    last_decision = "yes"
+                elif "hayır" in content_lower or "geç" in content_lower or "no" in content_lower or "skip" in content_lower:
+                    last_decision = "no"
+                last_q_id = None
+except Exception:
+    pass
+print(last_decision or "")
+PYEOF
+)"
+  if [ "$_GIT_RESULT" = "yes" ]; then
+    if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "$CLAUDE_PROJECT_DIR" ] && [ ! -d "$CLAUDE_PROJECT_DIR/.git" ]; then
+      (cd "$CLAUDE_PROJECT_DIR" && git init -b main >/dev/null 2>&1) && \
+        mcl_audit_log "git-init-executed" "stop" "dir=${CLAUDE_PROJECT_DIR}"
+    fi
+    mcl_state_set git_init_consent '"yes"' >/dev/null 2>&1 || true
+    mcl_audit_log "git-init-consent" "stop" "decision=yes"
+  elif [ "$_GIT_RESULT" = "no" ]; then
+    mcl_state_set git_init_consent '"no"' >/dev/null 2>&1 || true
+    mcl_audit_log "git-init-consent" "stop" "decision=no"
+  fi
+fi
+
 # --- Aşama 6b ui-review dispatch ---
 # Emitted when the developer selects an option on the UI review askq.
 # - approve-family: advance ui_sub_phase to BACKEND, unlock backend paths

@@ -1098,7 +1098,18 @@ print(json.dumps(sys.stdin.read())[1:-1])
   fi
 fi
 
-FULL_CONTEXT="${SESSION_CONTEXT_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${PHASE_ALLOWLIST_ESCALATE_NOTICE}${DSI_NOTICE}${ACTIVE_PHASE_NOTICE}${STATIC_CONTEXT}"
+# --- Git init onayı (Plugin Kural A) ---
+# İlk açılışta proje dizininde git deposu yoksa modele direktif inject et.
+# Onay state'e kaydedilir, ikinci kez sorulmaz.
+GIT_INIT_NOTICE=""
+_GIT_CONSENT="$(mcl_state_get git_init_consent 2>/dev/null)"
+if [ "$_GIT_CONSENT" = "null" ] || [ -z "$_GIT_CONSENT" ]; then
+  if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "$CLAUDE_PROJECT_DIR" ] && [ ! -d "$CLAUDE_PROJECT_DIR/.git" ]; then
+    GIT_INIT_NOTICE="<mcl_audit name=\\\"git-init-consent-pending\\\">\\n📦 Bu projede git deposu yok. MCL plugin orkestrasyonu (Kural A) yerel git deposu gerektirir — değişiklik takibi, rollback ve audit için. Bu turun başında AskUserQuestion ile geliştiriciye sor:\\n  Question prefix: ${_BT}MCL ${INSTALLED_VERSION} | Git deposu kurulumu:${_BT}\\n  Body (geliştirici dilinde): Bu projede git deposu yok. MCL plugin orkestrasyonu için yerel ${_BT}git init${_BT} çalıştırılsın mı? (Sadece yerel: remote eklenmez, push yapılmaz, otomatik commit atılmaz.)\\n  Options: [${_BT}Evet, kur${_BT}, ${_BT}Hayır, geç${_BT}]\\nGeliştirici cevabı sonrası Stop hook ${_BT}git_init_consent${_BT} state alanını günceller; bu uyarı tekrar gösterilmez. Bu askq, Aşama 1 askq'sından önce sorulur (ön koşul).\\n</mcl_audit>\\n\\n"
+  fi
+fi
+
+FULL_CONTEXT="${GIT_INIT_NOTICE}${SESSION_CONTEXT_NOTICE}${SEMGREP_NOTICE}${PROJECT_MEMORY_NOTICE}${PROACTIVE_NOTICE}${PARTIAL_SPEC_NOTICE}${PATTERN_MATCHING_NOTICE}${PATTERN_RULES_NOTICE}${SCOPE_DISCIPLINE_NOTICE}${ROLLBACK_NOTICE}${ATOMIC_COMMIT_NOTICE}${REGRESSION_BLOCK_NOTICE}${PHASE5_SKIP_NOTICE}${ROOT_CAUSE_DISCIPLINE_NOTICE}${ROOT_CAUSE_CHAIN_WARN_NOTICE}${PLAN_CRITIQUE_PENDING_NOTICE}${PHASE_REVIEW_NOTICE}${RESPEC_GUARD_NOTICE}${PLUGIN_GATE_NOTICE}${UI_FLOW_NOTICE}${PLUGIN_MISS_NOTICE}${PHASE_ALLOWLIST_ESCALATE_NOTICE}${DSI_NOTICE}${ACTIVE_PHASE_NOTICE}${STATIC_CONTEXT}"
 
 # Log MCL injection size for cost accounting (mcl-doctor)
 if command -v python3 >/dev/null 2>&1; then
