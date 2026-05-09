@@ -7,6 +7,70 @@
 
 ## [Unreleased]
 
+## [13.0.20] - 2026-05-09
+
+### Plugin Kural A (B3) + Build-time normalization framework (B1)
+
+İki yeni özellik bu sürümle:
+
+#### B3 — Plugin Kural A: Git Init Onayı
+
+Pseudocode "ilk açılışta git deposu yoksa kullanıcıya sor" diyordu, kod hiç
+yoktu. Eklendi (commit `f706f39`).
+
+Yapı:
+- `state.json` → `git_init_consent` alanı (null/yes/no)
+- `mcl-activate.sh` → `.git` yoksa + consent null ise modele talimat inject
+  (askq aç, options: "Evet, kur" / "Hayır, geç")
+- `mcl-stop.sh` → askq cevabını işle: yes ise `git init -b main` çalıştır,
+  state'i set et; no ise sadece state'i set et
+- İkinci kez sorulmaz (consent null değil)
+
+Tasarım kararı: TR'a özel "Git deposu kurulumu" string'i question prefix'inde.
+14 dil destekli scanner pattern'i ayrı bir tura bırakıldı (B3.2 candidate).
+
+#### B1.framework — Build-time Skill Normalization
+
+Kullanıcının "tek noktada güncelleme" felsefesi → veritabanı normalizasyonu
+mantığı dokümantasyona uygulandı (commit `a83af56`).
+
+Yapı:
+- `skills/my-claude-lang/phase-mapping.md` → kanonik kaynak (22 faz tablosu)
+- `skills/my-claude-lang/_templates/` → template'ler
+- `scripts/build-skills.py` → mapping + template → skill dosyaları
+- `setup.sh` → kurulumdan önce build çağırır
+
+Placeholder formatı:
+```
+{{phase_no:slug}}    → faz numarası (tdd → 9)
+{{phase_name:slug}}  → kanonik ad (tdd → "TDD Yürütme")
+{{phase_audit:slug}} → çıktı audit
+{{phase_file:slug}}  → skill dosyası adı
+```
+
+Pilot: `asama11-code-review.md` template'e çevrildi. Build çalıştırıldı,
+placeholder'lar resolve edildi, doğrulandı. Kalan 21 skill template'e
+geçirme **B1.detay** olarak ayrı turlara bırakıldı (her biri için manuel
+inceleme gerek — eski numbering bağlam-bağımlı).
+
+Build script özellikleri:
+- `python3 scripts/build-skills.py` — tüm template'leri build eder
+- `python3 scripts/build-skills.py --check` — drift kontrolü (CI için)
+- 22 faz parse edildi, eksik slug referansı varsa fail
+- Idempotent: değişmeyen dosyalar yeniden yazılmaz
+
+#### Atlanan adımlar (sonraki turlar)
+
+- **B1.detay**: 21 skill dosyası → template'e çevirme (her biri ayrı tur)
+- **A8 hassas**: pre-tool spec-approve advance ayrımı (geçen turda başarısız,
+  254 satır içinden state-set vs REASON-set ayırma gerek)
+- **C**: test cleanup (11 dosya manuel inceleme, hepsi PASS şu an)
+- **v13.1.0 major bump**: tüm atomik refactor bittiğinde
+
+#### Baseline
+
+271 passed, 0 failed, 2 skipped korundu.
+
 ## [13.0.19] - 2026-05-09
 
 ### Mekanik Tasarım Refaktörü — Yarısı Tamam (yamala kaldırma turu)

@@ -669,14 +669,14 @@ except Exception:
          && [ "$STATE_SPEC_HASH" = "$JIT_SPEC_HASH" ]; then
         mcl_debug_log "pre-tool" "askq-jit-idempotent" "hash=${JIT_SPEC_HASH:0:12}"
       else
-        # v13.0.19 — Hard enforce sıralılık (parite Stop hook ile):
+        # v13.0.20 — Hard enforce sıralılık (parite Stop hook ile):
         # Spec-approve advance YAPILMAZ eğer Aşama 1/2/3 audit zinciri eksikse.
         # Stop hook zaten decision:block veriyor (asıl enforce noktası);
         # burada sadece state advance no-op + warn audit (tool çağrısını
         # engellemeden state'i ileri atmamak — Stop tarafı block görsün).
         _JIT_CHAIN="$(_mcl_pre_spec_audit_chain_status 2>/dev/null || echo ok)"
         if [ -n "$_JIT_CHAIN" ] && [ "$_JIT_CHAIN" != "ok" ]; then
-          # v13.0.19 — Auto-fill missing chain audits. Developer's
+          # v13.0.20 — Auto-fill missing chain audits. Developer's
           # spec-approve askq onayı = retroactive trust signal: if
           # the chain is incomplete (Aşama 2 closing askq atlandı,
           # Aşama 3 silent audit emit edilmedi, vs.) MCL kabul eder
@@ -737,7 +737,7 @@ except Exception:
         CURRENT_PHASE="$(mcl_state_get current_phase 2>/dev/null)"
         SPEC_APPROVED="$(mcl_state_get spec_approved 2>/dev/null)"
         PHASE_NAME="$(mcl_state_get phase_name 2>/dev/null)"
-        fi  # v13.0.19 — closes _JIT_CHAIN incomplete check
+        fi  # v13.0.20 — closes _JIT_CHAIN incomplete check
       fi
     elif [ "$JIT_INTENT" = "summary-confirm" ] \
          && _mcl_pre_is_approve_option "$JIT_SELECTED" \
@@ -893,7 +893,7 @@ fi
 # Skipped when spec_approved=false (MCL LOCK already denies; no need for
 # double layer). Skipped when current_phase is empty/invalid.
 if [ "$SPEC_APPROVED" = "true" ] && command -v python3 >/dev/null 2>&1; then
-  # v13.0.19 — Removed `[ -z "$REASON" ]` guard. Layer B is the most
+  # v13.0.20 — Removed `[ -z "$REASON" ]` guard. Layer B is the most
   # critical gate (sequential phase enforcement) and MUST fire regardless
   # of prior REASON state. If Layer B denies, its REASON overrides earlier
   # ones — phase allowlist violations are higher priority than soft warns.
@@ -978,7 +978,7 @@ except Exception:
     print('allow|'); sys.exit(0)
 
 allowed = pspec.get('allowed_tools', None)
-# v13.0.19 — fail-closed: if gate-spec has no allowed_tools field for
+# v13.0.20 — fail-closed: if gate-spec has no allowed_tools field for
 # this phase (e.g., outdated gate-spec.json from old setup.sh), DENY
 # mutating tools instead of allowing. Safe default — model gets clear
 # signal to refresh hooks; no silent permission leakage.
@@ -1000,7 +1000,7 @@ print('allow|')
           # Extract derived active_phase from verdict detail for accurate REASON.
           _PA_ACTIVE="$(printf '%s' "$_PA_VERDICT" | grep -oE 'active_phase=[0-9]+' | head -1 | cut -d= -f2)"
           [ -z "$_PA_ACTIVE" ] && _PA_ACTIVE="$_PA_PHASE"
-          # v13.0.19 — Always audit Layer B fire (debug visibility).
+          # v13.0.20 — Always audit Layer B fire (debug visibility).
           # Production'da Layer B atlama vakaları için audit log iz bırakır.
           mcl_audit_log "phase-allowlist-check" "pre-tool" "tool=${TOOL_NAME} phase=${_PA_PHASE} active=${_PA_ACTIVE} verdict=${_PA_VERDICT%%|*}"
           case "${_PA_VERDICT%%|*}" in
