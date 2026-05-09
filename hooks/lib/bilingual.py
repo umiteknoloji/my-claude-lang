@@ -27,6 +27,7 @@ API:
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 # Process-global cache
@@ -36,6 +37,10 @@ _DEFAULT_EMPTY: dict[str, dict] = {"messages": {}}
 
 
 def _data_dir_candidates() -> list[Path]:
+    # MYCL_DATA_DIR env var → tek mutlak override (test/dev için).
+    env_dir = os.environ.get("MYCL_DATA_DIR")
+    if env_dir:
+        return [Path(env_dir)]
     return [
         Path.home() / ".claude" / "data",
         Path(__file__).resolve().parent.parent.parent / "data",

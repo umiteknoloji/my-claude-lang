@@ -4,6 +4,10 @@
     "description": "MyCL hook'larının user-facing mesajları. Tek noktadan TR+EN render. lib/bilingual.py render(key, **kwargs) ile çağırır → 'TR\\n\\nEN' verir. Yeni mesaj eklemek = burada satır eklemek (kod değişmez). Placeholder'lar: {phase} {phase_name} {tool} {audit} {strike}."
   },
   "messages": {
+    "mycl_banner": {
+      "tr": "MyCL {version} — Anlam Doğrulama Katmanı aktif",
+      "en": "MyCL {version} — Semantic Verification Layer active"
+    },
     "phase_done_notification": {
       "tr": "✅ Aşama {phase} ({phase_name}) tamamlandı. → Aşama {next_phase} başlıyor.",
       "en": "✅ Phase {phase} ({phase_name}) complete. → Phase {next_phase} starting."

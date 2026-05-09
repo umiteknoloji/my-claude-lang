@@ -38,6 +38,8 @@ def _env_with(project_dir: Path) -> dict:
     import os
     env = os.environ.copy()
     env["CLAUDE_PROJECT_DIR"] = str(project_dir)
+    # Repo-local data dir override → home'daki kurulu eski kopya devreye girmesin
+    env["MYCL_DATA_DIR"] = str(_HOOK_PATH.resolve().parent.parent / "data")
     # Self-project guard'dan kaçınma için MYCL_REPO_PATH'ı tmp_path'e
     # bağlamayız; default ~/my-claude-lang ile test_path farklı.
     return env
@@ -61,10 +63,15 @@ def test_hook_emits_banner_first_block(tmp_path):
     """İlk blok MyCL banner'ı (TR + boş satır + EN). Görünür sinyal."""
     out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
     context = out["hookSpecificOutput"]["additionalContext"]
+    version = (
+        (_HOOK_PATH.resolve().parent.parent / "VERSION")
+        .read_text(encoding="utf-8")
+        .strip()
+    )
     # Banner ilk satır
-    assert context.startswith("MyCL 1.0.0 — Anlam Doğrulama Katmanı aktif")
+    assert context.startswith(f"MyCL {version} — Anlam Doğrulama Katmanı aktif")
     # TR + boş satır + EN (CLAUDE.md bilingual kuralı)
-    assert "\n\nMyCL 1.0.0 — Semantic Verification Layer active" in context
+    assert f"\n\nMyCL {version} — Semantic Verification Layer active" in context
 
 
 def test_hook_includes_phase_directive(tmp_path):

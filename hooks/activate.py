@@ -33,7 +33,20 @@ if str(_REPO_ROOT) not in sys.path:
 
 from hooks.lib import audit, bilingual, dsi, framing, plugin, trace  # noqa: E402
 
-_MYCL_VERSION = "1.0.0"
+
+def _read_version() -> str:
+    """VERSION dosyasından sürümü oku — tek-kaynak.
+
+    Repo kökünde VERSION; bulunmazsa "0.0.0" (defansif default).
+    """
+    version_file = _REPO_ROOT / "VERSION"
+    try:
+        return version_file.read_text(encoding="utf-8").strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
+
+
+_MYCL_VERSION = _read_version()
 
 
 def _is_self_project(project_dir: str) -> bool:
@@ -79,12 +92,10 @@ def _build_context(project_root: str, turn_tokens: int = 0) -> str:
     """Banner + Manifesto + DSI + Plugin Kural A consent prompt (varsa)."""
     blocks: list[str] = []
 
-    # 0. Banner — sade görünür sinyal (sürüm + dil); TR + boş satır + EN
-    blocks.append(
-        f"MyCL {_MYCL_VERSION} — Anlam Doğrulama Katmanı aktif\n"
-        f"\n"
-        f"MyCL {_MYCL_VERSION} — Semantic Verification Layer active"
-    )
+    # 0. Banner — sade görünür sinyal (bilingual.render → TR + boş satır + EN)
+    banner = bilingual.render("mycl_banner", version=_MYCL_VERSION)
+    if banner and not banner.startswith("["):
+        blocks.append(banner)
 
     # 1. Manifesto (co-author framing — Disiplin #14, #15)
     manifesto = framing.for_context()
