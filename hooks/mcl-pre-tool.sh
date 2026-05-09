@@ -762,7 +762,7 @@ fi
 # Skipped when spec_approved=false (MCL LOCK already denies; no need for
 # double layer). Skipped when current_phase is empty/invalid.
 if [ "$SPEC_APPROVED" = "true" ] && command -v python3 >/dev/null 2>&1; then
-  # v13.0.20 — Removed `[ -z "$REASON" ]` guard. Layer B is the most
+  # v13.1.0 — Removed `[ -z "$REASON" ]` guard. Layer B is the most
   # critical gate (sequential phase enforcement) and MUST fire regardless
   # of prior REASON state. If Layer B denies, its REASON overrides earlier
   # ones — phase allowlist violations are higher priority than soft warns.
@@ -847,7 +847,7 @@ except Exception:
     print('allow|'); sys.exit(0)
 
 allowed = pspec.get('allowed_tools', None)
-# v13.0.20 — fail-closed: if gate-spec has no allowed_tools field for
+# v13.1.0 — fail-closed: if gate-spec has no allowed_tools field for
 # this phase (e.g., outdated gate-spec.json from old setup.sh), DENY
 # mutating tools instead of allowing. Safe default — model gets clear
 # signal to refresh hooks; no silent permission leakage.
@@ -869,7 +869,7 @@ print('allow|')
           # Extract derived active_phase from verdict detail for accurate REASON.
           _PA_ACTIVE="$(printf '%s' "$_PA_VERDICT" | grep -oE 'active_phase=[0-9]+' | head -1 | cut -d= -f2)"
           [ -z "$_PA_ACTIVE" ] && _PA_ACTIVE="$_PA_PHASE"
-          # v13.0.20 — Always audit Layer B fire (debug visibility).
+          # v13.1.0 — Always audit Layer B fire (debug visibility).
           # Production'da Layer B atlama vakaları için audit log iz bırakır.
           mcl_audit_log "phase-allowlist-check" "pre-tool" "tool=${TOOL_NAME} phase=${_PA_PHASE} active=${_PA_ACTIVE} verdict=${_PA_VERDICT%%|*}"
           case "${_PA_VERDICT%%|*}" in

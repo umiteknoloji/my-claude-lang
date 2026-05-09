@@ -1,6 +1,6 @@
 # MCL Özellik Kataloğu
 
-**Güncel sürüm:** 13.0.20
+**Güncel sürüm:** 13.1.0
 
 ---
 
@@ -324,8 +324,8 @@ Her Aşama 9 turunda üç kural:
 **Rollback Checkpoint** (8.0.9)
 Spec onayında `git rev-parse HEAD` → `state.rollback_sha`. Her turda SHA ve `git reset --hard` komutu gösterilir (ilk tur, `/mcl-rollback` ile yeniden).
 
-**Layer B Phase Allowlist** (13.0.9 → 13.0.20 always-fire)
-Her tool çağrısında aktif fazın `allowed_tools` listesi kontrol edilir; izinli değilse `phase-allowlist-tool-block` deny + REASON. v13.0.10 KATI mod (otomatik açılma yok). v13.0.20: REASON koşulu kaldırıldı — Layer B her tool çağrısında fire eder, allowlist ihlali pre-set REASON'ı override eder. Fail-closed: gate-spec'te `allowed_tools` field yoksa mutating tool DENY (eski varsayılan: allow, sızıntı kapısıydı). Debug audit her fire'da: `phase-allowlist-check | tool=<X> phase=<N> verdict=<deny:tool|deny:path|allow>`.
+**Layer B Phase Allowlist** (13.0.9 → 13.1.0 always-fire)
+Her tool çağrısında aktif fazın `allowed_tools` listesi kontrol edilir; izinli değilse `phase-allowlist-tool-block` deny + REASON. v13.0.10 KATI mod (otomatik açılma yok). v13.1.0: REASON koşulu kaldırıldı — Layer B her tool çağrısında fire eder, allowlist ihlali pre-set REASON'ı override eder. Fail-closed: gate-spec'te `allowed_tools` field yoksa mutating tool DENY (eski varsayılan: allow, sızıntı kapısıydı). Debug audit her fire'da: `phase-allowlist-check | tool=<X> phase=<N> verdict=<deny:tool|deny:path|allow>`.
 
 **Persuasion Manifesto** (13.0.16)
 `<mcl_core>` açılışında "WHY THESE 22 PHASES — this pipeline works WITH you, not against you" başlıklı 8 satırlık ikna bloğu. Her atlamanın modele *maliyetini* (rewrite, retry) somut örneklerle anlatır. Negative framing yerine positive incentive. İngilizce (model ağırlıkları İngilizce daha güçlü çalışır).

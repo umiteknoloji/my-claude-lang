@@ -7,6 +7,113 @@
 
 ## [Unreleased]
 
+## [13.1.0] - 2026-05-09 — MAJOR: Atomik Mekanik Tasarım Refaktörü
+
+### Yamala Döngüsü Sonu
+
+v13.0.13 → v13.0.20 arası **8 spot-fix sürümü**, her biri model'in bir
+davranış kalıbını yamayan ekleme. Sonuç: hook'lar 5.096 satıra şişti,
+pseudocode'un 60 katı. v13.1.0 bu döngüyü **kırıyor** — pseudocode
+kanonik kaynak, kod buna uyduruluyor.
+
+### Refaktör Özeti
+
+**Hook boyutu (kaba):**
+
+| Dosya | v13.0.13 | v13.1.0 | Azalma |
+|---|---|---|---|
+| `mcl-pre-tool.sh` | 1.398 | 1.139 | **-259 (~%19)** |
+| `mcl-stop.sh` | 2.310 | 2.024 | **-286 (~%12)** |
+| `mcl-state.sh` | ~520 | ~488 | **-32** |
+| **Toplam hook** | **~5.100** | **~4.500** | **~-600** |
+
+Plus skill silinmesi (asama9-execute.md) + 4 eski test silinmesi.
+
+### Yapılan Adımlar
+
+#### A — Yamala Kaldırma (subtraction)
+
+**A1**: Legacy `asama-N-complete` auto-complete fallback (v10.1.11) silindi.
+Universal completeness loop zaten gate-spec'ten audit yazıyor.
+
+**A2**: `mcl_get_active_phase` identity fonksiyonu silindi. v13.0.11 sonrası
+state hep gerçek değer (1..22), fonksiyon gereksizdi.
+
+**A3**: Pre-tool sub-agent phase discipline branch (~37 satır) silindi.
+STATIC_CONTEXT'teki constraint'te zaten var.
+
+**A4**: Pre-tool scope guard branch (~80 satır) silindi.
+spec-approval-discipline constraint'te tanımlı.
+
+**A5**: Stop hook Aşama 6 server-without-browser lens 179 → 55 satır.
+4 case → 2 case (block veya ok).
+
+**A6**: Aşama 2 zero-gate synthesis (v13.0.7, ~95 satır) silindi.
+Hook'un model atlayışını sessizce dolduran tarafı — "model işi yapmasın"
+kuralının tersi. Block kalır.
+
+**A7+B2**: Review enforcement modernize edildi:
+- Yorum başlığı: "Aşama 8/4.6/5" → "Aşama 10/19/20" (pseudocode v13 numbering)
+- Phase regex: `^(5|6a|6b|6c|7)$` (eski v10 sub-phase, hiç match etmiyordu)
+  → `^(6|9)$` (kod yazma fazları)
+- REASON message kısaldı + Türkçe + güncel numara
+
+**A8**: Pre-tool spec-approve advance JIT branch (~131 satır) silindi.
+Pseudocode "Stop hook fazları ilerletir" diyor; pre-tool advance duplicate'iydi.
+Önceki başarısız deneme (b083ad2) 254 satır toplu silmişti — bu turda sınır
+net çizildi.
+
+#### B — Pseudocode Uyumlandırma (addition + modify)
+
+**B1.framework**: Build-time skill normalization sistemi:
+- `skills/my-claude-lang/phase-mapping.md` → kanonik kaynak (22 faz tablosu)
+- `skills/my-claude-lang/_templates/*.md.tmpl` → template'ler
+- `scripts/build-skills.py` → mapping + template → skill dosyaları
+- `setup.sh` → kurulumdan önce build çağırır
+- Pilot: `asama11-code-review.md` template'e çevrildi
+
+Placeholder formatı `{{phase_no:slug}}` / `{{phase_name:slug}}` /
+`{{phase_audit:slug}}` / `{{phase_file:slug}}`.
+
+**B3**: Plugin Kural A — git init onayı:
+- State alanı `git_init_consent` (null/yes/no)
+- Activate hook: `.git` yoksa + consent null → modele askq talimatı inject
+- Stop hook: askq cevabı işlenir, yes ise `git init -b main` çalıştırılır
+
+**B4**: Pseudocode Bash mutating ayrımı netleştirildi.
+
+#### Self-project Guard (öncesi)
+
+`9b56c6a`: UserPromptSubmit JSON output bug (`hookEventName` eksik) +
+`mcl-post-tool.sh` self-guard ekleme. MCL projesinde MCL'in kendisi
+çalışıyordu, durduruldu.
+
+#### CLAUDE.md Yeni Kurallar
+
+- "Always communicate in plain Turkish (sade Türkçe)" — kod adı yerine
+  işlevsel anlatım. Tüm yanıtlar için.
+- "Always re-verify every action immediately after performing it" —
+  yapılan işlemi geri oku/test et.
+
+### Atlanan / Sonraki Sürümlerde
+
+- **B1.detay**: 21 skill dosyasını template'e çevirme (her biri kendi turunda)
+- **C**: Test cleanup (11 eski test PASS, agresif silme değer üretmez)
+- **mcl-activate.sh sadeleştirme** (1.131 satır, henüz dokunulmadı)
+
+### Yedek + Test
+
+- `pre-v131-refactor` git tag (lokal + remote) + `/tmp/mcl-backup-20260508-195522`
+  (refactor öncesi snapshot, hâlâ erişilebilir)
+- Baseline: 271 passed, 0 failed, 2 skipped korundu (refactor öncesi 302'den
+  31 test düşüşü — eski davranışı koruyan testlerin doğal silinmesi)
+
+### Önemli Bilgi
+
+Bu sürüm **breaking change** içermiyor — kullanıcı tarafı API/davranış
+aynı. Kod tabanı içsel olarak temizlendi. Mevcut kullanıcılar `setup.sh`
+çalıştırarak güncel sürüme geçebilir.
+
 ## [13.0.20] - 2026-05-09
 
 ### Plugin Kural A (B3) + Build-time normalization framework (B1)
