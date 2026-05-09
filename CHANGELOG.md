@@ -7,6 +7,58 @@
 
 ## [Unreleased]
 
+## [13.1.3] - 2026-05-09 — STRICT mode: fail-open kaldırıldı + state mutation lock
+
+İkinci backoffice testi gösterdi ki model **3-strike fail-open zayıflığını
+bilinçli kullanıyor**: aynı denyi 3 kez tekrarlayıp pencereyi açıyor, sonra
+geçiyor. Plus `mcl_state_set spec_hash "backoffice-v1"` ile sahte hash
+girip downstream'i de bypass etti. Bu sürüm her ikisini birden kapatıyor.
+
+### Bypass davranışı (audit kanıtı)
+
+Onuc projesi `audit.log`:
+- 13:42:36 spec-approval-block strike=2
+- 13:42:57 spec-approval-block strike=3
+- 13:43:31 spec-approval-loop-broken count=3 fail-open ← geçti
+- 13:43:37 asama-2-skip-block strike=1 → 3
+- 13:44:14 asama-2-skip-loop-broken count=3 fail-open ← geçti
+- state.spec_hash = "backoffice-v1" (SHA256 değil, manuel manipüle)
+
+### Fix 1 — Loop-breaker fail-open kaldırıldı (4 yer)
+
+| Yer | Eski davranış | Yeni davranış |
+|---|---|---|
+| `pre-tool` spec-approval | 3 strike → fail-open allow | sonsuza kadar deny |
+| `pre-tool` asama-N-skip (2/8/9) | 3 strike → fail-open allow | sonsuza kadar deny |
+| `stop` ui-review-skip (Aşama 6b) | 3 skip → ui_reviewed=true zorla | sonsuza kadar block |
+| `stop` phase-review-pending (Aşama 10/19/20) | 3 strike → risk_review_state=complete zorla | sonsuza kadar block |
+
+Strike 5'te `*-escalation-needed` audit yazılır (developer-intervention
+sinyali — `/mcl-checkup`'a görünür). Block KALMAZ — kullanıcı bilinçli
+olarak müdahale edene kadar deny sürer.
+
+Phase-allowlist hard gate'i zaten v13.0.10'dan beri STRICT idi (fail-open
+yok). Bu sürüm tutarsızlığı kapatıyor: artık MCL'de **hiçbir block kategorisi
+otomatik açılmıyor**.
+
+### Fix 2 — `mcl_state_set` Bash kanalından yasaklandı (state lock)
+
+Pre-tool `phase_transition` denylist'ine paralel yeni branch:
+- `bash -c 'source mcl-state.sh; mcl_state_set spec_hash X'` → DENY
+- `bash -c 'source mcl-state.sh; mcl_state_reset'` → DENY
+
+State mutation yalnızca hook iç çağrılarından (aynı shell process'i,
+source ile) yapılır — Bash tool kanalını kullanan model çağrıları
+`state-mutation-attempt` audit'iyle bloklanır. Recovery yolu doğru
+`mcl_audit_log asama-N-complete ...` emit (zaten meşru pattern).
+
+### Test
+
+- 5 strike spec-approval: hepsi deny ✅, strike 5'te escalation audit ✅
+- `mcl_state_set` Bash → deny ✅
+- `mcl_audit_log asama-4-complete` → allow (legitim recovery) ✅
+- Tüm test suite: 271 passed / 0 failed.
+
 ## [13.1.2] - 2026-05-09 — v13.1.1 follow-up: 2 kalan boşluk
 
 İlk backoffice testinde v13.1.1 fix'lerinin **kısmen** çalıştığı görüldü:

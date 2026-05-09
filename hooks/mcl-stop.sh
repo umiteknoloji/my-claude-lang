@@ -631,27 +631,24 @@ if [ -f "$_PR_GUARD" ] && command -v python3 >/dev/null 2>&1 \
     _PR_ASKUQ="$(printf '%s' "$_PR_JSON" | python3 -c \
       'import json,sys; d=json.loads(sys.stdin.read()); print("true" if d.get("askuq_present") else "false")' 2>/dev/null)"
 
-    # --- Aşama 6b enforcement (since v10.0.2) ---
+    # --- Aşama 6b enforcement (v13.1.3 STRICT) ---
     # When in 6a (BUILD_UI): if model wrote UI but did NOT emit
     # AskUserQuestion this turn, block — designer approval is required
-    # before the turn can end. Loop-breaker after 3 strikes.
+    # before the turn can end. Fail-open kaldırıldı (v13.1.3) — model
+    # 3 kez askq atlayarak `ui_reviewed=true`'yu zorla set ettiremez.
+    # 5 strike'ta visible escalation audit yazılır.
     if [ "$_PR_ACTIVE_PHASE" = "6a" ] && [ "$_PR_CODE" = "true" ] && [ "$_PR_ASKUQ" != "true" ]; then
       _UR_BLOCK_COUNT="$(_mcl_loop_breaker_count "ui-review-skip-block" 2>/dev/null || echo 0)"
-      if [ "${_UR_BLOCK_COUNT:-0}" -ge 3 ]; then
-        mcl_audit_log "ui-review-loop-broken" "stop" "count=${_UR_BLOCK_COUNT} fail-open"
-        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_review_loop_broken "${_UR_BLOCK_COUNT}"
-        # Force-mark UI as reviewed so downstream phases can proceed.
-        mcl_state_set ui_reviewed true >/dev/null 2>&1 || true
-        mcl_state_set ui_sub_phase '"BACKEND"' >/dev/null 2>&1 || true
-      else
-        mcl_audit_log "ui-review-skip-block" "stop" "count=${_UR_BLOCK_COUNT}"
-        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_review_skip_block "${_UR_BLOCK_COUNT}"
-        printf '%s\n' "{
-  \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL AŞAMA 6b GEREKLİ — UI dosyaları yazıldı ama tasarım onayı sorulmadı.\n\nBu turda eksiksiz şu adımları yap:\n1. (Yapmadıysan) Bash ile dev server: ${_BT}npm install${_BT} → ${_BT}npm run dev${_BT} (run_in_background:true) → sleep 3 → ${_BT}open <url>${_BT} (macOS) / ${_BT}xdg-open <url>${_BT} (Linux). Geliştirici UI'ı tarayıcıda görmeden onay veremez.\n2. AskUserQuestion çağır — prefix ${_BT}MCL ${INSTALLED_VERSION} | ${_BT}, soru (geliştiricinin dilinde): 'Tasarımı onaylıyor musun?'. Options: 'Onayla' / 'Revize' / 'İptal'. Approve label BARE VERB ('Onayla' — açıklama yok; açıklama description'da).\n3. STOP. AskUserQuestion sonrası response BİTER. Geliştiricinin tool_result cevabını bekle.\n\nLoop-breaker: 3 üst üste skip → fail-open (ui_reviewed=true zorla set edilir, downstream açılır). Şu anki sayı: ${_UR_BLOCK_COUNT}/3.\"
-}"
-        exit 0
+      mcl_audit_log "ui-review-skip-block" "stop" "count=$((_UR_BLOCK_COUNT + 1))"
+      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append ui_review_skip_block "$((_UR_BLOCK_COUNT + 1))"
+      if [ "$((_UR_BLOCK_COUNT + 1))" -ge 5 ]; then
+        mcl_audit_log "ui-review-escalation-needed" "stop" "strike=$((_UR_BLOCK_COUNT + 1)) developer-intervention-required"
       fi
+      printf '%s\n' "{
+  \"decision\": \"block\",
+  \"reason\": \"⚠️ MCL AŞAMA 6b GEREKLİ — UI dosyaları yazıldı ama tasarım onayı sorulmadı.\n\nBu turda eksiksiz şu adımları yap:\n1. (Yapmadıysan) Bash ile dev server: ${_BT}npm install${_BT} → ${_BT}npm run dev${_BT} (run_in_background:true) → sleep 3 → ${_BT}open <url>${_BT} (macOS) / ${_BT}xdg-open <url>${_BT} (Linux). Geliştirici UI'ı tarayıcıda görmeden onay veremez.\n2. AskUserQuestion çağır — prefix ${_BT}MCL ${INSTALLED_VERSION} | ${_BT}, soru (geliştiricinin dilinde): 'Tasarımı onaylıyor musun?'. Options: 'Onayla' / 'Revize' / 'İptal'. Approve label BARE VERB ('Onayla' — açıklama yok; açıklama description'da).\n3. STOP. AskUserQuestion sonrası response BİTER. Geliştiricinin tool_result cevabını bekle.\n\nv13.1.3 STRICT: fail-open kaldırıldı — block sonsuza kadar kalır. Şu anki strike: $((_UR_BLOCK_COUNT + 1)).\"
+}"
+      exit 0
     fi
 
     if [ "$_PR_ASKUQ" = "true" ]; then
@@ -729,25 +726,18 @@ PYEOF
         fi
       fi
 
-      # Loop-breaker (since v9.0.0): if this enforcement already fired
-      # 3+ times in the current session, fail-open. Repeated stickies
-      # without a Aşama 8 dialog mean the model can't recover; further
-      # blocks would just trap the developer.
+      # v13.1.3 STRICT — fail-open kaldırıldı. Phase-review (Aşama 10/19/20)
+      # zorunlu, atlanmaz. Model 3 kez askq atlayarak risk_review_state'i
+      # zorla "complete" işaretletemez. 5 strike'ta visible escalation.
       _PR_BLOCK_COUNT="$(_mcl_loop_breaker_count "phase-review-pending" 2>/dev/null || echo 0)"
-      if [ "${_PR_BLOCK_COUNT:-0}" -ge 3 ]; then
-        mcl_audit_log "phase-review-loop-broken" "stop" "count=${_PR_BLOCK_COUNT} fail-open"
-        command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append risk_review_loop_broken "${_PR_BLOCK_COUNT}"
-        # Mark risk review complete so downstream phases (Aşama 9/10/11)
-        # can proceed. Aşama 8 was effectively skipped this session.
-        mcl_state_set risk_review_state '"complete"' >/dev/null 2>&1 || true
-      else
-      # Return decision:block so Claude is forced to continue.
+      if [ "$((_PR_BLOCK_COUNT + 1))" -ge 5 ]; then
+        mcl_audit_log "phase-review-escalation-needed" "stop" "strike=$((_PR_BLOCK_COUNT + 1)) developer-intervention-required"
+      fi
       printf '%s\n' "{
   \"decision\": \"block\",
-  \"reason\": \"⚠️ MCL AŞAMA 10 RISK REVIEW ZORUNLU\n\nAşama 9 kod yazıldı ama Aşama 10 Risk Review başlamadı. İki seçenek:\n\n(A) Aşama 9 TDD eksikse: kalan kodu yaz. Bu block her kod-yazma turunda tekrar tetiklenir.\n\n(B) Aşama 9 tamamsa: Aşama 10'u BU response'da başlat. Yazdığın kodu güvenlik (injection, auth, XSS, CSRF), performans (N+1, unbounded), edge case (null/empty), data integrity, race condition açılarından gözden geçir. Her risk için TEK askq, prefix ${_BT}MCL ${INSTALLED_VERSION} |${_BT}. Aşama 10 → 19 (impact) → 20 (verify) sıralı yürür.\n\nPseudocode invariant: Aşama 10/19/20 zorunlu, atlanmaz.\"
+  \"reason\": \"⚠️ MCL AŞAMA 10 RISK REVIEW ZORUNLU\n\nAşama 9 kod yazıldı ama Aşama 10 Risk Review başlamadı. İki seçenek:\n\n(A) Aşama 9 TDD eksikse: kalan kodu yaz. Bu block her kod-yazma turunda tekrar tetiklenir.\n\n(B) Aşama 9 tamamsa: Aşama 10'u BU response'da başlat. Yazdığın kodu güvenlik (injection, auth, XSS, CSRF), performans (N+1, unbounded), edge case (null/empty), data integrity, race condition açılarından gözden geçir. Her risk için TEK askq, prefix ${_BT}MCL ${INSTALLED_VERSION} |${_BT}. Aşama 10 → 19 (impact) → 20 (verify) sıralı yürür.\n\nv13.1.3 STRICT: fail-open kaldırıldı. Pseudocode invariant: Aşama 10/19/20 zorunlu, atlanmaz.\"
 }"
       exit 0
-      fi
     fi
   fi
 fi

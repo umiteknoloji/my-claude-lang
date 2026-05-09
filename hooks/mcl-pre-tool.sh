@@ -78,12 +78,18 @@ except Exception:
     pass
 ' 2>/dev/null)"
 
-# -------- Branch: Phase transition emit denylist --------
+# -------- Branch: Phase transition + state-set emit denylist --------
 # Model `phase_transition` veya `asama-N-progression-from-emit` audit emit
 # edemez — bunlar yalnızca universal completeness loop tarafından yazılır.
 # `asama-N-complete` ise pseudocode'da bazı fazlarda kullanılan meşru pattern
 # (Aşama 5, 7, 21, 22), yasaklanmaz. Deny scope dar: TOOL_NAME=Bash AND
 # command body içinde mcl_audit_log/mcl_trace_append çağrısı + yasak token.
+#
+# v13.1.3 ek: model'in `mcl_state_set` ile state.json'u manipüle etmesi
+# de yasak. Onuc testinde model `mcl_state_set spec_hash "backoffice-v1"`
+# çağırıp sahte hash girdi, fail-open ile downstream geçti. State lib
+# yalnızca hook iç çağrılarından (kendi shell process'inde) tetiklenmeli;
+# Bash tool kanalı üzerinden state mutation yasak.
 if [ "$TOOL_NAME" = "Bash" ]; then
   _BASH_CMD="$(printf '%s' "$RAW_INPUT" | python3 -c '
 import json, sys
@@ -109,6 +115,24 @@ print(json.dumps({
         "permissionDecisionReason": sys.argv[1]
     }
 }))' "v13.0 deterministic gate: \`${_BAD_TOKEN}\` is hook-emitted only via universal completeness loop. Model must NOT emit phase transitions directly. Hook reads gate-spec.json and writes phase_transition + state advance when per-phase gate criteria are met."
+    exit 0
+  fi
+  # v13.1.3 — `mcl_state_set` Bash kanalından yasak (model state manipülasyonu).
+  # `mcl_state_reset` da aynı kategoride (full-state overwrite). Hook iç çağrıları
+  # source ile aynı shell'de çalıştığı için Bash tool'u tetiklemez — yalnızca model
+  # `bash -c 'source ...; mcl_state_set ...'` denemesi block edilir.
+  if echo "$_BASH_CMD" | grep -qE '\b(mcl_state_set|mcl_state_reset)\b'; then
+    mcl_audit_log "state-mutation-attempt" "pre-tool" "tool=${TOOL_NAME} cmd-fragment=$(echo "$_BASH_CMD" | grep -oE 'mcl_state_(set|reset)[^|;&]*' | head -1 | head -c 80)"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append state_mutation_attempt
+    python3 -c '
+import json, sys
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": sys.argv[1]
+    }
+}))' "v13.1.3 STATE LOCK — \`mcl_state_set\` ve \`mcl_state_reset\` Bash kanalından çağrılamaz. State, faz mantığının iç invariantı; yalnızca hook'lar (mcl-stop.sh, mcl-pre-tool.sh, mcl-post-tool.sh) state'i mutate eder. Faz ilerlemesi için recovery: doğru \`asama-N-complete\` audit emit (mcl_audit_log) — state'i hook bu audit'i okuyup advance eder."
     exit 0
   fi
 fi
@@ -1073,33 +1097,32 @@ if [ -n "$REASON" ]; then
   #   stay advisory (allow with reason) for now — same as v10.0.0+.
   DECISION="allow"
   if [ "$REASON_KIND" = "spec-approval" ]; then
+    # v13.1.3 STRICT — fail-open kaldırıldı. Model deny → tekrar dene → tekrar
+    # dene → 3-strike ile geç davranışı bilinçli bypass'tı. Block sonsuza
+    # kadar kalır; tek çıkış doğru `asama-4-complete` audit emit veya
+    # AskUserQuestion onayı. 5 strike'ta visible escalation audit yazılır.
     _SA_LB_COUNT="$(_mcl_loop_breaker_count "spec-approval-block" 2>/dev/null || echo 0)"
-    if [ "${_SA_LB_COUNT:-0}" -ge 3 ]; then
-      mcl_audit_log "spec-approval-loop-broken" "pre-tool" "count=${_SA_LB_COUNT} fail-open"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_approval_loop_broken "${_SA_LB_COUNT}"
-      DECISION="allow"
-    else
-      DECISION="deny"
-      mcl_audit_log "spec-approval-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SA_LB_COUNT + 1))"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_approval_block "$((_SA_LB_COUNT + 1))"
+    DECISION="deny"
+    mcl_audit_log "spec-approval-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SA_LB_COUNT + 1))"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append spec_approval_block "$((_SA_LB_COUNT + 1))"
+    if [ "$((_SA_LB_COUNT + 1))" -ge 5 ] && [ "${_SA_ESC_LOGGED:-0}" -eq 0 ]; then
+      mcl_audit_log "spec-approval-escalation-needed" "pre-tool" "strike=$((_SA_LB_COUNT + 1)) developer-intervention-required"
+      _SA_ESC_LOGGED=1
     fi
   elif [ "$REASON_KIND" = "asama-2-skip" ] \
        || [ "$REASON_KIND" = "asama-8-skip" ] \
        || [ "$REASON_KIND" = "asama-9-skip" ]; then
-    # v10.1.8 + v10.1.12: phase-skip blocks. Same loop-breaker shape
-    # as spec-approval-block. Recovery is the asama-N-complete Bash
-    # emit (parallels v10.1.7 spec-approval recovery via asama-4-complete).
+    # v13.1.3 STRICT — phase-skip blocks artık fail-open YOK (parallels
+    # spec-approval STRICT mode). Recovery: doğru asama-N-complete bash
+    # emit. 5 strike'ta visible escalation audit.
     _SKIP_PH_NUM="${REASON_KIND#asama-}"
     _SKIP_PH_NUM="${_SKIP_PH_NUM%-skip}"
     _SK_LB_COUNT="$(_mcl_loop_breaker_count "asama-${_SKIP_PH_NUM}-skip-block" 2>/dev/null || echo 0)"
-    if [ "${_SK_LB_COUNT:-0}" -ge 3 ]; then
-      mcl_audit_log "asama-${_SKIP_PH_NUM}-skip-loop-broken" "pre-tool" "count=${_SK_LB_COUNT} fail-open"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "asama_${_SKIP_PH_NUM}_skip_loop_broken" "${_SK_LB_COUNT}"
-      DECISION="allow"
-    else
-      DECISION="deny"
-      mcl_audit_log "asama-${_SKIP_PH_NUM}-skip-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SK_LB_COUNT + 1))"
-      command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "asama_${_SKIP_PH_NUM}_skip_block" "$((_SK_LB_COUNT + 1))"
+    DECISION="deny"
+    mcl_audit_log "asama-${_SKIP_PH_NUM}-skip-block" "pre-tool" "tool=${TOOL_NAME} strike=$((_SK_LB_COUNT + 1))"
+    command -v mcl_trace_append >/dev/null 2>&1 && mcl_trace_append "asama_${_SKIP_PH_NUM}_skip_block" "$((_SK_LB_COUNT + 1))"
+    if [ "$((_SK_LB_COUNT + 1))" -ge 5 ]; then
+      mcl_audit_log "asama-${_SKIP_PH_NUM}-skip-escalation-needed" "pre-tool" "strike=$((_SK_LB_COUNT + 1)) developer-intervention-required"
     fi
   elif [ "$REASON_KIND" = "phase-allowlist-tool" ] \
        || [ "$REASON_KIND" = "phase-allowlist-path" ]; then
