@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+"""stop — Stop hook (faz advance motoru).
+
+Pseudocode §2 Stop:
+    1. Self-project guard
+    2. Transcript son assistant text → spec_detect → spec_hash + MUST_N
+       state'e yaz (line-anchored, emoji opsiyonel)
+    3. Son AskUserQuestion tool_use + tool_result eşleştir → askq intent
+       classify (approve/revise/cancel)
+    4. Aşama 4 spec onay özel akışı:
+         intent=approve + spec_hash + current_phase=4 →
+         spec_approved=True + audit chain auto-fill (Aşama 1, 2, 3, 4)
+    5. Universal completeness loop:
+         while phase_complete(current): gate.advance(); current = state.current_phase
+       (audit-driven sıralı walk; her tur +1; CLAUDE.md sequence invariantı.)
+    6. Phase-done audit (advance sonrası DSI'da bir sonraki turda görünür)
+
+Faz-spesifik mercekler (Aşama 6 sunucu+tarayıcı, Aşama 10/19/20
+enforcement, Aşama 22 hook-yazılı tamlık raporu) 1.0.x'te detaylanır;
+1.0.0 motorun çekirdeği — askq onay zinciri + completeness loop.
+
+Stop hook output:
+    Claude Code Stop event sessiz olabilir — yan etkiler (state, audit)
+    asıl değer. Output boş = "continue" (default). 1.0.0'da Stop hook
+    block etmez; sadece state/audit mutate eder.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from hooks.lib import (  # noqa: E402
+    askq, audit, gate, spec_detect, state, transcript,
+)
+
+
+def _is_self_project(project_dir: str) -> bool:
+    repo_path = os.environ.get("MYCL_REPO_PATH") or str(Path.home() / "my-claude-lang")
+    try:
+        cwd = Path(project_dir).resolve()
+        myc = Path(repo_path).resolve()
+    except OSError:
+        return False
+    return cwd == myc
+
+
+def _read_input() -> dict:
+    try:
+        raw = sys.stdin.read()
+    except (OSError, ValueError):
+        return {}
+    if not raw.strip():
+        return {}
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+
+
+# ---------- spec hash detect ----------
+
+
+def _detect_and_store_spec(transcript_path: str, project_dir: str) -> str | None:
+    """Transcript son assistant text'inde spec varsa hash + MUST listele.
+
+    Returns: yeni spec_hash (yazıldıysa) veya None.
+    """
+    if not transcript_path:
+        return None
+    text = transcript.last_assistant_text(transcript_path)
+    if not text or not spec_detect.contains(text):
+        return None
+    body = spec_detect.extract_body(text)
+    if not body:
+        return None
+    normalized = spec_detect.normalize(body)
+    new_hash = spec_detect.compute_hash(normalized)
+    current_hash = state.get("spec_hash", project_root=project_dir)
+    if current_hash == new_hash:
+        return None
+    must_list = spec_detect.extract_must_list(body)
+    state.update(
+        {"spec_hash": new_hash, "spec_must_list": must_list},
+        project_root=project_dir,
+    )
+    audit.log_event(
+        "spec-hash-stored", "stop.py",
+        f"hash={new_hash[:12]} must_count={len(must_list)}",
+        project_root=project_dir,
+    )
+    return new_hash
+
+
+# ---------- askq intent ----------
+
+
+def _detect_askq_intent(transcript_path: str) -> str | None:
+    """Transcript'in son AskUserQuestion sonucundan intent çıkar.
+
+    Returns: "approve" | "revise" | "cancel" | "ambiguous" | None
+    """
+    if not transcript_path:
+        return None
+    _use, result = transcript.latest_askq_pair(transcript_path)
+    if result is None:
+        return None
+    return askq.classify_tool_result(result)
+
+
+# ---------- Aşama 4 spec-approve flow ----------
+
+
+def _spec_approve_flow(project_dir: str) -> bool:
+    """Aşama 4 spec onayı işle.
+
+    Koşullar:
+      - state.current_phase == 4
+      - state.spec_hash mevcut (None değil)
+      - state.spec_approved == False (idempotent guard)
+
+    Yan etkiler (atomik):
+      - state.spec_approved = True
+      - audit chain auto-fill: asama-1-complete, asama-2-complete,
+        asama-3-complete (varsa atla), asama-4-complete
+
+    Returns: yeni onay yapıldıysa True, no-op ise False.
+    """
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    if cp != 4:
+        return False
+    spec_hash = state.get("spec_hash", project_root=project_dir)
+    if not spec_hash:
+        return False
+    if state.get("spec_approved", False, project_root=project_dir):
+        return False
+
+    state.set_field("spec_approved", True, project_root=project_dir)
+
+    # Audit chain auto-fill — aşağı sıralı (idempotent: zaten varsa atla)
+    existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
+    for n in (1, 2, 3, 4):
+        name = f"asama-{n}-complete"
+        if name not in existing:
+            audit.log_event(
+                name, "stop.py",
+                f"spec-approve-chain hash={spec_hash[:12]}",
+                project_root=project_dir,
+            )
+    return True
+
+
+# ---------- universal completeness loop ----------
+
+
+def _run_completeness_loop(project_dir: str) -> int:
+    """Audit-driven sıralı faz advance.
+
+    Her iterasyonda:
+      1. current_phase oku
+      2. gate.is_phase_complete (required_audits_any var mı audit'te?)
+      3. Var → gate.advance() → +1
+      4. Yok → break
+
+    Returns: tamamlanan advance sayısı.
+    """
+    advance_count = 0
+    # Sonsuz döngü koruması: max 22 iterasyon
+    for _ in range(22):
+        cp = state.get("current_phase", 1, project_root=project_dir)
+        if cp >= 22:
+            break
+        if not _is_phase_complete(cp, project_dir):
+            break
+        gate.advance(project_root=project_dir, caller="stop.py")
+        advance_count += 1
+    return advance_count
+
+
+def _is_phase_complete(phase: int, project_dir: str) -> bool:
+    """Faz `phase` için required_audits_any audit log'da var mı?"""
+    spec = gate.load_gate_spec()
+    phase_def = spec.get("phases", {}).get(str(phase))
+    if not isinstance(phase_def, dict):
+        return False
+    required = phase_def.get("required_audits_any") or []
+    if not required:
+        return False
+    existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
+    return any(name in existing for name in required)
+
+
+# ---------- main ----------
+
+
+def main() -> int:
+    payload = _read_input()
+    project_dir = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+
+    if _is_self_project(project_dir):
+        return 0
+
+    transcript_path = str(payload.get("transcript_path") or "")
+
+    # 1. Spec hash detect (line-anchored Spec regex)
+    _detect_and_store_spec(transcript_path, project_dir)
+
+    # 2. AskUserQuestion intent classify
+    intent = _detect_askq_intent(transcript_path)
+
+    # 3. Aşama 4 spec-approve flow (intent=approve + spec_hash mevcut)
+    if intent == askq.INTENT_APPROVE:
+        _spec_approve_flow(project_dir)
+
+    # 4. Universal completeness loop (audit-driven walk)
+    _run_completeness_loop(project_dir)
+
+    # Stop hook sessiz — output yok ("continue" default)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
