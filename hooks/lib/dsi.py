@@ -32,8 +32,12 @@ from hooks.lib import audit, gate, progress, tokens
 _ESCALATION_SUFFIX = "escalation-needed"
 
 
-def _phase_directive_text(phase: int, project_root: str | None = None) -> str:
-    """phase_meta.json'dan aktif faz directive'ini al (TR + EN)."""
+def _phase_directive_text(phase: int) -> str:
+    """phase_meta.json'dan aktif faz directive'ini al (TR + EN).
+
+    Not: project_root parametresi yok — phase_meta.json global
+    (~/.claude/data veya repo'ya bakılır), project-specific değil.
+    """
     meta = progress.load_phase_meta()
     phase_def = meta.get("phases", {}).get(str(phase), {})
     if not isinstance(phase_def, dict):
@@ -49,8 +53,14 @@ def render_active_phase_directive(
     phase: int,
     project_root: str | None = None,
 ) -> str:
-    """<mycl_active_phase_directive> içeriği."""
-    text = _phase_directive_text(phase, project_root=project_root)
+    """<mycl_active_phase_directive> içeriği.
+
+    project_root API simetrisi için tutuldu (diğer render fonksiyonları
+    proje-spesifik); _phase_directive_text bunu kullanmıyor (phase_meta
+    global).
+    """
+    _ = project_root  # API simetrisi için; phase_meta global
+    text = _phase_directive_text(phase)
     if not text:
         return ""
     return f"<mycl_active_phase_directive>\n{text}\n</mycl_active_phase_directive>"
@@ -65,35 +75,23 @@ def render_phase_status(project_root: str | None = None) -> str:
     return f"<mycl_phase_status>\n{bar}\n</mycl_phase_status>"
 
 
-def _has_escalation_audit(project_root: str | None = None) -> bool:
-    """audit log'da herhangi bir *-escalation-needed var mı?"""
-    for ev in audit.read_all(project_root=project_root):
-        name = ev.get("name", "")
-        if name.endswith(_ESCALATION_SUFFIX):
-            return True
-    return False
-
-
 def render_phase_allowlist_escalate(
     project_root: str | None = None,
 ) -> str:
     """<mycl_phase_allowlist_escalate> uyarı.
 
     Sadece audit log'da escalation tespit edildiyse emit; yoksa boş.
+    Tek pass: audit.read_all bir kez okunur, filter + last in tek geçiş.
     """
-    if not _has_escalation_audit(project_root=project_root):
+    last_escalation: dict | None = None
+    for ev in audit.read_all(project_root=project_root):
+        if ev.get("name", "").endswith(_ESCALATION_SUFFIX):
+            last_escalation = ev
+    if last_escalation is None:
         return ""
-    # Son escalation audit'ini bul
-    matches = [
-        ev for ev in audit.read_all(project_root=project_root)
-        if ev.get("name", "").endswith(_ESCALATION_SUFFIX)
-    ]
-    if not matches:
-        return ""
-    last = matches[-1]
     return (
         "<mycl_phase_allowlist_escalate>\n"
-        f"⚠️ Escalation: {last['name']} (audit: {last['detail']})\n"
+        f"⚠️ Escalation: {last_escalation['name']} (audit: {last_escalation['detail']})\n"
         f"Geliştirici müdahalesi gerekiyor; pipeline pasif bekliyor.\n"
         f"Developer intervention required; pipeline is waiting.\n"
         "</mycl_phase_allowlist_escalate>"
