@@ -136,7 +136,7 @@
       "narration_en": "Phase 21 (localized)"
     },
     "22": {
-      "directive_tr": "Aşama 22 — Tamlık Denetimi. Hook .mcycl/audit.log, state.json, trace.log okur. 1-21 fazlarının audit'lerini denetler. Aşama 9 TDD (her AC × red/green/refactor) ve Aşama 11-18 boru hattı (start/end/rescan) zorunlu derin denetim. Atlanan/eksik fazlar 'Açık Konular'da. `asama-22-complete` audit'i HOOK yazar (model değil).",
+      "directive_tr": "Aşama 22 — Tamlık Denetimi. Hook .mycl/audit.log, state.json, trace.log okur. 1-21 fazlarının audit'lerini denetler. Aşama 9 TDD (her AC × red/green/refactor) ve Aşama 11-18 boru hattı (start/end/rescan) zorunlu derin denetim. Atlanan/eksik fazlar 'Açık Konular'da. `asama-22-complete` audit'i HOOK yazar (model değil).",
       "directive_en": "Phase 22 — Completeness Audit. Hook reads .mycl/audit.log, state.json, trace.log. Audits Phases 1-21. Mandatory deep checks: Phase 9 TDD (each AC × red/green/refactor) and Phases 11-18 (start/end/rescan). Skipped/missing phases listed under 'Open Items'. `asama-22-complete` audit written by HOOK (not model).",
       "narration_tr": "Aşama 22 (tamlık)",
       "narration_en": "Phase 22 (completeness)"

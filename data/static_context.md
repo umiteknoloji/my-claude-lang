@@ -15,7 +15,7 @@ MyCL üç tür XML tag kullanır:
 - `<mycl_constraint name="…">` — Yakalanmış kurallar bloğu.
 - `<mycl_active_phase_directive>`, `<mycl_phase_status>`,
   `<mycl_phase_allowlist_escalate>` — DSI mesajları (turun başında
-  mcl-activate.py tarafından gönderilir).
+  activate.py tarafından gönderilir).
 
 Tag içeriği değişebilir; tag adları sabittir. Hook bunları string
 match ile arar.
@@ -28,7 +28,7 @@ MyCL uses three kinds of XML tags:
 - `<mycl_constraint name="…">` — Captured rules block.
 - `<mycl_active_phase_directive>`, `<mycl_phase_status>`,
   `<mycl_phase_allowlist_escalate>` — DSI messages (sent at turn
-  start by mcl-activate.py).
+  start by activate.py).
 
 Tag content may vary; tag names are fixed. Hook searches them by
 string match.
@@ -116,10 +116,12 @@ MyCL'de hiçbir block kategorisi otomatik açılmaz (fail-open YOK):
 sinyal). Block KALMAZ — kullanıcı bilinçli müdahale edene kadar deny
 sürer.
 
-State mutation (`mcl_state_set`/`reset`) Bash kanalından YASAK.
-State, faz mantığının iç invariantı; sadece hook'lar mutate eder.
-Faz ilerlemesi için: doğru `mcl_audit_log asama-N-complete` emit
-(legitim recovery yolu).
+State mutation (Python `state.set_field` / `state.update` /
+`state.reset` çağrıları) Bash kanalından YASAK. State, faz mantığının
+iç invariantı; sadece hook'lar mutate eder. Faz ilerlemesi için
+recovery yolu: `audit.log_event("asama-N-complete", "<caller>",
+"<detail>")` ile audit emit (Bash'ten `python3 -c "from hooks.lib
+import audit; audit.log_event(...)"` legitim).
 
 [English]
 
@@ -134,10 +136,12 @@ At strike 5, an `*-escalation-needed` audit is written (user-visible
 signal). Block REMAINS — deny continues until the user intervenes
 intentionally.
 
-State mutation (`mcl_state_set`/`reset`) is FORBIDDEN via the Bash
-channel. State is the inner invariant of phase logic; only hooks
-mutate it. To advance: emit `mcl_audit_log asama-N-complete`
-correctly (legitimate recovery path).
+State mutation (Python `state.set_field` / `state.update` /
+`state.reset` calls) is FORBIDDEN via the Bash channel. State is the
+inner invariant of phase logic; only hooks mutate it. Recovery path
+to advance: `audit.log_event("asama-N-complete", "<caller>",
+"<detail>")` (legitimate, callable from Bash via `python3 -c "from
+hooks.lib import audit; audit.log_event(...)"`).
 
 ---
 

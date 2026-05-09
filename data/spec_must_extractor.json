@@ -30,9 +30,9 @@
       "notes": "Inline 'X SHOULD Y' kalıbı için fallback"
     },
     "section_terminator": {
-      "regex": "^[ \\t]*(?:#+[ \\t]+|[A-Z][a-zA-Z ]+:[ \\t]*$)",
-      "flags": "MULTILINE",
-      "notes": "Yeni bölüm başlığı = MUST/SHOULD bölümünün sonu"
+      "regex": "^[ \\t]*(?:#+[ \\t]+|[^\\W\\d_][\\w ]*:[ \\t]*$)",
+      "flags": "MULTILINE | UNICODE",
+      "notes": "Yeni bölüm başlığı = MUST/SHOULD bölümünün sonu. Unicode-aware (Türkçe Önerilen:, Zorunlu:, Şartlar: ASCII [A-Z] ile yakalanmıyordu — KK düzeltmesi)."
     }
   },
   "extraction_strategy": {
@@ -43,6 +43,6 @@
   },
   "binding_audit_format": {
     "description": "Sonraki fazlar audit'lerine 'covers=MUST_3,MUST_5' ekleyerek hangi MUST'u karşıladığını bildirir. Aşama 22 hook bu binding'leri toplar, kapsanmamış MUST'ları rapora yazar.",
-    "example": "asama-9-ac-3-green | mcl-stop | covers=MUST_2,MUST_4 spec_hash=ab12cd34"
+    "example": "asama-9-ac-3-green | stop.py | covers=MUST_2,MUST_4 spec_hash=ab12cd34"
   }
 }
