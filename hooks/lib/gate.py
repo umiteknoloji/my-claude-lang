@@ -220,9 +220,12 @@ def advance(
         # Son fazda; pipeline tamamlanmış, no-op.
         return 22
     nxt = cp + 1
-    state.set_field("current_phase", nxt, project_root=project_root)
-    # phase_name'i de güncelle (pseudocode'a uyumlu, basit string).
-    state.set_field("phase_name", _phase_name_for(nxt), project_root=project_root)
+    # Atomik write: current_phase + phase_name tek çağrıda (KK G1 düzeltmesi).
+    # İki ayrı set_field arasında çökmek state'i tutarsız bırakıyordu.
+    state.update(
+        {"current_phase": nxt, "phase_name": _phase_name_for(nxt)},
+        project_root=project_root,
+    )
     audit.log_event(
         "phase-advance",
         caller,
