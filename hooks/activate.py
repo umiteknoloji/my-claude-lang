@@ -76,8 +76,15 @@ def _emit(text: str) -> None:
 
 
 def _build_context(project_root: str, turn_tokens: int = 0) -> str:
-    """STATIC_CONTEXT + DSI + Plugin Kural A consent prompt (varsa)."""
+    """Banner + Manifesto + DSI + Plugin Kural A consent prompt (varsa)."""
     blocks: list[str] = []
+
+    # 0. Banner — sade görünür sinyal (sürüm + dil); TR + boş satır + EN
+    blocks.append(
+        f"MyCL {_MYCL_VERSION} — Anlam Doğrulama Katmanı aktif\n"
+        f"\n"
+        f"MyCL {_MYCL_VERSION} — Semantic Verification Layer active"
+    )
 
     # 1. Manifesto (co-author framing — Disiplin #14, #15)
     manifesto = framing.for_context()

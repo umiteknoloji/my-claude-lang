@@ -57,6 +57,16 @@ def test_hook_emits_context(tmp_path):
     assert "MyCL" in context
 
 
+def test_hook_emits_banner_first_block(tmp_path):
+    """İlk blok MyCL banner'ı (TR + boş satır + EN). Görünür sinyal."""
+    out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
+    context = out["hookSpecificOutput"]["additionalContext"]
+    # Banner ilk satır
+    assert context.startswith("MyCL 1.0.0 — Anlam Doğrulama Katmanı aktif")
+    # TR + boş satır + EN (CLAUDE.md bilingual kuralı)
+    assert "\n\nMyCL 1.0.0 — Semantic Verification Layer active" in context
+
+
 def test_hook_includes_phase_directive(tmp_path):
     out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
     context = out["hookSpecificOutput"]["additionalContext"]
