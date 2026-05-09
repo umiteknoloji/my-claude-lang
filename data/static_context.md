@@ -169,17 +169,34 @@ fragments, fixed technical tokens (MUST/SHOULD).
 
 ## 6. Filesystem Layout / Dosya Düzeni
 
-```
-.mycl/
-├── state.json       (current_phase, spec_approved, spec_hash, ...)
-├── audit.log        (append-only, sequential phase events)
-├── trace.log        (append-only, transition records)
-├── config.json      (git_init_consent, plugin choices)
-├── specs/           (saved spec snapshots, sha256.md)
-└── log/             (per-session post-tool diary)
-```
+[Türkçe]
 
-Hooks: `~/.claude/hooks/{activate,pre_tool,post_tool,stop}.py`.
-Lib: `~/.claude/hooks/lib/*.py`.
-Skills: `~/.claude/skills/mycl/*.md`.
-Data: `~/.claude/data/*.json`.
+Her MyCL-yönetimli proje kök dizininde bir `.mycl/` klasörü tutar:
+state, audit, trace, config, spec snapshot'lar ve oturum log'ları.
+MyCL'in kendi kodu (hook, lib, skill, data) Claude Code kurulumunda
+`~/.claude/` altında durur — projeden bağımsız, tek kurulum.
+
+[English]
+
+Every MyCL-managed project keeps a `.mycl/` folder at its root:
+state, audit, trace, config, spec snapshots, and session logs.
+MyCL's own code (hooks, lib, skills, data) lives under `~/.claude/`
+in the Claude Code install — project-independent, single install.
+
+```
+<project root>/
+└── .mycl/
+    ├── state.json       (current_phase, spec_approved, spec_hash, ...)
+    ├── audit.log        (append-only, sequential phase events)
+    ├── trace.log        (append-only, transition records)
+    ├── config.json      (git_init_consent, plugin choices)
+    ├── specs/           (saved spec snapshots, sha256.md)
+    └── log/             (per-session post-tool diary)
+
+~/.claude/
+├── hooks/
+│   ├── activate.py post_tool.py pre_tool.py stop.py
+│   └── lib/*.py
+├── skills/mycl/*.md
+└── data/*.json
+```

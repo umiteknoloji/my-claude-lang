@@ -58,7 +58,8 @@
       "fail_open": false,
       "self_critique_required": true,
       "public_commitment_required": true,
-      "spec_block_required": true
+      "spec_block_required": true,
+      "subagent_rubber_duck": true
     },
     "5": {
       "name": "Desen Eşleştirme",
@@ -139,7 +140,8 @@
       "fail_open": false,
       "self_critique_required": true,
       "public_commitment_required": true,
-      "tdd_cycle_required": true
+      "tdd_cycle_required": true,
+      "subagent_rubber_duck": true
     },
     "10": {
       "name": "Risk İncelemesi",
@@ -308,8 +310,7 @@
       ],
       "fail_open": false,
       "self_critique_required": false,
-      "public_commitment_required": false,
-      "subagent_rubber_duck": true
+      "public_commitment_required": false
     },
     "21": {
       "name": "Yerelleştirilmiş Rapor",
