@@ -1,28 +1,24 @@
 <mcl_phase name="asama11-code-review">
 
-# Aşama 11: Code Review (auto-fix on changed files)
+# Aşama 11: Kod İncelemesi (auto-fix on changed files)
 
-Aşama 10 is the first of 8 dedicated quality phases (Aşama 10–17 in
-the v11 architecture; previously the sub-step `9.1` of the monolithic
-`asama9-quality-tests.md`). Each phase is now a top-level Aşama with
-its own audit emits, but the underlying **discipline is unchanged**
-from the v10 sub-step:
+Kod İncelemesi, kalite boru hattının ilk fazı (Aşama
+11-14). Auto-fix only — askq yok,
+dialog yok. Detect → fix-if-unambiguous → record audit → proceed.
 
-- No AskUserQuestion. Auto-fix only.
-- Detect → fix-if-unambiguous → record audit → proceed.
-- "Soft applicability" — when not applicable, write a `not-applicable`
-  audit and skip silently.
+"Soft applicability" — uygulanabilir değilse `not-applicable` audit yaz, sessizce atla.
 
-## When Aşama 10 Runs
+## When Aşama 11 Runs
 
-Immediately after Aşama 9 (Risk Review dialog complete) and BEFORE
-Aşama 11 (Simplify). Scope: files changed in the current session
-(Aşama 6 / Aşama 8).
+Immediately after Aşama 10 (Risk İncelemesi
+dialog complete) and BEFORE Aşama 12 (Sadeleştirme).
+Scope: files changed in the current session (Aşama 6 /
+Aşama 9).
 
 ## Detect
 
-Pattern-rules compliance check (from Aşama 5 PATTERN_SUMMARY when
-present):
+Pattern-rules compliance check (from Aşama 5
+PATTERN_SUMMARY when present):
 
 - Naming convention violations
 - Error handling pattern violations
@@ -36,19 +32,18 @@ Plus general code-review findings:
 
 ## Auto-fix scope
 
-Apply silently via Edit / MultiEdit / Write when the fix is
-unambiguous:
+Apply silently via Edit / MultiEdit / Write when the fix is unambiguous:
 
 - Renames to match Aşama 5 naming convention
 - Removed dead code
 - Added validation for already-typed inputs
 
 When auto-fix is ambiguous (multiple valid fixes, no clear winner),
-write `asama-11-ambiguous` audit and skip the fix. The earlier
-Aşama 9 risk dialog already gave the developer a chance to surface
-ambiguous items.
+write `asama-11-ambiguous` audit and skip the fix.
+The earlier Aşama 10 risk dialog already gave the
+developer a chance to surface ambiguous items.
 
-## Audit emit (dual — v11 + v10 backward-compat)
+## Audit emit
 
 Start of phase:
 
@@ -71,17 +66,11 @@ bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; \
   mcl_audit_log "asama-11-not-applicable" "mcl-stop.sh" "reason=<why>"'
 ```
 
-The `asama-9-1-*` lines are v10 backward-compat aliases. Existing
-v10 enforcement helpers (mcl-stop.sh `asama-9-complete` auto-emit,
-the open-severity gate) still observe these aliases. R8 cutover
-(v11.0.0) removes the v10 lines from this skill — at that point
-hook helpers will be retitled to scan `asama-10-*` only.
-
 ## Anti-patterns
 
-- Asking the developer questions in Aşama 10 (auto-fix only).
+- Asking the developer questions in Aşama 11 (auto-fix only).
 - Skipping the phase without an audit entry (skip-detection requires
   the audit; the not-applicable audit is the correct skip path).
-- Re-applying fixes the developer already declined in Aşama 9.
+- Re-applying fixes the developer already declined in Aşama 10.
 
 </mcl_phase>

@@ -90,10 +90,19 @@ echo ""
 #    Clean the destination first so renamed/removed files do NOT linger
 #    from prior MCL versions. Without this, stale files can shadow
 #    current behavior (seen during 5.2.0 → 5.3.0 upgrade).
+
+# 1a. Build skill files from templates (if any).
+#     Templates in skills/my-claude-lang/_templates/ use placeholders
+#     resolved against phase-mapping.md (canonical source).
+if [ -f "$SCRIPT_DIR/scripts/build-skills.py" ]; then
+  python3 "$SCRIPT_DIR/scripts/build-skills.py" 2>&1 | sed 's/^/[build] /'
+fi
+
 rm -rf "$SKILL_DST"
 mkdir -p "$SKILL_DST"
 cp "$SKILL_SRC" "$SKILL_DST/SKILL.md"
 cp "$SKILL_RULES_SRC"/*.md "$SKILL_DST/"
+# _templates dizinini hedefe kopyalama (sadece build çıktıları gider)
 echo "[OK] Skill files installed to $SKILL_DST (clean copy)"
 
 # 2. Install hook scripts (four hooks + lib/)
