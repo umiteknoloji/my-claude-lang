@@ -302,7 +302,7 @@ _mcl_runtime_reason() {
 }
 
 _mcl_pre_spec_audit_chain_status() {
-  # v13.0.18 — Spec-approve advance prerequisitlerini kontrol eder.
+  # v13.0.19 — Spec-approve advance prerequisitlerini kontrol eder.
   # Aşama 4 spec onayı askq'si onaylandığında, Aşama 1, 2, 3'ün gerçekten
   # tamamlandığını kanıtlayan audit'ler audit.log'da bulunmalı. Eksikse
   # spec-approve advance hakkı kazanılmamış demektir (atlama tespit).

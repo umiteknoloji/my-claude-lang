@@ -1,27 +1,32 @@
 <mcl_phase name="asama22-completeness">
 
-# Aşama 22: Completeness Audit (was Aşama 13 in v10) — audits phases 1–20
+# Aşama 22: Completeness Audit — audits phases 1–21
 
-Aşama 21 runs AFTER Aşama 20 (Localized Report) and BEFORE the
+Aşama 22 runs AFTER Aşama 21 (Localized Report) and BEFORE the
 session closes. It reads the session's audit/state/trace files and
 produces a machine-verifiable summary of which phases ran end-to-end
-— with deep dives on Aşama 8 (test-first; was Aşama 7 in v10) and
-the 8 quality phases Aşama 10–17 (was Aşama 9.1–9.8 sub-steps in v10).
+— with deep dives on Aşama 9 (TDD test-first) and the 8 quality+test
+phases (Aşama 11–18).
 
-## Critical Questions Aşama 13 Answers
+**Audit emit:** Hook (Stop hook universal completeness loop)
+`asama-22-complete` audit'ini otomatik yazar. **Rapor metni** model
+tarafından üretilir — sentez ve markdown render gerektirir, model
+işidir; audit kanca işidir. Bu ayrım pseudocode "kanca yazar, model
+yazmaz" kuralının netleştirilmesidir.
 
-- **Did each phase 1-12 actually complete?** Not just "model claimed
+## Critical Questions Aşama 22 Answers
+
+- **Did each phase 1-21 actually complete?** Not just "model claimed
   done" — verified against audit.log signals.
-- **Aşama 7 — were tests written? Was test_command run GREEN?** TDD
-  compliance is the project's most-violated invariant; surface it.
-- **Aşama 9 — did each sub-step (9.1-9.8) start, end, and apply
-  auto-fix?** Aşama 9 is the auto-fix pipeline; partial completion
-  ships vulnerable code.
+- **Aşama 9 (TDD) — were tests written? Was test_command run GREEN?**
+  TDD compliance is the project's most-violated invariant; surface it.
+- **Aşama 11-18 quality+test pipeline — did each phase start, end,
+  and apply auto-fix?** Partial completion ships vulnerable code.
 
-## When Aşama 13 Runs
+## When Aşama 22 Runs
 
-Immediately after Aşama 12 Localized Report. If Aşama 12 was no-op
-(English session — nothing to translate), Aşama 13 still runs.
+Immediately after Aşama 21 Localized Report. If Aşama 21 was no-op
+(English session — nothing to translate), Aşama 22 still runs.
 Completeness audit is the LAST output before the session closes.
 
 ## Procedure

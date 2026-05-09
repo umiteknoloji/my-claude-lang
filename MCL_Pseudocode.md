@@ -515,7 +515,7 @@ MCL Kuş Bakışı — Sözde Kod
     │
     ▼
   [Claude modeli cevap üretir]
-    Model: AskUserQuestion("MCL 13.0.18 | Faz 1 — Niyet özeti onayı: ...")
+    Model: AskUserQuestion("MCL 13.0.19 | Faz 1 — Niyet özeti onayı: ...")
     │
     ▼
   [mcl-pre-tool.sh tetiklenir — AskUserQuestion]
@@ -560,8 +560,8 @@ MCL Kuş Bakışı — Sözde Kod
      anlaşıldı → kod yaz" priorını dengeler. İngilizce (model ağırlıkları
      İngilizce daha güçlü çalışır).
 
-  Katman B (Faz İzin Listesi) — v13.0.18 always-fire:
-     Her fazda sadece o fazın "allowed_tools" listesi izinli. v13.0.18:
+  Katman B (Faz İzin Listesi) — v13.0.19 always-fire:
+     Her fazda sadece o fazın "allowed_tools" listesi izinli. v13.0.19:
      REASON koşulu kaldırıldı — Layer B her tool çağrısında fire eder, allowlist
      ihlali pre-set REASON'ı override eder. Fail-closed: gate-spec'te
      allowed_tools field yoksa mutating tool DENY (eski varsayılan: allow,
@@ -640,7 +640,7 @@ MCL Kuş Bakışı — Sözde Kod
 
   6. Loop-breaker:
      Bazı engellerde 3 ardışık reddetme → otomatik açılma + audit uyarısı
-     (eski mekanizma). v13.0.18 sonrası Katman B'de otomatik açılma YOK —
+     (eski mekanizma). v13.0.19 sonrası Katman B'de otomatik açılma YOK —
      blok kalkmaz, audit uyarısı kullanıcıya iletilir.
 
   7. /mcl-checkup:

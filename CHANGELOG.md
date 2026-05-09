@@ -7,6 +7,104 @@
 
 ## [Unreleased]
 
+## [13.0.19] - 2026-05-09
+
+### Mekanik Tasarım Refaktörü — Yarısı Tamam (yamala kaldırma turu)
+
+Pseudocode kanonik kabul edildikten sonra ilk büyük temizlik turu.
+Hedef v13.1.0 atomik refaktör; bu sürüm ara nokta — yamalaların büyük
+kısmı kaldırıldı, kalan adımlar (B1 detayları, B3, A8 hassas, C, D)
+sonraki turlara bırakıldı.
+
+**Net etki: ~1054 satır azalma** (8 önce-temizlik commit'i + bu turda
+yapılan A1-A7+B2+B4).
+
+#### Bu turda yapılanlar
+
+**A1 — Legacy fallback temizliği** (commit `b083ad2`)
+- `hooks/mcl-pre-tool.sh:80-88` "v13.0 BRIDGE" yorumu sade hale getirildi.
+- `hooks/mcl-stop.sh` Aşama 9 auto-complete fallback (legacy v10.1.11,
+  ~63 satır) silindi. Universal completeness loop zaten gate-spec'ten
+  faz tamamlanma audit'lerini yazıyor — duplikasyon kalktı.
+
+**A2 — `mcl_get_active_phase` silindi**
+- `hooks/lib/mcl-state.sh:464-495` (~32 satır) silindi. v13.0.11 sonrası
+  state hep gerçek değer (1..22), fonksiyon identity'ye düşmüştü.
+- 4 çağrı yeri `mcl_state_get current_phase` ile değiştirildi.
+
+**A3 + A4 + A5 — Hook sadeleştirme** (commit `f95269e`)
+- A3: Pre-tool sub-agent phase discipline branch (~37 satır) silindi —
+  STATIC_CONTEXT'teki constraint'te zaten var.
+- A4: Pre-tool scope guard branch (~80 satır) silindi — spec-approval-
+  discipline constraint'te tanımlı.
+- A5: Stop hook Aşama 6 server-without-browser lens 179 satır → 55 satır.
+  4 case → 2 case (block veya ok). Pseudocode "sunucu+tarayıcı zorunlu,
+  KATI" diyor — tek koşul yeter.
+
+**A6 — Aşama 2 zero-gate synthesis silindi** (commit `06a7128`)
+- `hooks/mcl-stop.sh:925-1020` (~95 satır) silindi. Model precision
+  audit emit etmediyse hook otomatik dolduruyordu — "model işi yapmasın"
+  kuralının tersi. Block davranışı kalır, fail-loud.
+- Pseudocode kullanıcı düzenlemesi: Aşama 6/7/8 atlama koşulları
+  somutlaştı ("UI yoksa atlanır", "Aşama 6'ya bağlı", "DB yoksa atlanır").
+
+**A7 + B2 — Review enforcement modernize** (commit `7dcfed5`)
+- Yorum başlığı: "Aşama 8 / 4.6 / 5 review enforcement" → "Aşama 10/19/20
+  review enforcement". Pseudocode v13 numbering.
+- Phase regex: `^(5|6a|6b|6c|7)$` (eski v10 sub-phase, hiç match etmiyordu)
+  → `^(6|9)$` (Aşama 6 UI Build + Aşama 9 TDD = kod yazma fazları).
+- REASON message kısaldı + Türkçe + güncel numara: "Aşama 9 kod yazıldı
+  ama Aşama 10 Risk Review başlamadı..."
+
+**B4 — Pseudocode Bash ayrımı netleştirme** (commit `4451e67`)
+- `MCL_Pseudocode.md:31-38` Bash satırına ek not: state-mutating Bash
+  (mkdir, rm, npm install, git push) plugin gate'te ayrıca filtrelenir.
+- Niyet açıklaması — kullanıcı testlerinde gözlemlenen davranışa uygun.
+
+#### A8 başarısız (geri alındı)
+
+A8.K4.1 (pre-tool spec-approve advance JIT silme, ~254 satır) denendi.
+Sildiğim kod içinde MCL LOCK için gerekli spec-approval REASON setting
+de varmış. 11 test fail oldu, `git checkout HEAD -- hooks/mcl-pre-tool.sh`
+ile geri alındı. A8 ayrı bir hassas refaktör turu gerektiriyor.
+
+#### Atlanan adımlar (sonraki turlarda)
+
+- **B1 detayları**: skill dosyasındaki eski numbering (Aşama 13, 9.1-9.8)
+  güncel numbering'e tam çevrim — tüm 22 skill için.
+- **B3**: Plugin Kural A git init onayı — kodda hiç yok, yeni özellik
+  (~50-100 satır + state alanı + askq processing). Ayrı tur.
+- **A8**: pre-tool spec-approve advance hassas ayrımı (state advance
+  vs REASON setting ayrılması).
+- **C**: Eski test dosyalarının cleanup'ı (28 test dosyası, 271 PASS
+  stable, agresif silme değer üretmez).
+- **D**: v13.1.0 major bump tüm refactor bittiğinde.
+
+#### Boyut karşılaştırması
+
+| Dosya | v13.0.18 | v13.0.19 | Azalma |
+|---|---|---|---|
+| `mcl-pre-tool.sh` | 1.398 | 1.270 | -128 |
+| `mcl-stop.sh` | 2.310 | 2.024 | -286 |
+| `mcl-activate.sh` | 1.131 | 1.131 | 0 |
+| `mcl-post-tool.sh` | 257 | 257 | 0 |
+| `mcl-state.sh` | ~520 | ~488 | -32 |
+
+Ek temizlik:
+- Skill: `asama9-execute.md` silindi (149 satır → asama9-tdd.md'ye taşındı, +40)
+- Test: `test-v1310`, `test-v1307`, `test-v10-1-asama8-9-enforcement`,
+  `test-v10-asama6b-enforcement` silindi (eski davranışı koruyordu)
+
+#### Yedek noktası
+
+`pre-v131-refactor` git tag (lokal + remote) + `/tmp/mcl-backup-20260508-195522`
+(36MB lokal kopya). Geri dönüş garantili.
+
+#### Baseline
+
+271 passed, 0 failed, 2 skipped (test düşüşü tamamı eski davranışı
+koruyan testlerin silinmesinden — beklenen).
+
 ## [13.0.18] - 2026-05-08
 
 ### Layer B (phase allowlist) artık her zaman fire eder — Aşama 5 Write deliği kapatıldı

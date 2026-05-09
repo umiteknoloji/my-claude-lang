@@ -1655,14 +1655,14 @@ if [ "$ASKQ_INTENT" = "spec-approve" ]; then
     mcl_audit_log "askq-ignored-no-spec" "stop" "phase=${CURRENT_PHASE}"
     mcl_debug_log "stop" "askq-ignored-no-spec" "phase=${CURRENT_PHASE}"
   elif [ "$CURRENT_PHASE" = "4" ] || [ "$CURRENT_PHASE" = "3" ]; then
-    # v13.0.18 — Hard enforce sıralılık: spec-approve advance hakkı için
+    # v13.0.19 — Hard enforce sıralılık: spec-approve advance hakkı için
     # Aşama 1, 2, 3 audit'leri tam olmalı. Eksikse atlama tespit edildi —
     # state advance YAPILMAZ + decision:block + REASON.
     _CHAIN_STATUS="$(_mcl_pre_spec_audit_chain_status 2>/dev/null || echo ok)"
     if [ -n "$_CHAIN_STATUS" ] && [ "$_CHAIN_STATUS" != "ok" ]; then
-      # v13.0.18 — Auto-fill: developer's spec-approve onayı = retroactive
+      # v13.0.19 — Auto-fill: developer's spec-approve onayı = retroactive
       # trust signal. Eksik chain audit'lerini "auto-fill-spec-approve"
-      # markıyla emit et, advance'i fire ettir. v13.0.18'da burada block
+      # markıyla emit et, advance'i fire ettir. v13.0.19'da burada block
       # vardı; gerçek üretim senaryosu (model Aşama 2 closing askq atlıyor,
       # Aşama 3 silent audit hiç emit edilmiyor) chain'i hiç doldurmuyor →
       # advance imkânsız, model bypass'a yöneliyordu. Auto-fill bu deadlock'u
