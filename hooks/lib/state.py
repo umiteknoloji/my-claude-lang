@@ -69,6 +69,7 @@ _DEFAULT_STATE: dict[str, Any] = {
     "partial_spec_body_sha": None,
     "regression_block_active": False,
     "regression_output": "",
+    "total_tokens": 0,  # cumulative session tokens (lib/tokens.py)
     "last_update": 0,
 }
 
