@@ -106,6 +106,32 @@ def test_invalid_spec_approved_rejected(tmp_project):
         state.set_field("spec_approved", 1)
 
 
+def test_invalid_spec_must_list_rejected(tmp_project):
+    with pytest.raises(state.StateValidationError):
+        state.set_field("spec_must_list", "MUST_1")
+    with pytest.raises(state.StateValidationError):
+        state.set_field("spec_must_list", None)
+    with pytest.raises(state.StateValidationError):
+        state.set_field("spec_must_list", {"id": "MUST_1"})
+
+
+def test_valid_spec_must_list_accepted(tmp_project):
+    items = [{"id": "MUST_1", "text": "Auth"}, {"id": "MUST_2", "text": "RBAC"}]
+    state.set_field("spec_must_list", items)
+    assert state.get("spec_must_list") == items
+    state.set_field("spec_must_list", [])  # boş kabul
+    assert state.get("spec_must_list") == []
+
+
+def test_invalid_schema_version_rejected(tmp_project):
+    with pytest.raises(state.StateValidationError):
+        state.set_field("schema_version", 0)
+    with pytest.raises(state.StateValidationError):
+        state.set_field("schema_version", -1)
+    with pytest.raises(state.StateValidationError):
+        state.set_field("schema_version", "3")
+
+
 # ---------- reset ----------
 
 

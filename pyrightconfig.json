@@ -1,0 +1,7 @@
+{
+  "include": ["hooks", "tests"],
+  "extraPaths": ["."],
+  "pythonVersion": "3.10",
+  "reportUnusedParameter": "none",
+  "reportMissingImports": "warning"
+}

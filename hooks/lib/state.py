@@ -7,11 +7,13 @@ Sözleşme:
     - state.json proje köküne `.mycl/state.json` yolunda durur.
     - Read/write atomik (tmp + rename).
     - Format auth: `current_phase ∈ [1, 22]`, `spec_hash` ya `None`
-      ya 64-char hex SHA256, `spec_approved` bool.
+      ya 64-char hex SHA256, `spec_approved` bool, `spec_must_list`
+      list, `schema_version` int.
     - Format dışı değer reject — hook iç çağrılarında bile yanlış
       yazım engellenir.
     - Bash kanalından mutate yasak — bu yasak `pre_tool.py`'de
-      enforce edilir (`mcl_state_set` Bash'te DENY).
+      enforce edilir (Bash'ten `state.set_field` / `state.update` /
+      `state.reset` çağrıları DENY).
 
 İnvariant:
     `current_phase` sıralı ilerletilir; her transition tam bir artış.
@@ -92,8 +94,9 @@ def _validate(data: dict[str, Any]) -> None:
     """Format auth — yazmadan önce çağrılır.
 
     Plan kararı (v1.0.0): geçersiz değer yazılmaz. Bash kanalından
-    `mcl_state_set spec_hash backoffice-v1` gibi sahte değerler hook
-    iç çağrılarında bile reject edilir (defense in depth).
+    sahte değerler (örn. `state.set_field("spec_hash", "backoffice-v1")`
+    benzeri çağrı) hook iç çağrılarında bile reject edilir (defense
+    in depth — v13.1.3 öğrenimi).
     """
     cp = data.get("current_phase")
     if cp not in _VALID_PHASES:
@@ -111,6 +114,18 @@ def _validate(data: dict[str, Any]) -> None:
     if not isinstance(sa, bool):
         raise StateValidationError(
             f"spec_approved {sa!r} geçersiz; bool olmalı"
+        )
+
+    smust = data.get("spec_must_list")
+    if not isinstance(smust, list):
+        raise StateValidationError(
+            f"spec_must_list {smust!r} geçersiz; list olmalı"
+        )
+
+    sv = data.get("schema_version")
+    if not isinstance(sv, int) or sv < 1:
+        raise StateValidationError(
+            f"schema_version {sv!r} geçersiz; pozitif int olmalı"
         )
 
 
