@@ -62,7 +62,7 @@ def extract_text(msg):
 # (e.g. spec + "Kodu yazıyorum") must not hide the spec from partial
 # detection.
 spec_line_re = re.compile(
-    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:",
+    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?(?:\U0001F4CB[ \t]+)?Spec\b[^\n:]*:",
     re.MULTILINE,
 )
 

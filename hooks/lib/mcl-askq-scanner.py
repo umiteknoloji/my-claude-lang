@@ -267,7 +267,7 @@ SPEC_LINE_RE = re.compile(
     # Tolerant match: 📋 Spec[ optional-text ]: — accepts forms like
     # "📋 Spec:", "📋 Spec (revised):", "📋 Spec — Web Calculator:".
     # The colon is still required as a body anchor.
-    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:",
+    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?(?:\U0001F4CB[ \t]+)?Spec\b[^\n:]*:",
     re.MULTILINE,
 )
 

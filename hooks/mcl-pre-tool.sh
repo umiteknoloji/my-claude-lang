@@ -173,8 +173,14 @@ except Exception:
 # MCL-managed project deadlocks (no .git/ → no plugin orchestration →
 # no spec). Plugin gate branch does NOT honor this exception (gate-active
 # means environment is incomplete; everything mutating waits).
+#
+# v13.1.2: regex anchored to end-of-line (`[[:space:]]*$`) so compound
+# commands like `git init && echo "..." > .gitignore` are NOT treated
+# as the bootstrap exception. Otherwise the `&&` tail (with redirect)
+# bypasses spec-approval. Bare `git init` (with or without trailing
+# whitespace) still passes.
 _mcl_is_git_init_only() {
-  printf '%s' "$1" | grep -qE '^[[:space:]]*git[[:space:]]+init([[:space:]]|$)'
+  printf '%s' "$1" | grep -qE '^[[:space:]]*git[[:space:]]+init[[:space:]]*$'
 }
 
 # -------- Branch: plugin gate (hard gate, overrides phase logic) --------

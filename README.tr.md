@@ -152,7 +152,7 @@ Her kapalı-uçlu kapı (Aşama 1 özet, Aşama 4 spec onayı, her Aşama 10
 risk, her Aşama 19 etki, plugin onayı, git-init onayı, drift çözümü,
 `/mcl-update` / `/mcl-finish` / yapıştırılan-CLI onayı) yerleşik
 Claude Code `AskUserQuestion` çağrısı olarak geliyor; soru başlığı
-`MCL 13.1.1 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
+`MCL 13.1.2 | ` ile başlıyor. Kararı arayüzden tıklıyorsun — artık
 "evet" yazmak veya `✅ MCL APPROVED` eklemek yok. Aşama 1'in
 açık-uçlu parametre toplama kısmı ise düz metin sohbet olarak
 kalıyor.
@@ -162,7 +162,7 @@ Spec drift (onaylı gövdenin mevcut emisyonla eşleşmemesi) artık
 bir drift uyarısı yayınlıyor ve AskUserQuestion ile sana yeni gövdeyi
 onaylamak mı yoksa onaylı gövdeye dönmek mi istediğini soruyor.
 
-Her yanıt `🌐 MCL 13.1.1` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
+Her yanıt `🌐 MCL 13.1.2` ile başlıyor — böylece köprünün aktif olduğunu her zaman biliyorsun.
 
 ### UI Build / Review Fazları
 

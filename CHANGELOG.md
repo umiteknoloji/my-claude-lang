@@ -7,6 +7,41 @@
 
 ## [Unreleased]
 
+## [13.1.2] - 2026-05-09 — v13.1.1 follow-up: 2 kalan boşluk
+
+İlk backoffice testinde v13.1.1 fix'lerinin **kısmen** çalıştığı görüldü:
+mutating Bash gating ✅, Stop hook trigger ✅. Ama 2 kenar durum kaldı.
+
+### Sorun A — Compound `git init && ...` bypass
+
+`_mcl_is_git_init_only` regex'i `^git init([[:space:]]|$)` şeklindeydi —
+"git init" ile başlayan **her** komutu bootstrap istisnası kabul ediyordu.
+Model `git init && echo "..." > .gitignore` çağırdı; `&&` sonrası redirect
+spec-approval gate'ini bypass etti.
+
+**Fix:** Regex anchored `^[[:space:]]*git[[:space:]]+init[[:space:]]*$` —
+sadece tek başına `git init` izinli, compound her şey deny.
+
+### Sorun B — Spec emoji opsiyonel
+
+Hook'lar `📋 Spec:` (emoji + "Spec:") arıyordu. Model emoji'yi atlayıp
+düz `Spec:` yazdı (eski prompt cache'i). Stop hook spec'i yakalayamadı,
+spec_hash null kaldı, advance olmadı.
+
+**Fix:** 7 yerdeki regex'te `\U0001F4CB[ \t]+` grup opsiyonel hale
+getirildi: `(?:\U0001F4CB[ \t]+)?Spec\b`. Line-anchored yapı korundu —
+prose içindeki "Spec:" referansları yine eşleşmez (sadece satır başı).
+Güncellenen dosyalar:
+- `hooks/mcl-stop.sh` (3 regex: SPEC_RE, spec_line_re ×2)
+- `hooks/lib/mcl-spec-ui-intent.py` (2 regex)
+- `hooks/lib/mcl-partial-spec.sh`
+- `hooks/lib/mcl-askq-scanner.py`
+- `hooks/lib/mcl-spec-save.sh`
+
+### Test
+
+271 passed / 0 failed / 2 skipped.
+
 ## [13.1.1] - 2026-05-09 — Backoffice testinde ortaya çıkan 3 kritik bug
 
 Üretim simülasyonu (boş `onuc` projesinde "backoffice yap" prompt'u) MCL'in

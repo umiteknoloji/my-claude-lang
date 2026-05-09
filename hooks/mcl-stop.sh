@@ -174,7 +174,7 @@ _mcl_spec_presence_audit() {
   python3 - "$transcript" 2>/dev/null <<'PYEOF' || true
 import json, re, sys
 path = sys.argv[1]
-SPEC_RE = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:", re.MULTILINE)
+SPEC_RE = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?(?:\U0001F4CB[ \t]+)?Spec\b[^\n:]*:", re.MULTILINE)
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 last_assistant_blocks = None
 try:
@@ -315,7 +315,7 @@ def extract_text(msg):
         return "\n".join(parts) if parts else None
     return None
 
-spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:", re.MULTILINE)
+spec_line_re = re.compile(r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?(?:\U0001F4CB[ \t]+)?Spec\b[^\n:]*:", re.MULTILINE)
 
 last_spec_text = None
 try:
@@ -1748,7 +1748,7 @@ import json, re, sys, subprocess
 
 transcript_path, paths_lib = sys.argv[1], sys.argv[2]
 spec_line_re = re.compile(
-    r'^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:', re.MULTILINE)
+    r'^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?(?:\U0001F4CB[ \t]+)?Spec\b[^\n:]*:', re.MULTILINE)
 
 spec_body = ''
 try:

@@ -72,7 +72,7 @@ def extract_text(msg):
 # Must stay in sync with mcl-stop.sh — finds the last assistant turn
 # that CONTAINS a spec block (not just the last assistant turn).
 spec_line_re = re.compile(
-    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?\U0001F4CB[ \t]+Spec\b[^\n:]*:",
+    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?(?:\U0001F4CB[ \t]+)?Spec\b[^\n:]*:",
     re.MULTILINE,
 )
 
