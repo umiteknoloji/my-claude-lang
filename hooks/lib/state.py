@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 1  # MyCL 1.0.0 yeni başlangıç; v13.x state'iyle migration yok
 
 _DEFAULT_STATE: dict[str, Any] = {
     "schema_version": SCHEMA_VERSION,
