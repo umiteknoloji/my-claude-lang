@@ -63,7 +63,8 @@ _DEFAULT_STATE: dict[str, Any] = {
     "last_write_ts": None,
     "plan_critique_done": False,
     "restart_turn_ts": None,
-    "git_init_consent": None,
+    # Not: git_init_consent state.json'dan kaldırıldı; plugin.py
+    # `.mycl/config.json`'da yönetiyor (kalıcı, reset() etkilemez).
     "partial_spec": False,
     "partial_spec_body_sha": None,
     "regression_block_active": False,
