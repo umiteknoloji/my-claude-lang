@@ -31,6 +31,9 @@ from typing import Optional
 _TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%SZ"
 _LINE_SEP = " | "
 _PHASE_COMPLETE_RE = re.compile(r"^asama-\d+-(complete|end)$")
+_PHASE_FINISHED_RE = re.compile(
+    r"^asama-\d+-(complete|end|skipped|not-applicable)$"
+)
 _PHASE_AUDIT_RE = re.compile(r"^asama-(\d+)-")
 
 
@@ -141,8 +144,28 @@ def latest(name: str, project_root: str | None = None) -> Optional[dict[str, str
 
 
 def is_phase_complete(name: str) -> bool:
-    """Audit ismi faz-tamamlama (asama-N-complete veya asama-N-end) mı?"""
+    """Audit ismi *kesin* faz-tamamlama mı (complete veya end)?
+
+    Disiplin #4 imza zorunluluğu BU iki forma uygulanır.
+    Skip / not-applicable bu fonksiyonda False döner.
+    """
     return _PHASE_COMPLETE_RE.match(name) is not None
+
+
+def is_phase_finished(name: str) -> bool:
+    """Audit ismi *herhangi bir* faz-bitiş formu mu?
+
+    `gate.advance()` bunu kullanır — pseudocode'da bir faz şu 4 durumda
+    sona erebilir: complete, end, skipped, not-applicable. Hepsi
+    "sıradaki faza geç" sinyali.
+
+    Örnek:
+        asama-5-skipped reason=greenfield → True (gate ilerler)
+        asama-8-not-applicable             → True (gate ilerler)
+        asama-9-ac-1-red                   → False (TDD ara adımı)
+        precision-audit                    → False (faz-bitiş değil)
+    """
+    return _PHASE_FINISHED_RE.match(name) is not None
 
 
 def phase_number(name: str) -> Optional[int]:

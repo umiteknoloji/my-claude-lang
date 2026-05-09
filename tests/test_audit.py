@@ -145,12 +145,35 @@ def test_log_event_rejects_empty_name(tmp_project):
 
 
 def test_is_phase_complete():
+    """is_phase_complete = sadece complete veya end (Disiplin #4 imza için)."""
     assert audit.is_phase_complete("asama-4-complete") is True
     assert audit.is_phase_complete("asama-22-complete") is True
     assert audit.is_phase_complete("asama-6-end") is True
     assert audit.is_phase_complete("asama-5-skipped") is False
+    assert audit.is_phase_complete("asama-8-not-applicable") is False
     assert audit.is_phase_complete("precision-audit") is False
     assert audit.is_phase_complete("asama-9-ac-1-red") is False
+
+
+def test_is_phase_finished():
+    """is_phase_finished = herhangi bir bitiş (complete/end/skipped/not-applicable).
+
+    gate.advance() bunu kullanır — pseudocode'da bir fazın 'bitmesi'
+    bu 4 durumdan herhangi biri.
+    """
+    # 4 bitiş formu hepsi True
+    assert audit.is_phase_finished("asama-4-complete") is True
+    assert audit.is_phase_finished("asama-6-end") is True
+    assert audit.is_phase_finished("asama-5-skipped") is True
+    assert audit.is_phase_finished("asama-8-not-applicable") is True
+    # Bitiş olmayan audit'ler False
+    assert audit.is_phase_finished("asama-9-ac-1-red") is False
+    assert audit.is_phase_finished("asama-9-ac-1-green") is False
+    assert audit.is_phase_finished("asama-10-items-declared") is False
+    assert audit.is_phase_finished("precision-audit") is False
+    assert audit.is_phase_finished("engineering-brief") is False
+    # Faz prefix'i olmayan audit'ler de False
+    assert audit.is_phase_finished("pattern-summary-stored") is False
 
 
 def test_phase_number():
