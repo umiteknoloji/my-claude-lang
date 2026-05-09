@@ -7,6 +7,58 @@
 
 ## [Unreleased]
 
+## [13.1.1] - 2026-05-09 — Backoffice testinde ortaya çıkan 3 kritik bug
+
+Üretim simülasyonu (boş `onuc` projesinde "backoffice yap" prompt'u) MCL'in
+hiç ilerlemediğini gösterdi: kullanıcı "Onayla" verdi, model spec yazdı,
+ama state hep `current_phase=1, spec_approved=false` kaldı. Log incelemesi 3
+ayrı kök sebep ortaya çıkardı.
+
+### Bug 1 — `gate-spec.json` setup'tan install edilmiyor
+
+`setup.sh:104` skill rules'tan sadece `*.md` kopyalıyordu; `gate-spec.json`
+(Layer B faz tool allowlist'i) kuruluya hiç ulaşmıyordu. Layer B
+fail-soft moduna düşüyor, sadece eski `spec-approval-block` gate'i devrede
+kalıyordu.
+
+**Fix:** `setup.sh`'a `cp "$SKILL_RULES_SRC"/*.json` satırı eklendi.
+
+### Bug 2 — AskUserQuestion zincirinde Stop hook tetiklenmiyor
+
+Claude Code, AskUserQuestion sonrası **Stop event üretmiyor** — model
+"tur biti" demediği sürece. Backoffice senaryosunda akış AskUserQuestion →
+"Onayla" → Bash → Write deny → kullanıcı interrupt şeklinde gitti; **Stop
+hook hiç çalışmadı**, dolayısıyla spec hash'i hesaplanmadı, state advance
+edilmedi. `hook-health.json`'da `stop` field'ı bile yoktu.
+
+**Fix:** `mcl-post-tool.sh` AskUserQuestion sonrası `mcl-stop.sh`'ı manuel
+tetikliyor (çıktı yutuluyor, Stop hook idempotent — state zaten advanced
+ise no-op). PostToolUse zaten AskUserQuestion'dan sonra atıyor; bu bağlantı
+boşluğu kapatıyor.
+
+### Bug 3 — Bash heredoc spec onayı öncesi block edilmiyor
+
+Pre-tool spec-approval gate'i sadece `Write|Edit|MultiEdit|NotebookEdit`
+tool'larını tutuyordu. Model Write deny olunca `cat > spec.md << 'EOF' …`
+ve `mkdir -p` ile dosya yazmaya devam etti. Mutating Bash regex'i mevcuttu
+ama yalnızca `plugin_gate_active=true` durumunda devredeydi.
+
+**Fix:**
+- `_mcl_is_bash_writer` ve `_mcl_extract_bash_cmd` helper fonksiyonları
+  pre-tool'un başında tanımlandı (DRY: plugin gate ile spec-approval gate
+  aynı fonksiyonu kullanıyor).
+- Spec-approval block'a Bash branch'i eklendi: mutating Bash + spec
+  onaylanmamış → deny.
+- `_mcl_is_git_init_only` istisnası: `git init` Plugin Kural A bootstrap
+  çağrısı, spec onayı OLMADAN da izinli kalır (yoksa ilk-aktivasyon
+  deadlock'a girer).
+- Fast-path (line ~570) `Bash`'i listeye ekledi ki Bash spec-approval
+  block'a ulaşabilsin (önceden Bash erken `exit 0` ile geçiyordu).
+
+### Test
+
+271 passed / 0 failed / 2 skipped — regresyon yok.
+
 ## [13.1.0] - 2026-05-09 — MAJOR: Atomik Mekanik Tasarım Refaktörü
 
 ### Yamala Döngüsü Sonu

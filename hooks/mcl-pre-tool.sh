@@ -126,6 +126,57 @@ except Exception:
   [ -n "$SUBAGENT_TYPE" ] && mcl_trace_append plugin_dispatched "$SUBAGENT_TYPE"
 fi
 
+# -------- Helper: detect mutating Bash command --------
+# Used by plugin gate AND spec-approval block (Bug 3 fix v13.1.1).
+# Pre-v13.1.1 the same Python regex lived inline only in the plugin
+# gate branch — meaning `cat > spec.md << EOF`, `mkdir -p ...`, etc.
+# slipped past spec-approval enforcement when plugin_gate_active=false.
+# Returns 0 (true) if mutating, 1 (false) if read-only.
+_mcl_is_bash_writer() {
+  local cmd="$1"
+  [ -z "$cmd" ] && return 1
+  printf '%s' "$cmd" | python3 -c '
+import re, sys
+cmd = sys.stdin.read()
+if re.search(r"(^|[^<>&0-9])>>?\s*[^&\s]", cmd) or re.search(r"\btee\b(?!\s*--help)", cmd):
+    sys.exit(0)
+token_re = r"(?:^|[\s|;&`(])"
+patterns = [
+    token_re + r"(rm|mv|cp|touch|mkdir|rmdir|chmod|chown|chgrp|ln|truncate|dd|patch|install|unlink)\b",
+    token_re + r"sed\b[^|;&`]*?\s-i\b",
+    token_re + r"git\s+(commit|push|add|rm|mv|reset|checkout|restore|switch|rebase|merge|pull|fetch|init|clone|stash|tag|branch|clean|cherry-pick|revert|apply|am|worktree)\b",
+    token_re + r"(npm|yarn|pnpm|bun|pip|pip3|poetry|uv|gem|bundle|cargo|go|brew|apt|apt-get|dnf|yum|pacman|zypper)\s+(install|i|ci|add|remove|uninstall|update|upgrade|mod)\b",
+    token_re + r"(docker|docker-compose|kubectl|terraform|ansible|helm|systemctl|launchctl)\s+\w+",
+    token_re + r"(curl|wget)\s+[^|;&`]*(-o|--output|-O|--download)\b",
+]
+for p in patterns:
+    if re.search(p, cmd):
+        sys.exit(0)
+sys.exit(1)
+' 2>/dev/null
+}
+
+# Extract Bash command from RAW_INPUT (stable JSON parse).
+_mcl_extract_bash_cmd() {
+  printf '%s' "$1" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+    print((obj.get("tool_input") or {}).get("command","") or "")
+except Exception:
+    pass
+' 2>/dev/null
+}
+
+# `git init` is the Plugin Kural A bootstrap call — must remain allowed
+# even when spec_approved=false, otherwise the very first session of an
+# MCL-managed project deadlocks (no .git/ → no plugin orchestration →
+# no spec). Plugin gate branch does NOT honor this exception (gate-active
+# means environment is incomplete; everything mutating waits).
+_mcl_is_git_init_only() {
+  printf '%s' "$1" | grep -qE '^[[:space:]]*git[[:space:]]+init([[:space:]]|$)'
+}
+
 # -------- Branch: plugin gate (hard gate, overrides phase logic) --------
 # When `plugin_gate_active=true` in state, mutating tools AND writer-Bash
 # commands are denied regardless of phase/approval. Read-only tools still
@@ -139,43 +190,8 @@ if [ "$PLUGIN_GATE_ACTIVE" = "true" ]; then
       GATE_DENY=1
       ;;
     Bash)
-      BASH_CMD="$(printf '%s' "$RAW_INPUT" | python3 -c '
-import json, sys
-try:
-    obj = json.loads(sys.stdin.read())
-    print((obj.get("tool_input") or {}).get("command","") or "")
-except Exception:
-    pass
-' 2>/dev/null)"
-      if [ -n "$BASH_CMD" ]; then
-        IS_WRITER="$(printf '%s' "$BASH_CMD" | python3 -c '
-import re, sys
-cmd = sys.stdin.read()
-# Shell-redirection writers: `> file`, `>> file`, `>|`, `|& tee`.
-if re.search(r"(^|[^<>&0-9])>>?\s*[^&\s]", cmd) or re.search(r"\btee\b(?!\s*--help)", cmd):
-    print("1"); sys.exit(0)
-# Mutating commands at token boundary.
-token_re = r"(?:^|[\s|;&`(])"
-patterns = [
-    token_re + r"(rm|mv|cp|touch|mkdir|rmdir|chmod|chown|chgrp|ln|truncate|dd|patch|install|unlink)\b",
-    token_re + r"sed\b[^|;&`]*?\s-i\b",
-    token_re + r"git\s+(commit|push|add|rm|mv|reset|checkout|restore|switch|rebase|merge|pull|fetch|init|clone|stash|tag|branch|clean|cherry-pick|revert|apply|am|worktree)\b",
-    token_re + r"(npm|yarn|pnpm|bun|pip|pip3|poetry|uv|gem|bundle|cargo|go|brew|apt|apt-get|dnf|yum|pacman|zypper)\s+(install|i|ci|add|remove|uninstall|update|upgrade|mod)\b",
-    # NOTE: we deliberately do NOT block `bash foo.sh` / `python3 foo.py`.
-    # Read-only helper scripts (our own `mcl-plugin-gate.sh check`, lint
-    # dry-runs, stat collectors) would otherwise be false-positived. Real
-    # mutating scripts still hit the other patterns when they reach a
-    # mutating shell command inside.
-    token_re + r"(docker|docker-compose|kubectl|terraform|ansible|helm|systemctl|launchctl)\s+\w+",
-    token_re + r"(curl|wget)\s+[^|;&`]*(-o|--output|-O|--download)\b",
-]
-for p in patterns:
-    if re.search(p, cmd):
-        print("1"); sys.exit(0)
-print("0")
-' 2>/dev/null)"
-        [ "$IS_WRITER" = "1" ] && GATE_DENY=1
-      fi
+      BASH_CMD="$(_mcl_extract_bash_cmd "$RAW_INPUT")"
+      _mcl_is_bash_writer "$BASH_CMD" && GATE_DENY=1
       ;;
     *)
       # Read-only tools (Read, Glob, Grep, TodoWrite, WebFetch, WebSearch, Task, AskUserQuestion, ...).
@@ -551,8 +567,11 @@ fi
 # Skill, TodoWrite, and Task MCL-specific blocks run BEFORE this fast-path.
 # v13.0.9: AskUserQuestion + TodoWrite must proceed past fast-path so the
 # Layer B phase allowlist branch (line ~875) can check them per gate-spec.
+# v13.1.1 Bug 3: Bash must also proceed so spec-approval block can lock
+# mutating writes (cat > foo, mkdir, npm install, etc.). Read-only Bash
+# leaves _LOCK_TARGET=0 and falls through Layer B (always-allowed there).
 case "$TOOL_NAME" in
-  Write|Edit|MultiEdit|NotebookEdit|AskUserQuestion|TodoWrite) ;;
+  Write|Edit|MultiEdit|NotebookEdit|AskUserQuestion|TodoWrite|Bash) ;;
   *) exit 0 ;;
 esac
 
@@ -695,6 +714,16 @@ REASON_KIND=""
 _LOCK_TARGET=0
 case "$TOOL_NAME" in
   Write|Edit|MultiEdit|NotebookEdit) _LOCK_TARGET=1 ;;
+  Bash)
+    # v13.1.1 Bug 3 fix: mutating Bash (cat > foo, mkdir, rm, npm install,
+    # etc.) was bypassing the spec-approval gate before this branch. The
+    # only exception is `git init` (Plugin Kural A bootstrap — see helper
+    # comment near _mcl_is_git_init_only above).
+    _LOCK_BASH_CMD="$(_mcl_extract_bash_cmd "$RAW_INPUT")"
+    if _mcl_is_bash_writer "$_LOCK_BASH_CMD" && ! _mcl_is_git_init_only "$_LOCK_BASH_CMD"; then
+      _LOCK_TARGET=1
+    fi
+    ;;
 esac
 if [ "$_LOCK_TARGET" = "1" ] && [ "$SPEC_APPROVED" != "true" ]; then
   # v13.0.5: When the session has zero Aşama 1-4 audit evidence, the model

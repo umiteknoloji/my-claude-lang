@@ -263,4 +263,24 @@ except: pass
   fi
 fi
 
+# v13.1.1 Bug 2 fix: AskUserQuestion sonrası Claude Code Stop event'i
+# tetiklemiyor — model bir sonraki tool'a geçtiğinden tur "biti" sayılmıyor.
+# Sonuç: askq spec-approve cevapları kayıt edilmiyor, state.spec_approved
+# hep false kalıyor, faz hiç ilerlemiyor. Burada AskUserQuestion'ın PostToolUse
+# trigger'ını kullanıp Stop hook'u manuel çalıştırıyoruz. Stop hook idempotent:
+# state zaten advanced ise no-op (audit'e idempotent-noop kaydı düşer).
+# Çıktı yutuluyor — post-tool'un decision üretme yetkisi yok, Stop hook'un
+# block kararı burada anlamsız.
+_PT_TOOL_NAME="$(printf '%s' "$RAW_INPUT" | python3 -c '
+import json, sys
+try: print(json.loads(sys.stdin.read()).get("tool_name",""))
+except: pass
+' 2>/dev/null)"
+if [ "$_PT_TOOL_NAME" = "AskUserQuestion" ]; then
+  _PT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [ -x "$_PT_SCRIPT_DIR/mcl-stop.sh" ]; then
+    printf '%s' "$RAW_INPUT" | bash "$_PT_SCRIPT_DIR/mcl-stop.sh" >/dev/null 2>&1 || true
+  fi
+fi
+
 exit 0

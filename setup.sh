@@ -102,6 +102,9 @@ rm -rf "$SKILL_DST"
 mkdir -p "$SKILL_DST"
 cp "$SKILL_SRC" "$SKILL_DST/SKILL.md"
 cp "$SKILL_RULES_SRC"/*.md "$SKILL_DST/"
+# JSON data files (e.g. gate-spec.json — Layer B faz tool allowlist).
+# Without this, mutating-tool gating falls back to spec-approval-only mode.
+cp "$SKILL_RULES_SRC"/*.json "$SKILL_DST/" 2>/dev/null || true
 # _templates dizinini hedefe kopyalama (sadece build çıktıları gider)
 echo "[OK] Skill files installed to $SKILL_DST (clean copy)"
 
