@@ -4,10 +4,11 @@ MyCL Kuş Bakışı — Sözde Kod
 
   KULLANICI ←──→ MyCL (anlam doğrulama katmanı) ←──→ CLAUDE CODE (model + araçlar)
                 │
-                ├── 4 kanca (Claude Code'un çağırdığı bash dosyaları)
+                ├── 4 kanca (Claude Code'un çağırdığı Python dosyaları:
+                │   activate.py, pre_tool.py, post_tool.py, stop.py)
                 ├── state.json (faz, spec onayı, vb.)
                 ├── audit.log (sadece eklenen olay kaydı)
-                ├── 22 faz tanımı (gate-spec.json)
+                ├── 22 faz tanımı (data/gate_spec.json)
                 └── her faz için skill dosyası
 
   2. Kancalar — Ne Zaman Çalışır, Ne Yapar
@@ -28,13 +29,15 @@ MyCL Kuş Bakışı — Sözde Kod
   # Her araç çağrısından ÖNCE
   on PreToolUse(tool_name, tool_input):
       pre_tool.py çalışır:
-          if tool_name in [Read, Glob, Grep, LS, WebFetch, WebSearch, Task, Skill, Bash]:
-              return İZİN_VER  # araştırma + audit yazma her zaman serbest
+          if tool_name in [Read, Glob, Grep, LS, WebFetch, WebSearch, Task, Skill]:
+              return İZİN_VER  # araştırma her zaman serbest
                                 # (gate-spec: _global_always_allowed_tools)
-                                # NOT: Bash buradan geçer ama state-mutating
-                                # komutlar (mkdir, rm, npm install, git push,
-                                # vb.) plugin gate'te ayrıca filtrelenir;
-                                # mutating Bash yasaktır.
+
+          # Bash özel: read-only komutlar her fazda izinli; mutating
+          # komutlar (mkdir, rm, npm install, cat > foo, vb.) faz-spesifik
+          # gate_spec.json[allowed_tools]'a göre filtrelenir + spec_approved
+          # öncesi ekstra kilit (spec-approval block). audit emit + git init
+          # özel istisnalar (legitim recovery yolları).
 
           # Katman B — fazın izin verdiği araç mı?
           aktif_faz = aktif_fazi_turet(state, audit_log)
@@ -531,9 +534,10 @@ MyCL Kuş Bakışı — Sözde Kod
     → state.current_phase = 2 (Hassasiyet Denetimi — sıralı, v13.0.11 düzeltmesi)
     → Audit: summary-confirm-approve
 
-  Not: Eğer Stop kanca bunu kaçırırsa, bir sonraki PreToolUse'da
-  pre-tool.sh'in JIT askq advance mekanizması (line ~744) yedek olarak
-  aynı state ilerletmeyi yapar.
+  Not: Eğer Stop kanca bunu kaçırırsa (örn. AskUserQuestion zincirinde
+  Stop event tetiklenmediği için — v13.1.1 Bug 2 paterni), post_tool.py
+  AskUserQuestion sonrası stop.py'yi sub-shell olarak manuel tetikler.
+  Side effect (state, audit) parent'a geçer, decision yutulur.
     │
     ▼
   [Sonraki kullanıcı mesajında veya devam turunda]
@@ -623,8 +627,13 @@ MyCL Kuş Bakışı — Sözde Kod
   kelime).
 
   1. Audit yazma kurtarma yolu:
-     bash -c 'source ~/.claude/hooks/lib/mycl-state.sh; mcl_audit_log <ad> <çağıran> "<detay>"'
+     python3 -c 'import sys; sys.path.insert(0, "$HOME/.claude"); \
+       from hooks.lib import audit; \
+       audit.log_event("<ad>", "<çağıran>", "<detay>")'
      Model askq açamadığında veya state takıldığında elle ilerletme.
+     state.set_field bu kanaldan ÇAĞRILAMAZ (pre_tool.py state-mutation
+     lock); sadece audit.log_event legitim. Hook gate audit'i okuyup
+     state'i kendi ilerletir.
 
   2. /mycl-restart:
      Tüm state'i sıfırla, faz=1'e dön. MCL_RESTART_MODE dalı.
