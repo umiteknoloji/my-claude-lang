@@ -223,6 +223,20 @@ def test_log_event_signed_rejects_summary_with_keys(tmp_project):
         )
 
 
+def test_log_event_signed_rejects_pipe_in_extra_detail(tmp_project):
+    """log_event_signed extra_detail'i log_event'e iletir; pipe içeren
+    extra_detail validation'ı log_event ValueError'ında yakalanır
+    (T5 KK gap'i — coverage tamamlandı)."""
+    with pytest.raises(ValueError):
+        audit.log_event_signed(
+            "asama-4-complete",
+            "stop.py",
+            signature="ab",
+            summary="ok",
+            extra_detail="key1=v1 | key2=v2",
+        )
+
+
 # ---------- isolation ----------
 
 

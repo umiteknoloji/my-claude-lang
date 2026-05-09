@@ -147,8 +147,14 @@ def test_reset_returns_default(tmp_project):
 
 
 def test_missing_fields_filled_from_default(tmp_project):
-    """Eski schema state.json'unda yeni alanlar yoksa, read() default ile
-    doldurur — forward-compatible upgrade."""
+    """Forward-compatible upgrade: eski (veya hipotetik gelecek) state
+    formatında yeni MyCL alanları yoksa, read() eksikleri default ile
+    tamamlar — read merge davranışı test ediliyor.
+
+    `schema_version: 3` v13.x-stili eski state'i temsil ediyor (MyCL
+    1.0.0'da SCHEMA_VERSION = 1; 3 hipotetik eski sürüm değeri olarak
+    geçerli — _validate `int >= 1` kontrolünü geçer). Test'in niyeti:
+    schema rakamı ne olursa olsun eksik alan default'tan dolar."""
     p = state.state_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text('{"schema_version": 3, "current_phase": 5}', encoding="utf-8")
