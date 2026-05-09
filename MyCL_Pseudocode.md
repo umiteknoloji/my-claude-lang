@@ -255,7 +255,7 @@ MyCL Kuş Bakışı — Sözde Kod
      Aşama 6 dev server + browser auto-open ile biter ve STOP. Aşama 7
      askq önceden AÇILMAZ — geliştiricinin bir sonraki turn'undaki
      free-form cevabı intent classification ile yorumlanır:
-       * approve cue'ları (14 dilde) → asama-7-complete, Aşama 8'e geç
+       * approve cue'ları (TR + EN) → asama-7-complete, Aşama 8'e geç
        * revise cue'ları → Aşama 6'ya geri dön, geri bildirimle yeniden yaz
        * cancel cue'ları → pipeline durur
        * approve + revise birlikte (örn. "güzel ama büyüt") → revise kazanır
