@@ -31,6 +31,10 @@ MCL Kuş Bakışı — Sözde Kod
           if tool_name in [Read, Glob, Grep, LS, WebFetch, WebSearch, Task, Skill, Bash]:
               return İZİN_VER  # araştırma + audit yazma her zaman serbest
                                 # (gate-spec: _global_always_allowed_tools)
+                                # NOT: Bash buradan geçer ama state-mutating
+                                # komutlar (mkdir, rm, npm install, git push,
+                                # vb.) plugin gate'te ayrıca filtrelenir;
+                                # mutating Bash yasaktır.
 
           # Katman B — fazın izin verdiği araç mı?
           aktif_faz = aktif_fazi_turet(state, audit_log)
