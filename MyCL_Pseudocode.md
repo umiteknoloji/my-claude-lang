@@ -1,8 +1,8 @@
-MCL Kuş Bakışı — Sözde Kod
+MyCL Kuş Bakışı — Sözde Kod
 
   1. Üst Seviye Mimari
 
-  KULLANICI ←──→ MCL (anlam doğrulama katmanı) ←──→ CLAUDE CODE (model + araçlar)
+  KULLANICI ←──→ MyCL (anlam doğrulama katmanı) ←──→ CLAUDE CODE (model + araçlar)
                 │
                 ├── 4 kanca (Claude Code'un çağırdığı bash dosyaları)
                 ├── state.json (faz, spec onayı, vb.)
@@ -14,20 +14,20 @@ MCL Kuş Bakışı — Sözde Kod
 
   # Her kullanıcı mesajında — turun başında
   on UserPromptSubmit:
-      mcl-activate.sh çalışır:
+      activate.py çalışır:
           - state.json oku (current_phase nedir?)
           - audit.log oku (hangi audit'ler yazılmış?)
           - Bildirimler hazırla:
-              * <mcl_active_phase_directive>  → şu an aktif faz, ne yazılmalı
-              * <mcl_phase_status>            → ilerleme: 3/8 risk çözüldü gibi
-              * <mcl_phase_allowlist_escalate> → 5+ kez reddedildiyse kullanıcıya uyarı
+              * <mycl_active_phase_directive>  → şu an aktif faz, ne yazılmalı
+              * <mycl_phase_status>            → ilerleme: 3/8 risk çözüldü gibi
+              * <mycl_phase_allowlist_escalate> → 5+ kez reddedildiyse kullanıcıya uyarı
               * Faza özel diğer bildirimler
           - STATIC_CONTEXT (sabit kurallar) + tüm bildirimler → modele gönder
 
 
   # Her araç çağrısından ÖNCE
   on PreToolUse(tool_name, tool_input):
-      mcl-pre-tool.sh çalışır:
+      pre_tool.py çalışır:
           if tool_name in [Read, Glob, Grep, LS, WebFetch, WebSearch, Task, Skill, Bash]:
               return İZİN_VER  # araştırma + audit yazma her zaman serbest
                                 # (gate-spec: _global_always_allowed_tools)
@@ -47,7 +47,7 @@ MCL Kuş Bakışı — Sözde Kod
               return REDDET("Bu yol Aşama X'te yasak")
 
           # Diğer korumalar:
-          # - spec_approved=false → MCL LOCK
+          # - spec_approved=false → MyCL LOCK
           # - sır/kimlik bilgisi taraması
           # - yıkıcı işlem yeniden onayı (rm -rf gibi)
           # - plugin kapısı (zorunlu plugin yoksa)
@@ -56,7 +56,7 @@ MCL Kuş Bakışı — Sözde Kod
 
   # Her araç çağrısından SONRA
   on PostToolUse(tool_name, tool_input, tool_output):
-      mcl-post-tool.sh çalışır:
+      post_tool.py çalışır:
           - TDD desen tespit (yol sezgisi):
               * test yolu → audit: tdd-test-write
               * üretim yolu → audit: tdd-prod-write
@@ -69,7 +69,7 @@ MCL Kuş Bakışı — Sözde Kod
 
   # Model cevabını bitirince (her turun sonu)
   on Stop:
-      mcl-stop.sh çalışır:
+      stop.py çalışır:
           # 1. Spec bloğu tespit
           if "📋 Spec:" son_assistant_mesajinda:
               spec_hash hesapla, state'e yaz
@@ -116,7 +116,7 @@ MCL Kuş Bakışı — Sözde Kod
      çıkarır, hangisini kastettiğini sorar.
 
   askq:
-     "MCL X.Y.Z | Faz 1 — Niyet özeti onayı"
+     "MyCL X.Y.Z | Faz 1 — Niyet özeti onayı"
 
   Çıktı:
      summary-confirm-approve
@@ -144,7 +144,7 @@ MCL Kuş Bakışı — Sözde Kod
        * GATE         → mimari etkili, geliştiriciye sor
 
   askq:
-     "MCL X.Y.Z | Faz 2 — Precision-audit niyet onayı"
+     "MyCL X.Y.Z | Faz 2 — Precision-audit niyet onayı"
 
   Çıktı:
      precision-audit + asama-2-complete
@@ -189,7 +189,7 @@ MCL Kuş Bakışı — Sözde Kod
      askq ile onay istenir.
 
   askq:
-     "MCL X.Y.Z | Faz 4 — Spec onayı"
+     "MyCL X.Y.Z | Faz 4 — Spec onayı"
 
   Çıktı:
      asama-4-complete + asama-4-ac-count must=N should=M
@@ -489,9 +489,9 @@ MCL Kuş Bakışı — Sözde Kod
 
   Ne yapar:
      Üç dosyayı okur:
-       * .mcl/audit.log
-       * .mcl/state.json
-       * .mcl/trace.log
+       * .mycl/audit.log
+       * .mycl/state.json
+       * .mycl/trace.log
      1-21 fazlarının her birinin doğru audit'lerini kontrol eder.
      Iki zorunlu derin denetim:
        * Aşama 9 TDD: her AC için 3 audit (red/green/refactor) var mı?
@@ -508,17 +508,17 @@ MCL Kuş Bakışı — Sözde Kod
   KULLANICI: "backoffice projesi yapacağım..."
     │
     ▼
-  [mcl-activate.sh tetiklenir]
+  [activate.py tetiklenir]
     → state.json: current_phase=1
-    → <mcl_active_phase_directive> Aşama 1 yönergesi gönderilir
+    → <mycl_active_phase_directive> Aşama 1 yönergesi gönderilir
     → STATIC_CONTEXT + tüm bildirimler
     │
     ▼
   [Claude modeli cevap üretir]
-    Model: AskUserQuestion("MCL 13.1.0 | Faz 1 — Niyet özeti onayı: ...")
+    Model: AskUserQuestion("MyCL 1.0.0 | Faz 1 — Niyet özeti onayı: ...")
     │
     ▼
-  [mcl-pre-tool.sh tetiklenir — AskUserQuestion]
+  [pre_tool.py tetiklenir — AskUserQuestion]
     → Katman B: Aşama 1 allowed_tools = [AskUserQuestion]  ✓
     → İZİN_VER
     │
@@ -526,7 +526,7 @@ MCL Kuş Bakışı — Sözde Kod
   [askq arayüzde gösterilir, kullanıcı "Onayla" tıklar]
     │
     ▼
-  [mcl-stop.sh tetiklenir]
+  [stop.py tetiklenir]
     → askq tool_use/tool_result çiftini yakalar
     → state.current_phase = 2 (Hassasiyet Denetimi — sıralı, v13.0.11 düzeltmesi)
     → Audit: summary-confirm-approve
@@ -537,7 +537,7 @@ MCL Kuş Bakışı — Sözde Kod
     │
     ▼
   [Sonraki kullanıcı mesajında veya devam turunda]
-    → mcl-activate.sh: aktif faz=2 → Aşama 2 yönergesi gönderilir
+    → activate.py: aktif faz=2 → Aşama 2 yönergesi gönderilir
     → Model hassasiyet denetimi yapar, asama-2-complete yazar
     → Universal completeness loop 2→3→4'e ilerletir (audit zinciri tamsa)
     → Model spec yazar + Faz 4 askq açar
@@ -553,7 +553,7 @@ MCL Kuş Bakışı — Sözde Kod
      index tablosu render edilir.
 
   Persuasion Manifesto (v13.0.16):
-     <mcl_core> açılışında "WHY THESE 22 PHASES — this pipeline works WITH
+     <mycl_core> açılışında "WHY THESE 22 PHASES — this pipeline works WITH
      you, not against you" başlıklı 8 satırlık ikna bloğu. Her atlamanın
      modele *maliyetini* (rewrite, retry) somut örneklerle anlatır. Negative
      framing yerine positive incentive — model train data'sındaki "niyet
@@ -571,7 +571,7 @@ MCL Kuş Bakışı — Sözde Kod
   Spec-Approve Audit Chain (v13.0.14 + v13.0.17 auto-fill):
      Aşama 4 spec-approve advance için audit zinciri şart:
      summary-confirm-approve + asama-2-complete + asama-3-complete. v13.0.17:
-     developer "Onayla" demişse chain incomplete olsa bile MCL eksik
+     developer "Onayla" demişse chain incomplete olsa bile MyCL eksik
      audit'leri "auto-fill-spec-approve" markıyla emit eder, advance fire
      eder (deadlock kırma — model bypass'a yelteniyordu).
 
@@ -595,7 +595,7 @@ MCL Kuş Bakışı — Sözde Kod
   Spec Varlık Denetimi:
      Edit/Write/MultiEdit çağrıldı ama assistant mesajında 📋 Spec: bloğu
      yok → Stop kancası spec-required-warn audit yazar
-     (uyarı amaçlı, /mcl-checkup'ta görünür)
+     (uyarı amaçlı, /mycl-checkup'ta görünür)
 
   TDD Uyumluluk Skoru:
      Post-tool tdd-test-write + tdd-prod-write olaylarını sayar; testin
@@ -604,7 +604,7 @@ MCL Kuş Bakışı — Sözde Kod
 
   Devtime/Runtime REASON Split (v13.0.13):
      Hook block REASON'ları iki dilde tutulur: devtime (uzun İngilizce
-     debug — MCL geliştirenler için) + runtime (kısa Türkçe — son
+     debug — MyCL geliştirenler için) + runtime (kısa Türkçe — son
      kullanıcı için). _mcl_is_devtime helper CLAUDE_PROJECT_DIR'a göre
      seçer. Production session'da kırmızı "Error:" panik yumuşatılır.
 
@@ -618,24 +618,24 @@ MCL Kuş Bakışı — Sözde Kod
 
   6. Kaçış Valfleri
 
-  Tüm /mcl-* slash komutları mcl-activate.sh'da PROMPT_NORM dize
+  Tüm /mycl-* slash komutları activate.py'da PROMPT_NORM dize
   eşleştirmesiyle yakalanır (ayrı komut dosyası değil, kanca-tespitli anahtar
   kelime).
 
   1. Audit yazma kurtarma yolu:
-     bash -c 'source ~/.claude/hooks/lib/mcl-state.sh; mcl_audit_log <ad> <çağıran> "<detay>"'
+     bash -c 'source ~/.claude/hooks/lib/mycl-state.sh; mcl_audit_log <ad> <çağıran> "<detay>"'
      Model askq açamadığında veya state takıldığında elle ilerletme.
 
-  2. /mcl-restart:
+  2. /mycl-restart:
      Tüm state'i sıfırla, faz=1'e dön. MCL_RESTART_MODE dalı.
 
-  3. /mcl-update:
-     git pull + setup.sh — yeni MCL sürümü. MCL_UPDATE_MODE dalı.
+  3. /mycl-update:
+     git pull + setup.sh — yeni MyCL sürümü. MCL_UPDATE_MODE dalı.
 
-  4. /mcl-version:
-     Kurulu MCL sürümünü göster.
+  4. /mycl-version:
+     Kurulu MyCL sürümünü göster.
 
-  5. /mcl-doctor:
+  5. /mycl-doctor:
      Token & maliyet raporu (cost.json okur).
 
   6. Loop-breaker:
@@ -643,21 +643,21 @@ MCL Kuş Bakışı — Sözde Kod
      (eski mekanizma). v13.1.0 sonrası Katman B'de otomatik açılma YOK —
      blok kalkmaz, audit uyarısı kullanıcıya iletilir.
 
-  7. /mcl-checkup:
+  7. /mycl-checkup:
      Tüm fazların durumunu salt-okunur rapor olarak göster.
 
-  8. /mcl-finish:
+  8. /mycl-finish:
      Birikmiş Aşama 19 etkilerini bir kontrol noktasında topla, proje
      düzeyinde bitirme raporu üret.
 
   9. Diğer slash komutları:
-     /mcl-cost, /mcl-dispatch, /mcl-dsi, /mcl-log, /mcl-plugin,
-     /mcl-rollback, /mcl-self, /mcl-semgrep, /mcl-stack, /mcl-state,
-     /mcl-tag, /mcl-test, /mcl-trace — her biri activate hook'ta
+     /mycl-cost, /mycl-dispatch, /mycl-dsi, /mycl-log, /mycl-plugin,
+     /mycl-rollback, /mycl-self, /mycl-semgrep, /mycl-stack, /mycl-state,
+     /mycl-tag, /mycl-test, /mycl-trace — her biri activate hook'ta
      PROMPT_NORM string match ile yakalanır, faza özel kısa cevaplar
      veya state inceleme amaçlıdır.
 
-  7. Tek Cümleyle MCL
+  7. Tek Cümleyle MyCL
 
   ▎ Model her turda 22 fazlı sıralı boru hattının tam olarak hangi fazında
   ▎ olduğunu bilir, fazın izinli araç listesini Katman B zorlar, faz
