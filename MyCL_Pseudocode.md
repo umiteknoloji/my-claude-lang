@@ -51,9 +51,11 @@ MyCL Kuş Bakışı — Sözde Kod
 
           # Diğer korumalar:
           # - spec_approved=false → MyCL LOCK
-          # - sır/kimlik bilgisi taraması
           # - yıkıcı işlem yeniden onayı (rm -rf gibi)
           # - plugin kapısı (zorunlu plugin yoksa)
+          # NOT: hardcoded secret taraması Aşama 14 (Güvenlik) hook'una
+          # bırakıldı — semgrep + paket audit ile derin tarama yeterli;
+          # pre-tool runtime'da extra pattern match overlap üretiyordu.
           return İZİN_VER
 
 
