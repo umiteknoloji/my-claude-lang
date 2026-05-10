@@ -208,3 +208,31 @@ def test_hook_renders_escalation_when_present(tmp_path):
     out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
     context = out["hookSpecificOutput"]["additionalContext"]
     assert "<mycl_phase_allowlist_escalate>" in context
+
+
+# ---------- subagent orchestration directive (Aşama 1 POC) ----------
+
+
+def test_hook_emits_subagent_directive_in_phase_1(tmp_path):
+    """Aşama 1'de subagent_orchestration aktif → directive emit edilir."""
+    out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
+    context = out["hookSpecificOutput"]["additionalContext"]
+    assert "<mycl_phase_subagent_directive>" in context
+    assert "mycl-phase-runner" in context
+    assert "Task" in context
+    assert "Phase 1" in context
+
+
+def test_hook_skips_subagent_directive_in_phase_without_flag(tmp_path):
+    """Aşama 2'de subagent_orchestration false → directive emit edilmez."""
+    mycl_dir = tmp_path / ".mycl"
+    mycl_dir.mkdir(parents=True, exist_ok=True)
+    state_path = mycl_dir / "state.json"
+    state_path.write_text(
+        '{"schema_version": 1, "current_phase": 2, "spec_approved": false, '
+        '"spec_hash": null, "spec_must_list": []}',
+        encoding="utf-8",
+    )
+    out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
+    context = out["hookSpecificOutput"]["additionalContext"]
+    assert "<mycl_phase_subagent_directive>" not in context

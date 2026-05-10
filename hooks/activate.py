@@ -31,7 +31,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hooks.lib import audit, bilingual, dsi, framing, plugin, trace  # noqa: E402
+from hooks.lib import audit, bilingual, dsi, framing, orchestrator, plugin, state, trace  # noqa: E402
 
 
 def _read_version() -> str:
@@ -109,6 +109,52 @@ def _build_context(project_root: str, turn_tokens: int = 0) -> str:
     )
     if dsi_text:
         blocks.append(dsi_text)
+
+    # 2.5. Subagent orchestration directive — aktif fazda
+    # `subagent_orchestration: true` ise modeli mycl-phase-runner Task
+    # çağrısına yönlendir. Subagent text döner, stop hook parse eder.
+    cp = state.get("current_phase", 1, project_root=project_root)
+    if orchestrator.is_orchestration_enabled(cp):
+        try:
+            skill_content = orchestrator.read_skill(cp)
+        except FileNotFoundError:
+            skill_content = ""
+        state_snapshot = {
+            "current_phase": cp,
+            "spec_must_list": state.get(
+                "spec_must_list", [], project_root=project_root,
+            ),
+            "pattern_summary": state.get(
+                "pattern_summary", "n/a", project_root=project_root,
+            ),
+        }
+        prior_output = state.get(
+            "last_phase_output", "none", project_root=project_root,
+        )
+        subagent_prompt = orchestrator.build_subagent_prompt(
+            phase_n=cp,
+            skill_content=skill_content,
+            state_snapshot=state_snapshot,
+            prior_output=prior_output,
+        )
+        directive_tr = (
+            f"Aşama {cp} için **mycl-phase-runner** subagent'ını "
+            f"**Task** tool ile çağır. Subagent text döner "
+            f"(`complete: <özet>` formatında); hook bunu okur. Başka "
+            f"tool çağırma — sadece Task ile subagent başlat."
+        )
+        directive_en = (
+            f"For Phase {cp}, invoke the **mycl-phase-runner** subagent "
+            f"via **Task** tool. Subagent returns text "
+            f"(`complete: <summary>` format); hook reads it. Don't call "
+            f"other tools; only Task to start the subagent."
+        )
+        blocks.append(
+            "<mycl_phase_subagent_directive>\n"
+            f"{directive_tr}\n\n{directive_en}\n\n"
+            f"Subagent prompt:\n```\n{subagent_prompt}\n```\n"
+            "</mycl_phase_subagent_directive>"
+        )
 
     # 3. Plugin Kural A: git init consent (ilk-açılışta sor, sonra asla tekrar)
     if plugin.should_ask_git_init_consent(project_root=project_root):

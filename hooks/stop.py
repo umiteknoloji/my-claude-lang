@@ -38,7 +38,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from hooks.lib import (  # noqa: E402
-    askq, audit, gate, spec_detect, state, transcript,
+    askq, audit, gate, orchestrator, spec_detect, state, transcript,
 )
 
 
@@ -253,6 +253,107 @@ def _detect_phase_complete_trigger(
     return wrote
 
 
+# ---------- subagent orchestration (Aşama N) ----------
+
+
+def _find_phase_runner_output(transcript_path: str) -> str | None:
+    """Transcript'te son `mycl-phase-runner` Task çağrısının tool_result text'i."""
+    if not transcript_path:
+        return None
+    use_id: str | None = None
+    last_result: str | None = None
+    for msg in transcript.iter_messages(transcript_path):
+        for content in msg.get("message", {}).get("content", []):
+            if not isinstance(content, dict):
+                continue
+            ctype = content.get("type")
+            if ctype == "tool_use" and content.get("name") == "Task":
+                inp = content.get("input") or {}
+                if isinstance(inp, dict) and inp.get("subagent_type") == "mycl-phase-runner":
+                    use_id = content.get("id")
+            elif ctype == "tool_result" and use_id is not None:
+                if content.get("tool_use_id") == use_id:
+                    raw = content.get("content")
+                    if isinstance(raw, list):
+                        parts = [
+                            blk.get("text", "")
+                            for blk in raw
+                            if isinstance(blk, dict) and blk.get("type") == "text"
+                        ]
+                        last_result = "\n".join(p for p in parts if p)
+                    elif isinstance(raw, str):
+                        last_result = raw
+    return last_result
+
+
+def _detect_subagent_phase_output(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """mycl-phase-runner subagent çıktısını parse et, audit + state advance.
+
+    Aşama N'de `subagent_orchestration: true` ise:
+      - complete → `asama-N-complete` audit
+      - skipped  → `asama-N-skipped reason=X` audit
+      - pending  → `asama-N-pending question=X` audit (advance YOK)
+      - error    → `asama-N-subagent-error` audit (advance YOK, STRICT)
+
+    Universal completeness loop advance'i complete/skipped audit'inden
+    sonra sağlar (audit-driven walk paterni).
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    if not orchestrator.is_orchestration_enabled(cp):
+        return False
+
+    output_text = _find_phase_runner_output(transcript_path)
+    if not output_text:
+        return False
+
+    parsed = orchestrator.parse_phase_output(output_text)
+    existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
+
+    if parsed.outcome == orchestrator.PhaseOutcome.COMPLETE:
+        audit_name = f"asama-{cp}-complete"
+        if audit_name in existing:
+            return False
+        audit.log_event(
+            audit_name, "stop.py",
+            f"subagent-emit summary={parsed.summary[:80]}",
+            project_root=project_dir,
+        )
+        return True
+
+    if parsed.outcome == orchestrator.PhaseOutcome.SKIPPED:
+        audit_name = f"asama-{cp}-skipped"
+        if audit_name in existing:
+            return False
+        audit.log_event(
+            audit_name, "stop.py",
+            f"reason={parsed.reason} detail={parsed.detail[:80]}",
+            project_root=project_dir,
+        )
+        return True
+
+    if parsed.outcome == orchestrator.PhaseOutcome.PENDING:
+        audit.log_event(
+            f"asama-{cp}-pending", "stop.py",
+            f"question={parsed.question[:120]}",
+            project_root=project_dir,
+        )
+        return False
+
+    # ERROR
+    audit.log_event(
+        f"asama-{cp}-subagent-error", "stop.py",
+        f"detail={parsed.detail[:120]}",
+        project_root=project_dir,
+    )
+    return False
+
+
 # ---------- main ----------
 
 
@@ -275,9 +376,14 @@ def main() -> int:
     if intent == askq.INTENT_APPROVE:
         _spec_approve_flow(project_dir)
 
-    # 3.5. Faz tamamlama text trigger (Aşama 1-3 ana kanal; modelin
-    # cevabında `asama-N-complete` varsa sıralı eşleşmede audit emit,
-    # atlama denemesinde phase-skip-attempt audit).
+    # 3.5. Subagent orkestrasyon — Aşama N'de subagent_orchestration
+    # aktifse mycl-phase-runner Task tool çıktısını parse et, audit +
+    # state advance (universal loop sonradan ilerletir).
+    _detect_subagent_phase_output(transcript_path, project_dir)
+
+    # 3.6. Faz tamamlama text trigger (fallback — orchestration yoksa
+    # veya subagent çıktısı yoksa modelin cevabındaki `asama-N-complete`
+    # tetik kelimesi kanalı).
     _detect_phase_complete_trigger(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)
