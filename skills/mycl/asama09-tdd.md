@@ -72,6 +72,10 @@ fixture düzenine uyar.
 
 ## Çıktı (her AC için 3 audit)
 
+> **Model:** `asama-9-complete` (sonda — tüm AC'ler bittikten sonra) cevap metninde düz yazıyla.
+> **Hook:** `asama-9-ac-N-red/green/refactor` (her AC döngüsünde test runner sonucuyla `tdd.py` yazar) + `regression-clear` (tam suite YEŞİL post_tool sinyali).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-9-ac-1-red
 asama-9-ac-1-green
@@ -140,6 +144,10 @@ code must follow existing patterns.
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-9-complete` (at end — after all ACs) plain text in reply.
+> **Hook:** `asama-9-ac-N-red/green/refactor` per AC (`tdd.py` writes on test runner result) + `regression-clear` (full suite green via post_tool).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 3 audits per AC + `asama-9-complete` at end.
 

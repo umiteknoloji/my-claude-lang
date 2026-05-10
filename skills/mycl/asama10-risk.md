@@ -68,6 +68,10 @@ buna zaman yatırımı kabul eder.
 
 ## Çıktı (audit)
 
+> **Model:** `asama-10-complete` (tüm risk maddeleri çözüldükten sonra) cevap metninde düz yazıyla.
+> **Hook:** `asama-10-items-declared count=K`, `asama-10-item-N-resolved decision=...` (her askq sonucu için hook + askq classifier yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-10-items-declared count=K
 asama-10-item-1-resolved decision=apply  # veya skip/rule
@@ -123,6 +127,10 @@ Each risk presented one-by-one via AskUserQuestion:
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-10-complete` (after all risk items resolved) plain text in reply.
+> **Hook:** `asama-10-items-declared count=K`, `asama-10-item-N-resolved decision=...` (askq classifier writes per item).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-10-items-declared count=K` + `asama-10-item-N-resolved
 decision=apply|skip|rule` per item + `asama-10-complete`.

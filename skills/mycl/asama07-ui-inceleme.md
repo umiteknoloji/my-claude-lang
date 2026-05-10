@@ -71,6 +71,10 @@ yasak — Aşama 6'ya dönünce orada açılır.
 
 ## Çıktı (audit)
 
+> **Model:** Bu aşama askq intent classification ile sürer; model `asama-7-complete` zikretmez. Free-form intent → hook karar verir (approve/revise/cancel).
+> **Hook:** `asama-7-complete`, `asama-7-skipped`, `asama-7-revise-requested` — askq classifier sonucuna göre hook yazar.
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-7-complete    # approve veya fallback "Onayla"
 asama-7-skipped     # cancel veya Aşama 6 skipped

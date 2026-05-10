@@ -99,6 +99,10 @@ Bash AskUserQuestion gerekmez — hook tek başına çalışır.
 
 ## Çıktı (audit)
 
+> **Model:** Bu aşama özeldir — model `asama-22-complete` **emit etmez**. Pre_tool model'in Bash/Write ile emit denemesini DENY ile bloklar.
+> **Hook:** `asama-22-complete` tek başına stop hook tarafından, tamlık raporu üretildikten sonra yazılır.
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-22-complete (HOOK tarafından — modelden değil)
 ```
@@ -152,6 +156,10 @@ trace summary, hook signature.
 `Read` (audit/state/trace) + `Write` (report).
 
 ## Audit output
+
+> **Model:** This phase is special — model **does not** emit `asama-22-complete`. Pre_tool DENYs Bash/Write emission attempts.
+> **Hook:** `asama-22-complete` is hook-emitted by stop hook after the completeness report is generated.
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-22-complete` (hook only — never model).
 

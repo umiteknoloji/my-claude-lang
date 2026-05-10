@@ -48,6 +48,10 @@ audit. Backend Aşama 8 (DB) veya Aşama 9 (TDD)'de yazılır.
 
 ## Çıktı (3 seçenek)
 
+> **Model:** `asama-6-complete` veya `asama-6-skipped reason=no-ui-flow` cevap metninde düz yazıyla.
+> **Hook:** `asama-6-end server_started=... browser_opened=...` (sunucu+tarayıcı sertifikası — hook doğrulayarak yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 | Audit | Anlam |
 |---|---|
 | `asama-6-complete` | UI hazır (manuel emit) |
@@ -108,6 +112,10 @@ it in the browser **before** any backend is written.
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output (one of three)
+
+> **Model:** `asama-6-complete` or `asama-6-skipped reason=no-ui-flow` plain text in reply.
+> **Hook:** `asama-6-end server_started=... browser_opened=...` (server+browser certificate — hook writes after verification).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 - `asama-6-complete` (manual emit)
 - `asama-6-skipped reason=no-ui-flow` (no UI in project)

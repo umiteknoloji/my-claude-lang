@@ -50,6 +50,10 @@ Aşama 20 EN raporu Türkçeye çevrilir; başka dilde session'larda 1.0.0
 
 ## Çıktı (audit)
 
+> **Model:** `asama-21-complete` (TR çevirisi yazıldıktan sonra) veya `asama-21-skipped reason=already-english` (EN oturumda) cevap metninde düz yazıyla.
+> **Hook:** Aşama 21'de hook'un emit ettiği yan audit yok; tetik ile audit yazımı tek kanaldır.
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-21-complete (TR çevirisi yazıldı)
 asama-21-skipped reason=already-english
@@ -91,6 +95,10 @@ remain in English (1.0.x may restore 14-language support).
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-21-complete` (after TR translation) or `asama-21-skipped reason=already-english` (EN session) plain text in reply.
+> **Hook:** No side audits in Phase 21; trigger emission is the single channel.
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-21-complete` | `asama-21-skipped reason=already-english`.
 

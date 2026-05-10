@@ -46,6 +46,10 @@ sadece çeviri.
 
 ## Çıktı (audit)
 
+> **Model:** Bu aşama sessizdir; model özel olarak `asama-3-complete` emit etmez. `silent_phase: true` flag'i ile hook universal completeness loop sırasında otomatik geçirir.
+> **Hook:** `engineering-brief` ve `asama-3-complete` audit'lerini hook yazar.
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 engineering-brief
 asama-3-complete
@@ -92,6 +96,10 @@ Marked `[default: X, changeable]`.
 - Auth/persistence not gated in Phase 2
 
 ## Audit output
+
+> **Model:** silent phase; model does not emit. `silent_phase: true` triggers auto-advance.
+> **Hook:** writes `engineering-brief` and `asama-3-complete` automatically.
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `engineering-brief` + `asama-3-complete`. Auto-advanced via universal
 completeness loop (silent_phase=true).

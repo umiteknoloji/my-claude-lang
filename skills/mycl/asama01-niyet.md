@@ -43,12 +43,18 @@ sonrası başlar.
 
 ## Çıktı (audit)
 
+Aşama 1 tamamlandığında cevap metninde **düz yazıyla** zikret:
+
 ```
-summary-confirm-approve
 asama-1-complete
 ```
 
-İkisinden biri yazılınca Aşama 2'ye advance.
+Stop hook transcript'i okur, sıralı eşleşmeyi (N == current_phase)
+doğrular, `.mycl/audit.log`'a yazar ve `current_phase`'i 2'ye
+ilerletir. Atlama denemesi (`asama-9-complete` vb.) reddedilir +
+`phase-skip-attempt` audit'lenir. Sen `Write`/`Bash` çağırma —
+gereksiz; pre_tool zaten bloklar. Tam mekanizma: ana skill "Audit
+emission kanalı" sözleşmesi.
 
 ## Anti-pattern
 
@@ -59,9 +65,11 @@ asama-1-complete
 - ❌ AskUserQuestion açmadan "evet onaylıyorsan devam edeyim" — askq
   hook için zorunlu (intent classifier sonrası `spec_approved` flag).
 
-## Recovery
+## Recovery (yalnızca geliştirici müdahalesi)
 
-Manual emit (geliştirici müdahalesi):
+**Model için değildir** — bu komutu sen çalıştırma. Hook arızası
+şüphesi varsa geliştirici yerel terminalden manuel emit eder:
+
 ```bash
 python3 -c "from hooks.lib import audit; audit.log_event('summary-confirm-approve', 'recovery', 'manual')"
 ```
@@ -95,7 +103,19 @@ Write/Edit/Bash forbidden in Phase 1 — code writing starts after Phase
 
 ## Audit output
 
-`summary-confirm-approve` or `asama-1-complete` advances to Phase 2.
+When Phase 1 is complete, mention this trigger word in your reply text
+(plain words, no file write):
+
+```
+asama-1-complete
+```
+
+The Stop hook reads the transcript, verifies sequential match
+(N == current_phase), appends to `.mycl/audit.log`, and advances
+`current_phase` to 2. Skip attempts (e.g. `asama-9-complete`) are
+rejected and audited as `phase-skip-attempt`. Don't call
+`Write`/`Bash` — unnecessary; pre_tool blocks them anyway. Full
+mechanism: see "Audit emission channel" contract in main skill.
 
 ## Anti-patterns
 

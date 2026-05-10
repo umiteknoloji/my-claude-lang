@@ -39,6 +39,10 @@ silme + revert için onay) — pratikte kalite pipeline'da askq açma.
 
 ## Çıktı (audit)
 
+> **Model:** `asama-11-complete` (rescan count=0 olduktan sonra) cevap metninde düz yazıyla.
+> **Hook:** `asama-11-scan`, `asama-11-issue-N-fixed`, `asama-11-rescan` (tarayıcı/fixer döngüsünde hook yazar) + `asama-11-escalation-needed` (max 5 rescan aşılırsa).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-11-scan count=K1
 asama-11-issue-1-fixed
@@ -86,6 +90,10 @@ validation, misleading naming.
 **No askq** in quality pipeline; auto-fix only.
 
 ## Audit output
+
+> **Model:** `asama-11-complete` (after rescan count=0) plain text in reply.
+> **Hook:** `asama-11-scan`, `asama-11-issue-N-fixed`, `asama-11-rescan` (scanner/fixer cycle) + `asama-11-escalation-needed` (over max 5 rescans).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-11-scan count=K` → `asama-11-issue-N-fixed` per fix →
 `asama-11-rescan count=K2` → ... → `asama-11-rescan count=0` →

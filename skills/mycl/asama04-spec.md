@@ -89,6 +89,10 @@ spec onayı önce.
 
 ## Çıktı (audit)
 
+> **Model:** Bu aşama özeldir — askq onayı + spec_hash mevcudiyeti tetikler. Model `asama-4-complete` cevap metninde zikretmez; askq classify "approve" sonrası hook chain auto-fill (1, 2, 3, 4) yapar.
+> **Hook:** `asama-4-complete` ve `asama-4-ac-count` (chain auto-fill ile) — `_spec_approve_flow` yazar.
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-4-complete
 asama-4-ac-count must=N should=M
@@ -151,6 +155,10 @@ MUST_N/SHOULD_N, classifies askq → approve, sets `spec_approved=True`,
 auto-fills audit chain (Phases 1-4), advances state.current_phase to 5.
 
 ## Audit output
+
+> **Model:** Special — askq approval + spec_hash trigger hook chain auto-fill (Phases 1-4). Model does not mention `asama-4-complete` in reply.
+> **Hook:** `_spec_approve_flow` writes `asama-4-complete` and `asama-4-ac-count`.
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-4-complete` + `asama-4-ac-count must=N should=M`.
 

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -196,6 +197,62 @@ def _is_phase_complete(phase: int, project_dir: str) -> bool:
     return any(name in existing for name in required)
 
 
+# ---------- text trigger phase complete ----------
+
+
+_PHASE_COMPLETE_TRIGGER_RE = re.compile(r"asama-(\d+)-complete", re.IGNORECASE)
+
+
+def _detect_phase_complete_trigger(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """Modelin son cevabında `asama-N-complete` varsa kayıt at.
+
+    Sıralılık invariant'ı: yalnızca N == current_phase eşleşirse audit
+    emit. Atlama denemesi (N != cp) reddedilir, `phase-skip-attempt`
+    audit yazılır (görünür sinyal).
+
+    Aşama 4 chain auto-fill bu fonksiyonla paralel kanaldır; ikisi
+    çakışırsa idempotent (aynı audit varsa no-op).
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    text = transcript.last_assistant_text(transcript_path)
+    if not text:
+        return False
+    matches = _PHASE_COMPLETE_TRIGGER_RE.findall(text)
+    if not matches:
+        return False
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
+    wrote = False
+    for n_str in matches:
+        try:
+            n = int(n_str)
+        except ValueError:
+            continue
+        if n == cp:
+            audit_name = f"asama-{n}-complete"
+            if audit_name in existing:
+                continue
+            audit.log_event(
+                audit_name, "stop.py",
+                f"text-trigger-emit phase={n}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+        else:
+            audit.log_event(
+                "phase-skip-attempt", "stop.py",
+                f"emit_phase={n} current_phase={cp}",
+                project_root=project_dir,
+            )
+    return wrote
+
+
 # ---------- main ----------
 
 
@@ -217,6 +274,11 @@ def main() -> int:
     # 3. Aşama 4 spec-approve flow (intent=approve + spec_hash mevcut)
     if intent == askq.INTENT_APPROVE:
         _spec_approve_flow(project_dir)
+
+    # 3.5. Faz tamamlama text trigger (Aşama 1-3 ana kanal; modelin
+    # cevabında `asama-N-complete` varsa sıralı eşleşmede audit emit,
+    # atlama denemesinde phase-skip-attempt audit).
+    _detect_phase_complete_trigger(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)
     _run_completeness_loop(project_dir)

@@ -40,6 +40,10 @@ kabul. Spec MUST'larına bağlı kod path'leri **mutlaka kapsanır**.
 
 ## Çıktı (audit)
 
+> **Model:** `asama-15-not-applicable reason=...` (Aşama 15 kapsam dışıysa) cevap metninde düz yazıyla.
+> **Hook:** `asama-15-scan`, `asama-15-test-N-added`, `asama-15-end-green` (tam suite YEŞİL post_tool sinyaliyle hook yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-15-scan count=K (eksik test sayısı)
 asama-15-test-N-added
@@ -87,6 +91,10 @@ No fixed % (Goodhart risk) — critical paths 100%, getter/setter 0% OK.
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-15-not-applicable reason=...` (when out of scope) plain text in reply.
+> **Hook:** `asama-15-scan`, `asama-15-test-N-added`, `asama-15-end-green` (hook writes on full-suite green via post_tool).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-15-scan count=K` → `asama-15-test-N-added` →
 `asama-15-end-green` | `asama-15-not-applicable`.

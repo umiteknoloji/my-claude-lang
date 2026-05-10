@@ -46,6 +46,10 @@ NFR varsa örnekler:
 
 ## Çıktı (audit)
 
+> **Model:** `asama-18-not-applicable reason=no-nfr-in-spec` (spec'te NFR yoksa) cevap metninde düz yazıyla.
+> **Hook:** `asama-18-scan`, `asama-18-scenario-N-passed`, `asama-18-end-target-met`, `asama-18-target-missed` (k6/locust ölçüm sonucuyla hook yazar; target-missed → Aşama 13 reentry).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-18-scan count=K (yük testi senaryo sayısı)
 asama-18-scenario-N-passed metric=p99 target=50ms actual=42ms
@@ -92,6 +96,10 @@ Read NFRs → write scenario (k6/locustfile) → run on dedicated runner
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-18-not-applicable reason=no-nfr-in-spec` (when no NFR) plain text in reply.
+> **Hook:** `asama-18-scan`, `asama-18-scenario-N-passed`, `asama-18-end-target-met`, `asama-18-target-missed` (hook writes on k6/locust measurement; target-missed → Phase 13 reentry).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-18-scan count=K` → `asama-18-scenario-N-passed metric=...
 target=... actual=...` → `asama-18-end-target-met` |

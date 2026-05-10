@@ -68,6 +68,10 @@ MyCL <version> | Aşama 19 ortası — hâlâ bu yönde mi ilerleyelim?
 
 ## Çıktı (audit)
 
+> **Model:** `asama-19-complete` (tüm etki maddeleri çözüldükten sonra) cevap metninde düz yazıyla.
+> **Hook:** `asama-19-items-declared count=K`, `asama-19-item-N-resolved decision=...` (her askq sonucu için askq classifier yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-19-items-declared count=K
 asama-19-item-1-resolved decision=apply  # veya skip/rule
@@ -118,6 +122,10 @@ Same one-by-one pattern as Phase 10. Options: Skip / Fix / Rule
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-19-complete` (after all impact items resolved) plain text in reply.
+> **Hook:** `asama-19-items-declared count=K`, `asama-19-item-N-resolved decision=...` (askq classifier writes per item).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-19-items-declared count=K` → `asama-19-item-N-resolved
 decision=apply|skip|rule` → `asama-19-complete`.

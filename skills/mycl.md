@@ -85,8 +85,18 @@ Doğrudan setter (1→4 atlama) yasak. Hook bile bu kuralı çiğneyemez.
 
 **Audit zinciri.** `asama-N-complete` audit yazılmadan `current_phase`
 N+1'e geçmez. Universal completeness loop her tur sonu audit'leri
-okuyup ilerletir — model emit edemez (`phase_transition` Bash deneyi
-DENY).
+okuyup ilerletir.
+
+**Audit emission kanalı.** Audit dosyaya **hook** yazar, model değil.
+Model bir aşamayı tamamladığında cevap metninde `asama-N-complete`
+trigger word'ünü düz yazıyla zikreder; stop hook transcript'i okur ve
+**sıralı eşleşmede** (N == current_phase) `.mycl/audit.log`'a o satırı
+append eder + `.mycl/state.json`'da `current_phase`'i +1 ilerletir.
+Atlama denemesi (örn. cp=1'de `asama-9-complete`) reddedilir ve
+`phase-skip-attempt` audit'i ile işaretlenir (görünür sinyal). Model ↔
+hook kanalı **transcript metni**, dosya değil. `Write` veya `Bash` ile
+audit dosyasına yazma denemesi gereksiz ve pre_tool tarafından
+engellenir; manuel `phase_transition` Bash deneyi DENY.
 
 **STRICT mode.** Fail-open YOK. Yetersiz veri = belirsizlik =
 fail-closed deny. 5 strike sonrası `*-escalation-needed` audit (sinyal,

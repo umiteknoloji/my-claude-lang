@@ -46,6 +46,10 @@ mock'lanmış sınırlar gerçek hayatta yumuşak çuvallayabilir.
 
 ## Çıktı (audit)
 
+> **Model:** `asama-16-not-applicable reason=...` (kapsam dışıysa) cevap metninde düz yazıyla.
+> **Hook:** `asama-16-scan`, `asama-16-test-N-added`, `asama-16-end-green` (tam suite YEŞİL post_tool sinyaliyle hook yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-16-scan count=K
 asama-16-test-N-added
@@ -95,6 +99,10 @@ end flow tests → run until GREEN.
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-16-not-applicable reason=...` (when out of scope) plain text in reply.
+> **Hook:** `asama-16-scan`, `asama-16-test-N-added`, `asama-16-end-green` (hook writes on full-suite green via post_tool).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-16-scan count=K` → `asama-16-test-N-added` →
 `asama-16-end-green` | `asama-16-not-applicable`.

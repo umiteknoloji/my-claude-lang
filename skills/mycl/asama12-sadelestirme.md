@@ -40,6 +40,10 @@ askq YOK (kalite pipeline kuralı).
 
 ## Çıktı (audit)
 
+> **Model:** `asama-12-complete` (rescan count=0 olduktan sonra) cevap metninde düz yazıyla.
+> **Hook:** `asama-12-scan`, `asama-12-issue-N-fixed`, `asama-12-rescan` (tarayıcı/fixer döngüsünde hook yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-12-scan count=K
 asama-12-issue-N-fixed
@@ -82,6 +86,10 @@ Scan → fix (auto, no askq) → rescan until K=0 (max 5).
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-12-complete` (after rescan count=0) plain text in reply.
+> **Hook:** `asama-12-scan`, `asama-12-issue-N-fixed`, `asama-12-rescan` (scanner/fixer cycle).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-12-scan count=K` → `asama-12-issue-N-fixed` →
 `asama-12-rescan count=0` → `asama-12-complete`.

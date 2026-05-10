@@ -44,6 +44,10 @@ Aşama 9 TDD'de yazılan kod, mevcut kodla **tutarlı görünsün** —
 
 ## Çıktı (audit)
 
+> **Model:** `asama-5-complete` veya `asama-5-skipped reason=...` cevap metninde düz yazıyla — sıralı eşleşmede hook kabul eder.
+> **Hook:** `pattern-summary-stored` ve diğer yan audit'ler — model bunları yazmaz.
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 pattern-summary-stored
 asama-5-complete
@@ -98,6 +102,10 @@ write summary to `state.pattern_summary`.
 Read/Glob/Grep/LS only.
 
 ## Audit output
+
+> **Model:** `asama-5-complete` or `asama-5-skipped reason=...` plain text in reply.
+> **Hook:** `pattern-summary-stored` and side audits — model does not write these.
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `pattern-summary-stored` | `asama-5-complete` | `asama-5-skipped
 reason=greenfield`.

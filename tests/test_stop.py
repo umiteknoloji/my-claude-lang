@@ -406,3 +406,71 @@ def test_nonexistent_transcript_path_no_op(tmp_path):
     )
     assert rc == 0
     assert _read_state(tmp_path)["spec_hash"] is None
+
+
+# ---------- text trigger phase complete ----------
+
+
+def test_text_trigger_emits_audit_when_phase_matches(tmp_path):
+    """cp=1 + transcript 'asama-1-complete' → audit emit edilir."""
+    _write_state(tmp_path, current_phase=1)
+    tp = _write_transcript(
+        tmp_path,
+        spec_text="Aşama 1 tamamlandı.\n\nasama-1-complete",
+    )
+    rc = _run_hook(
+        {"cwd": str(tmp_path), "transcript_path": str(tp)},
+        env=_env_with(tmp_path),
+    )
+    assert rc == 0
+    audit_text = _read_audit(tmp_path)
+    assert "asama-1-complete" in audit_text
+    assert "phase-skip-attempt" not in audit_text
+    # Completeness loop tetik audit'i görüp Aşama 2'ye ilerletmeli
+    assert _read_state(tmp_path)["current_phase"] == 2
+
+
+def test_text_trigger_rejects_skip_attempt(tmp_path):
+    """cp=1 + transcript 'asama-9-complete' → reject + phase-skip-attempt audit."""
+    _write_state(tmp_path, current_phase=1)
+    tp = _write_transcript(
+        tmp_path,
+        spec_text="atlama denemem.\n\nasama-9-complete",
+    )
+    rc = _run_hook(
+        {"cwd": str(tmp_path), "transcript_path": str(tp)},
+        env=_env_with(tmp_path),
+    )
+    assert rc == 0
+    audit_text = _read_audit(tmp_path)
+    assert "asama-9-complete" not in audit_text
+    assert "phase-skip-attempt" in audit_text
+    # Atlama reddedildi, faz 1'de kalır
+    assert _read_state(tmp_path)["current_phase"] == 1
+
+
+def test_text_trigger_idempotent(tmp_path):
+    """Aynı tetik tekrar yazılırsa duplicate audit yok."""
+    _write_state(tmp_path, current_phase=1)
+    _seed_audit(tmp_path, "asama-1-complete")
+    tp = _write_transcript(tmp_path, spec_text="asama-1-complete")
+    _run_hook(
+        {"cwd": str(tmp_path), "transcript_path": str(tp)},
+        env=_env_with(tmp_path),
+    )
+    audit_text = _read_audit(tmp_path)
+    assert audit_text.count("asama-1-complete") == 1
+
+
+def test_text_trigger_no_match_no_op(tmp_path):
+    """Tetik kelimesi yoksa audit eklenmez."""
+    _write_state(tmp_path, current_phase=1)
+    tp = _write_transcript(tmp_path, spec_text="merhaba dünya")
+    _run_hook(
+        {"cwd": str(tmp_path), "transcript_path": str(tp)},
+        env=_env_with(tmp_path),
+    )
+    audit_text = _read_audit(tmp_path)
+    assert "asama-1-complete" not in audit_text
+    assert "phase-skip-attempt" not in audit_text
+    assert _read_state(tmp_path)["current_phase"] == 1

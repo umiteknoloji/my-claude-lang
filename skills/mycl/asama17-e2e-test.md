@@ -59,6 +59,10 @@ asama-17-not-applicable reason=no-ui
 
 ## Çıktı (audit)
 
+> **Model:** `asama-17-not-applicable reason=no-ui` (UI yoksa) cevap metninde düz yazıyla.
+> **Hook:** `asama-17-scan`, `asama-17-test-N-added`, `asama-17-end-green` (Playwright headless YEŞİL post_tool sinyaliyle hook yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-17-scan count=K
 asama-17-test-N-added
@@ -105,6 +109,10 @@ write tests (page object pattern) → run headless until GREEN.
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-17-not-applicable reason=no-ui` (when no UI) plain text in reply.
+> **Hook:** `asama-17-scan`, `asama-17-test-N-added`, `asama-17-end-green` (hook writes on Playwright headless green via post_tool).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-17-scan count=K` → `asama-17-test-N-added` →
 `asama-17-end-green` | `asama-17-not-applicable reason=no-ui`.

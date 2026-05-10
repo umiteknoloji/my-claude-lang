@@ -63,6 +63,10 @@ HIGH/MEDIUM bulgular **otomatik fix edilir**; ancak çözüm belirsizse
 
 ## Çıktı (audit)
 
+> **Model:** `asama-14-complete` (rescan count=0 olduktan sonra) cevap metninde düz yazıyla.
+> **Hook:** `asama-14-scan` (semgrep+audit+secret), `asama-14-issue-N-fixed`, `asama-14-rescan` (tarayıcı/fixer döngüsünde hook yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-14-scan count=K (semgrep+audit+secret)
 asama-14-issue-N-fixed (her bulgu)
@@ -119,6 +123,10 @@ When auto-fix is unsafe, surface as a Phase 10 risk dialog item.
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-14-complete` (after rescan count=0) plain text in reply.
+> **Hook:** `asama-14-scan` (semgrep+audit+secret), `asama-14-issue-N-fixed`, `asama-14-rescan` (scanner/fixer cycle).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-14-scan count=K` → `asama-14-issue-N-fixed` →
 `asama-14-rescan count=0` → `asama-14-complete`.

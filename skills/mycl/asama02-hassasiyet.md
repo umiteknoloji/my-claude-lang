@@ -44,6 +44,10 @@ MyCL <version> | Phase 2 — Precision-audit intent confirmation
 
 ## Çıktı (audit)
 
+> **Model:** `asama-2-complete` cevap metninde düz yazıyla — sıralı eşleşmede hook kabul eder.
+> **Hook:** `precision-audit` ve diğer yan audit'ler — model bunları yazmaz.
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 precision-audit
 asama-2-complete
@@ -96,6 +100,10 @@ Verify the intent across **7 dimensions** before writing the spec.
 `AskUserQuestion` + global readonly. Write/Edit/Bash forbidden.
 
 ## Audit output
+
+> **Model:** `asama-2-complete` plain text in reply — hook accepts on sequential match.
+> **Hook:** `precision-audit` and other side audits — model does not write these.
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `precision-audit` + `asama-2-complete`. Self-critique required.
 

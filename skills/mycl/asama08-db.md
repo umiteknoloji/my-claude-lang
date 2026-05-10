@@ -61,6 +61,10 @@ asama-8-not-applicable reason=no-db-in-scope
 
 ## Çıktı (audit)
 
+> **Model:** `asama-8-not-applicable reason=...` (DB kapsam dışıysa) cevap metninde düz yazıyla.
+> **Hook:** `asama-8-end tables=N indexes=M migrations=K` (schema/migration sayımıyla hook yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-8-end tables=N indexes=M migrations=K
 asama-8-not-applicable reason=no-db-in-scope
@@ -102,6 +106,10 @@ Design data per normalization rules with no future-tense problems.
 `asama-8-not-applicable reason=no-db-in-scope` when DB not in scope.
 
 ## Audit output
+
+> **Model:** `asama-8-not-applicable reason=...` (when DB out of scope) plain text in reply.
+> **Hook:** `asama-8-end tables=N indexes=M migrations=K` (hook writes after counting schema/migrations).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-8-end tables=N indexes=M migrations=K`.
 

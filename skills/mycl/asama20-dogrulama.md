@@ -75,6 +75,10 @@ Spec Coverage'da `❌ test yok` MUST varsa:
 
 ## Çıktı (audit)
 
+> **Model:** `asama-20-complete` (rapor + mock cleanup tamamlandıktan sonra) cevap metninde düz yazıyla.
+> **Hook:** `asama-20-spec-coverage-rendered must_total=... must_green=...`, `asama-20-mock-cleanup-resolved` (rapor üretiminde hook yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-20-spec-coverage-rendered must_total=N must_green=M
 asama-20-mock-cleanup-resolved
@@ -127,6 +131,10 @@ Even with `❌ no test` MUSTs, `asama-20-complete` is emitted; Phase
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-20-complete` (after report + mock cleanup) plain text in reply.
+> **Hook:** `asama-20-spec-coverage-rendered must_total=... must_green=...`, `asama-20-mock-cleanup-resolved` (hook writes during report rendering).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-20-spec-coverage-rendered must_total=N must_green=M` +
 `asama-20-mock-cleanup-resolved` + `asama-20-complete`.

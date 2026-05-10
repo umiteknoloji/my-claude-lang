@@ -40,6 +40,10 @@ askq YOK.
 
 ## Çıktı (audit)
 
+> **Model:** `asama-13-complete` (rescan count=0 olduktan sonra) cevap metninde düz yazıyla.
+> **Hook:** `asama-13-scan`, `asama-13-issue-N-fixed`, `asama-13-rescan` (tarayıcı/fixer döngüsünde hook yazar).
+> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
 ```
 asama-13-scan count=K
 asama-13-issue-N-fixed
@@ -82,6 +86,10 @@ or defer to Phase 18.
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
 ## Audit output
+
+> **Model:** `asama-13-complete` (after rescan count=0) plain text in reply.
+> **Hook:** `asama-13-scan`, `asama-13-issue-N-fixed`, `asama-13-rescan` (scanner/fixer cycle).
+> **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-13-scan count=K` → `asama-13-issue-N-fixed` →
 `asama-13-rescan count=0` → `asama-13-complete`.
