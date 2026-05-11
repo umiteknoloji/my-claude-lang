@@ -82,9 +82,10 @@ CLAUDE_DIR="${CLAUDE_HOME:-$HOME/.claude}"
 MYCL_DIR="$CLAUDE_DIR/mycl"
 SKILLS_DIR="$CLAUDE_DIR/skills"
 DATA_DIR="$CLAUDE_DIR/data"
+AGENTS_DIR="$CLAUDE_DIR/agents"
 SETTINGS="$CLAUDE_DIR/settings.json"
 
-run mkdir -p "$MYCL_DIR" "$SKILLS_DIR/mycl/ortak" "$DATA_DIR"
+run mkdir -p "$MYCL_DIR" "$SKILLS_DIR/mycl/ortak" "$DATA_DIR" "$AGENTS_DIR"
 
 # 3. ~/.claude/mycl/ — repo kopyası (hooks + skills + data + lib)
 echo "→ ~/.claude/mycl/ — repo klonlanıyor"
@@ -157,6 +158,13 @@ echo "→ ~/.claude/data/"
 for f in "$SCRIPT_DIR"/data/*; do
   [ -f "$f" ] || continue
   copy_file "$f" "$DATA_DIR/$(basename "$f")"
+done
+
+# 5.5. ~/.claude/agents/ — agent definitions (Claude Code agent loader)
+echo "→ ~/.claude/agents/ — agent definitions"
+for f in "$SCRIPT_DIR"/agents/*.md; do
+  [ -f "$f" ] || continue
+  copy_file "$f" "$AGENTS_DIR/$(basename "$f")"
 done
 
 # 6. settings.json hook merge (Python — JSON merge atomik)

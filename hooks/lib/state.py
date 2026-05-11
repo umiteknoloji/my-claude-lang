@@ -40,6 +40,7 @@ _DEFAULT_STATE: dict[str, Any] = {
     "spec_approved": False,
     "spec_hash": None,
     "spec_must_list": [],
+    "last_phase_output": "none",
     "plugin_gate_active": False,
     "plugin_gate_missing": [],
     "ui_flow_active": False,

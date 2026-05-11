@@ -324,6 +324,10 @@ def _detect_subagent_phase_output(
             f"subagent-emit summary={parsed.summary[:80]}",
             project_root=project_dir,
         )
+        state.set_field(
+            "last_phase_output", parsed.summary,
+            project_root=project_dir,
+        )
         return True
 
     if parsed.outcome == orchestrator.PhaseOutcome.SKIPPED:
@@ -333,6 +337,10 @@ def _detect_subagent_phase_output(
         audit.log_event(
             audit_name, "stop.py",
             f"reason={parsed.reason} detail={parsed.detail[:80]}",
+            project_root=project_dir,
+        )
+        state.set_field(
+            "last_phase_output", f"skipped reason={parsed.reason}",
             project_root=project_dir,
         )
         return True

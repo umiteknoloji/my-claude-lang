@@ -99,8 +99,8 @@ def build_subagent_prompt(
         f"- skipped reason=<token>: <detail>\n"
         f"- pending: <question>\n"
         f"- error: <description>\n\n"
-        f"Tools allowed: Read, Glob, Grep. "
-        f"No Write/Edit/Bash/AskUserQuestion.\n"
+        f"Tools allowed: Read, Glob, Grep, AskUserQuestion. "
+        f"No Write/Edit/Bash.\n"
     )
 
 
