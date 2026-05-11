@@ -90,9 +90,13 @@ def test_smoke_phase_1_write_denied(tmp_path):
     assert _decision(out) == "deny"
 
 
-def test_smoke_phase_1_askq_allowed(tmp_path):
-    """state=1 + AskUserQuestion → Aşama 1'de izinli → ALLOW."""
-    _write_state(tmp_path, current_phase=1, spec_approved=True)
+def test_smoke_phase_2_askq_allowed(tmp_path):
+    """state=2 + AskUserQuestion → Aşama 2'de izinli → ALLOW.
+
+    Aşama 1 POC'la birlikte allowed_tools=["Task"] oldu (askq subagent
+    içine taşındı); askq izni Aşama 2'den itibaren tek-context fazlarda.
+    """
+    _write_state(tmp_path, current_phase=2, spec_approved=True)
     out = _run(_PRE_TOOL, {
         "cwd": str(tmp_path), "tool_name": "AskUserQuestion",
         "tool_input": {"questions": []},
@@ -273,16 +277,21 @@ def test_completeness_loop_stops_at_missing_audit(tmp_path):
 
 
 def test_activate_dsi_full_chain(tmp_path):
-    """activate → DSI: directive + status + git_init_consent."""
-    _write_state(tmp_path, current_phase=1)
+    """activate → DSI: directive + status + git_init_consent (Aşama 2).
+
+    Aşama 1 POC orchestration aktif olduğu için active_phase_directive
+    devre dışı (çakışan yönlendirme önlemi). Tam DSI zincirini Aşama
+    2'den itibaren bekleriz (orchestration kapalı, eski tek-context).
+    """
+    _write_state(tmp_path, current_phase=2)
     out = _run(_ACTIVATE, {"cwd": str(tmp_path)}, _env_with(tmp_path))
     payload = json.loads(out)
     ctx = payload["hookSpecificOutput"]["additionalContext"]
-    # Directive (Aşama 1)
+    # Directive (Aşama 2)
     assert "<mycl_active_phase_directive>" in ctx
     # Pipeline status
     assert "<mycl_phase_status>" in ctx
-    assert "[1⏳]" in ctx
+    assert "[2⏳]" in ctx
     # Git yok → consent prompt
     assert "<mycl_git_init_consent_request>" in ctx
 
@@ -300,10 +309,17 @@ def test_activate_skips_consent_when_git_exists(tmp_path):
 
 
 def test_production_sim_empty_project_phase_1_intent(tmp_path):
-    """Boş proje + activate → state default Aşama 1 + DSI directive."""
+    """Boş proje + activate → Aşama 1 POC subagent directive + phase status.
+
+    Aşama 1 orchestration aktif → DSI directive yerine
+    mycl_phase_subagent_directive emit edilir; phase_status hâlâ DSI
+    bloğunda görünür (bilgi katmanı).
+    """
     out = _run(_ACTIVATE, {"cwd": str(tmp_path)}, _env_with(tmp_path))
     payload = json.loads(out)
     ctx = payload["hookSpecificOutput"]["additionalContext"]
-    # Aşama 1 directive görünür
-    assert "Aşama 1" in ctx or "Phase 1" in ctx
+    # Subagent directive (Aşama 1 POC) — DSI directive yerine
+    assert "<mycl_phase_subagent_directive>" in ctx
+    assert "mycl-phase-runner" in ctx
+    # Phase status hâlâ görünür
     assert "[1⏳]" in ctx

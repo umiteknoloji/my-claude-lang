@@ -21,13 +21,14 @@
     "1": {
       "name": "Niyet Toplama",
       "name_en": "Intent Gathering",
-      "allowed_tools": ["AskUserQuestion"],
+      "allowed_tools": ["Task"],
       "denied_paths": [],
       "required_audits_any": ["summary-confirm-approve", "asama-1-complete"],
       "fail_open": false,
       "self_critique_required": false,
       "public_commitment_required": false,
-      "subagent_orchestration": true
+      "subagent_orchestration": true,
+      "_note": "subagent_orchestration aktif → allowed_tools yalnız Task; askq subagent içinde çağrılır."
     },
     "2": {
       "name": "Hassasiyet Denetimi",

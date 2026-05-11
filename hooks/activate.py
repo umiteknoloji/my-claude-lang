@@ -103,9 +103,15 @@ def _build_context(project_root: str, turn_tokens: int = 0) -> str:
         blocks.append(manifesto)
 
     # 2. DSI (active phase directive + status + escalation + tokens)
+    # Subagent orchestration aktif fazda DSI'nın active_phase_directive
+    # kısmı atlanır — çakışan yönlendirme model'i kafasız bırakıyordu
+    # (POC trace kanıtı). Phase status + escalation + tokens kalır
+    # (bilgi katmanı, çelişen yön değil).
+    cp_for_dsi = state.get("current_phase", 1, project_root=project_root)
     dsi_text = dsi.render_full_dsi(
         turn_tokens=turn_tokens,
         project_root=project_root,
+        include_directive=not orchestrator.is_orchestration_enabled(cp_for_dsi),
     )
     if dsi_text:
         blocks.append(dsi_text)

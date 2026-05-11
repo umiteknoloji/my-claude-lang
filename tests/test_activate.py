@@ -75,14 +75,26 @@ def test_hook_emits_banner_first_block(tmp_path):
 
 
 def test_hook_includes_phase_directive(tmp_path):
+    """Subagent orchestration kapalı fazlarda DSI active_phase_directive emit edilir.
+
+    Aşama 1 orchestration aktif → DSI devre dışı → directive yok.
+    Aşama 2'ye set ederek directive emit beklenir (eski tek-context akışı).
+    """
+    mycl_dir = tmp_path / ".mycl"
+    mycl_dir.mkdir(parents=True, exist_ok=True)
+    (mycl_dir / "state.json").write_text(
+        '{"schema_version": 1, "current_phase": 2, "spec_approved": false, '
+        '"spec_hash": null, "spec_must_list": []}', encoding="utf-8",
+    )
     out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
     context = out["hookSpecificOutput"]["additionalContext"]
     assert "<mycl_active_phase_directive>" in context
-    # Default current_phase=1 → Aşama 1 directive
-    assert "Aşama 1" in context or "Phase 1" in context
+    assert "Aşama 2" in context or "Phase 2" in context
 
 
 def test_hook_includes_phase_status(tmp_path):
+    """Phase status DSI bloğunda — orchestration aktif fazda bile görünür
+    (include_directive=False olsa da status kısmı emit edilir)."""
     out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
     context = out["hookSpecificOutput"]["additionalContext"]
     assert "<mycl_phase_status>" in context

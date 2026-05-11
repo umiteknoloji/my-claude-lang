@@ -117,17 +117,23 @@ def render_token_visibility(
 def render_full_dsi(
     turn_tokens: int = 0,
     project_root: str | None = None,
+    include_directive: bool = True,
 ) -> str:
     """Tüm DSI bloğu — activate.py her tur başı çağırır.
 
     Boş içerikli tag'ler emit edilmez (gürültü engellenir).
+
+    `include_directive=False`: subagent_orchestration aktif fazlarda
+    çakışan yönlendirmeyi önlemek için aktif faz directive'i atlanır;
+    phase_status + escalation + tokens hâlâ emit edilir (bilgi katmanı).
     """
     current = gate.active_phase(project_root=project_root)
     blocks: list[str] = []
 
-    directive = render_active_phase_directive(current, project_root=project_root)
-    if directive:
-        blocks.append(directive)
+    if include_directive:
+        directive = render_active_phase_directive(current, project_root=project_root)
+        if directive:
+            blocks.append(directive)
 
     status = render_phase_status(project_root=project_root)
     if status:
