@@ -5,6 +5,60 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-05-11
+
+### Eklenenler / Added
+
+- **`PreCompact` hook** (`hooks/pre_compact.py`) — Anthropic resmi
+  event'i; context compaction öncesi MyCL state + son 10 audit + spec
+  MUST listesi `.mycl/wip_snapshot.json`'a serileştirir; bilingual TR
+  + EN reinforcement reminder döndürür. Anthropic Issue #53223
+  ("CLAUDE.md instruction compliance is architecturally unenforced")
+  referansı; mimari boşluğa karşı deterministik araç.
+- **Reinforcement reminder pattern** (`hooks/activate.py`) —
+  Anthropic resmi öneri (effective context engineering):
+  `_build_context()` her aktivasyonun sonunda
+  `<mycl_reinforcement_reminder>` bloğu emit eder. Bilingual TR + EN,
+  4 madde (faz sırası, mutating tool kuralı, audit emission,
+  fail-closed).
+- **B feature: text trigger phase complete** (`hooks/stop.py`) —
+  modelin son cevabında `asama-N-complete` regex'i; sıralı eşleşmede
+  (N == current_phase) audit emit; atlama denemesinde
+  `phase-skip-attempt` audit + reject.
+- **Multi-agent orchestration POC** (Aşama 1) —
+  `agents/mycl-phase-runner.md` + `hooks/lib/orchestrator.py`;
+  senkron sıralı `Task` tool çağrısıyla subagent dispatch + handoff.
+- **Anthropic resmi plugin coexistence dokümantasyonu** — README'de
+  `security-guidance`, `code-review`, `code-simplifier`,
+  `session-report` ile birlikte kullanım rehberi.
+- **`hookify` plugin çakışma uyarısı** — README'de açık not.
+
+### Değişen / Changed
+
+- **README.md + README.tr.md** — Anthropic resmi plugin'lerle koexist
+  bölümü + ilham/topluluk referansları (OpenSpec, obra/superpowers,
+  Playwright agents, komunite/kalfa, Anthropic Issue #53223). Test
+  sayısı 521 → 555. Hook sayısı 4 → 5.
+- **plugin.json** — keywords, homepage, repository alanları eklendi;
+  description güncellendi (22-phase pipeline + drift
+  counter-measures).
+- **setup.sh** — `PreCompact` hook kaydı eklendi (5 hook →
+  settings.json merge).
+- **agents/** — yeni dizin; plugin marketplace formatına uygun agent
+  definition (`mycl-phase-runner.md`).
+- **MYCL_DATA_DIR env var** — `gate.py` + `bilingual.py`'a override
+  desteği (test/dev ortamı tutarlılığı için).
+
+### Test
+
+- 521 → 555 test (+34: 25 yeni dosya + 9 mevcut testlerin
+  genişlemesi).
+- Yeni dosyalar: `test_pre_compact.py` (8 test), `test_orchestrator.py`
+  (17 test); mevcut genişlemeler: `test_activate.py` (+2 reinforcement
+  + 3 subagent), `test_stop.py` (+4 text trigger).
+
+[1.0.1]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.1
+
 ## [1.0.0] — 2026-05-09
 
 ### Yeni Başlangıç / Fresh Start

@@ -1,9 +1,28 @@
 {
   "name": "my-claude-lang",
-  "version": "1.0.0",
-  "description": "Semantic development bridge for non-English-speaking developers. Three-phase mutual understanding verification between developer and Claude Code. NOT a translator — a meaning verification system.",
+  "version": "1.0.1",
+  "description": "MyCL — 22-phase semantic verification layer for Claude Code with Turkish intent layer + drift counter-measures (PreCompact + reinforcement reminder). Pure Python, zero SaaS, MIT.",
   "author": {
-    "name": "YZ-LLM"
+    "name": "YZ-LLM",
+    "email": "ayseumitduman@gmail.com"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "homepage": "https://github.com/YZ-LLM/my-claude-lang",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YZ-LLM/my-claude-lang.git"
+  },
+  "keywords": [
+    "claude-code",
+    "semantic-verification",
+    "22-phase-pipeline",
+    "turkish",
+    "spec-driven",
+    "tdd",
+    "drift-counter-measure",
+    "precompact",
+    "audit-trail",
+    "fail-closed",
+    "strict-mode"
+  ]
 }

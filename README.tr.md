@@ -1,4 +1,4 @@
-# MyCL — my-claude-lang 1.0.0
+# MyCL — my-claude-lang 1.0.1
 
 Claude Code üstüne anlam-doğrulama katmanı. MyCL 22 fazlı bir
 geliştirme boru hattı dayatır, audit zincirleriyle disiplini sıkar
@@ -9,8 +9,8 @@ server yok.
 
 ## MyCL nedir (ne değildir)
 
-MyCL **şudur**: dört Python kanca (`UserPromptSubmit`, `PreToolUse`,
-`PostToolUse`, `Stop`) ki:
+MyCL **şudur**: beş Python kanca (`UserPromptSubmit`, `PreToolUse`,
+`PostToolUse`, `Stop`, `PreCompact`) ki:
 
 - Aktif fazı `.mycl/state.json`'da takip eder
 - Her fazı `.mycl/audit.log`'da bir audit ile mühürler
@@ -43,7 +43,7 @@ Kurulum:
 2. Repo'yu `~/.claude/mycl/` altına kopyalar
 3. `mycl.md` skill'ini `~/.claude/skills/`'e tanıtır
 4. Veri dosyalarını `~/.claude/data/`'ya bırakır
-5. 4 kancayı `~/.claude/settings.json`'a MERGE eder (idempotent —
+5. 5 kancayı `~/.claude/settings.json`'a MERGE eder (idempotent —
    tekrar çalıştırılabilir)
 6. Smoke test (py_compile + lib import)
 
@@ -81,7 +81,7 @@ Her faz için: `skills/mycl/asama<NN>-*.md`.
 ```
 KULLANICI  ←→  MyCL (anlam doğrulama)  ←→  CLAUDE CODE (model + tools)
                   │
-                  ├─ 4 kanca (Claude Code çağırır)
+                  ├─ 5 kanca (Claude Code çağırır)
                   ├─ state.json (current_phase, spec_approved, ...)
                   ├─ audit.log (append-only olay kaydı)
                   ├─ 22 faz veri olarak (gate_spec.json)
@@ -89,7 +89,7 @@ KULLANICI  ←→  MyCL (anlam doğrulama)  ←→  CLAUDE CODE (model + tools)
 ```
 
 Kancalar **dolaylı** iletişim kurar — `state.json` + `audit.log`
-üzerinden. Birbirini import etmez. Dört kanca da `hooks/lib/*`
+üzerinden. Birbirini import etmez. Beş kanca da `hooks/lib/*`
 modüllerini kullanır (state, audit, gate, askq, spec_detect,
 transcript, bilingual, dsi, plugin, …).
 
@@ -133,15 +133,63 @@ yok, graceful degradation yok.
 python3 -m pytest tests/ -v
 ```
 
-521 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
+555 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
 matrix'i (state × tool, STRICT no-fail-open, state lock,
-completeness loop, DSI integration) kapsar.
+completeness loop, DSI integration, PreCompact snapshot, reinforcement
+reminder) kapsar.
 
 ## Devre dışı bırakma
 
 `~/.claude/settings.json`'daki `hooks` dizisinden `mycl` prefixli
 girişleri sil. MyCL state dosyaları (`.mycl/`) proje başına yaşar
 ve ayrı silinebilir.
+
+## Anthropic Resmi Plugin'leri ile Birlikte Kullanım
+
+MyCL, Anthropic'in curated plugin dizini (`anthropics/claude-plugins-official`)
+ile **birlikte çalışacak** şekilde tasarlandı. 22-faz pipeline'ı
+tamamlayan seçili resmi plugin'ler:
+
+- **`security-guidance`** — Edit/Write/MultiEdit için `PreToolUse`
+  kanca; Aşama 14 (Güvenlik) için inline pattern uyarıları ekler.
+  Çakışma yok — `pre_tool.py` ile yan yana çalışır.
+- **`anthropics/claude-code-security-review`** (ayrı repo) — manuel
+  `/code-review` ile PR bazlı derin güvenlik denetimi. Aşama 14
+  taraması sonrası repo geneli inceleme için.
+- **`code-review`** / **`code-simplifier`** — manuel slash command'lar;
+  Aşama 11 ve 12 için opsiyonel ikinci geçiş.
+- **`session-report`** — manuel `/session-report` token / cache
+  istatistiği. Aşama 22 tamlık denetimini **değil tamamlar** (yer
+  almaz, ayrı kapsam: istatistik vs MUST kapsanma).
+
+### ⚠️ Kanca çakışma uyarısı
+
+`hookify` plugin'i (topluluk) **4 event'e** (UserPromptSubmit,
+PreToolUse, PostToolUse, Stop) bağlanır — MyCL kanca zinciriyle
+çakışır ve faz geçişlerini kesintiye uğratabilir. **MyCL ile birlikte
+`hookify` install etmeyin.** Kural-tabanlı eylem önleme için MyCL
+captured-rules'u `CLAUDE.md`'ye eklemek yeterli.
+
+## İlham + Topluluk Referansları
+
+MyCL olgun Claude Code topluluk projelerinin omuzlarında durur:
+
+- **[Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec)** —
+  spec-driven development framework; MyCL Aşama 4 spec blok formatı
+  kavramsal olarak uyumlu.
+- **[obra/superpowers](https://github.com/obra/superpowers)** — TDD
+  methodology + spec-first workflow; MyCL Aşama 9 TDD döngüsü için
+  referans.
+- **[Playwright agents](https://github.com/topics/playwright-agent)** —
+  Aşama 17 E2E test orchestration için.
+- **[komunite/kalfa](https://github.com/komunite/kalfa)** — Türkçe
+  Claude Code OS (10 agent, 22 komut, 993 skill); MyCL'in Türkçe
+  niyet katmanı + Aşama 21 yerel rapor ilham kaynağı.
+- **[Anthropic Issue #53223](https://github.com/anthropics/claude-code/issues/53223)** —
+  "CLAUDE.md instruction compliance is architecturally unenforced"
+  resmi tespiti; MyCL'in faz-bazlı PreToolUse enforcement +
+  PreCompact reminder = Anthropic'in önerdiği deterministik
+  counter-measure'ın doğrudan implementasyonu.
 
 ## Lisans
 

@@ -1,4 +1,4 @@
-# MyCL — my-claude-lang 1.0.0
+# MyCL — my-claude-lang 1.0.1
 
 A semantic-verification layer on top of Claude Code. MyCL imposes a
 22-phase development pipeline, ratchets discipline through audit
@@ -9,8 +9,8 @@ frameworks, no MCP servers.
 
 ## What MyCL is (and isn't)
 
-MyCL **is** four Python hooks (`UserPromptSubmit`, `PreToolUse`,
-`PostToolUse`, `Stop`) that:
+MyCL **is** five Python hooks (`UserPromptSubmit`, `PreToolUse`,
+`PostToolUse`, `Stop`, `PreCompact`) that:
 
 - Track the active phase in `.mycl/state.json`
 - Seal each phase with an audit entry in `.mycl/audit.log`
@@ -42,7 +42,7 @@ The installer:
 2. Copies the repo to `~/.claude/mycl/`
 3. Registers `mycl.md` skill in `~/.claude/skills/`
 4. Drops data files into `~/.claude/data/`
-5. Merges 4 hooks into `~/.claude/settings.json` (idempotent — safe
+5. Merges 5 hooks into `~/.claude/settings.json` (idempotent — safe
    to re-run)
 6. Smoke-tests `py_compile` + lib imports
 
@@ -132,10 +132,57 @@ no "let it pass after N strikes," no graceful degradation.
 python3 -m pytest tests/ -v
 ```
 
-521 tests cover lib units (every module), each hook (subprocess
+555 tests cover lib units (every module), each hook (subprocess
 chain), and a smoke matrix that exercises pseudocode invariants
 (state × tool, STRICT no-fail-open, state lock, completeness loop,
-DSI integration).
+DSI integration, PreCompact snapshot, reinforcement reminder).
+
+## Coexistence with Anthropic Official Plugins
+
+MyCL is designed to **coexist** with Anthropic's curated plugin
+directory (`anthropics/claude-plugins-official`). Selected official
+plugins that complement MyCL's 22-phase pipeline:
+
+- **`security-guidance`** — `PreToolUse` hook on Edit/Write/MultiEdit;
+  augments MyCL Phase 14 with inline pattern warnings. No conflict —
+  runs alongside MyCL's `pre_tool.py`.
+- **`anthropics/claude-code-security-review`** (separate repo) —
+  manual `/code-review` for PR-based deep security audit; use after
+  Phase 14 scan for repository-wide review.
+- **`code-review`** / **`code-simplifier`** — manual slash commands;
+  optional developer-initiated second-pass for Phases 11 & 12.
+- **`session-report`** — manual `/session-report` for token / cache
+  statistics. **Complements (does not replace)** MyCL Phase 22
+  completeness audit (different scope: statistics vs MUST coverage).
+
+### ⚠️ Hook collision warning
+
+The `hookify` plugin (community) registers on **4 events**
+(UserPromptSubmit, PreToolUse, PostToolUse, Stop) — it will collide
+with MyCL's hook chain and may interrupt phase transitions. **Do not
+install `hookify` alongside MyCL.** For rule-based action prevention,
+add MyCL captured-rules in `CLAUDE.md` instead.
+
+## Inspiration & Community References
+
+MyCL stands on the shoulders of mature Claude Code community projects:
+
+- **[Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec)** —
+  spec-driven development framework; MyCL Phase 4 spec block format
+  conceptually compatible.
+- **[obra/superpowers](https://github.com/obra/superpowers)** — TDD
+  methodology + spec-first workflow; reference for MyCL Phase 9 TDD
+  cycle structure.
+- **[Playwright agents](https://github.com/topics/playwright-agent)** —
+  E2E test orchestration patterns for MyCL Phase 17.
+- **[komunite/kalfa](https://github.com/komunite/kalfa)** — Turkish
+  Claude Code OS (10 agents, 22 commands, 993 skills); inspiration
+  for MyCL's Turkish intent layer + Phase 21 localized report.
+- **[Anthropic Issue #53223](https://github.com/anthropics/claude-code/issues/53223)** —
+  official acknowledgment that "CLAUDE.md instruction compliance is
+  architecturally unenforced"; MyCL's per-phase PreToolUse enforcement
+  + PreCompact reminder = direct implementation of Anthropic's
+  recommended deterministic counter-measure.
 
 ## Disabling
 

@@ -125,7 +125,12 @@ def test_first_run_writes_session_start_trace(tmp_path):
     assert trace_log.exists()
     content = trace_log.read_text(encoding="utf-8")
     assert "session_start" in content
-    assert "1.0.0" in content
+    version = (
+        (_HOOK_PATH.resolve().parent.parent / "VERSION")
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+    assert version in content
 
 
 def test_second_run_does_not_duplicate_session_start(tmp_path):
