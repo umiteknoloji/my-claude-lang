@@ -1,4 +1,4 @@
-# MyCL — my-claude-lang 1.0.1
+# MyCL — my-claude-lang 1.0.2
 
 A semantic-verification layer on top of Claude Code. MyCL imposes a
 22-phase development pipeline, ratchets discipline through audit
@@ -132,10 +132,11 @@ no "let it pass after N strikes," no graceful degradation.
 python3 -m pytest tests/ -v
 ```
 
-555 tests cover lib units (every module), each hook (subprocess
+556 tests cover lib units (every module), each hook (subprocess
 chain), and a smoke matrix that exercises pseudocode invariants
 (state × tool, STRICT no-fail-open, state lock, completeness loop,
-DSI integration, PreCompact snapshot, reinforcement reminder).
+DSI integration, PreCompact snapshot, reinforcement reminder,
+Agent tool globally allowed).
 
 ## Coexistence with Anthropic Official Plugins
 

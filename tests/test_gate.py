@@ -333,6 +333,18 @@ def test_real_repo_gate_spec_loads():
     assert len(spec["phases"]) == 22
 
 
+def test_real_repo_gate_spec_agent_globally_allowed():
+    """Agent tool (host subagent dispatch) globally allowed list'te.
+
+    /zeka self-critique system + diğer subagent-dispatch akışları
+    Aşama 1 dahil her fazda Agent tool kullanabilsin diye eklendi.
+    Subagent state'e dokunmaz; tek yazıcı parent context.
+    """
+    gate.reset_cache()
+    spec = gate.load_gate_spec()
+    assert "Agent" in spec["_global_always_allowed_tools"]
+
+
 # ---------- isolation ----------
 
 

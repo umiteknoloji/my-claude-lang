@@ -5,6 +5,24 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-05-11
+
+### Düzeltilen / Fixed
+
+- **Aşama 1 + tüm fazlarda `Agent` tool deny** —
+  `data/gate_spec.json`'daki `_global_always_allowed_tools` listesine
+  `Agent` eklendi. Host Claude Code'da `Task` tool ile birlikte `Agent`
+  da subagent dispatch için kullanılıyor (/zeka self-critique sistemi,
+  plugin validator, vb.). Subagent state'e dokunmaz → mutation
+  invariant korunur. Bu fix öncesi /zeka Aşama 1'de fail-closed deny
+  alıyordu.
+
+### Test
+
+- 555 → 556 test (+1: `test_real_repo_gate_spec_agent_globally_allowed`).
+
+[1.0.2]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.2
+
 ## [1.0.1] — 2026-05-11
 
 ### Eklenenler / Added
