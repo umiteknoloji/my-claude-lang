@@ -186,6 +186,7 @@ mycl_hooks = {
     "PreToolUse":       str(hooks_root / "pre_tool.py"),
     "PostToolUse":      str(hooks_root / "post_tool.py"),
     "Stop":             str(hooks_root / "stop.py"),
+    "PreCompact":       str(hooks_root / "pre_compact.py"),
 }
 
 # Mevcut settings'i oku (yoksa boş dict)
