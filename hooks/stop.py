@@ -208,9 +208,14 @@ def _detect_phase_complete_trigger(
 ) -> bool:
     """Modelin son cevabında `asama-N-complete` varsa kayıt at.
 
-    Sıralılık invariant'ı: yalnızca N == current_phase eşleşirse audit
-    emit. Atlama denemesi (N != cp) reddedilir, `phase-skip-attempt`
-    audit yazılır (görünür sinyal).
+    Üç durum:
+      - N == cp → audit emit (idempotent).
+      - N > cp  → gerçek atlama denemesi → `phase-skip-attempt`
+        audit (görünür sinyal, sıralılık invariant'ı korunur).
+      - N < cp  → stale-emit (faz zaten geçilmiş, model özet
+        amaçlı eski etiketi tekrar yazmış) → SESSİZ, audit yazma.
+        Bu durum sıralılık ihlali değil; gürültü olmasın diye log
+        edilmez.
 
     Aşama 4 chain auto-fill bu fonksiyonla paralel kanaldır; ikisi
     çakışırsa idempotent (aynı audit varsa no-op).
@@ -244,12 +249,13 @@ def _detect_phase_complete_trigger(
             )
             existing.add(audit_name)
             wrote = True
-        else:
+        elif n > cp:
             audit.log_event(
                 "phase-skip-attempt", "stop.py",
                 f"emit_phase={n} current_phase={cp}",
                 project_root=project_dir,
             )
+        # else n < cp: stale-emit, sessiz geç
     return wrote
 
 

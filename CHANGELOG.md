@@ -5,6 +5,27 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **`phase-skip-attempt` false-positive (stale-emit)** —
+  `hooks/stop.py::_detect_phase_complete_trigger` modelin son
+  cevabındaki `asama-N-complete` etiketi için üç durum ayırt eder:
+  N == cp → audit emit (idempotent), N > cp → gerçek atlama
+  denemesi → `phase-skip-attempt` audit, N < cp → stale-emit
+  (faz zaten geçilmiş, model özet/tekrar amaçlı eski etiketi
+  yazmış) → SESSİZ no-op. Önceki davranış N != cp tüm farkları
+  skip-attempt olarak işaretliyordu → 3 false-positive audit
+  (`~/mycl_bo/.mycl/audit.log` örneğinde gözlendi:
+  emit_phase=1 cur=2, emit_phase=2 cur=3, emit_phase=4 cur=5).
+
+### Test
+
+- 556 → 557 test (+1: `test_text_trigger_stale_emit_silent`).
+
+[1.0.3]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.3
+
 ## [1.0.2] — 2026-05-11
 
 ### Düzeltilen / Fixed

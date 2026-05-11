@@ -474,3 +474,26 @@ def test_text_trigger_no_match_no_op(tmp_path):
     assert "asama-1-complete" not in audit_text
     assert "phase-skip-attempt" not in audit_text
     assert _read_state(tmp_path)["current_phase"] == 1
+
+
+def test_text_trigger_stale_emit_silent(tmp_path):
+    """cp=2 + transcript 'asama-1-complete' (geçmiş faz) → sessiz no-op.
+
+    Faz zaten ilerlemiş; model özet veya tekrar amaçlı eski etiketi
+    yazmış. Bu sıralılık ihlali DEĞİL — gürültü olmasın diye
+    `phase-skip-attempt` yazılmaz.
+    """
+    _write_state(tmp_path, current_phase=2)
+    _seed_audit(tmp_path, "asama-1-complete")  # faz 1 zaten emit'li
+    tp = _write_transcript(tmp_path, spec_text="asama-1-complete")
+    _run_hook(
+        {"cwd": str(tmp_path), "transcript_path": str(tp)},
+        env=_env_with(tmp_path),
+    )
+    audit_text = _read_audit(tmp_path)
+    # Stale-emit sessiz: phase-skip-attempt YAZILMAMALI
+    assert "phase-skip-attempt" not in audit_text
+    # asama-1-complete tekrar yazılmamış (sadece seed'den var)
+    assert audit_text.count("asama-1-complete") == 1
+    # Faz ilerlemedi
+    assert _read_state(tmp_path)["current_phase"] == 2
