@@ -235,6 +235,38 @@ def test_hook_emits_subagent_directive_in_phase_1(tmp_path):
     assert "Phase 1" in context
 
 
+def test_hook_emits_reinforcement_reminder(tmp_path):
+    """Her aktivasyonda reinforcement reminder en sonda emit edilir."""
+    out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
+    context = out["hookSpecificOutput"]["additionalContext"]
+    assert "<mycl_reinforcement_reminder>" in context
+    # Bilingual: TR + EN
+    assert "Aşamalar sıralı" in context
+    assert "Phase order is strict" in context
+    # spec_approved=False → mutating tool YASAK vurgusu
+    assert "YASAK" in context or "FORBIDDEN" in context
+    # En sonda olduğu kontrolü: reinforcement reminder son bloklardan
+    assert context.rstrip().endswith("</mycl_reinforcement_reminder>")
+
+
+def test_hook_reinforcement_reminder_unlocks_when_spec_approved(tmp_path):
+    """spec_approved=True → mutating tool izinli mesajı."""
+    mycl_dir = tmp_path / ".mycl"
+    mycl_dir.mkdir(parents=True, exist_ok=True)
+    (mycl_dir / "state.json").write_text(
+        '{"schema_version": 1, "current_phase": 5, "spec_approved": true, '
+        '"spec_hash": "abc", "spec_must_list": []}',
+        encoding="utf-8",
+    )
+    out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
+    context = out["hookSpecificOutput"]["additionalContext"]
+    assert "<mycl_reinforcement_reminder>" in context
+    assert "izinli" in context or "permitted" in context
+    # Aşama numarası dinamik
+    assert "Aşama 5/22" in context
+    assert "Phase 5/22" in context
+
+
 def test_hook_skips_subagent_directive_in_phase_without_flag(tmp_path):
     """Aşama 2'de subagent_orchestration false → directive emit edilmez."""
     mycl_dir = tmp_path / ".mycl"

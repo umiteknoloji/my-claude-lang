@@ -172,6 +172,53 @@ def _build_context(project_root: str, turn_tokens: int = 0) -> str:
                 "</mycl_git_init_consent_request>"
             )
 
+    # 4. Reinforcement reminder — en sonda emit (Anthropic resmi öneri:
+    # "Append a condensed reminder at the end of your system prompt").
+    # Uzun konuşma + post-compaction sonrası model'in faz disiplinini
+    # unutmasını önler. Bilingual TR + EN, spec_approved durumuna göre
+    # dinamik vurgu.
+    spec_approved = bool(state.get("spec_approved", False, project_root=project_root))
+    reminder_cp = cp_for_dsi
+    if spec_approved:
+        mutating_rule_tr = (
+            "Mutating tool (Write/Edit/Bash) izinli — spec onayı geçerli."
+        )
+        mutating_rule_en = (
+            "Mutating tools (Write/Edit/Bash) permitted — spec is approved."
+        )
+    else:
+        mutating_rule_tr = (
+            "Mutating tool (Write/Edit/Bash) YASAK — Aşama 4 spec onayı "
+            "yapılmadan kod yazımı yok."
+        )
+        mutating_rule_en = (
+            "Mutating tools (Write/Edit/Bash) FORBIDDEN — no code writes "
+            "until Phase 4 spec is approved."
+        )
+    reminder_tr = (
+        f"• Aşamalar sıralı: atlamak veya geri zıplamak yasak "
+        f"(şu an Aşama {reminder_cp}/22).\n"
+        f"• {mutating_rule_tr}\n"
+        f"• Audit kayıtlarını hook yazar; sen yalnız `asama-N-complete` "
+        f"tetik kelimesini cevap metnine düz yazıyla zikret.\n"
+        f"• Belirsizlik = fail-closed deny; tahmin yapma, kullanıcıya "
+        f"tek soru sor."
+    )
+    reminder_en = (
+        f"• Phase order is strict: no jumps or back-skips allowed "
+        f"(currently Phase {reminder_cp}/22).\n"
+        f"• {mutating_rule_en}\n"
+        f"• Audit records are written by hooks; you only mention "
+        f"`asama-N-complete` trigger words plainly in your reply text.\n"
+        f"• Ambiguity = fail-closed deny; never guess, ask the user "
+        f"one question."
+    )
+    blocks.append(
+        "<mycl_reinforcement_reminder>\n"
+        f"{reminder_tr}\n\n{reminder_en}\n"
+        "</mycl_reinforcement_reminder>"
+    )
+
     return "\n\n".join(blocks)
 
 
