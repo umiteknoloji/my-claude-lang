@@ -5,20 +5,77 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 1.0.5 — phase-advance trigger turn-shadow fix
+## [1.0.5] — 2026-05-12
 
-Stop hook'un `_detect_phase_complete_trigger` fonksiyonu
-`last_assistant_text` kullanıyordu. Bu sadece kronolojik son
-assistant text turn'üne bakar. Model phase-runner sonrası turn1'de
-`asama-N-complete` emit edip kullanıcı "devam et" deyince model
-turn2'de prose üretiyor (trigger yok). turn2 gölgeliyor → regex
-eşleşmiyor → audit yazılmıyor → state.json hiç oluşmuyor → faz
-hiç ilerlemiyor.
+### Düzeltilen / Fixed
 
-Fix: `find_last_assistant_text_matching` predicate-based scan
-trigger içeren en son turn'ü bulur.
+- **Phase-advance trigger turn-shadow** —
+  `hooks/stop.py::_detect_phase_complete_trigger`
+  `last_assistant_text` kullanıyordu; bu sadece kronolojik son
+  assistant text turn'üne bakar. Model phase-runner sonrası turn1'de
+  `asama-N-complete` emit edip kullanıcı "devam et" deyince model
+  turn2'de prose üretiyor (trigger yok). turn2 gölgeliyor → regex
+  eşleşmiyor → audit yazılmıyor → `state.json` hiç oluşmuyor → faz
+  hiç ilerlemiyor. Düzeltme: `find_last_assistant_text_matching`
+  predicate-based scan trigger içeren en son turn'ü bulur; sonraki
+  prose gölgeleyemez. Idempotent guard zaten korur.
+  `_detect_and_store_spec` kasıtlı olarak `last_assistant_text`
+  kullanmaya devam eder (spec son-turn semantiği).
 
-Test: +4 case (`test_stop_phase_trigger.py`).
+### Test
+
+- 568 → 572 test (+4: `test_stop_phase_trigger.py` —
+  shadowed-by-prose, no-trigger, n>cp skip-attempt, idempotent
+  re-emit).
+
+[1.0.5]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.5
+
+## [1.0.4] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **H-1: `spec_must_list` extractor 0 öğe döndü** — başlık regex'i
+  yalnızca "MUST" arıyordu; "MUST / SHOULD" yakalamıyordu. Liste-öğe
+  regex'i `-`, `*`, `+`, `N.` şart koşuyor; girintili `MUST_1` text
+  formatı yakalamıyordu. `hooks/lib/spec_detect.py::extract_must_list`'e
+  inline fallback eklendi — başlığı olmayan freeform spec metinlerinde
+  büyük harf `MUST`/`SHOULD`/`SHALL` satır kalıpları taranır.
+- **H-2: düz "onay" metni `spec_approved` set etmedi** — onay tespiti
+  yalnızca `AskUserQuestion` yapısal yanıtına bakıyordu; düz chat
+  mesajını görmüyordu. `transcript.last_user_text()` eklendi;
+  `stop.py::_detect_askq_intent` AskQ result yoksa düz user mesajını
+  classify eder (ambiguous → no-op).
+- **H-3: Aşama 1'de `AskUserQuestion` denied** —
+  `data/gate_spec.json` Aşama 1 `allowed_tools` listesinde yalnızca
+  `["Task"]` vardı; askq yoktu. Pseudocode §3 uyumlu olarak
+  `"AskUserQuestion"` eklendi.
+- **H-4: banner "MyCL 0.0.0" gösteriyor** — `setup.sh` VERSION
+  dosyasını kopyalamıyordu; `activate.py` `_REPO_ROOT/VERSION` arayıp
+  bulamayınca `0.0.0` default'una düşüyordu. Setup'a inline VERSION
+  copy bloğu eklendi (dry-run / force / exists-skip kontrolleriyle).
+- **H-5: spec-approval kilidi elle çözüldü** — blok mesajı oturum içi
+  kurtarma yolu göstermiyordu, "state.json'ı elle düzelt" diyordu.
+  `hooks/pre_tool.py` Adım 3.5'e `.mycl/state.json` + `.mycl/audit.log`
+  özel koruma bloğu eklendi (Write/Edit/MultiEdit + Bash redirect
+  `>`/`>>`/`tee`); spec/faz durumundan bağımsız her zaman aktif.
+- **H-6: spec format kısıtı belgesiz** — `MUST_1 text` (list-marker'sız)
+  formatının extractor tarafından okunmadığı kullanıcıya hiç
+  bildirilmemişti. `data/static_context.md`'e "Spec Format Kısıtları /
+  Spec Format Constraints" bölümü eklendi (TR + EN).
+- **`setup.sh copy_file` ileri-referans** — H-4 fix'i
+  `copy_file VERSION → $MYCL_DIR/VERSION` çağrısı eklemişti ama
+  `copy_file` fonksiyon olarak 135. satırda tanımlı; bash ileri-referans
+  desteklemediği için "command not found" veriyordu. İlgili satır
+  inline `if/cp` bloğuyla değiştirildi (mantık eşdeğeri).
+- **`stop.py` Pyright None-subscript** — `compute_hash` `Optional[str]`
+  döndürürken `new_hash[:12]` None-subscript riski taşıyordu. Erken
+  return guard eklendi; `_use, result = ...` → `_, result = ...`.
+
+### Test
+
+- 557 → 568 test (+11: H-1..H-6 regression coverage).
+
+[1.0.4]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.4
 
 ## [1.0.3] — 2026-05-12
 
