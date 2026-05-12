@@ -41,8 +41,16 @@ işaretlenir.
 
 ## İzinli tool'lar
 
-Yok (silent_phase: true). Read global allowlist'te ama gerek yok —
-sadece çeviri.
+Yok (silent_phase: true). Read/Glob/Grep global allowlist'te ama
+gerek yok — sadece çeviri.
+
+**Task ve Agent (subagent dispatch) bu fazda YASAK** —
+`_global_always_allowed_tools` listesinde olsalar bile Aşama 3 sessiz
+faz, hook auto-emit ile otomatik geçer (1.0.14). Model subagent
+çağırırsa Layer B deny etmiyor (global allowlist), ama anlamsız iş
+yapılır — pseudocode "model emit etmez, hook yazar" net direktif.
+Subagent çağırma; hook'a güven. Cevap metnine kısa "Aşama 3 sessiz —
+hook geçirecek" notu yeter veya hiçbir şey yazma.
 
 ## Çıktı (audit)
 
@@ -81,6 +89,12 @@ Strict translator role — no interpretation, no additions.
 ## Action
 
 **SILENT phase** — no askq, no user prompt. Hook auto-completes.
+
+**Task and Agent (subagent dispatch) are FORBIDDEN here** — even though
+they are in `_global_always_allowed_tools`, Phase 3 is silent and
+hook auto-emit handles it (1.0.14). Calling a subagent does
+meaningless work — pseudocode is explicit: "model does not emit,
+hook writes." Trust the hook; do not dispatch.
 
 Verb upgrades from natural language to surgical engineering verbs:
 - "list" → "render a paginated table"

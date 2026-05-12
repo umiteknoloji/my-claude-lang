@@ -89,3 +89,48 @@ def test_silent_phase_empty_required_audits_noop(tmp_project):
 
     events = audit.read_all(project_root=str(tmp_project))
     assert events == []
+
+
+def test_silent_phase_required_all_partial_emits_missing(tmp_project):
+    """1.0.18: silent_phase + required_audits_all + partial mevcut →
+    eksiklerin **hepsini** tek seferde yaz (loop break engelle).
+
+    Önceki davranış (1.0.14-1.0.17): 'for name in required: if name in
+    existing: return' — _all için yanlış (biri varsa dur). Düzeltme:
+    `_all` için 'hepsi varsa dur', değilse eksikleri yaz.
+    """
+    fake_phase_def = {
+        "silent_phase": True,
+        "required_audits_all": ["audit-a", "audit-b", "audit-c"],
+    }
+    # 'audit-a' önceden mevcut, 'audit-b' ve 'audit-c' eksik
+    audit.log_event("audit-a", "test", "pre-existing", project_root=str(tmp_project))
+
+    _silent_phase_auto_emit(99, fake_phase_def, str(tmp_project))
+
+    events = audit.read_all(project_root=str(tmp_project))
+    names = [ev.get("name") for ev in events]
+    # Hepsi olmalı: audit-a (pre-existing), audit-b + audit-c (yeni emit)
+    assert names.count("audit-a") == 1  # duplicate yok
+    assert names.count("audit-b") == 1
+    assert names.count("audit-c") == 1
+
+
+def test_silent_phase_required_all_full_existing_noop(tmp_project):
+    """1.0.18: silent_phase + required_audits_all + hepsi mevcut → no-op idempotent."""
+    fake_phase_def = {
+        "silent_phase": True,
+        "required_audits_all": ["audit-a", "audit-b"],
+    }
+    audit.log_event("audit-a", "test", "", project_root=str(tmp_project))
+    audit.log_event("audit-b", "test", "", project_root=str(tmp_project))
+
+    _silent_phase_auto_emit(99, fake_phase_def, str(tmp_project))
+
+    events = audit.read_all(project_root=str(tmp_project))
+    # Yeni emit yok; sadece 2 mevcut audit
+    silent_emits = [
+        ev for ev in events
+        if "silent-phase-auto-emit" in (ev.get("detail") or "")
+    ]
+    assert silent_emits == []

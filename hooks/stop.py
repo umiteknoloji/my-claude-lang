@@ -227,19 +227,34 @@ def _silent_phase_auto_emit(
     invariant'a uyumlu — sentinel atlama yok, `gate.advance()`
     bir sonraki iterasyonda normal akışla çalışır.
     """
-    required = (
-        phase_def.get("required_audits_all")
-        or phase_def.get("required_audits_any")
-        or []
-    )
-    if not required:
+    required_all = phase_def.get("required_audits_all") or []
+    required_any = phase_def.get("required_audits_any") or []
+    if not required_all and not required_any:
         return
-    existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
-    for name in required:
-        if name in existing:
-            return  # idempotent — zaten emit edilmiş
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    if required_all:
+        # _all (AND): hepsi varsa idempotent no-op; değilse eksiklerin
+        # **hepsini** tek seferde yaz (bir sonraki completeness check'in
+        # geçmesi için zorunlu, yoksa loop break + faz stuck).
+        if all(name in existing for name in required_all):
+            return
+        for name in required_all:
+            if name not in existing:
+                audit.log_event(
+                    name, "stop.py",
+                    f"silent-phase-auto-emit phase={phase}",
+                    project_root=project_dir,
+                )
+                existing.add(name)
+        return
+    # _any (OR): biri varsa idempotent no-op; değilse listenin ilkini yaz
+    # (gate_spec.json'da semantic sıralı tanımlanmış).
+    if any(name in existing for name in required_any):
+        return
     audit.log_event(
-        required[0], "stop.py",
+        required_any[0], "stop.py",
         f"silent-phase-auto-emit phase={phase}",
         project_root=project_dir,
     )

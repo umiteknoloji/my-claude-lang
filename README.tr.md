@@ -161,7 +161,7 @@ yok, graceful degradation yok.
 python3 -m pytest tests/ -v
 ```
 
-622 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
+624 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
 matrix'i (state × tool, STRICT no-fail-open, state lock,
 completeness loop, DSI integration, PreCompact snapshot, reinforcement
 reminder, Agent tool globally allowed, stale-emit sessiz) kapsar.

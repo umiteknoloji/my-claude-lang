@@ -5,6 +5,56 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.18] — 2026-05-12
+
+### Değişen / Changed
+
+- **Aşama 3 (Mühendislik Özeti) iki incelik fix** — 1.0.14'teki
+  silent_phase auto-emit sağlam çalışıyor, ama subagent (Sonnet 4.6,
+  10 lens) iki incelik tespit etti:
+
+  1. Skill "İzinli tool'lar: Yok" yetersiz çünkü
+     `_global_always_allowed_tools` listesinde `Task` ve `Agent`
+     var. Layer B Aşama 3'te Task'ı deny etmiyor. Model subagent
+     çağırıp sahte "Bağlam Tarama" işi yapabiliyor (kullanıcı
+     raporundaki davranış). **Skill explicit yasaklama eklendi**
+     (TR + EN bilingual).
+
+  2. `_silent_phase_auto_emit` idempotent guard `_all`/`_any`
+     ayrıştırılmamıştı. Mevcut "for name in required: if name in
+     existing: return" `_all` için yanlış (biri varsa dur, hepsi
+     değil). Aşama 3'te sorun yok (sadece `_any` var), ama
+     gelecek `silent_phase + _all` kombinasyonu (Aşama 22 vb.)
+     için sessiz zaman bombası. **Guard ayrıştırıldı**: `_all`
+     için "hepsi varsa dur, değilse eksikleri tek seferde yaz",
+     `_any` için "biri varsa dur, değilse ilk audit'i yaz".
+
+### Test
+
+- 622 → 624 test (+2: `test_silent_phase_required_all_partial_emits_missing`,
+  `test_silent_phase_required_all_full_existing_noop`).
+
+### Pre-emptive yan etki taraması (1.0.18'den itibaren yeni süreç)
+
+İmplementasyon öncesi etkilenen test'ler tarandı:
+- `test_stop_silent_phase.py` mevcut 4 case → refactor sonrası geçer
+  (mantık aynı sonuç, yol netleşir)
+- `test_stop.py:331` Aşama 3 audit'i tohum → etkilenmez
+- `test_audit.py:174` `engineering-brief False` beklentisi → korunur
+
+Bu pre-emptive tarama 1.0.16/1.0.17 turlarında atlanmış reactive
+fail'lerin önüne geçer — kullanıcı süreç iyileştirme önerisi.
+
+### Backward compat
+
+- Aşama 3 davranışı transparent (`_all` boş, sadece `_any` var) — fix
+  Aşama 3'te tetiklenmiyor. Gelecek silent_phase + _all faz'ları için
+  zemin hazırlandı.
+- Skill ek dayatma model davranışını kırabilir (subagent çağırma
+  alışkanlığı) — bu istenen sonuç.
+
+[1.0.18]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.18
+
 ## [1.0.17] — 2026-05-12
 
 ### Değişen / Changed
