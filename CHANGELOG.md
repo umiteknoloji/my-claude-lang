@@ -5,6 +5,30 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **`setup.sh` banner hardcoded sürüm** — kurulum tamamlama banner'ı
+  ("✅ MyCL X kurulumu tamamlandı." / "✅ MyCL X installation complete.")
+  her release'de `1.0.0` gösteriyordu; VERSION dosyası bump'lansa da
+  banner güncellenmiyordu (1.0.4 H-4 ile aynı kategori bug — orada
+  `activate.py` banner'ı düzeltilmişti, `setup.sh` banner'ı atlanmıştı).
+  Düzeltme: `SCRIPT_DIR` tanımından sonra `MYCL_VERSION="$(tr -d
+  '[:space:]' < "$SCRIPT_DIR/VERSION" 2>/dev/null || echo '?')"` yüklenir;
+  banner echo'ları `$MYCL_VERSION` kullanır. VERSION dosyası yoksa `?`
+  fallback. Help heredoc'taki (line 34) ve script-header yorumdaki
+  (line 2) "MyCL 1.0.0" referansları script kimliği bağlamında — kasıtlı
+  olarak dokunulmadı.
+
+### Test
+
+- 572 test (değişmedi — bash UX fix, pytest etkilenmez). Banner çıktısı
+  `bash setup.sh --dry-run` ile doğrulandı: `✅ MyCL 1.0.5 kurulumu
+  tamamlandı.` / `✅ MyCL 1.0.5 installation complete.`
+
+[1.0.6]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.6
+
 ## [1.0.5] — 2026-05-12
 
 ### Düzeltilen / Fixed

@@ -22,6 +22,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MYCL_VERSION="$(tr -d '[:space:]' < "$SCRIPT_DIR/VERSION" 2>/dev/null || echo '?')"
 DRY_RUN=0
 FORCE=0
 
@@ -282,14 +283,14 @@ fi
 
 # 8. Tamamlandı (TR + EN)
 echo
-echo "✅ MyCL 1.0.0 kurulumu tamamlandı."
+echo "✅ MyCL $MYCL_VERSION kurulumu tamamlandı."
 echo
 echo "Sonraki adımlar:"
 echo "  1. Yeni bir Claude Code oturumu başlat"
 echo "  2. Bir proje dizinine git: cd ~/projects/yeni-app"
 echo "  3. \"todo app yap\" gibi bir niyet yaz — MyCL Aşama 1'i tetikleyecek"
 echo
-echo "✅ MyCL 1.0.0 installation complete."
+echo "✅ MyCL $MYCL_VERSION installation complete."
 echo
 echo "Next steps:"
 echo "  1. Start a new Claude Code session"
