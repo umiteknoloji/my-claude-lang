@@ -5,6 +5,83 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.22] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **Aşama 7 (UI İncelemesi — DEFERRED) 4 implementation gap** —
+  Subagent (Sonnet 4.6, 10 lens): pseudocode tam, askq + cue'lar
+  sağlam, ama stop hook'ta cp==7 için intent işleyici hiç yoktu.
+  Aşama 5/6 pattern'i — "declared but not implemented".
+
+  1. **Intent classification stop hook'ta çalışmıyordu** — kullanıcı
+     "tamam" deyince `_detect_askq_intent` "approve" döner ama
+     `_spec_approve_flow` cp!=4 no-op. `asama-7-complete` hiç emit
+     yok → faz sonsuza dek bekler.
+  2. **`ui_reviewed` state yazılmıyordu** — schema'da var, set
+     edilmiyordu.
+  3. **Aşama 6 skipped → Aşama 7 auto-skip yoktu** — 1.0.21
+     extended trigger model emit'i yakalar ama otomatik türetme
+     eksik.
+  4. **`progress.py` deferred narration yok** — pseudocode v13.0.15
+     "Aşama 7 daima görünür" kuralı ihlali, ASCII bar'da Aşama 7
+     pending glyph (boş " ") gösteriyordu.
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_phase7_ui_review_flow`** — cp==7'de intent
+  classify sonucu:
+  - `approve` → `state.ui_reviewed=True` + `asama-7-complete` audit
+  - `cancel` → `asama-7-cancelled` soft halt audit
+  - `revise`/`ambiguous` → no-op (revise 1.0.23'e ertelendi)
+- **`hooks/stop.py::_check_phase7_auto_skip`** — cp==7 + `asama-6-skipped`
+  + Aşama 7 audit yok → otomatik `asama-7-skipped reason=asama-6-skipped`.
+- **`hooks/lib/progress.py::_derive_deferred_phases`** + `_glyph_for_phase`
+  `deferred_phases` parametre — gate_spec'te `deferred: true` flag
+  olan fazlar (Aşama 7) ASCII bar'da ⏸ glyph ile görünür kalır.
+  Skipped/finished/active öncelik; aksi halde deferred.
+- **`data/gate_spec.json` Aşama 7 `deferred: true`** flag.
+- **`skills/mycl/asama07-ui-inceleme.md`** — Task/Agent yasak notu
+  (Aşama 1/3/5/6 pattern).
+
+### Subagent ile farkım — revise ertelendi
+
+Subagent revise akışını kapsam içinde önerdi (cp=6 set, infinite loop
+özel kontrol). Ama audit append-only invariant ile çelişki:
+- revise → cp=6 set, Aşama 6 audit'ler geçerli → completeness loop
+  hemen advance eder cp=7 → **infinite loop**.
+- Doğru çözüm: `advance_requires_state` field gate_spec'e ek + Aşama 6
+  advance koşulu `ui_reviewed=False` no-op → büyük refactor.
+- **Anti-sycophancy**: subagent önerisi direkt kabul edilmedi, scope
+  yönetimi. revise akışı 1.0.23 ayrı release'e ertelendi.
+
+### Test
+
+- 650 → 663 test (+13: `test_phase7_refactor.py` — approve/cancel/
+  revise no-op/ambiguous, not cp 7, idempotent, auto-skip when 6
+  skipped/no when resolved/only cp==7, gate_spec deferred flag,
+  progress deferred glyph + active/skipped öncelik).
+
+### Pre-emptive yan etki taraması
+
+- `test_progress.py:83` `test_ascii_pipeline_pending_phases` —
+  `[2 ]` ve `[22 ]` kontrol ediyor, Aşama 7 kontrol etmiyor → ✓
+  etkilenmez
+- `test_progress.py:67` `test_ascii_pipeline_skipped_phases` —
+  skipped set'inde 7 → ↷ glyph (skipped öncelikli) ✓
+- `test_askq.py` classify mevcut, değişmez
+- `test_stop.py` askq intent flow mevcut, yeni path eklemiyor
+- `test_dsi.py` Aşama 7 directive mevcut, etkilenmez
+
+### Backward compat
+
+- `ui_reviewed` schema'da, yeni set'in `_validate` impact yok
+- `deferred` flag opsiyonel, eski gate_spec'lerde yoksa `_derive_deferred_phases`
+  boş set döner — eski davranış (Aşama 7 pending glyph) korunur
+- `asama-7-cancelled` yeni audit name — diğer aşamalar etkilenmez
+
+[1.0.22]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.22
+
 ## [1.0.21] — 2026-05-12
 
 ### Düzeltilen / Fixed

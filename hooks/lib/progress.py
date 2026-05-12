@@ -130,8 +130,16 @@ def _glyph_for_phase(
     skipped_phases: set[int],
     blocked: bool,
     meta: dict,
+    deferred_phases: set[int] | None = None,
 ) -> str:
-    """Tek faz için glyph seç."""
+    """Tek faz için glyph seç.
+
+    1.0.22: deferred_phases set'i — gate_spec.json'da `deferred: true`
+    flag olan fazlar (örn. Aşama 7 UI İncelemesi). Pseudocode v13.0.15
+    narration kuralı: deferred ≠ skipped, faz listesinde DAİMA görünür
+    kalır. Skipped/finished öncelik; aksi halde deferred glyph.
+    """
+    deferred = deferred_phases or set()
     if phase in skipped_phases:
         return meta.get("ascii_glyph_skipped", "↷")
     if phase in finished_phases:
@@ -140,7 +148,24 @@ def _glyph_for_phase(
         if blocked:
             return meta.get("ascii_glyph_blocked", "❌")
         return meta.get("ascii_glyph_active", "⏳")
+    if phase in deferred:
+        return meta.get("ascii_glyph_deferred", "⏸")
     return meta.get("ascii_glyph_pending", " ")
+
+
+def _derive_deferred_phases() -> set[int]:
+    """gate_spec.json'da `deferred: true` flag olan fazları topla (1.0.22).
+
+    Pseudocode v13.0.15: Aşama 7 (UI İncelemesi) deferred mode —
+    askq önceden açılmaz, kullanıcı free-form cevap verir. Narration:
+    "Aşama 5 → 6 → 7 (deferred) → 8 → 9".
+    """
+    from hooks.lib import gate
+    spec = gate.load_gate_spec()
+    return {
+        int(p) for p, pdef in spec.get("phases", {}).items()
+        if isinstance(pdef, dict) and pdef.get("deferred") is True
+    }
 
 
 def ascii_pipeline(
@@ -158,9 +183,14 @@ def ascii_pipeline(
     m = meta if meta is not None else load_phase_meta()
     fin = finished_phases or set()
     skp = skipped_phases or set()
+    # 1.0.22: deferred faz set'i (Aşama 7 UI İncelemesi)
+    deferred = _derive_deferred_phases()
     cells: list[str] = []
     for p in range(1, _PHASES_TOTAL + 1):
-        glyph = _glyph_for_phase(p, current_phase, fin, skp, blocked, m)
+        glyph = _glyph_for_phase(
+            p, current_phase, fin, skp, blocked, m,
+            deferred_phases=deferred,
+        )
         cells.append(f"[{p}{glyph}]")
     return "→".join(cells)
 

@@ -423,6 +423,79 @@ def _detect_phase_complete_trigger(
     return wrote
 
 
+def _phase7_ui_review_flow(intent: str | None, project_dir: str) -> bool:
+    """1.0.22: Aşama 7 (UI İncelemesi — DEFERRED) intent flow.
+
+    Pseudocode'a göre Aşama 7 askq önceden açılmaz; kullanıcının
+    free-form cevabı `askq.classify` ile intent'e dönüşür. Stop hook
+    cp==7'de intent'e göre:
+      - approve  → asama-7-complete + ui_reviewed=True
+      - cancel   → asama-7-cancelled (soft halt sinyali, hard deny değil)
+      - revise   → 1.0.23'e ertelendi (audit append-only invariant
+                   çelişki; cp=6 set sonrası completeness loop
+                   infinite advance riski)
+      - ambiguous/None → no-op (model fallback askq açabilir)
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if intent is None:
+        return False
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    if cp != 7:
+        return False
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    if intent == askq.INTENT_APPROVE:
+        if "asama-7-complete" in existing:
+            return False  # idempotent
+        state.set_field("ui_reviewed", True, project_root=project_dir)
+        audit.log_event(
+            "asama-7-complete", "stop.py",
+            "phase7-ui-review-approve intent=approve",
+            project_root=project_dir,
+        )
+        return True
+    if intent == askq.INTENT_CANCEL:
+        if "asama-7-cancelled" in existing:
+            return False
+        audit.log_event(
+            "asama-7-cancelled", "stop.py",
+            "phase7-ui-review-cancel intent=cancel — pipeline halt sinyali",
+            project_root=project_dir,
+        )
+        return True
+    # revise (1.0.23'e ertelendi) veya ambiguous: no-op
+    return False
+
+
+def _check_phase7_auto_skip(project_dir: str) -> bool:
+    """1.0.22: Aşama 6 atlandıysa Aşama 7 otomatik atlama.
+
+    Pseudocode: "Aşama 6 atlandıysa otomatik atlanır →
+    asama-7-skipped reason=asama-6-skipped". cp==7 + asama-6-skipped
+    audit var + Aşama 7 audit'i henüz yok ise hook auto-emit eder.
+
+    Returns: auto-skip yazıldıysa True.
+    """
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    if cp != 7:
+        return False
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    if "asama-6-skipped" not in existing:
+        return False
+    if any(name.startswith("asama-7-") for name in existing):
+        return False  # Aşama 7 zaten bir karar audit'i var
+    audit.log_event(
+        "asama-7-skipped", "stop.py",
+        "auto-skip reason=asama-6-skipped",
+        project_root=project_dir,
+    )
+    return True
+
+
 def _check_phase6_browser(detail: str, project_dir: str) -> None:
     """1.0.21: Aşama 6 `asama-6-end` detail parametrelerini incele.
 
@@ -650,6 +723,10 @@ def main() -> int:
     # 3. Aşama 4 spec-approve flow (intent=approve + spec_hash mevcut)
     if intent == askq.INTENT_APPROVE:
         _spec_approve_flow(project_dir)
+
+    # 3.1. (1.0.22) Aşama 7 UI review intent flow + auto-skip
+    _phase7_ui_review_flow(intent, project_dir)
+    _check_phase7_auto_skip(project_dir)
 
     # 3.5. Subagent orkestrasyon — Aşama N'de subagent_orchestration
     # aktifse mycl-phase-runner Task tool çıktısını parse et, audit +

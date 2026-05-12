@@ -69,6 +69,10 @@ asama-7-skipped reason=asama-6-skipped
 `AskUserQuestion` (fallback için) + global readonly. Write/Edit/Bash
 yasak — Aşama 6'ya dönünce orada açılır.
 
+**`Task` ve `Agent` (subagent dispatch) bu fazda YASAK** (Aşama 1/3/5/6
+pattern'i, 1.0.22). Free-form intent classify ana bağlamda yapılır;
+subagent dispatch gereksiz, askq.classify hook tarafında çalışır.
+
 ## Çıktı (audit)
 
 > **Model:** Bu aşama askq intent classification ile sürer; model `asama-7-complete` zikretmez. Free-form intent → hook karar verir (approve/revise/cancel).

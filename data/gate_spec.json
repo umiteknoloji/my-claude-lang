@@ -113,6 +113,8 @@
       "allowed_tools": ["AskUserQuestion"],
       "denied_paths": [],
       "required_audits_any": ["asama-7-complete", "asama-7-skipped"],
+      "deferred": true,
+      "_note": "1.0.22 — deferred: true flag (v13.0.15 narration kuralı). progress.ascii_pipeline Aşama 7'yi ⏸ glyph ile DAİMA görünür gösterir. stop.py::_phase7_ui_review_flow free-form intent classify (approve→complete+ui_reviewed=True, cancel→cancelled). _check_phase7_auto_skip: Aşama 6 skipped → otomatik asama-7-skipped. revise akışı 1.0.23'e ertelendi.",
       "fail_open": false,
       "deferred": true,
       "self_critique_required": false,
