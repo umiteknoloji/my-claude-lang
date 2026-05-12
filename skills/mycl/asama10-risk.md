@@ -80,6 +80,25 @@ asama-10-item-2-resolved decision=skip
 asama-10-complete  # tüm K maddesi resolved
 ```
 
+### Hook enforcement (1.0.25)
+
+Hook, asistan metninde aşağıdaki text-trigger'ları line-anchored regex
+ile yakalar (Aşama 10 ve Aşama 19 ortak):
+
+- `asama-10-items-declared count=K` → audit yazılır **ve** Aşama 10
+  için `state.open_severity_count = K` set edilir (Aşama 22 tamlık
+  denetimi okur). Aşama 19'da yalnızca audit; state yazılmaz.
+- `asama-10-item-M-resolved decision=apply|skip|rule` → audit yazılır.
+- `decision=rule` durumunda **ek** olarak `asama-10-rule-capture-M`
+  audit'i yazılır (CLAUDE.md captured-rules bloğu için kalıcı kanıt).
+- Tüm trigger'lar idempotent — aynı transcript yeniden taranınca
+  duplicate audit yazılmaz.
+
+`gate_spec.json` Aşama 10 + 19 required_audits_any'i yalnızca
+`asama-10-complete` / `asama-19-complete` içerir; eski `{n}` template
+literali (gate bypass riski) 1.0.25'te kaldırıldı. Item denetimi
+text-trigger zinciri ile yapılır, gate listesinde değil.
+
 ## Disiplin gerekleri
 
 - `subagent_rubber_duck: true` — Aşama 10 kritik; haiku subagent ile
@@ -134,6 +153,25 @@ Each risk presented one-by-one via AskUserQuestion:
 
 `asama-10-items-declared count=K` + `asama-10-item-N-resolved
 decision=apply|skip|rule` per item + `asama-10-complete`.
+
+### Hook enforcement (1.0.25)
+
+Hook scans assistant text with a line-anchored regex shared by Phase
+10 and 19:
+
+- `asama-10-items-declared count=K` → audit + `state.open_severity_count = K`
+  (Phase 10 only; Phase 22 completeness check reads it). Phase 19
+  emits the audit but does not write state.
+- `asama-10-item-M-resolved decision=apply|skip|rule` → audit emitted.
+- `decision=rule` additionally emits `asama-10-rule-capture-M` audit
+  (permanent evidence for CLAUDE.md captured-rules block).
+- Triggers are idempotent — rescanning the same transcript does not
+  duplicate audits.
+
+`gate_spec.json` Phase 10 + 19 `required_audits_any` now contains only
+`asama-10-complete` / `asama-19-complete`; the legacy `{n}` template
+literal (a gate-bypass risk) was removed in 1.0.25. Item enforcement
+runs through the text-trigger chain, not the gate list.
 
 ## Discipline
 

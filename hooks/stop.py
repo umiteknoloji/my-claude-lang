@@ -503,6 +503,18 @@ _PHASE_9_AC_TRIGGER_RE = re.compile(
 # Line anchor yok — diğer trigger regex'leri ile tutarlı
 # (_PHASE_COMPLETE_TRIGGER_RE word boundary kullanıyor).
 
+# 1.0.25: Aşama 10 + 19 item trigger'ları — generic regex.
+# Pseudocode Aşama 10 risk maddeleri + Aşama 19 etki maddeleri aynı
+# yapıda: items-declared count=K, item-{n}-resolved decision=apply|skip|rule.
+_PHASE_ITEMS_DECLARED_RE = re.compile(
+    r"\basama-(\d+)-items-declared\s+count=(\d+)\b",
+    re.IGNORECASE,
+)
+_PHASE_ITEM_RESOLVED_RE = re.compile(
+    r"\basama-(\d+)-item-(\d+)-resolved\s+decision=(apply|skip|rule)\b",
+    re.IGNORECASE,
+)
+
 
 def _detect_phase_9_ac_trigger(
     transcript_path: str, project_dir: str,
@@ -561,6 +573,109 @@ def _detect_phase_9_ac_trigger(
                 "tdd_last_green", audit_name,
                 project_root=project_dir,
             )
+    return wrote
+
+
+def _detect_phase_items_triggers(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """1.0.25: Aşama 10 + 19 item trigger'ları (items-declared + item-N-resolved).
+
+    Pseudocode:
+      - `asama-N-items-declared count=K` → toplam risk/etki sayısı
+        bildirimi (Aşama 10 risk, Aşama 19 etki).
+      - `asama-N-item-M-resolved decision=apply|skip|rule` → her madde
+        için karar (askq classifier sonucu).
+      - decision=rule → kalıcı kural (Rule Capture); ek audit
+        `asama-N-rule-capture-M`.
+
+    Hook:
+      - items-declared audit emit + Aşama 10 için state.open_severity_count
+        güncelle (count=K).
+      - item-resolved audit emit + decision=rule ise rule-capture audit
+        ek emit (DSI directive'ini hatırlatma için zemin).
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(
+            _PHASE_ITEMS_DECLARED_RE.search(t)
+            or _PHASE_ITEM_RESOLVED_RE.search(t)
+        ),
+        transcript_path,
+    )
+    if not text:
+        return False
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    wrote = False
+
+    # items-declared count=K
+    seen_declared: set[int] = set()
+    for n_str, count_str in _PHASE_ITEMS_DECLARED_RE.findall(text):
+        try:
+            n = int(n_str)
+            count = int(count_str)
+        except ValueError:
+            continue
+        if n in seen_declared:
+            continue
+        seen_declared.add(n)
+        audit_name = f"asama-{n}-items-declared"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"count={count} phase={n}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+        # Aşama 10 için state.open_severity_count yaz (Aşama 19 için
+        # ileri release'te ayrı state alanı tanımlanabilir; şu an Aşama
+        # 19 hash sayım Aşama 22 turunda).
+        if n == 10:
+            state.set_field(
+                "open_severity_count", count,
+                project_root=project_dir,
+            )
+
+    # item-{m}-resolved decision=apply|skip|rule
+    seen_resolved: set[tuple[int, int]] = set()
+    for n_str, m_str, decision in _PHASE_ITEM_RESOLVED_RE.findall(text):
+        try:
+            n = int(n_str)
+            m = int(m_str)
+        except ValueError:
+            continue
+        key = (n, m)
+        if key in seen_resolved:
+            continue
+        seen_resolved.add(key)
+        decision_lower = decision.lower()
+        audit_name = f"asama-{n}-item-{m}-resolved"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"phase={n} item={m} decision={decision_lower}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+        # Rule Capture: decision=rule → ek audit (DSI directive
+        # CLAUDE.md captured-rules'a ekleme zemini için)
+        if decision_lower == "rule":
+            rule_audit = f"asama-{n}-rule-capture-{m}"
+            if rule_audit not in existing:
+                audit.log_event(
+                    rule_audit, "stop.py",
+                    f"rule-capture phase={n} item={m}",
+                    project_root=project_dir,
+                )
+                existing.add(rule_audit)
+                wrote = True
     return wrote
 
 
@@ -816,6 +931,11 @@ def main() -> int:
     # format `asama-9-ac-{i}-(red|green|refactor)`. Generic extended
     # trigger bu format'ı kapsamıyor (ac-{i} ek segment).
     _detect_phase_9_ac_trigger(transcript_path, project_dir)
+
+    # 1.0.25: Aşama 10 + 19 item trigger'ları — items-declared count=K
+    # + item-{m}-resolved decision=apply|skip|rule. decision=rule ek
+    # rule-capture audit (CLAUDE.md captured-rules zemini).
+    _detect_phase_items_triggers(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)
     _run_completeness_loop(project_dir)

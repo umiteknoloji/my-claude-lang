@@ -5,6 +5,62 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.25] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 10 (Risk İncelemesi) + Aşama 19 (Etki İncelemesi) item
+  trigger zincirini bağladı — 4 boşluk** — Subagent (Sonnet 4.6, 10
+  lens): pseudocode + skill + Aşama 22 tamlık denetimi item-resolved
+  audit'lerini bekliyor, ama hook hiç yakalamıyordu:
+
+  1. **`asama-10-items-declared count=K` parse yok** —
+     `state.open_severity_count` hiç yazılmıyor; Aşama 22 risk
+     kapsanma raporu boş veri okuyor.
+  2. **`asama-10-item-M-resolved decision=apply|skip|rule` trigger yok**
+     — askq classifier her madde için audit yazıyordu ama model
+     text-trigger ile özet bildirimi yapsa hook görmüyordu.
+  3. **Rule Capture (`decision=rule`) implement edilmemiş** —
+     CLAUDE.md captured-rules için kalıcı kanıt audit'i (`asama-10-rule-capture-M`)
+     yazılmıyor.
+  4. **`gate_spec.json` Aşama 10 + 19 `required_audits_any` `{n}`
+     template literali** — `gate.py` placeholder çözmüyor; sadece
+     `asama-10-complete` tek başına kapıyı geçiriyor → gate bypass
+     riski (item denetimi fiilen yok).
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_PHASE_ITEMS_DECLARED_RE` + `_PHASE_ITEM_RESOLVED_RE`**
+  — generic regex (Aşama 10 ve 19 ortak): word-boundary, line anchor
+  yok, diğer trigger regex'leriyle tutarlı.
+- **`hooks/stop.py::_detect_phase_items_triggers`** — items-declared
+  count=K → audit yazılır + Aşama 10 için `state.open_severity_count = K`.
+  item-M-resolved decision=apply|skip|rule → audit emit; **decision=rule**
+  ek olarak `asama-10-rule-capture-M` audit yazar. Idempotent.
+
+### Değiştirilen / Changed
+
+- **`data/gate_spec.json` Aşama 10**: `required_audits_any` artık
+  yalnızca `["asama-10-complete"]`. Eski `asama-10-item-{n}-resolved`
+  template literal kaldırıldı — item denetimi text-trigger zinciri
+  ile yapılır, gate listesinde değil.
+- **`data/gate_spec.json` Aşama 19**: aynı temizlik — yalnızca
+  `["asama-19-complete"]`.
+- **`skills/mycl/asama10-risk.md`**: "Hook enforcement (1.0.25)"
+  bölümü TR + EN — text-trigger sözleşmesi + idempotency + Aşama 19
+  ile ortak regex notu.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.24 → 1.0.25, `.claude-plugin/plugin.json` 1.0.25.
+- `README.md` + `README.tr.md` başlık sürümü 1.0.7 (drift) → 1.0.25;
+  test sayısı 675 → 686.
+- 11 yeni test: `tests/test_phase10_refactor.py` (items-declared
+  count parse + state.open_severity_count yazımı, decision=apply/skip/rule
+  davranışı, rule-capture audit, Aşama 19 generic regex davranışı,
+  state yazım kapsamı, idempotency, full zincir, gate_spec template
+  temizlik doğrulaması, empty path no-op).
+
 ## [1.0.24] — 2026-05-12
 
 ### Düzeltilen / Fixed
