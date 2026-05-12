@@ -5,6 +5,36 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.12] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **`.mycl/audit.log` redirect block mesajı yön gösterici değildi** —
+  model `Bash(git init && mkdir -p .mycl && echo "..." > .mycl/audit.log
+  && echo "..." >> .mycl/audit.log)` çağırdığında hook doğru engelliyor
+  (H-5 state-mutation lock, 1.0.4'ten beri) ama mesaj sadece "yazılamaz
+  — state hook'lar tarafından yönetilir" diyor; model ne yapması
+  gerektiğini bilmiyor → bir sonraki turda doğru komutu kestirmek
+  zorunda. `hooks/pre_tool.py`'daki **iki redirect block** mesajı
+  (Write/Edit/MultiEdit + Bash redirect) iyileştirildi:
+  1. `MyCL {version} | ` prefix (diğer block mesajlarıyla tutarlılık).
+  2. Audit emit yöntemi açıkça yazıldı: "Cevap metnine `asama-N-complete`
+     tetik kelimesini düz yazıyla yaz; stop hook bunu okuyup audit'i
+     kendisi yazar."
+  3. Bash redirect block'unda alternatif: "Bootstrap'i bu komutsuz
+     tekrar dene: `git init && mkdir -p .mycl` yeterli." (compound
+     bootstrap 1.0.11'de allow oldu).
+
+  Davranış değişikliği yok — sadece UX/diagnostic netleştirme.
+  Model'in `audit.log`'a manuel yazımı engellemesi (hook'ların state
+  sahipliği invariantı) korunur.
+
+### Test
+
+- 599 test (değişmedi — sadece deny message string içeriği).
+
+[1.0.12]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.12
+
 ## [1.0.11] — 2026-05-12
 
 ### Düzeltilen / Fixed

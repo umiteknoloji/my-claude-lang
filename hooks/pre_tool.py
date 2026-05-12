@@ -240,10 +240,17 @@ def main() -> int:
                 f"tool={tool_name} path={fp_check}", project_root=project_dir,
             )
             return _deny(
-                "MyCL koruma: `.mycl/state.json` ve `.mycl/audit.log` "
-                "doğrudan yazılamaz — state hook'lar tarafından yönetilir.\n\n"
-                "MyCL guard: `.mycl/state.json` and `.mycl/audit.log` "
-                "cannot be written directly — state is managed by hooks."
+                f"MyCL {_MYCL_VERSION} | Koruma: `.mycl/state.json` "
+                "ve `.mycl/audit.log` doğrudan yazılamaz — state "
+                "hook'lar tarafından yönetilir. Audit emit etmek için "
+                "cevap metnine `asama-N-complete` tetik kelimesini düz "
+                "yazıyla yaz; stop hook bunu okuyup audit'i kendisi "
+                "yazar.\n\n"
+                f"MyCL {_MYCL_VERSION} | Guard: `.mycl/state.json` and "
+                "`.mycl/audit.log` cannot be written directly — state "
+                "is managed by hooks. To emit an audit, plainly write "
+                "the trigger word `asama-N-complete` in your reply; "
+                "the stop hook reads it and writes the audit itself."
             )
     if tool_name == "Bash" and _PROTECTED_MYCL_PATTERNS.search(bash_cmd):
         # Bash ile state.json veya audit.log redirect/yazma girişimi
@@ -253,10 +260,21 @@ def main() -> int:
                 f"tool=Bash cmd_excerpt={bash_cmd[:80]}", project_root=project_dir,
             )
             return _deny(
-                "MyCL koruma: `.mycl/state.json` ve `.mycl/audit.log` "
-                "Bash redirect ile yazılamaz — state hook'lar tarafından yönetilir.\n\n"
-                "MyCL guard: `.mycl/state.json` and `.mycl/audit.log` "
-                "cannot be overwritten via Bash redirect — hooks manage state."
+                f"MyCL {_MYCL_VERSION} | Koruma: `.mycl/state.json` ve "
+                "`.mycl/audit.log` Bash redirect (`>`/`>>`/`tee`) ile "
+                "yazılamaz — state hook'lar tarafından yönetilir. Audit "
+                "emit etmek için cevap metnine `asama-N-complete` tetik "
+                "kelimesini düz yazıyla yaz; stop hook bunu okuyup "
+                "audit'i kendisi yazar. Bootstrap'i bu komutsuz tekrar "
+                "dene: `git init && mkdir -p .mycl` yeterli.\n\n"
+                f"MyCL {_MYCL_VERSION} | Guard: `.mycl/state.json` and "
+                "`.mycl/audit.log` cannot be overwritten via Bash "
+                "redirect (`>`/`>>`/`tee`) — hooks manage state. To "
+                "emit an audit, plainly write the trigger word "
+                "`asama-N-complete` in your reply; the stop hook reads "
+                "it and writes the audit itself. Retry bootstrap "
+                "without that part: `git init && mkdir -p .mycl` is "
+                "enough."
             )
 
     # ---------- 4. Spec-approval block ----------
