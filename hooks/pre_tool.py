@@ -34,7 +34,9 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hooks.lib import activation, audit, bilingual, gate, state  # noqa: E402
+from hooks.lib import (  # noqa: E402
+    activation, audit, bilingual, gate, spec_detect, state, transcript,
+)
 
 
 def _read_version() -> str:
@@ -345,21 +347,46 @@ def main() -> int:
     if tool_name == "Bash" and _is_bootstrap_command(bash_cmd):
         return _allow()
 
-    # ---------- 4.7. Multi-askq audit (1.0.16) ----------
-    # Aşama 1 skill 'tek soru per turn' (pseudocode dictat). Model tek
-    # mesajda paralel askq açarsa görünürlük sinyali yaz. Deny YOK —
-    # Claude Code parallel tool calls race condition oluşturur; audit
-    # log'da trail kalır, gelecek sürümde sıkılaştırma için zemin.
+    # ---------- 4.7. AskUserQuestion özel kontroller ----------
     if tool_name == "AskUserQuestion":
         transcript_path = str(payload.get("transcript_path") or "")
+        cp = state.get("current_phase", 1, project_root=project_dir)
+
+        # 4.7.a — Multi-askq audit (1.0.16). Tek mesajda paralel askq →
+        # görünürlük sinyali. Deny YOK (Claude Code parallel tool calls
+        # race condition oluşturur); audit log'da trail kalır.
         if transcript_path:
             askq_count = _count_askq_in_last_assistant_turn(transcript_path)
             if askq_count > 1:
-                cp = state.get("current_phase", 1, project_root=project_dir)
                 audit.log_event(
                     "multi-askq-attempt", "pre_tool.py",
                     f"phase={cp} count={askq_count}",
                     project_root=project_dir,
+                )
+
+        # 4.7.b — Aşama 4 spec format guard (1.0.19). askq açılmadan
+        # ÖNCE son assistant text'te `📋 Spec —` bloğu olmalı. Aksi
+        # halde model spec body'sini askq prompt'una gömüyor →
+        # `spec_detect.contains` erişemez → `spec_hash=null` →
+        # `_spec_approve_flow` no-op → Bash deny zinciri. PreToolUse
+        # deny + retry mesajı ile model'i doğru akışa zorla. Spec
+        # format invariant CLAUDE.md captured rule (line-anchored
+        # MULTILINE regex); regex gevşetme yerine skill + hook
+        # deterministik enforcement.
+        if cp == 4:
+            last_text = (
+                transcript.last_assistant_text(transcript_path)
+                if transcript_path else ""
+            )
+            if not spec_detect.contains(last_text or ""):
+                audit.log_event(
+                    "spec-format-missing", "pre_tool.py",
+                    "phase=4 spec_body_not_in_assistant_text",
+                    project_root=project_dir,
+                )
+                return _deny(
+                    _bilingual_block("spec_missing_block")
+                    or "📋 Spec — başlığı assistant cevabında olmalı."
                 )
 
     # ---------- 5. Layer B (gate.evaluate) ----------

@@ -71,6 +71,12 @@ _DEFAULT_STATE: dict[str, Any] = {
     "regression_block_active": False,
     "regression_output": "",
     "total_tokens": 0,  # cumulative session tokens (lib/tokens.py)
+    # 1.0.19 — Aşama 2'den ertelenmiş: 7 boyut karar listesi
+    # ({dim: N, decision: "SILENT-ASSUME|SKIP-MARK|GATE", note: "..."}).
+    # Aşama 4 spec yazımında [assumed: X] / [unspecified: X] etiketleri
+    # için zemin. Mevcut state'lerde yok → default boş liste, backward
+    # compat ✓.
+    "precision_audit_decisions": [],
     "last_update": 0,
 }
 

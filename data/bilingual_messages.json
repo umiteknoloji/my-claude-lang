@@ -20,6 +20,10 @@
       "tr": "MyCL {version} | Kilit — spec onayı yok. Mutating tool `{tool}` engellendi. Önce Aşama 1 (niyet) → 2 (kontrol) → 3 (özet) → 4 (spec onayı) sırasıyla ilerleyin. Spec onaylanınca `{tool}` otomatik açılır.",
       "en": "MyCL {version} | Lock — no spec approval. Mutating tool `{tool}` blocked. First proceed Phase 1 (intent) → 2 (precision) → 3 (brief) → 4 (spec approval). Once approved, `{tool}` opens automatically."
     },
+    "spec_missing_block": {
+      "tr": "MyCL {version} | Spec format hatası — Aşama 4'te `📋 Spec — <başlık>:` bloğu **assistant text'te** olmalı, AskUserQuestion prompt'una gömülmüş halde değil. Önce spec'i ana cevap metnine yaz (line-anchored, MULTILINE regex yakalar), sonra onay için askq aç. Hook spec_hash detect etmek için son assistant text'i tarıyor; askq tool_use input'a bakmaz.",
+      "en": "MyCL {version} | Spec format error — In Phase 4, `📋 Spec — <title>:` block must be in **assistant text**, not embedded inside the AskUserQuestion prompt. Write the spec in the main reply text first (line-anchored, MULTILINE regex), then open askq for approval. Hook scans last assistant text for spec_hash detection; askq tool_use input is not seen."
+    },
     "spec_approval_escalation": {
       "tr": "MyCL {version} | ⚠️ Aşama 4 spec onayı 5+ strike — geliştirici müdahalesi gerekiyor. Pipeline hâlâ açılmıyor. AskUserQuestion ile spec onayı talep edin veya `python3 -c \"from hooks.lib import audit; audit.log_event('asama-4-complete', 'recovery', '<detay>')\"` ile manuel emit edin.",
       "en": "MyCL {version} | ⚠️ Phase 4 spec approval has hit 5+ strikes — developer intervention required. Pipeline remains closed. Re-emit AskUserQuestion for spec approval or manually emit via `python3 -c \"from hooks.lib import audit; audit.log_event('asama-4-complete', 'recovery', '<detail>')\"`."

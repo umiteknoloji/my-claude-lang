@@ -5,6 +5,77 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.19] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **Aşama 4 spec format bug zinciri (PreToolUse hook enforcement)** —
+  En kritik bug. Model `📋 Spec —` formatı yerine "Teknik Spec — ..."
+  veya "Proje: ..." gibi özel başlık kullanıyor; ayrıca spec body'sini
+  AskUserQuestion prompt'una gömüyordu (assistant text'inde değil).
+  `spec_detect.contains` regex matchlemiyor → `spec_hash=null` →
+  `_spec_approve_flow` no-op → `spec_approved=False` → Aşama 5+ Bash
+  deny zinciri. 1.0.14'te skill anti-pattern eklendi ama model gözardı
+  etti. Subagent (Sonnet 4.6, 10 lens) **PreToolUse deny** önerdi —
+  PostToolUse zaten geç olur (askq çalıştı, kullanıcı cevapladı).
+
+  Düzeltme: `hooks/pre_tool.py` `tool_name == "AskUserQuestion" +
+  cp == 4` ise son assistant text'te `spec_detect.contains` False
+  → **PreToolUse deny** + retry mesajı (`spec_missing_block`
+  bilingual TR + EN). Hook deterministik enforcement; model'i doğru
+  akışa zorlar. Skill talimatı + hook çift katmanlı koruma.
+
+  `spec_detect` regex'i gevşetme **reddedildi** (CLAUDE.md captured
+  rule: line-anchored MULTILINE regex invariant, v13.1.2 öğrenimi).
+  Zeka subagent gateway **reddedildi** (parent → sub1 → parent → sub2
+  yapısı pahalı + retry akışı model'e bağımlı). Hook PreToolUse 10x
+  daha az kod, aynı enforcement etkisi.
+
+### Değişen / Changed
+
+- **gate_spec.json Aşama 4 `subagent_rubber_duck: true` kaldırıldı**
+  — Aşama 1/2/3 ile tutarlı subagent dispatch politikası. Spec
+  yazımı ana bağlamda Skill + AskUserQuestion + (global) Read ile
+  yürütülür; bağlam şişmez.
+
+### Eklenen / Added
+
+- **`state.precision_audit_decisions: []` default field** — Aşama 2'den
+  ertelenmişti (1.0.17). 7 boyut karar listesi
+  (`{dim, decision, note}`) zemini. Aşama 4 spec yazımında
+  `[assumed: X]` / `[unspecified: X]` etiketlerini Aşama 2 kararlarından
+  türetmek için. Backward compat ✓ — mevcut state'lerde yok →
+  default boş liste döner.
+
+- **`spec_missing_block` bilingual mesaj** (`data/bilingual_messages.json`)
+  — PreToolUse deny mesajı. Spec format hatası açıklaması + retry
+  rehberi (TR + EN).
+
+### Test
+
+- 624 → 629 test (+5: `test_phase4_refactor.py` — precision_audit_decisions
+  default/set/get, gate_spec phase 4 subagent_rubber_duck removed;
+  `test_pre_tool.py` — Aşama 4 askq spec_present allow / spec_absent
+  deny / cp!=4 spec guard tetiklenmez).
+
+### Pre-emptive yan etki taraması (1.0.18'den itibaren süreç)
+
+- `test_pre_tool.py:285` — mevcut `test_phase_4_allows_askuserquestion`
+  spec_present + spec_absent + cp!=4 olarak **3 case'e split edildi**.
+- `test_integration_smoke.py:107` — fixture zaten spec assistant text'te
+  yazıyor, etkilenmez.
+- `test_state.py` — yeni field optional, validate fonksiyonu impact yok.
+
+### Ertelenmiş işler (subagent ile farkım, scope yönetimi)
+
+- Aşama 2 → Aşama 4 spec entegrasyonu: state'te `precision_audit_decisions`
+  saklanır, ama model'in Aşama 4 spec'ine `[assumed: X]` etiketleri
+  olarak yansıtması **skill dayatması** olarak kalıyor. Tam hook
+  enforcement (spec body'de assumed etiketleri kontrol et) ileri
+  release'e bırakıldı — minimum scope, mevcut bug'a odaklan.
+
+[1.0.19]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.19
+
 ## [1.0.18] — 2026-05-12
 
 ### Değişen / Changed

@@ -105,8 +105,11 @@ asama-4-ac-count must=N should=M
 - `public_commitment_required: true` — faz başında "bu fazda yapacağım
   3 şey: spec yaz, ⚠️ uyarıları çıkar, askq onay"
 - `spec_block_required: true` — Spec block olmadan complete edilmez
-- `subagent_rubber_duck: true` — kritik faz; haiku subagent ile
-  ikinci-göz pair-check
+- **Hook enforcement (1.0.19):** `pre_tool.py` AskUserQuestion + cp==4
+  öncesi son assistant text'te `📋 Spec —` formatında bloğu arar;
+  yoksa **PreToolUse deny + retry** mesajı. Model spec body'sini
+  askq prompt'una gömerse hook engellemiş olur. Skill talimatı +
+  hook deterministik enforcement birlikte çalışır.
 
 ## Anti-pattern
 
@@ -179,8 +182,12 @@ auto-fills audit chain (Phases 1-4), advances state.current_phase to 5.
 
 ## Discipline requirements
 
-self_critique_required, public_commitment_required, spec_block_required,
-subagent_rubber_duck — all true.
+self_critique_required, public_commitment_required, spec_block_required
+— all true. **Hook enforcement (1.0.19):** pre_tool.py runs a PreToolUse
+guard before AskUserQuestion at cp==4 — if the last assistant text
+does not contain a line-anchored `📋 Spec —` block, the askq is
+**denied with a retry prompt**. Skill directive + hook deterministic
+check work in tandem.
 
 ## Anti-patterns
 

@@ -282,15 +282,89 @@ def test_phase_6_blocks_write_to_backend_path(tmp_path):
         assert "path" in _reason(out).lower() or "yol" in _reason(out).lower() or "Aşama" in _reason(out)
 
 
-def test_phase_4_allows_askuserquestion(tmp_path):
-    """Aşama 4 spec onayı: AskUserQuestion izinli."""
+def test_phase_4_askq_allowed_with_spec_in_assistant_text(tmp_path):
+    """1.0.19: Aşama 4 askq izinli — son assistant text'te `📋 Spec —`
+    bloğu varsa PreToolUse geçer."""
     _write_state(tmp_path, current_phase=4, spec_approved=False)
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        json.dumps({"type": "assistant", "message": {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "📋 Spec — Todo App:\nMUST:\n- foo"}]
+        }}) + "\n",
+        encoding="utf-8",
+    )
+
     out = _run_hook(
         {"cwd": str(tmp_path), "tool_name": "AskUserQuestion",
-         "tool_input": {"questions": []}},
+         "tool_input": {"questions": []},
+         "transcript_path": str(transcript)},
         env=_env_with(tmp_path),
     )
     assert _decision(out) == "allow"
+
+
+def test_phase_4_askq_denied_when_spec_not_in_assistant_text(tmp_path):
+    """1.0.19: Aşama 4 askq DENY — son assistant text'te `📋 Spec —`
+    bloğu yoksa (model spec'i askq prompt'una gömmüş). PreToolUse
+    deny + retry."""
+    _write_state(tmp_path, current_phase=4, spec_approved=False)
+    transcript = tmp_path / "transcript.jsonl"
+    # Spec yok assistant text'te — model askq body'sine gömmüş varsayımı
+    transcript.write_text(
+        json.dumps({"type": "assistant", "message": {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Spec'i kullanıcı onayına sunuyorum."}]
+        }}) + "\n",
+        encoding="utf-8",
+    )
+
+    out = _run_hook(
+        {"cwd": str(tmp_path), "tool_name": "AskUserQuestion",
+         "tool_input": {"questions": []},
+         "transcript_path": str(transcript)},
+        env=_env_with(tmp_path),
+    )
+    assert _decision(out) == "deny"
+    reason = (
+        out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+        or out.get("decision", "")
+    )
+    assert "📋 Spec" in reason or "Spec format" in reason
+
+
+def test_phase_3_askq_not_subject_to_spec_check(tmp_path):
+    """1.0.19: Spec format guard sadece cp==4'te tetiklenir.
+    Diğer fazlarda askq normal akış."""
+    _write_state(tmp_path, current_phase=3, spec_approved=False)
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        json.dumps({"type": "assistant", "message": {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Aşama 3 sessiz, hook geçirecek."}]
+        }}) + "\n",
+        encoding="utf-8",
+    )
+
+    out = _run_hook(
+        {"cwd": str(tmp_path), "tool_name": "AskUserQuestion",
+         "tool_input": {"questions": []},
+         "transcript_path": str(transcript)},
+        env=_env_with(tmp_path),
+    )
+    # Aşama 3 askq normalde de yapılmaz ama hook engellemez (Layer B yapar)
+    # Burada spec guard tetiklenmemeli — cp != 4
+    decision = _decision(out)
+    # Aşama 3 allowed_tools=[] olduğu için Layer B deny verir.
+    # Önemli: deny REASON spec_missing değil, phase_allowlist olmalı.
+    if decision == "deny":
+        reason = (
+            out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+            or out.get("decision", "")
+        )
+        # Spec format hatası DEĞİL — Aşama 3 allowlist hatası
+        assert "Spec format" not in reason
+        assert "📋 Spec" not in reason
 
 
 # ---------- 5-strike escalation ----------

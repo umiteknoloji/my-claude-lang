@@ -64,7 +64,7 @@
       "self_critique_required": true,
       "public_commitment_required": true,
       "spec_block_required": true,
-      "subagent_rubber_duck": true
+      "_note": "1.0.19 — subagent_rubber_duck kaldırıldı (Aşama 1/2/3 ile tutarlı). Spec format enforcement pre_tool.py'da PreToolUse guard ile (AskUserQuestion + cp==4 + son assistant text'te 📋 Spec — yoksa deny)."
     },
     "5": {
       "name": "Desen Eşleştirme",
