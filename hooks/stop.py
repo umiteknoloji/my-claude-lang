@@ -228,6 +228,11 @@ def _detect_phase_complete_trigger(
         Bu durum sıralılık ihlali değil; gürültü olmasın diye log
         edilmez.
 
+    Trigger içeren EN SON assistant text turn'ünü tarar —
+    `last_assistant_text` turn1'de emit + turn2 prose senaryosunda
+    gölgelenirdi. `_detect_and_store_spec` `last_assistant_text`
+    kullanmaya devam eder (kasıtlı: spec son-turn semantiği).
+
     Aşama 4 chain auto-fill bu fonksiyonla paralel kanaldır; ikisi
     çakışırsa idempotent (aynı audit varsa no-op).
 
@@ -235,7 +240,10 @@ def _detect_phase_complete_trigger(
     """
     if not transcript_path:
         return False
-    text = transcript.last_assistant_text(transcript_path)
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(_PHASE_COMPLETE_TRIGGER_RE.search(t)),
+        transcript_path,
+    )
     if not text:
         return False
     matches = _PHASE_COMPLETE_TRIGGER_RE.findall(text)

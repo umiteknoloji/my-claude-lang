@@ -5,6 +5,21 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.0.5 — phase-advance trigger turn-shadow fix
+
+Stop hook'un `_detect_phase_complete_trigger` fonksiyonu
+`last_assistant_text` kullanıyordu. Bu sadece kronolojik son
+assistant text turn'üne bakar. Model phase-runner sonrası turn1'de
+`asama-N-complete` emit edip kullanıcı "devam et" deyince model
+turn2'de prose üretiyor (trigger yok). turn2 gölgeliyor → regex
+eşleşmiyor → audit yazılmıyor → state.json hiç oluşmuyor → faz
+hiç ilerlemiyor.
+
+Fix: `find_last_assistant_text_matching` predicate-based scan
+trigger içeren en son turn'ü bulur.
+
+Test: +4 case (`test_stop_phase_trigger.py`).
+
 ## [1.0.3] — 2026-05-12
 
 ### Düzeltilen / Fixed
