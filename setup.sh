@@ -120,7 +120,17 @@ copy_tree "$SCRIPT_DIR/skills" "$MYCL_DIR/skills"
 copy_tree "$SCRIPT_DIR/data" "$MYCL_DIR/data"
 
 # VERSION dosyası — activate.py _REPO_ROOT/VERSION okur; eksikse '0.0.0' (H-4 fix)
-copy_file "$SCRIPT_DIR/VERSION" "$MYCL_DIR/VERSION"
+# copy_file henüz tanımlı değil; doğrudan cp kullanılır
+if [ "$DRY_RUN" = 1 ]; then
+  echo "  [dry-run] cp $SCRIPT_DIR/VERSION → $MYCL_DIR/VERSION"
+elif [ -f "$SCRIPT_DIR/VERSION" ]; then
+  if [ -f "$MYCL_DIR/VERSION" ] && [ "$FORCE" = 0 ]; then
+    echo "  ↷ skip (exists): $MYCL_DIR/VERSION"
+  else
+    cp "$SCRIPT_DIR/VERSION" "$MYCL_DIR/VERSION"
+    echo "  ✓ $MYCL_DIR/VERSION"
+  fi
+fi
 
 # Hook'lara executable izin
 if [ "$DRY_RUN" = 0 ]; then
