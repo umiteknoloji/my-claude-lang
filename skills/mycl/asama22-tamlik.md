@@ -63,6 +63,14 @@ audit `covers=MUST_N` zincirinden:
 - Hangi MUST test ile bağlandı?
 - Hangi MUST test'siz kaldı? → "Açık Konular"
 
+### 5. Aşama 21 skip doğrulama (1.0.31)
+
+Aşama 21 (Yerelleştirilmiş Rapor) skip kararı model davranışında —
+hook tarafında dil tespiti yok. Detection control olarak Aşama 22
+audit log'da Aşama 21'in **ya `asama-21-complete` ya `asama-21-skipped
+reason=already-english`** içerdiğini doğrular. Hiçbiri yoksa **silent
+skip** → "Açık Konular"'a düşer (Aşama 21 sessiz atlandı, denetlenmedi).
+
 ## Tamlık raporu (hook yazar)
 
 ```
@@ -128,6 +136,14 @@ asama-22-complete (HOOK tarafından — modelden değil)
 ## Goal
 
 Verify the pipeline truly completed end-to-end. Surface skipped steps.
+
+### Phase 21 skip verification (1.0.31)
+
+Phase 21 (Localized Report) skip decision lives in model behavior —
+no hook-side language detection. Phase 22 acts as a detection control:
+it verifies the audit log contains **either `asama-21-complete` or
+`asama-21-skipped reason=already-english`**. If neither is present,
+it's a **silent skip** → surfaced under "Open Issues".
 
 ## CRITICAL: hook writes, model does NOT
 

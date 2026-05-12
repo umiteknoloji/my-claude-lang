@@ -5,6 +5,60 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.31] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 21 (Yerelleştirilmiş Rapor) belge tutarsızlıkları** —
+  Subagent (Sonnet 4.6, 10 lens) **kod değişikliği gerekmediğini**
+  doğruladı: phase-21-spesifik hook kodu yok, mevcut generic kanallar
+  (complete trigger + 1.0.21 extended trigger) zaten audit'leri
+  yakalıyor. Ancak iki belge tutarsızlığı + bir detection control
+  eksikliği tespit etti:
+
+  1. `gate_spec.json` Aşama 21 `allowed_tools: ["Write"]`, ama skill
+     dosyası `Write, Edit, MultiEdit, Bash, AskUserQuestion`
+     listeliyordu — sıkı çevirmen rolü için tek `Write` yeterli;
+     runtime'da skill geniş tool listesi yanıltıcıydı (gate gerçekten
+     `Edit/Bash` çağrılarını reddederdi).
+  2. `MyCL_Pseudocode.md` Aşama 21 çıktısı sadece `asama-21-complete`
+     yazıyor, `asama-21-skipped reason=already-english` eksikti.
+  3. Aşama 21 dil tespiti tamamen modelin sorumluluğunda; **silent
+     skip riski** vardı (model unutursa hiçbir audit yazılmaz).
+     Detection control yoktu.
+
+### Değiştirilen / Changed
+
+- **`skills/mycl/asama21-yerel-rapor.md`**:
+  - `allowed_tools` listesi `Write` tek satıra daraltıldı (TR + EN);
+    gate_spec ile hizalı.
+  - "Audit capture kanalı (1.0.31)" bölümü TR + EN; phase-21 spesifik
+    hook kodu olmadığı ve generic kanalların yeterli olduğu açıkça
+    belgelendi.
+- **`MyCL_Pseudocode.md`**: Aşama 21 çıktı satırına `asama-21-skipped
+  reason=already-english` eklendi.
+- **`skills/mycl/asama22-tamlik.md`**: "Aşama 21 skip doğrulama"
+  detection control lens maddesi eklendi (TR + EN). Aşama 22 audit
+  log'da Aşama 21 için ya `complete` ya `skipped` audit'i bulamazsa
+  "silent skip" olarak Açık Konular'a düşer.
+
+### Boundary
+
+- Hook kodu değişikliği YOK (kasıtlı). Aşama 21'in tek "fonksiyonel"
+  sorumluluğu çeviri; bu pure model davranışı. Generic complete +
+  extended trigger zaten audit'leri yakalıyor.
+- Aşama 22 lens maddesi davranışsal değil — Aşama 22 tamlık raporu
+  zaten audit log'u iter ediyor; bu lens sadece "Aşama 21'in kontrol
+  kategorisi" netleştirmesi.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.30 → 1.0.31, `.claude-plugin/plugin.json` 1.0.31.
+- `README.md` + `README.tr.md` test sayısı 737 → 742.
+- 5 yeni test: `tests/test_phase21_refactor.py` (gate_spec sanity:
+  required_audits, allowed_tools minimal, skippable; smoke: complete
+  trigger generic yakalama, skipped trigger extended regex yakalama).
+
 ## [1.0.30] — 2026-05-13
 
 ### Düzeltilen / Fixed

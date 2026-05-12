@@ -482,7 +482,8 @@ MyCL Kuş Bakışı — Sözde Kod
      çevirmek anlamsız).
 
   Çıktı:
-     asama-21-complete
+     asama-21-complete (TR çevirisi yazıldı)
+     asama-21-skipped reason=already-english (İngilizce oturum)
 
   ↓ (sıralı)
   ────────────────────────────────────────────────────────────────────
