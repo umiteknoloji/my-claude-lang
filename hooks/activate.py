@@ -31,7 +31,10 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hooks.lib import audit, bilingual, dsi, framing, orchestrator, plugin, state, trace  # noqa: E402
+from hooks.lib import (  # noqa: E402
+    activation, audit, bilingual, dsi, framing, orchestrator, plugin,
+    state, trace,
+)
 
 
 def _read_version() -> str:
@@ -231,6 +234,17 @@ def main() -> int:
     if _is_self_project(project_dir):
         return 0
 
+    # 1.0.5: opt-in `/mycl` session trigger.
+    # Trigger varsa session'ı aktive et + prompt'tan sıyır. Aktif değilse
+    # hook tamamen sessiz — banner yok, deny yok, audit yok.
+    session_id = str(payload.get("session_id", "") or "")
+    prompt = str(payload.get("prompt", "") or "")
+    has_trigger, stripped = activation.extract_trigger(prompt)
+    if has_trigger:
+        activation.activate_session(session_id, project_root=project_dir)
+    if not activation.is_session_active(session_id, project_root=project_dir):
+        return 0
+
     # Token sayısı — Claude Code transcript_path'ten input'ta gelebilir;
     # 1.0.0'da pratik: payload.get("turn_tokens", 0). Mevcut Claude Code
     # versiyonunda bu alan yok → 0; gelecekte eklenirse otomatik aktif.
@@ -241,9 +255,28 @@ def main() -> int:
     if not any(a.get("name", "").startswith("session_start") for a in audits):
         trace.session_start(_MYCL_VERSION, project_root=project_dir)
 
-    # Context render
-    context = _build_context(project_dir, turn_tokens=turn_tokens)
-    _emit(context)
+    # Context render — trigger varsa baş'a aktivasyon notu ekle.
+    parts: list[str] = []
+    if has_trigger:
+        note_tr = (
+            "MyCL bu turdan itibaren bu projede aktif.\n"
+            "Kullanıcının `/mycl` sonrası asıl mesajı: "
+            + (f"'{stripped}'" if stripped else "(boş — yalnızca aktivasyon onayı)")
+        )
+        note_en = (
+            "MyCL is active in this project from this turn onward.\n"
+            "User's actual message after `/mycl`: "
+            + (f"'{stripped}'" if stripped else "(empty — activation acknowledgment only)")
+        )
+        parts.append(
+            "<mycl_activation_note>\n"
+            f"{note_tr}\n\n{note_en}\n"
+            "</mycl_activation_note>"
+        )
+    main_ctx = _build_context(project_dir, turn_tokens=turn_tokens)
+    if main_ctx:
+        parts.append(main_ctx)
+    _emit("\n\n".join(parts))
     return 0
 
 

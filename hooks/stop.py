@@ -38,7 +38,8 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from hooks.lib import (  # noqa: E402
-    askq, audit, gate, orchestrator, spec_detect, state, transcript,
+    activation, askq, audit, gate, orchestrator, spec_detect, state,
+    transcript,
 )
 
 
@@ -387,6 +388,12 @@ def main() -> int:
     project_dir = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
 
     if _is_self_project(project_dir):
+        return 0
+
+    # 1.0.5: opt-in `/mycl` — aktif değilse hook no-op (spec hash kayıt,
+    # askq classify, completeness loop hiçbiri çalışmaz).
+    session_id = str(payload.get("session_id", "") or "")
+    if not activation.is_session_active(session_id, project_root=project_dir):
         return 0
 
     transcript_path = str(payload.get("transcript_path") or "")

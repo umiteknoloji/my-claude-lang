@@ -285,3 +285,120 @@ def test_hook_skips_subagent_directive_in_phase_without_flag(tmp_path):
     out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
     context = out["hookSpecificOutput"]["additionalContext"]
     assert "<mycl_phase_subagent_directive>" not in context
+
+
+# ---------- 1.0.5: opt-in `/mycl` trigger ----------
+
+
+def _env_no_force_active(project_dir: Path) -> dict:
+    """force-active bypass'siz env — gerçek opt-in davranışını test eder."""
+    env = _env_with(project_dir)
+    env.pop("MYCL_TEST_FORCE_ACTIVE", None)
+    return env
+
+
+def test_hook_no_op_when_session_inactive(tmp_path):
+    """`/mycl` trigger yok + session aktif değil → hook çıktı vermez."""
+    result = subprocess.run(
+        [sys.executable, str(_HOOK_PATH)],
+        input=json.dumps({
+            "cwd": str(tmp_path),
+            "session_id": "fresh-session",
+            "prompt": "normal kullanıcı mesajı",
+        }).encode("utf-8"),
+        capture_output=True,
+        timeout=10,
+        env=_env_no_force_active(tmp_path),
+    )
+    assert result.returncode == 0
+    # Boş stdout → Claude Code "no-op" olarak yorumlar
+    assert result.stdout.decode().strip() == ""
+
+
+def test_hook_activates_on_mycl_trigger(tmp_path):
+    """`/mycl <prompt>` → session aktive olur + aktivasyon notu emit."""
+    out = _run_hook(
+        {
+            "cwd": str(tmp_path),
+            "session_id": "new-session",
+            "prompt": "/mycl todo app yap",
+        },
+        env=_env_no_force_active(tmp_path),
+    )
+    context = out["hookSpecificOutput"]["additionalContext"]
+    assert "<mycl_activation_note>" in context
+    assert "'todo app yap'" in context
+    # Aktivasyon notu manifesto'dan önce
+    assert context.index("<mycl_activation_note>") < context.index("MyCL")
+    # Aktif session dosyası yazıldı
+    active_file = tmp_path / ".mycl" / "active_session.txt"
+    assert active_file.read_text(encoding="utf-8").strip() == "new-session"
+
+
+def test_hook_bare_mycl_trigger_empty_message(tmp_path):
+    """Sadece `/mycl` (mesaj yok) → aktivasyon onayı notu."""
+    out = _run_hook(
+        {
+            "cwd": str(tmp_path),
+            "session_id": "sess-bare",
+            "prompt": "/mycl",
+        },
+        env=_env_no_force_active(tmp_path),
+    )
+    context = out["hookSpecificOutput"]["additionalContext"]
+    assert "boş — yalnızca aktivasyon onayı" in context
+    assert "empty — activation acknowledgment only" in context
+
+
+def test_hook_remains_active_after_first_mycl_in_same_session(tmp_path):
+    """`/mycl` ilk turda aktive eder; sonraki turlarda aynı session_id → aktif."""
+    # 1. tur: /mycl ile aktive
+    _run_hook(
+        {
+            "cwd": str(tmp_path),
+            "session_id": "persistent-session",
+            "prompt": "/mycl başla",
+        },
+        env=_env_no_force_active(tmp_path),
+    )
+    # 2. tur: trigger olmadan ama aynı session_id
+    out = _run_hook(
+        {
+            "cwd": str(tmp_path),
+            "session_id": "persistent-session",
+            "prompt": "devam et",
+        },
+        env=_env_no_force_active(tmp_path),
+    )
+    context = out["hookSpecificOutput"]["additionalContext"]
+    # Banner + manifesto var (aktif)
+    assert "MyCL" in context
+    # Yeni aktivasyon notu yok (yalnızca ilk turda)
+    assert "<mycl_activation_note>" not in context
+
+
+def test_hook_new_session_id_is_pasive(tmp_path):
+    """Eski session aktif olsa bile yeni session_id pasif kalır."""
+    # Eski session'ı aktive et
+    _run_hook(
+        {
+            "cwd": str(tmp_path),
+            "session_id": "old-session",
+            "prompt": "/mycl",
+        },
+        env=_env_no_force_active(tmp_path),
+    )
+    # Yeni session_id ile çağır (trigger yok)
+    result = subprocess.run(
+        [sys.executable, str(_HOOK_PATH)],
+        input=json.dumps({
+            "cwd": str(tmp_path),
+            "session_id": "new-different-session",
+            "prompt": "ne yapayım",
+        }).encode("utf-8"),
+        capture_output=True,
+        timeout=10,
+        env=_env_no_force_active(tmp_path),
+    )
+    assert result.returncode == 0
+    assert result.stdout.decode().strip() == ""

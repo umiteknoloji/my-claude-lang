@@ -1,16 +1,18 @@
-# MyCL — my-claude-lang 1.0.3
+# MyCL — my-claude-lang 1.0.5
 
 Claude Code üstüne anlam-doğrulama katmanı. MyCL 22 fazlı bir
 geliştirme boru hattı dayatır, audit zincirleriyle disiplini sıkar
-ve fail-open YAPMAZ. Pure Python 3.8+, AI agent framework yok, MCP
-server yok.
+ve fail-open YAPMAZ. **Oturum başına opt-in** — `/mycl` yazılana
+kadar sessiz (1.0.5+). Pure Python 3.8+, AI agent framework yok,
+MCP server yok.
 
 > English: [README.md](README.md)
 
 ## MyCL nedir (ne değildir)
 
 MyCL **şudur**: beş Python kanca (`UserPromptSubmit`, `PreToolUse`,
-`PostToolUse`, `Stop`, `PreCompact`) ki:
+`PostToolUse`, `Stop`, `PreCompact`) ki **`/mycl` ile aktive
+edildikten sonra**:
 
 - Aktif fazı `.mycl/state.json`'da takip eder
 - Her fazı `.mycl/audit.log`'da bir audit ile mühürler
@@ -22,6 +24,10 @@ MyCL **şudur**: beş Python kanca (`UserPromptSubmit`, `PreToolUse`,
   (`<mycl_active_phase_directive>`, `<mycl_phase_status>`,
   `<mycl_phase_allowlist_escalate>`)
 - TR + EN çift dil konuşur (etiket yok, boş satır ayrılı)
+
+**Aktivasyon öncesi** (varsayılan, her yeni oturumda): beş kanca da
+no-op — banner, deny, audit, snapshot, hiçbiri çalışmaz. Claude Code
+MyCL kurulu değilmiş gibi davranır.
 
 MyCL **şu değildir**:
 
@@ -46,6 +52,28 @@ Kurulum:
 5. 5 kancayı `~/.claude/settings.json`'a MERGE eder (idempotent —
    tekrar çalıştırılabilir)
 6. Smoke test (py_compile + lib import)
+
+## Aktivasyon (1.0.5+)
+
+MyCL **Claude Code oturumu başına opt-in**'dir. Kurulumdan sonra:
+
+```
+> /mycl                  # çıplak aktivasyon — MyCL pipeline'ı açar
+> /mycl todo app yap     # aktivasyon + ilk niyet tek promptta
+```
+
+Herhangi bir promptta `/mycl` tespit edilince aktif session ID
+`.mycl/active_session.txt`'e yazılır ve MyCL o oturum boyunca açık
+kalır. Claude Code kapanınca yeni oturum yeni ID alır → tekrar
+açıldığında MyCL `/mycl` yazılana kadar sessiz.
+
+`/mycl` token'ı, model kullanıcının asıl mesajını görmeden önce
+prompt'tan sıyrılır; model bunun yerine sıyrılmış mesajı bir
+`<mycl_activation_note>` bloğunda görür.
+
+**Neden opt-in?** Çoğu oturumun 22-fazlı pipeline'a ihtiyacı yok
+(hızlı edit, keşif, küçük script). MyCL yalnızca açıkça istendiğinde
+devreye girer.
 
 ## 22 faz
 
@@ -133,7 +161,7 @@ yok, graceful degradation yok.
 python3 -m pytest tests/ -v
 ```
 
-557 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
+587 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
 matrix'i (state × tool, STRICT no-fail-open, state lock,
 completeness loop, DSI integration, PreCompact snapshot, reinforcement
 reminder, Agent tool globally allowed, stale-emit sessiz) kapsar.

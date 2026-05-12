@@ -1,16 +1,18 @@
-# MyCL — my-claude-lang 1.0.3
+# MyCL — my-claude-lang 1.0.5
 
 A semantic-verification layer on top of Claude Code. MyCL imposes a
 22-phase development pipeline, ratchets discipline through audit
-chains, and refuses to fail open. Pure Python 3.8+, no AI agent
-frameworks, no MCP servers.
+chains, and refuses to fail open. **Opt-in per session** via `/mycl`
+(1.0.5+) — silent until you ask for it. Pure Python 3.8+, no AI
+agent frameworks, no MCP servers.
 
 > Türkçe sürüm: [README.tr.md](README.tr.md)
 
 ## What MyCL is (and isn't)
 
 MyCL **is** five Python hooks (`UserPromptSubmit`, `PreToolUse`,
-`PostToolUse`, `Stop`, `PreCompact`) that:
+`PostToolUse`, `Stop`, `PreCompact`) that, **once activated with
+`/mycl`**:
 
 - Track the active phase in `.mycl/state.json`
 - Seal each phase with an audit entry in `.mycl/audit.log`
@@ -20,6 +22,10 @@ MyCL **is** five Python hooks (`UserPromptSubmit`, `PreToolUse`,
 - Inject phase-specific context (`<mycl_active_phase_directive>`,
   `<mycl_phase_status>`, `<mycl_phase_allowlist_escalate>`) every turn
 - Speak TR + EN bilingually (no labels, blank-line separated)
+
+**Before activation** (default state for any new session): all five
+hooks no-op — banner, deny, audit, snapshot — nothing fires. Claude
+Code behaves exactly as without MyCL installed.
 
 MyCL **is not**:
 
@@ -45,6 +51,28 @@ The installer:
 5. Merges 5 hooks into `~/.claude/settings.json` (idempotent — safe
    to re-run)
 6. Smoke-tests `py_compile` + lib imports
+
+## Activation (1.0.5+)
+
+MyCL is **opt-in per Claude Code session**. After installation:
+
+```
+> /mycl                  # bare activation — MyCL now runs the pipeline
+> /mycl todo app yap     # activation + first intent in one prompt
+```
+
+Once `/mycl` is detected on any prompt, the active session ID is
+written to `.mycl/active_session.txt` and MyCL stays on for the rest
+of that session. Closing Claude Code starts a fresh session ID, so the
+next time you open it, MyCL is silent again until you type `/mycl`.
+
+The `/mycl` token is stripped from the prompt before the model sees
+the user's actual message; the model receives an `<mycl_activation_note>`
+that quotes the stripped message so it knows what the user asked.
+
+**Why opt-in?** Many sessions don't need the 22-phase pipeline (quick
+edits, exploration, scripts). MyCL only kicks in when you explicitly
+ask for it.
 
 ## The 22 phases
 
@@ -132,7 +160,7 @@ no "let it pass after N strikes," no graceful degradation.
 python3 -m pytest tests/ -v
 ```
 
-557 tests cover lib units (every module), each hook (subprocess
+587 tests cover lib units (every module), each hook (subprocess
 chain), and a smoke matrix that exercises pseudocode invariants
 (state × tool, STRICT no-fail-open, state lock, completeness loop,
 DSI integration, PreCompact snapshot, reinforcement reminder,
