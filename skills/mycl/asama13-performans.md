@@ -51,6 +51,14 @@ asama-13-rescan count=0
 asama-13-complete
 ```
 
+### Hook enforcement (1.0.26)
+
+Hook, Aşama 11 ile aynı generic text-trigger setini kullanır
+(`asama-13-scan / issue-M-fixed / rescan / escalation-needed`).
+`asama-13-complete` ve `asama-13-escalation-needed` modelin
+sorumluluğunda; hook auto-emit yapmaz. Detay: Aşama 11 skill
+"Hook enforcement (1.0.26)" bölümü.
+
 ## Anti-pattern
 
 - ❌ "Performans için micro-optimization yapmadan ölç" — Aşama 13'te
@@ -93,6 +101,13 @@ or defer to Phase 18.
 
 `asama-13-scan count=K` → `asama-13-issue-N-fixed` →
 `asama-13-rescan count=0` → `asama-13-complete`.
+
+### Hook enforcement (1.0.26)
+
+Hook uses the same generic text-trigger set as Phase 11 (`asama-13-scan
+/ issue-M-fixed / rescan / escalation-needed`). `asama-13-complete`
+and `asama-13-escalation-needed` are model-responsibility — no
+auto-emit. See Phase 11 skill "Hook enforcement (1.0.26)" for details.
 
 ## Anti-patterns
 

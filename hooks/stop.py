@@ -679,6 +679,152 @@ def _detect_phase_items_triggers(
     return wrote
 
 
+# 1.0.26: Aşama 11-13 Kalite Boru Hattı trigger'ları — generic regex.
+# Pseudocode (satır 354-386): her kalite fazı aynı 3-step döngü:
+# scan count=K → issue-N-fixed → rescan count=K' → ... → rescan count=0.
+# Max 5 rescan aşıldıysa model asama-N-escalation-needed yazar.
+# Aşama 14 subagent_orchestration kanalıyla geldiği için scope dışı
+# (audit double-emit riski).
+_PHASE_QUALITY_PHASES = frozenset({11, 12, 13})
+_PHASE_SCAN_TRIGGER_RE = re.compile(
+    r"\basama-(\d+)-scan\s+count=(\d+)\b",
+    re.IGNORECASE,
+)
+_PHASE_ISSUE_FIXED_TRIGGER_RE = re.compile(
+    r"\basama-(\d+)-issue-(\d+)-fixed\b",
+    re.IGNORECASE,
+)
+_PHASE_RESCAN_TRIGGER_RE = re.compile(
+    r"\basama-(\d+)-rescan\s+count=(\d+)\b",
+    re.IGNORECASE,
+)
+_PHASE_ESCALATION_TRIGGER_RE = re.compile(
+    r"\basama-(\d+)-escalation-needed\b",
+    re.IGNORECASE,
+)
+
+
+def _detect_phase_quality_triggers(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """1.0.26: Aşama 11-13 Kalite Boru Hattı text-trigger'ları.
+
+    Yakalanan trigger'lar (Aşama 14 hariç — subagent kanalı kullanıyor):
+      - `asama-N-scan count=K` → yeni tarama döngüsü, K issue tespit
+      - `asama-N-issue-M-fixed` → tek issue auto-fix
+      - `asama-N-rescan count=K` → fix sonrası yeniden tarama; K=0
+        bitiş sinyali (ama `asama-N-complete` audit'i model yazar,
+        bu hook auto-emit ETMEZ — sorumluluk sınırı)
+      - `asama-N-escalation-needed` → max 5 rescan aşıldı,
+        geliştirici müdahalesi (model yazar; hook yakalar, auto-emit
+        ETMEZ — STRICT mode bypass ödülünü önler)
+
+    Hook her dört trigger için idempotent audit emit yapar; başka
+    state mutation veya complete/escalation auto-emit yoktur.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(
+            _PHASE_SCAN_TRIGGER_RE.search(t)
+            or _PHASE_ISSUE_FIXED_TRIGGER_RE.search(t)
+            or _PHASE_RESCAN_TRIGGER_RE.search(t)
+            or _PHASE_ESCALATION_TRIGGER_RE.search(t)
+        ),
+        transcript_path,
+    )
+    if not text:
+        return False
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    wrote = False
+
+    seen_scan: set[int] = set()
+    for n_str, count_str in _PHASE_SCAN_TRIGGER_RE.findall(text):
+        try:
+            n = int(n_str)
+            count = int(count_str)
+        except ValueError:
+            continue
+        if n not in _PHASE_QUALITY_PHASES or n in seen_scan:
+            continue
+        seen_scan.add(n)
+        audit_name = f"asama-{n}-scan"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"quality-pipeline scan phase={n} count={count}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+
+    seen_issue: set[tuple[int, int]] = set()
+    for n_str, m_str in _PHASE_ISSUE_FIXED_TRIGGER_RE.findall(text):
+        try:
+            n = int(n_str)
+            m = int(m_str)
+        except ValueError:
+            continue
+        key = (n, m)
+        if n not in _PHASE_QUALITY_PHASES or key in seen_issue:
+            continue
+        seen_issue.add(key)
+        audit_name = f"asama-{n}-issue-{m}-fixed"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"quality-pipeline issue-fixed phase={n} issue={m}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+
+    seen_rescan: set[int] = set()
+    for n_str, count_str in _PHASE_RESCAN_TRIGGER_RE.findall(text):
+        try:
+            n = int(n_str)
+            count = int(count_str)
+        except ValueError:
+            continue
+        if n not in _PHASE_QUALITY_PHASES or n in seen_rescan:
+            continue
+        seen_rescan.add(n)
+        audit_name = f"asama-{n}-rescan"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"quality-pipeline rescan phase={n} count={count}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+
+    seen_esc: set[int] = set()
+    for n_str in _PHASE_ESCALATION_TRIGGER_RE.findall(text):
+        try:
+            n = int(n_str)
+        except ValueError:
+            continue
+        if n not in _PHASE_QUALITY_PHASES or n in seen_esc:
+            continue
+        seen_esc.add(n)
+        audit_name = f"asama-{n}-escalation-needed"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"quality-pipeline escalation phase={n}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+
+    return wrote
+
+
 def _check_phase6_browser(detail: str, project_dir: str) -> None:
     """1.0.21: Aşama 6 `asama-6-end` detail parametrelerini incele.
 
@@ -936,6 +1082,12 @@ def main() -> int:
     # + item-{m}-resolved decision=apply|skip|rule. decision=rule ek
     # rule-capture audit (CLAUDE.md captured-rules zemini).
     _detect_phase_items_triggers(transcript_path, project_dir)
+
+    # 1.0.26: Aşama 11-13 Kalite Boru Hattı text-trigger'ları (scan /
+    # issue-fixed / rescan / escalation-needed). Aşama 14 subagent
+    # kanalıyla geldiği için scope dışı. Hook auto-emit YOK —
+    # `asama-N-complete` ve `escalation-needed` model sorumluluğunda.
+    _detect_phase_quality_triggers(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)
     _run_completeness_loop(project_dir)

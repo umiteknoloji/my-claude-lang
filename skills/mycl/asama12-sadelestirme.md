@@ -51,6 +51,14 @@ asama-12-rescan count=0
 asama-12-complete
 ```
 
+### Hook enforcement (1.0.26)
+
+Hook, Aşama 11 ile aynı generic text-trigger setini kullanır
+(`asama-12-scan / issue-M-fixed / rescan / escalation-needed`).
+`asama-12-complete` ve `asama-12-escalation-needed` modelin
+sorumluluğunda; hook auto-emit yapmaz. Detay: Aşama 11 skill
+"Hook enforcement (1.0.26)" bölümü.
+
 ## Anti-pattern
 
 - ❌ "Soyutlama olsa daha temiz olur" → 1 caller varsa soyutlama
@@ -93,6 +101,13 @@ Scan → fix (auto, no askq) → rescan until K=0 (max 5).
 
 `asama-12-scan count=K` → `asama-12-issue-N-fixed` →
 `asama-12-rescan count=0` → `asama-12-complete`.
+
+### Hook enforcement (1.0.26)
+
+Hook uses the same generic text-trigger set as Phase 11 (`asama-12-scan
+/ issue-M-fixed / rescan / escalation-needed`). `asama-12-complete`
+and `asama-12-escalation-needed` are model-responsibility — no
+auto-emit. See Phase 11 skill "Hook enforcement (1.0.26)" for details.
 
 ## Anti-patterns
 

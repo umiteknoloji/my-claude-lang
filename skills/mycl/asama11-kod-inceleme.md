@@ -57,6 +57,25 @@ asama-11-complete
 K=0 olana kadar **max 5 rescan**. Aşılırsa `asama-11-escalation-needed`
 audit (geliştirici müdahalesi).
 
+### Hook enforcement (1.0.26)
+
+Hook, asistan metninde dört text-trigger'ı line-anchored regex ile
+yakalar (Aşama 11, 12, 13 ortak — Aşama 14 subagent kanalıyla geldiği
+için scope dışı):
+
+- `asama-11-scan count=K` → audit emit
+- `asama-11-issue-M-fixed` → audit emit (her issue ayrı kayıt)
+- `asama-11-rescan count=K` → audit emit
+- `asama-11-escalation-needed` → audit emit
+
+**Hook auto-emit YAPMAZ**: `asama-11-complete` ve
+`asama-11-escalation-needed` audit'lerini **model** kendi cevabında
+yazar; hook sadece yakalar. STRICT mode bypass ödülünü önlemek için
+"5 rescan aşıldı, hook escalation auto-yazar" davranışı eklenmedi.
+
+Tüm trigger'lar idempotent — aynı transcript yeniden taranınca
+duplicate audit yazılmaz.
+
 ## Anti-pattern
 
 - ❌ "Sadece spec dosyalarına bak" — Aşama 11 **yeni veya değişen
@@ -99,6 +118,26 @@ validation, misleading naming.
 `asama-11-rescan count=K2` → ... → `asama-11-rescan count=0` →
 `asama-11-complete`. Max 5 rescans before
 `asama-11-escalation-needed`.
+
+### Hook enforcement (1.0.26)
+
+Hook scans assistant text for four text-triggers via line-anchored
+regex (shared by Phases 11, 12, 13 — Phase 14 uses the subagent
+channel and is out of scope to avoid double-emit):
+
+- `asama-11-scan count=K` → audit
+- `asama-11-issue-M-fixed` → audit (one per issue)
+- `asama-11-rescan count=K` → audit
+- `asama-11-escalation-needed` → audit
+
+**Hook does NOT auto-emit** `asama-11-complete` or
+`asama-11-escalation-needed`; the **model** writes them in its reply,
+the hook only captures. The defensive "auto-emit escalation after 5
+rescans" behavior is deliberately omitted to prevent STRICT-mode
+bypass-as-reward.
+
+All triggers are idempotent — rescanning the same transcript does not
+duplicate audits.
 
 ## Anti-patterns
 

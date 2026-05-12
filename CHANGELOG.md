@@ -5,6 +5,57 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.26] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 11-13 Kalite Boru Hattı text-trigger zinciri bağlandı** —
+  Subagent (Sonnet 4.6, 10 lens) Aşama 11'in Aşama 9'la birebir aynı
+  "declared but not implemented" deseninde olduğunu doğruladı: skill
+  ve audit kontratı tam tasarlı (`scan / issue-fixed / rescan /
+  escalation-needed`) ama hook'larda hiç text-trigger yakalanmıyordu.
+  Pseudocode satır 354-386'da Aşama 11-14 ortak 3-step döngü
+  tanımlı; subagent generic regex yaklaşımını onayladı.
+
+### Eklenen / Added
+
+- **`hooks/stop.py` 4 yeni text-trigger regex'i** — generic, Aşama 11,
+  12, 13 ortak (Aşama 14 `subagent_orchestration` kanalıyla geldiği
+  için scope dışı, double-emit önlemek):
+  - `_PHASE_SCAN_TRIGGER_RE`: `asama-N-scan count=K`
+  - `_PHASE_ISSUE_FIXED_TRIGGER_RE`: `asama-N-issue-M-fixed`
+  - `_PHASE_RESCAN_TRIGGER_RE`: `asama-N-rescan count=K`
+  - `_PHASE_ESCALATION_TRIGGER_RE`: `asama-N-escalation-needed`
+- **`hooks/stop.py::_detect_phase_quality_triggers`** — dört trigger
+  için idempotent audit emit. Scope: phase ∈ {11, 12, 13}; diğer
+  fazlar filtrelenir.
+- **`skills/mycl/asama11-kod-inceleme.md` "Hook enforcement (1.0.26)"
+  bölümü** — TR + EN. Aşama 12 ve 13 skill dosyalarında kısa referans
+  (Aşama 11'e işaret).
+
+### Sorumluluk sınırı / Boundary
+
+- **Hook auto-emit YOK** — subagent kritiği gereği `asama-N-complete`
+  ve `asama-N-escalation-needed` audit'leri model sorumluluğunda kalır.
+  Savunmacı "5 rescan aşılırsa hook escalation auto-yazar" davranışı
+  bilerek eklenmedi (STRICT mode bypass-as-reward riski; v13.1.3
+  felsefesi).
+- **Yeni state alanı YOK** — `quality_phase_N_green` veya
+  `quality_rescan_count_phase_N` bool/int alanları eklenmedi
+  (duplikasyon kaçınma; Aşama 22 tamlık denetimi audit log'u
+  iterate eder).
+- **gate_spec.json değişikliği YOK** — Aşama 11/12/13
+  `required_audits_any` zaten temizdi (`{n}` template literal yok).
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.25 → 1.0.26, `.claude-plugin/plugin.json` 1.0.26.
+- `README.md` + `README.tr.md` test sayısı 686 → 699.
+- 13 yeni test: `tests/test_phase11_refactor.py` (scan/issue/rescan/
+  escalation audit emission, Aşama 12 ve 13 generic regex davranışı,
+  Aşama 14 scope dışı doğrulaması, idempotency, full zincir, state
+  mutation yok kontrolü, gate_spec template temizliği).
+
 ## [1.0.25] — 2026-05-13
 
 ### Düzeltilen / Fixed
