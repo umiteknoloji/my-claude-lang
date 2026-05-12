@@ -104,7 +104,8 @@
       "public_commitment_required": true,
       "skippable": true,
       "skip_reason": "no-ui-flow",
-      "lens": "server_browser_check"
+      "lens": "server_browser_check",
+      "_note": "1.0.21 — Generic _PHASE_EXTENDED_TRIGGER_RE (stop.py) skipped/end/end-green/end-target-met/not-applicable suffix'lerini yakalar; öncesi sadece 'complete' suffix vardı (Aşama 5/6/8/15-18/22 emit'leri kayıp). asama-6-end detail (server_started, browser_opened) parse + browser_opened=false → asama-6-no-browser-warn soft audit (KATI mod gözetimi)."
     },
     "7": {
       "name": "UI İncelemesi",

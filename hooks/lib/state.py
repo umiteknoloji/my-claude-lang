@@ -44,8 +44,11 @@ _DEFAULT_STATE: dict[str, Any] = {
     "plugin_gate_active": False,
     "plugin_gate_missing": [],
     "ui_flow_active": False,
-    "ui_sub_phase": None,
-    "ui_build_hash": None,
+    # 1.0.21 — ui_sub_phase ve ui_build_hash field'ları kaldırıldı.
+    # state.py'de declared'tı ama hiçbir hook okumuyor/yazmıyordu (dead).
+    # Pseudocode'da explicit yer almıyordu; CLAUDE.md "dedicated
+    # implementation" ihlali. Backward compat ✓: eski state.json'larda
+    # field varsa read() merged dict default sıfırlar (mevcut pattern).
     "ui_reviewed": False,
     "scope_paths": [],
     "pattern_scan_due": False,

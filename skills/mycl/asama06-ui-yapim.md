@@ -46,10 +46,25 @@ audit. Backend Aşama 8 (DB) veya Aşama 9 (TDD)'de yazılır.
 
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
+**`Task` ve `Agent` (subagent dispatch) bu fazda YASAK** (Aşama 1/3/5
+pattern'i, 1.0.21). Frontend yazımı + npm install/dev + browser auto-
+open ana bağlamda yürür; subagent dispatch gereksiz, bağlam zaten
+mevcut. Subagent sadece Aşama 10/14 paralel mercek için.
+
 ## Çıktı (3 seçenek)
 
-> **Model:** `asama-6-complete` veya `asama-6-skipped reason=no-ui-flow` cevap metninde düz yazıyla.
-> **Hook:** `asama-6-end server_started=... browser_opened=...` (sunucu+tarayıcı sertifikası — hook doğrulayarak yazar).
+> **Model:** Üç audit'ten birini cevap metnine düz yazıyla emit eder:
+> 1. `asama-6-complete` — UI hazır (basit complete)
+> 2. `asama-6-skipped reason=no-ui-flow` — proje UI içermez (CLI/lib/backend-only)
+> 3. `asama-6-end server_started=true browser_opened=true` — KATI mod sertifikası (tercih edilen)
+>
+> **Hook (1.0.21):** Generic extended trigger regex `asama-(\d+)-(end|skipped|...)`
+> bu emit'leri yakalar + audit emit eder. `asama-6-end` parametrelerinde
+> `browser_opened=false` varsa hook `asama-6-no-browser-warn` soft audit
+> ekler (görünür sinyal, hard deny değil). Model `server_started`/
+> `browser_opened` doğru emit etmek zorunda — hook doğrulamaz; pseudocode
+> KATI mod model'in sorumluluğu.
+>
 > **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
 
 | Audit | Anlam |

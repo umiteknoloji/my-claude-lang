@@ -5,6 +5,91 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.21] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **Generic extended phase trigger — 6 aşamayı etkileyen kayıp text-
+  trigger bug'ı (kritik keşif)** — mevcut `_PHASE_COMPLETE_TRIGGER_RE`
+  regex sadece "complete" suffix yakalıyordu (`asama-(\d+)-complete`).
+  Pseudocode'da tanımlı `asama-5-skipped`, `asama-6-end`, `asama-6-skipped`,
+  `asama-8-end`, `asama-8-not-applicable`, `asama-15-end-green`,
+  `asama-16-end-green`, `asama-17-end-green`, `asama-18-end-target-met`,
+  Aşama 15-18 `not-applicable` audit'leri **hook'a hiç ulaşmıyordu**.
+  Model emit etse bile text-trigger kanalı kayıp → audit log'da
+  görünmez → `required_audits_any` gate fail riski.
+
+  Düzeltme: yeni `_PHASE_EXTENDED_TRIGGER_RE` regex
+  (`(end-target-met|end-green|skipped|not-applicable|end)`) + yeni
+  `_detect_phase_extended_trigger` helper. main()'da
+  `_detect_phase_complete_trigger`'dan sonra çağrılır. Longest match
+  sırası (end-green/end-target-met ÖNCE end). Idempotent + sıralılık
+  opsiyonel (extended trigger'lar yan kanal — `phase-skip-attempt`
+  yazmaz, sessiz geçer; mevcut `_detect_phase_complete_trigger` sıralılık
+  invariant'ı koruyor).
+
+- **Aşama 6 `asama-6-end` parametre parse + browser warn** — pseudocode
+  `asama-6-end server_started=true browser_opened=true` KATI mod
+  sertifikası. 1.0.20'ya kadar parametre parse yoktu. `_check_phase6_browser`
+  helper: `asama-6-end` detail field'ında `browser_opened=false` ise
+  `asama-6-no-browser-warn` soft audit emit (görünür sinyal, hard deny
+  değil — pseudocode "no hard gates except four" ilkesi).
+
+### Değişen / Changed
+
+- **`state.py` `ui_sub_phase` + `ui_build_hash` field'ları kaldırıldı**
+  — declared but not implemented (1.0.0'dan beri ölü). Hiçbir hook
+  okumuyor/yazmıyor (grep onayladı). CLAUDE.md "dedicated implementation"
+  kuralı + minimum state şeması.
+- **`skills/mycl/asama06-ui-yapim.md`** — Task/Agent yasak notu
+  (Aşama 1/3/5 pattern'i). Emit format'ı net (3 seçenek + hook
+  davranışı). `asama-6-no-browser-warn` mekanizması açıklandı.
+- **`data/gate_spec.json` Aşama 6** — `_note` güncellendi (extended
+  trigger + browser warn mekanizması).
+
+### Test
+
+- 637 → 650 test (+13: `test_phase6_refactor.py` — extended trigger
+  Aşama 6 end/skipped/cert, Aşama 5 skipped now caught, Aşama 15
+  end-green longest match, Aşama 18 end-target-met, Aşama 8
+  not-applicable, idempotent, n!=cp silent skip, browser helper
+  true/false, state default no ui_sub_phase/ui_build_hash).
+
+### Pre-emptive yan etki taraması
+
+- `grep "ui_sub_phase\|ui_build_hash" tests/ hooks/` → sadece state.py
+  yorum referansı. Test'lerde kullanım yok → kaldırma güvenli.
+- `test_post_tool.py:139-189` ui_flow_active testleri → etkilenmez
+- `test_audit.py:151,166` `is_phase_complete("asama-6-end")` → audit
+  name "asama-6-end" prefix kontrolü, hook artık emit edecek → True
+  dönecek
+- `test_stop_phase_trigger.py:122-144` `asama-6-complete` zincir →
+  mevcut regex'e dokunmuyor (yeni regex paralel), etkilenmez
+- `test_progress.py:103,120` `asama-6-end` log → progress.py emit ediyor
+  (audit lifecycle ayrı), etkilenmez
+
+### Generic feature yan etkisi (pozitif)
+
+Extended trigger Aşama 6 dışındaki **5 aşamayı da kapsar**:
+- Aşama 5: `asama-5-skipped` (greenfield) artık yakalanır
+- Aşama 7: `asama-7-skipped` (Aşama 6 atlandıysa)
+- Aşama 8: `asama-8-end`, `asama-8-not-applicable`
+- Aşama 15-18: `asama-N-end-green`, `asama-N-end-target-met`,
+  `asama-N-not-applicable`
+- Aşama 21: `asama-21-skipped` (İngilizce session)
+
+Bu aşamaların kendi turlarında detay refactor gerekmeyecek (text-trigger
+kanalı zaten açık olacak), sadece audit semantiği kontrol edilecek.
+
+### Backward compat
+
+- `ui_sub_phase`/`ui_build_hash` kaldırma: eski state.json dosyalarında
+  field varsa `read()` merged dict default sıfırlar (mevcut pattern).
+- Extended trigger regex paralel kanal — mevcut `_PHASE_COMPLETE_TRIGGER_RE`'e
+  dokunmuyor. Aşama 1-4 davranışı değişmez.
+
+[1.0.21]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.21
+
 ## [1.0.20] — 2026-05-12
 
 ### Düzeltilen / Fixed

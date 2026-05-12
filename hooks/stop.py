@@ -298,6 +298,18 @@ _PATTERN_SUMMARY_RE = re.compile(
 # `[ \t]*` (newline yok) — `\s*` newline yutar ve sonraki satırı yanlışlıkla
 # yakalardı. Sadece tab/space whitespace, satır içi.
 
+# 1.0.21: Generic extended phase trigger — `complete` dışındaki suffix'leri
+# yakalar. Mevcut `_PHASE_COMPLETE_TRIGGER_RE` sadece "complete" suffix.
+# Pseudocode'da diğer çıktılar: skipped (5, 6, 7, 21), end (6, 8),
+# end-green (15-17), end-target-met (18), not-applicable (8, 15-18, 22).
+# Önemli sıralama: "end-target-met" ve "end-green" "end"den ÖNCE — longest
+# match (regex alternation greedy değil; ilk match kazanır).
+_PHASE_EXTENDED_TRIGGER_RE = re.compile(
+    r"asama-(\d+)-(end-target-met|end-green|skipped|not-applicable|end)"
+    r"\b(?:[ \t]+(\S[^\n]*))?",
+    re.IGNORECASE,
+)
+
 
 def _extract_pattern_summary(text: str, project_dir: str) -> bool:
     """`pattern-summary: <özet>` satırı varsa state'e yaz.
@@ -408,6 +420,97 @@ def _detect_phase_complete_trigger(
                 project_root=project_dir,
             )
         # else n < cp: stale-emit, sessiz geç
+    return wrote
+
+
+def _check_phase6_browser(detail: str, project_dir: str) -> None:
+    """1.0.21: Aşama 6 `asama-6-end` detail parametrelerini incele.
+
+    `asama-6-end server_started=true browser_opened=false` durumunda
+    `asama-6-no-browser-warn` soft audit emit eder (pseudocode "KATI
+    mod sertifikası" gereği). Hard deny değil — geliştirici uyarıyı
+    görür, tarayıcı açma sorumluluğu modelin/kullanıcının.
+    """
+    if not detail:
+        return
+    if "browser_opened=false" not in detail.lower():
+        return
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    if "asama-6-no-browser-warn" in existing:
+        return  # idempotent
+    audit.log_event(
+        "asama-6-no-browser-warn", "stop.py",
+        f"browser_opened=false detected in detail: {detail[:80]}",
+        project_root=project_dir,
+    )
+
+
+def _detect_phase_extended_trigger(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """Aşama N için `complete` dışındaki audit suffix'lerini yakala.
+
+    1.0.21 — mevcut `_detect_phase_complete_trigger` sadece "complete"
+    suffix yakalıyordu; `asama-6-end`, `asama-5-skipped`, `asama-15-end-green`
+    gibi audit'ler hook'a hiç ulaşmıyordu (text-trigger kanalı kayıp).
+    Generic fix: extended trigger regex (skipped|end|end-green|
+    end-target-met|not-applicable).
+
+    Sıralılık:
+      - N == cp → audit emit (idempotent).
+      - N != cp → sessiz geç (skip-attempt yazma; extended trigger'lar
+        opsiyonel/yan kanal — sıralılık zorunluluğu yok, `_detect_phase_complete_trigger`
+        bu işi yapıyor).
+
+    Aşama 6 spesifik: `asama-6-end` detail parametrelerinde
+    `browser_opened=false` varsa `_check_phase6_browser` warn emit.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(_PHASE_EXTENDED_TRIGGER_RE.search(t)),
+        transcript_path,
+    )
+    if not text:
+        return False
+    matches = _PHASE_EXTENDED_TRIGGER_RE.findall(text)
+    if not matches:
+        return False
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    wrote = False
+    seen: set[tuple[int, str]] = set()
+    for n_str, suffix, detail in matches:
+        try:
+            n = int(n_str)
+        except ValueError:
+            continue
+        key = (n, suffix.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        if n != cp:
+            # Extended trigger'lar sıralılık zorunlu değil — sessiz geç.
+            continue
+        audit_name = f"asama-{n}-{suffix.lower()}"
+        if audit_name in existing:
+            continue
+        audit.log_event(
+            audit_name, "stop.py",
+            f"extended-trigger-emit phase={n} suffix={suffix} detail={detail or ''}",
+            project_root=project_dir,
+        )
+        existing.add(audit_name)
+        wrote = True
+        # Aşama 6 spesifik: end audit detail kontrolü
+        if n == 6 and suffix.lower() == "end":
+            _check_phase6_browser(detail or "", project_dir)
     return wrote
 
 
@@ -557,6 +660,12 @@ def main() -> int:
     # veya subagent çıktısı yoksa modelin cevabındaki `asama-N-complete`
     # tetik kelimesi kanalı).
     _detect_phase_complete_trigger(transcript_path, project_dir)
+
+    # 1.0.21: Extended trigger — `skipped`, `end`, `end-green`,
+    # `end-target-met`, `not-applicable` suffix'leri yakalar. Aşama 6
+    # `asama-6-end` parametre parse + soft warn; Aşama 5/7/21 skipped
+    # de bu kanaldan yakalanır.
+    _detect_phase_extended_trigger(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)
     _run_completeness_loop(project_dir)
