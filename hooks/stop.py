@@ -83,6 +83,8 @@ def _detect_and_store_spec(transcript_path: str, project_dir: str) -> str | None
         return None
     normalized = spec_detect.normalize(body)
     new_hash = spec_detect.compute_hash(normalized)
+    if new_hash is None:
+        return None
     current_hash = state.get("spec_hash", project_root=project_dir)
     if current_hash == new_hash:
         return None
@@ -112,7 +114,7 @@ def _detect_askq_intent(transcript_path: str) -> str | None:
     """
     if not transcript_path:
         return None
-    _use, result = transcript.latest_askq_pair(transcript_path)
+    _, result = transcript.latest_askq_pair(transcript_path)
     if result is not None:
         return askq.classify_tool_result(result)
     # Fallback: AskQ tool_result yok → son user mesajı text'ini classify et
