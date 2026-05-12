@@ -191,7 +191,17 @@ def _run_completeness_loop(project_dir: str) -> int:
     # Sonsuz döngü koruması: max 22 iterasyon
     for _ in range(22):
         cp = state.get("current_phase", 1, project_root=project_dir)
-        if cp >= 22:
+        if cp > 22:
+            break
+        if cp == 22:
+            # 1.0.32: Aşama 22 özel akışı — hook tamlık raporunu yazar
+            # ve `asama-22-complete` audit'ini emit eder. Model emit
+            # YASAK (skill kontratı). Idempotent.
+            existing_22 = {
+                ev.get("name") for ev in audit.read_all(project_root=project_dir)
+            }
+            if "asama-22-complete" not in existing_22:
+                _emit_phase_22_completeness_report(project_dir)
             break
         phase_def = spec.get("phases", {}).get(str(cp), {})
         if isinstance(phase_def, dict) and phase_def.get("silent_phase"):
@@ -376,6 +386,22 @@ def _detect_phase_complete_trigger(
     })
     wrote = False
     for n in unique_nums:
+        # 1.0.32: Aşama 22 kontrat ihlali koruması — `asama-22-complete`
+        # **yalnızca hook** tarafından yazılır (skill kontratı). Model
+        # cevap metnine yazsa bile generic trigger onu audit'e geçirmez;
+        # bunun yerine illegal-emit-attempt audit yazılır (görünür sinyal).
+        if n == 22:
+            illegal = "phase-22-illegal-emit-attempt"
+            if illegal not in existing:
+                audit.log_event(
+                    illegal, "stop.py",
+                    "phase=22 model attempted asama-22-complete emit; "
+                    "hook is the sole writer per skill contract",
+                    project_root=project_dir,
+                )
+                existing.add(illegal)
+                wrote = True
+            continue
         if n == cp:
             audit_name = f"asama-{n}-complete"
             if audit_name in existing:
@@ -832,6 +858,347 @@ def _detect_phase_quality_triggers(
             wrote = True
 
     return wrote
+
+
+# 1.0.32: Aşama 22 Tamlık Denetimi — hook tamlık raporunu yazar +
+# `asama-22-complete` audit'ini emit eder. Skill kontratı: model
+# emit edemez (kontrat ihlali → `phase-22-illegal-emit-attempt`).
+# 5 invariant: faz audit zinciri (1-21), Aşama 9 TDD derinliği,
+# Aşama 11-18 pipeline derinliği, Spec MUST kapsanma, Aşama 21 skip
+# doğrulama. Rapor `.mycl/completeness_report.md` dosyasına yazılır;
+# bilingual (TR + EN, boş satır ayrılı).
+_PHASE_22_REPORT_FILENAME = "completeness_report.md"
+
+
+def _phase_22_check_audit_chain(events: list[dict]) -> tuple[list[int], list[int]]:
+    """Aşama 1-21 audit zinciri kontrolü.
+
+    Her faz için `required_audits_any` veya `required_audits_all`
+    listesindeki audit'lerden en az biri (any) ya da hepsi (all)
+    var mı?
+
+    Returns:
+        (passed_phases, missing_phases) — int listeleri.
+    """
+    spec = gate.load_gate_spec()
+    existing = {ev.get("name") for ev in events}
+    passed: list[int] = []
+    missing: list[int] = []
+    for n in range(1, 22):
+        phase_def = spec.get("phases", {}).get(str(n), {})
+        if not isinstance(phase_def, dict):
+            missing.append(n)
+            continue
+        required_all = phase_def.get("required_audits_all") or []
+        required_any = phase_def.get("required_audits_any") or []
+        if required_all:
+            if all(name in existing for name in required_all):
+                passed.append(n)
+            else:
+                missing.append(n)
+        elif required_any:
+            if any(name in existing for name in required_any):
+                passed.append(n)
+            else:
+                missing.append(n)
+        else:
+            # Required audit tanımlı değil — bu faz pass kabul edilir
+            passed.append(n)
+    return passed, missing
+
+
+def _phase_22_check_tdd_depth(
+    events: list[dict], project_dir: str,
+) -> tuple[int, int, bool]:
+    """Aşama 9 TDD derinliği: her MUST için red+green+refactor audit'i.
+
+    `regression-clear` semantiği: test failure hiç olmadıysa bu audit
+    hiç yazılmaz — yalnış pozitif önlemek için OR mantığı: son
+    `asama-9-ac-N-green` audit'i de GREEN sinyali sayılır.
+
+    Returns:
+        (ac_complete_count, ac_total_count, has_final_green) tuple.
+    """
+    from hooks.lib import spec_must
+    must_id_list = spec_must.must_ids(project_root=project_dir)
+    ac_total = len(must_id_list)
+    if ac_total == 0:
+        return 0, 0, False
+    existing = {ev.get("name") for ev in events}
+    ac_complete = 0
+    for i in range(1, ac_total + 1):
+        red = f"asama-9-ac-{i}-red"
+        green = f"asama-9-ac-{i}-green"
+        refactor = f"asama-9-ac-{i}-refactor"
+        if red in existing and green in existing and refactor in existing:
+            ac_complete += 1
+    # Final GREEN: regression-clear VEYA son asama-9-ac-N-green varsa
+    has_final_green = (
+        "regression-clear" in existing
+        or any(
+            name.startswith("asama-9-ac-")
+            and name.endswith("-green")
+            for name in existing
+        )
+    )
+    return ac_complete, ac_total, has_final_green
+
+
+def _phase_22_check_quality_testing_depth(
+    events: list[dict],
+) -> list[int]:
+    """Aşama 11-18 pipeline derinliği — her faz için durum kontrolü.
+
+    Bir faz "açık konu" sayılır:
+      - `asama-N-not-applicable` audit yok VE
+      - (`asama-N-rescan` audit yok — yani K=0'a ulaşmadı VEYA
+        `asama-N-end-green` / `asama-N-end-target-met` yok)
+      - VE `asama-N-complete` da yok
+
+    Yani: faz "complete", "not-applicable", "end-green",
+    "end-target-met" veya "rescan" (rescan=0 sinyalleyen) ile
+    kapanmamışsa açık konu.
+
+    Returns:
+        Açık konu olarak işaretlenen faz numaralarının listesi.
+    """
+    existing = {ev.get("name") for ev in events}
+    open_issues: list[int] = []
+    for n in range(11, 19):
+        complete = f"asama-{n}-complete" in existing
+        not_applicable = f"asama-{n}-not-applicable" in existing
+        end_green = f"asama-{n}-end-green" in existing
+        end_target_met = f"asama-{n}-end-target-met" in existing
+        rescan = f"asama-{n}-rescan" in existing
+        if not (complete or not_applicable or end_green
+                or end_target_met or rescan):
+            open_issues.append(n)
+    return open_issues
+
+
+def _phase_22_check_must_coverage(project_dir: str) -> tuple[int, int, list[str]]:
+    """Spec MUST kapsanma sayımı + kapsanmamış MUST ID listesi.
+
+    Returns:
+        (must_total, must_green, uncovered_ids).
+    """
+    from hooks.lib import spec_must
+    all_ids = spec_must.must_ids(project_root=project_dir)
+    uncovered = spec_must.uncovered_musts(project_root=project_dir)
+    return len(all_ids), len(all_ids) - len(uncovered), uncovered
+
+
+def _phase_22_check_phase_21_skip(events: list[dict]) -> bool:
+    """Aşama 21 skip doğrulama — complete veya skipped audit'i var mı?
+
+    Returns:
+        True → audit log Aşama 21'i denetlemiş (complete veya skipped);
+        False → silent skip (Açık Konular'a düşer).
+    """
+    existing = {ev.get("name") for ev in events}
+    return (
+        "asama-21-complete" in existing
+        or "asama-21-skipped" in existing
+    )
+
+
+def _phase_22_format_duration(events: list[dict]) -> str:
+    """trace.log session_start ts ile son audit ts arasındaki süre."""
+    try:
+        from hooks.lib import trace
+        from datetime import datetime
+        sessions = trace.find(event="session_start", project_root=None)
+        if not sessions or not events:
+            return "n/a"
+        start_ts = sessions[0]["ts"]
+        end_ts = events[-1].get("ts", "")
+        if not end_ts:
+            return "n/a"
+        # ISO 8601 parse (UTC Z veya +00:00)
+        start_dt = datetime.fromisoformat(start_ts.replace("Z", "+00:00"))
+        end_dt = datetime.fromisoformat(end_ts.replace("Z", "+00:00"))
+        delta = end_dt - start_dt
+        total_seconds = int(delta.total_seconds())
+        hours, rem = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(rem, 60)
+        return f"{hours}h {minutes}m {seconds}s"
+    except (ValueError, ImportError, KeyError):
+        return "n/a"
+
+
+def _emit_phase_22_completeness_report(project_dir: str) -> bool:
+    """1.0.32: Aşama 22 tamlık raporu üretimi + `asama-22-complete` emit.
+
+    Skill kontratı: hook tek yazar; model emit edemez. Idempotent.
+    Rapor `.mycl/completeness_report.md` dosyasına yazılır; bilingual.
+
+    5 invariant:
+      1. Aşama 1-21 audit zinciri
+      2. Aşama 9 TDD derinliği (AC red/green/refactor + final GREEN)
+      3. Aşama 11-18 pipeline derinliği (scan/rescan veya not-applicable)
+      4. Spec MUST kapsanma (spec_must API)
+      5. Aşama 21 skip doğrulama (1.0.31 detection control)
+
+    Boş `spec_must_list` durumunda soft uyarı (crash YOK).
+
+    Returns: True (rapor yazıldıysa).
+    """
+    from hooks.lib import bilingual
+    from datetime import datetime, timezone
+    events = audit.read_all(project_root=project_dir)
+    # 1. Audit zinciri
+    passed_phases, missing_phases = _phase_22_check_audit_chain(events)
+    # 2. TDD derinliği
+    ac_complete, ac_total, has_final_green = _phase_22_check_tdd_depth(
+        events, project_dir,
+    )
+    # 3. Pipeline derinliği
+    quality_open_issues = _phase_22_check_quality_testing_depth(events)
+    # 4. MUST kapsanma
+    must_total, must_green, uncovered = _phase_22_check_must_coverage(
+        project_dir,
+    )
+    # 5. Aşama 21 skip
+    phase_21_verified = _phase_22_check_phase_21_skip(events)
+
+    # Process Trace özeti
+    from hooks.lib import trace
+    transitions = trace.find(
+        event="phase_transition", project_root=project_dir,
+    )
+    transition_count = len(transitions)
+    audit_count = len(events)
+    duration = _phase_22_format_duration(events)
+    final_regression_clear = next(
+        (ev for ev in reversed(events)
+         if ev.get("name") == "regression-clear"),
+        None,
+    )
+    final_green_ts = (
+        final_regression_clear.get("ts", "n/a")
+        if final_regression_clear else "n/a"
+    )
+    sessions = trace.find(
+        event="session_start", project_root=project_dir,
+    )
+    session_start_ts = sessions[0]["ts"] if sessions else "n/a"
+
+    # Açık Konular listesi
+    open_issues: list[str] = []
+    if missing_phases:
+        open_issues.append(
+            f"Eksik audit zinciri: faz(lar) {missing_phases} "
+            f"required_audits karşılanmadı."
+        )
+    if ac_total > 0 and ac_complete < ac_total:
+        open_issues.append(
+            f"Aşama 9 TDD: {ac_complete}/{ac_total} AC tamam — "
+            f"{ac_total - ac_complete} AC için red/green/refactor "
+            "audit zinciri eksik."
+        )
+    if ac_total > 0 and not has_final_green:
+        open_issues.append(
+            "Aşama 9 final GREEN sinyali yok (regression-clear veya "
+            "son asama-9-ac-N-green audit'i bulunamadı)."
+        )
+    if ac_total == 0:
+        open_issues.append(
+            "Spec MUST listesi boş — Aşama 4 onaylanmamış olabilir."
+        )
+    for n in quality_open_issues:
+        open_issues.append(
+            f"Aşama {n} pipeline: complete / not-applicable / "
+            f"end-green / end-target-met / rescan audit'lerinden "
+            "hiçbiri yok."
+        )
+    if uncovered:
+        open_issues.append(
+            f"Spec MUST kapsanma: {must_green}/{must_total} "
+            f"(kapsanmamış: {', '.join(uncovered)})."
+        )
+    if not phase_21_verified:
+        open_issues.append(
+            "Aşama 21 silent skip: ne `asama-21-complete` ne "
+            "`asama-21-skipped` audit'i log'da."
+        )
+
+    # Bilingual header
+    header = bilingual.render("completeness_report_header")
+
+    # Status satırları
+    chain_status = "✅" if not missing_phases else "❌"
+    tdd_status = (
+        "✅"
+        if ac_total > 0 and ac_complete == ac_total and has_final_green
+        else "⚠️" if ac_total > 0 else "ℹ️"
+    )
+    quality_status = "✅" if not quality_open_issues else "⚠️"
+    must_status = (
+        "✅" if must_total > 0 and not uncovered
+        else "⚠️" if must_total > 0
+        else "ℹ️"
+    )
+    phase_21_status = "✅" if phase_21_verified else "⚠️"
+
+    open_issues_block = (
+        "\n".join(f"  - {issue}" for issue in open_issues)
+        if open_issues else "  (yok / none)"
+    )
+
+    now_ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    report = (
+        f"{header}\n"
+        f"\n"
+        f"{chain_status} Aşama 1-21 audit zinciri: "
+        f"{len(passed_phases)}/21 geçti\n"
+        f"{tdd_status} Aşama 9 TDD: {ac_complete}/{ac_total} AC "
+        f"red→green→refactor"
+        + (" + final GREEN" if has_final_green else "") + "\n"
+        f"{quality_status} Aşama 11-18 pipeline: "
+        f"{8 - len(quality_open_issues)}/8 kapandı\n"
+        f"{must_status} Spec MUST kapsanma: {must_green}/{must_total}\n"
+        f"{phase_21_status} Aşama 21 doğrulanmış: "
+        f"{'evet' if phase_21_verified else 'hayır (silent skip)'}\n"
+        f"\n"
+        f"Açık Konular / Open Issues:\n"
+        f"{open_issues_block}\n"
+        f"\n"
+        f"Process Trace özeti / Process Trace summary:\n"
+        f"  - session_start: {session_start_ts}\n"
+        f"  - {transition_count} phase transition\n"
+        f"  - {audit_count} audit emit\n"
+        f"  - Final regression-clear: {final_green_ts}\n"
+        f"  - Toplam süre / Total duration: {duration}\n"
+        f"\n"
+        f"🤖 Hook signature: stop.py @ {now_ts}\n"
+    )
+
+    # Raporu dosyaya yaz (.mycl/ altına)
+    from pathlib import Path
+    mycl_dir = Path(project_dir) / ".mycl"
+    mycl_dir.mkdir(parents=True, exist_ok=True)
+    report_path = mycl_dir / _PHASE_22_REPORT_FILENAME
+    report_path.write_text(report, encoding="utf-8")
+
+    # state.last_phase_output'a özet yaz
+    summary = (
+        f"Aşama 22 tamlık raporu üretildi. "
+        f"Faz zinciri {len(passed_phases)}/21, TDD {ac_complete}/{ac_total}, "
+        f"MUST {must_green}/{must_total}, "
+        f"açık konu sayısı: {len(open_issues)}."
+    )
+    state.set_field(
+        "last_phase_output", summary, project_root=project_dir,
+    )
+
+    # asama-22-complete audit emit
+    audit.log_event(
+        "asama-22-complete", "stop.py",
+        f"completeness-report-written open_issues={len(open_issues)}",
+        project_root=project_dir,
+    )
+    return True
 
 
 # 1.0.30: Aşama 20 Doğrulama Raporu — hook spec coverage'i kendi

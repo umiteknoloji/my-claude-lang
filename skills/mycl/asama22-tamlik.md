@@ -115,6 +115,29 @@ Bash AskUserQuestion gerekmez — hook tek başına çalışır.
 asama-22-complete (HOOK tarafından — modelden değil)
 ```
 
+### Hook enforcement (1.0.32)
+
+**Bu turda Aşama 22 implementasyonu hook'a getirildi.** Önceden skill
+tasarlanmış ama hiçbir hook çalışmıyordu (declared-but-not-implemented).
+
+- `_run_completeness_loop` Aşama 22 dalı: cp == 22 ve
+  `asama-22-complete` yoksa rapor üretilir + audit emit edilir.
+  Idempotent.
+- `_detect_phase_complete_trigger` Aşama 22 guard: model
+  `asama-22-complete` cevap metnine yazsa bile hook bu audit'i
+  yazmaz; bunun yerine `phase-22-illegal-emit-attempt` audit emit
+  edilir (görünür sinyal, kontrat ihlali kaydı).
+- `_emit_phase_22_completeness_report`: 5 invariant kontrolü
+  (audit zinciri 1-21, Aşama 9 TDD derinliği, Aşama 11-18 pipeline
+  derinliği, Spec MUST kapsanma, Aşama 21 skip doğrulama). Bilingual
+  rapor `.mycl/completeness_report.md` dosyasına yazılır. State'in
+  `last_phase_output` alanına özet konur.
+- `regression-clear` semantiği: test failure hiç olmadıysa bu audit
+  yazılmaz. Final GREEN sinyali OR mantığıyla — `regression-clear`
+  VEYA son `asama-9-ac-N-green` audit'i.
+- Boş `spec_must_list` durumunda crash yok; rapora "Spec MUST listesi
+  boş — Aşama 4 onaylanmamış olabilir" soft uyarısı düşer.
+
 ## Disiplin gerekleri
 
 `subagent_rubber_duck: true` — Aşama 22 kritik faz; haiku ikinci-göz
@@ -178,6 +201,29 @@ trace summary, hook signature.
 > **Details:** see "Audit emission channel" contract in main skill.
 
 `asama-22-complete` (hook only — never model).
+
+### Hook enforcement (1.0.32)
+
+**Phase 22 hook implementation landed in this turn** (previously a
+declared-but-not-implemented skill).
+
+- `_run_completeness_loop` Phase 22 branch: when `cp == 22` and
+  `asama-22-complete` is absent, the hook generates the report and
+  emits the audit. Idempotent.
+- `_detect_phase_complete_trigger` Phase 22 guard: even if the model
+  writes `asama-22-complete` in its reply, the hook does NOT promote
+  it to an audit; it emits `phase-22-illegal-emit-attempt` instead
+  (visible signal — contract violation).
+- `_emit_phase_22_completeness_report`: 5 invariant checks (audit
+  chain 1-21, Phase 9 TDD depth, Phase 11-18 pipeline depth, spec
+  MUST coverage, Phase 21 skip verification). Bilingual report
+  written to `.mycl/completeness_report.md`; summary placed in
+  `state.last_phase_output`.
+- `regression-clear` semantics: not written if no test failure ever
+  occurred. Final GREEN signal uses OR — either `regression-clear`
+  OR the last `asama-9-ac-N-green` audit.
+- Empty `spec_must_list` does not crash; the report surfaces "spec
+  MUST list empty — Phase 4 may not be approved" as a soft notice.
 
 ## Discipline
 

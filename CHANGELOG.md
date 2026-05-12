@@ -5,6 +5,78 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.32] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 22 (Tamlık Denetimi) — en büyük declared-but-not-implemented
+  boşluğu kapatıldı**. Subagent (Sonnet 4.6, 10 lens) 5 kritik sorun
+  tespit etti:
+  1. `_run_completeness_loop` `cp >= 22: break` ile Aşama 22'ye HİÇ
+     girmiyordu — plan implementasyon otomatik çağrılmazdı (en
+     kritik açık).
+  2. Model `asama-22-complete` cevap metnine yazınca generic
+     `_detect_phase_complete_trigger` onu audit'e yazıyordu → hook
+     devre dışı kalır, skill kontratı (hook tek yazar) ihlal edilir.
+  3. `regression-clear` audit'i test failure hiç olmadıysa hiç
+     yazılmaz; mevcut invariant katı eşitlik kontrolü yaptığı için
+     yanlış pozitif "Açık Konu" üretirdi. OR mantığı: son
+     `asama-9-ac-N-green` audit'i de GREEN sinyali sayılır.
+  4. Boş `spec_must_list` durumunda hook crash etmemeli; soft uyarı.
+  5. Aşama 11-18 pipeline kapanış sinyalleri belirsizdi (complete /
+     not-applicable / end-green / end-target-met / rescan dallarının
+     OR mantığı netleştirildi).
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_emit_phase_22_completeness_report`**: 5 invariant
+  doğrulama + bilingual rapor üretimi + `asama-22-complete` audit
+  emit. Idempotent. Rapor `.mycl/completeness_report.md` dosyasına
+  yazılır; özeti `state.last_phase_output`'a düşer.
+- **`_phase_22_check_audit_chain`** (1-21 audit zinciri),
+  **`_phase_22_check_tdd_depth`** (AC red/green/refactor + OR final
+  GREEN), **`_phase_22_check_quality_testing_depth`** (Aşama 11-18
+  pipeline kapanış dalları), **`_phase_22_check_must_coverage`**
+  (spec_must API), **`_phase_22_check_phase_21_skip`** (1.0.31
+  detection control).
+- **`_phase_22_format_duration`**: trace.log session_start ts ile son
+  audit ts farkı → `Xh Ym Zs` formatı.
+
+### Değiştirilen / Changed
+
+- **`hooks/stop.py::_run_completeness_loop`**: `cp >= 22: break`
+  → `cp == 22` dalı (rapor üret + audit emit), `cp > 22` break.
+- **`hooks/stop.py::_detect_phase_complete_trigger`**: Aşama 22 guard
+  — model `asama-22-complete` yazsa bile bu audit yazılmaz; bunun
+  yerine `phase-22-illegal-emit-attempt` audit emit (idempotent,
+  görünür sinyal). Skill kontratı (hook tek yazar) bu turda gerçekten
+  enforce ediliyor.
+- **`skills/mycl/asama22-tamlik.md`**: "Hook enforcement (1.0.32)"
+  bölümü TR + EN. Audit kontratı, invariant detayları, boundary'ler
+  belgelendi.
+
+### Sözleşme korunumu / Boundary
+
+- Hook auto-emit istisnası (Aşama 22): skill kontratı zaten hook'u
+  tek yazar olarak tanımlıyor. Bu istisna meşru; diğer fazlardaki
+  "model emit / hook capture" sınırı korunuyor.
+- `asama-22-complete` audit'i için Aşama 22 dışında dönüş yok —
+  illegal-emit-attempt kanalı sayesinde kontrat sertleştirildi.
+- Bilingual rapor: TR + EN bloklar boş satır ayrılı (1.0.0
+  sözleşmesi).
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.31 → 1.0.32, `.claude-plugin/plugin.json` 1.0.32.
+- `README.md` + `README.tr.md` test sayısı 742 → 761.
+- 19 yeni test: `tests/test_phase22_refactor.py` (completeness loop
+  Aşama 22 dalı, bilingual rapor, idempotency, model emit deny,
+  illegal-emit idempotency, eksik audit zinciri, boş spec_must_list,
+  kapsanmamış MUST, Aşama 21 silent skip, TDD derinliği regression-
+  clear ve ac-green OR, pipeline open issue, pipeline complete pass,
+  phase 21 skip verification, must coverage, last_phase_output,
+  cp > 22 no-op).
+
 ## [1.0.31] — 2026-05-13
 
 ### Düzeltilen / Fixed
