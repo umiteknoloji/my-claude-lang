@@ -52,6 +52,11 @@ ORM kullanılıyorsa (Prisma, TypeORM, SQLAlchemy, Django ORM):
 
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
 
+**`Task` ve `Agent` (subagent dispatch) bu fazda YASAK** (Aşama 1/3/5/6/7
+pattern'i, 1.0.23). DB şeması yazımı + migration ana bağlamda yürür;
+subagent dispatch gereksiz, bağlam şişmez. Subagent sadece Aşama 10/14
+paralel mercek için.
+
 ## Atlama
 
 Veritabanı kapsamda yoksa:
@@ -100,6 +105,11 @@ Design data per normalization rules with no future-tense problems.
 ## Allowed tools
 
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
+
+**`Task` and `Agent` (subagent dispatch) are FORBIDDEN here** (Aşama
+1/3/5/6/7 pattern, 1.0.23). DB schema + migration writing runs in main
+context; subagent dispatch unnecessary. Subagent reserved for Phase
+10/14 parallel review.
 
 ## Skip
 

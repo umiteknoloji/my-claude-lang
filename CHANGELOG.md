@@ -5,6 +5,39 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.23] — 2026-05-12
+
+### Değişen / Changed
+
+- **Aşama 8 (Veritabanı Tasarımı) skill Task/Agent yasak notu** —
+  Subagent VERDICT: **KORU** (tek küçük ek). Gate_spec sağlam,
+  1.0.21 extended trigger `asama-8-end` ve `asama-8-not-applicable`'i
+  yakalıyor, test geçiyor, DB scope detect modele bırakılmış
+  (Aşama 6 UI detect ile tutarlı kasıtlı pattern).
+  Sadece `skills/mycl/asama08-db.md`'ye Aşama 1/3/5/6/7 pattern'iyle
+  tutarlı Task/Agent yasak notu eklendi (TR + EN).
+
+### Ertelenmiş (subagent notu)
+
+`asama-8-end tables=N indexes=M migrations=K` parametre parse'ı
+**Aşama 22 turunda** yapılacak — tamlık denetimi DB sayımı ihtiyacı
+netleşince state.py'ye field eklemek + stop.py parse helper birlikte.
+Şimdi erken optimizasyon, ölü state alanı üretir.
+
+### Test
+
+- 663 test (değişmedi — sadece skill text, hiç kod değişikliği yok).
+
+### Süreç gözlemi
+
+Subagent ilk kez "REFAKTÖR" yerine "KORU" verdi. Aşama 1-7'de hep
+"declared but not implemented" boşluklar vardı; Aşama 8'de motor +
+gate_spec sağlam, sadece tutarlılık notu eksik. 1.0.21 extended
+trigger generic fix bu turun kapsamını minimum tuttu — fayda
+yansıyor.
+
+[1.0.23]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.23
+
 ## [1.0.22] — 2026-05-12
 
 ### Düzeltilen / Fixed
