@@ -5,6 +5,70 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.30] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 20 (Doğrulama Raporu + Sahte Veri Temizliği) 4 boşluk** —
+  Subagent (Sonnet 4.6, 10 lens) tespit etti:
+  1. `asama-20-spec-coverage-rendered` audit'i skill kontratında var
+     ama hiçbir yerde üretilmiyordu; `spec_must` modülü `must_ids()`
+     ve `uncovered_musts()` API'leriyle hazır olduğu hâlde
+     kullanılmıyordu.
+  2. `gate_spec.json` `required_audits_any` (OR) — sadece
+     `asama-20-mock-cleanup-resolved` tek başına kapıyı geçiyordu;
+     spec coverage raporu hiç üretilmeden faz ilerleyebilir
+     **gate bypass riski** vardı.
+  3. `asama-20-mock-cleanup-resolved` text-trigger yakalanmıyordu
+     (Aşama 11/14 ile aynı declared-but-not-implemented deseni).
+  4. Skill dosyası `subagent_rubber_duck: true (gate_spec.json)` diye
+     yanlış belge — gate_spec'te böyle flag yoktu.
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_maybe_emit_phase_20_spec_coverage`**: `spec_must`
+  API ile deterministik sayım. `must_total = len(must_ids())`,
+  `must_green = must_total - len(uncovered_musts())`. Side_audit emit
+  `asama-20-spec-coverage-rendered must_total=N must_green=M`.
+  Idempotent. cp == 20 guard.
+- **`hooks/stop.py::_PHASE_20_MOCK_CLEANUP_RE`** + `_detect_phase_20_mock_cleanup`:
+  model text-trigger yakalama, idempotent audit emit.
+
+### Değiştirilen / Changed
+
+- **`data/gate_spec.json` Aşama 20**:
+  - `required_audits_any` (OR) → `required_audits_all` (AND).
+    Üç audit de zorunlu: `complete`, `spec-coverage-rendered`,
+    `mock-cleanup-resolved`.
+  - `side_audits: ["asama-20-spec-coverage-rendered"]` — hook
+    auto-emit semantiği belgeli.
+  - `allowed_tools` genişletildi: `Edit`, `MultiEdit`,
+    `AskUserQuestion` eklendi (skill ile tutarlı; mock cleanup
+    inline düzenleme + geliştirici onayı için).
+  - `_note` ile gate bypass kapanışı ve yeni semantik belgelendi.
+- **`skills/mycl/asama20-dogrulama.md`**: yanlış
+  `subagent_rubber_duck: true` claim'i silindi; "Hook enforcement
+  (1.0.30)" bölümü TR + EN eklendi (gate semantiği, hook auto-emit
+  sınırı, spec_must API kullanımı).
+
+### Sözleşme korunumu / Boundary
+
+- Hook auto-emit istisnası: `asama-20-spec-coverage-rendered` purely
+  aritmetik — model creativity riski sıfır. Diğer fazlarda
+  "hook captures, model speaks" sınırı korunuyor.
+- `asama-20-complete` ve `asama-20-mock-cleanup-resolved` modelin
+  sorumluluğunda (1.0.26+ sözleşmesi).
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.29 → 1.0.30, `.claude-plugin/plugin.json` 1.0.30.
+- `README.md` + `README.tr.md` test sayısı 725 → 737.
+- 12 yeni test: `tests/test_phase20_refactor.py` (spec coverage
+  must_total/must_green sayımı, boş spec_must_list, tüm kapsanmış,
+  idempotency, phase guard, mock-cleanup text-trigger, gate_spec
+  required_audits_all + side_audits + allowed_tools doğrulamaları,
+  subagent_rubber_duck yokluğu).
+
 ## [1.0.29] — 2026-05-13
 
 ### Düzeltilen / Fixed

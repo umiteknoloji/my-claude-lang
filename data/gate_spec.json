@@ -309,15 +309,18 @@
     "20": {
       "name": "Doğrulama Raporu + Sahte Veri Temizliği",
       "name_en": "Verification Report + Mock Data Cleanup",
-      "allowed_tools": ["Write", "Bash"],
+      "allowed_tools": ["Write", "Edit", "MultiEdit", "Bash", "AskUserQuestion"],
       "denied_paths": [],
-      "required_audits_any": [
+      "required_audits_all": [
         "asama-20-complete",
+        "asama-20-spec-coverage-rendered",
         "asama-20-mock-cleanup-resolved"
       ],
+      "side_audits": ["asama-20-spec-coverage-rendered"],
       "fail_open": false,
       "self_critique_required": false,
-      "public_commitment_required": false
+      "public_commitment_required": false,
+      "_note": "1.0.30 — required_audits_any (OR) → required_audits_all (AND). Eski OR semantiğinde sadece `mock-cleanup-resolved` audit'i kapıyı geçiriyordu (gate bypass: spec coverage raporu hiç üretilmeden faz ilerleyebiliyordu). Şimdi üç audit de zorunlu. side_audits: hook `asama-20-spec-coverage-rendered must_total=N must_green=M` audit'ini spec_must API'siyle deterministik üretir (model yazmaz). allowed_tools genişletildi (Edit/MultiEdit/AskUserQuestion) — mock cleanup için inline düzenleme + geliştirici onayı gerekli olabilir; skill ile tutarlı."
     },
     "21": {
       "name": "Yerelleştirilmiş Rapor",

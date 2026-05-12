@@ -834,6 +834,82 @@ def _detect_phase_quality_triggers(
     return wrote
 
 
+# 1.0.30: Aşama 20 Doğrulama Raporu — hook spec coverage'i kendi
+# hesaplar (spec_must API'siyle deterministik). Model rapor tablosunu
+# sunar; hook ise `asama-20-spec-coverage-rendered must_total=N
+# must_green=M` audit yazar (side_audit). Aşama 22 tamlık denetimi
+# bunu okur.
+_PHASE_20_MOCK_CLEANUP_RE = re.compile(
+    r"\basama-20-mock-cleanup-resolved\b",
+    re.IGNORECASE,
+)
+
+
+def _maybe_emit_phase_20_spec_coverage(project_dir: str) -> bool:
+    """1.0.30: Aşama 20 spec coverage audit'ini hook üretir.
+
+    spec_must.must_ids() + spec_must.uncovered_musts() ile MUST → AC
+    eşlemesi (covers=MUST_X audit detail zinciri) üzerinden
+    deterministik sayım. Model creativity riski yok; hook aritmetiği.
+
+    Idempotent. Sadece current_phase == 20'de çalışır.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    from hooks.lib import spec_must
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    if cp != 20:
+        return False
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    if "asama-20-spec-coverage-rendered" in existing:
+        return False
+    all_ids = spec_must.must_ids(project_root=project_dir)
+    uncovered = spec_must.uncovered_musts(project_root=project_dir)
+    must_total = len(all_ids)
+    must_green = must_total - len(uncovered)
+    audit.log_event(
+        "asama-20-spec-coverage-rendered", "stop.py",
+        f"must_total={must_total} must_green={must_green}",
+        project_root=project_dir,
+    )
+    return True
+
+
+def _detect_phase_20_mock_cleanup(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """1.0.30: `asama-20-mock-cleanup-resolved` text-trigger yakalama.
+
+    Mock cleanup içeriği proje-spesifik (`__fixtures__/`, inline mock,
+    dev seed, hardcoded test user) — hook bunu kendi tespit etmez;
+    model Bash/Edit ile cleanup uygular, text-trigger'ı kendi yazar.
+    Hook idempotent audit emit eder.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(_PHASE_20_MOCK_CLEANUP_RE.search(t)),
+        transcript_path,
+    )
+    if not text:
+        return False
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    if "asama-20-mock-cleanup-resolved" in existing:
+        return False
+    audit.log_event(
+        "asama-20-mock-cleanup-resolved", "stop.py",
+        "phase=20 mock cleanup acknowledged",
+        project_root=project_dir,
+    )
+    return True
+
+
 # 1.0.29: Aşama 19 mid-pipeline reconfirmation (sınırsız soru fazı).
 # Skill: etki listesi 10+ maddeye ulaşırsa "hâlâ bu yönde mi?" askq
 # açılır. Mekanizma: hook audit log'da 10+ `asama-19-item-M-resolved`
@@ -1345,6 +1421,14 @@ def main() -> int:
     # `asama-19-mid-reconfirm-acked` text-trigger yazar; hook yakalar.
     _maybe_emit_mid_reconfirm(project_dir)
     _detect_mid_reconfirm_acked(transcript_path, project_dir)
+
+    # 1.0.30: Aşama 20 Doğrulama Raporu. Hook spec_must API'siyle
+    # MUST kapsanmasını deterministik sayar (must_total/must_green)
+    # ve `asama-20-spec-coverage-rendered` side-audit yazar. Model
+    # rapor tablosunu sunar + mock cleanup uygular,
+    # `asama-20-mock-cleanup-resolved` text-trigger yazar; hook yakalar.
+    _maybe_emit_phase_20_spec_coverage(project_dir)
+    _detect_phase_20_mock_cleanup(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)
     _run_completeness_loop(project_dir)

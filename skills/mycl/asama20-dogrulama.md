@@ -85,10 +85,20 @@ asama-20-mock-cleanup-resolved
 asama-20-complete
 ```
 
-## Disiplin gerekleri
+### Hook enforcement (1.0.30)
 
-`subagent_rubber_duck: true` (gate_spec.json) — kritik faz; haiku
-ikinci-göz pair-check.
+- `asama-20-spec-coverage-rendered must_total=N must_green=M` →
+  **hook auto-emit** (side_audit). `spec_must` API'siyle
+  (`must_ids()` + `uncovered_musts()`) deterministik hesap;
+  model creativity riski yok. Idempotent.
+- `asama-20-mock-cleanup-resolved` → model text-trigger ile yazar,
+  hook yakalar (model mock cleanup'ı Bash/Edit ile uygular; proje-
+  spesifik içerik hook'ta tespit edilmez).
+- `asama-20-complete` → model yazar; mevcut text-trigger kanalı
+  yakalar.
+- **gate_spec `required_audits_all` (AND)**: üç audit de zorunlu.
+  Eski OR semantiğinde sadece `mock-cleanup-resolved` kapıyı geçiyordu;
+  1.0.30'da gate bypass riski kapandı.
 
 ## Anti-pattern
 
@@ -139,9 +149,18 @@ Even with `❌ no test` MUSTs, `asama-20-complete` is emitted; Phase
 `asama-20-spec-coverage-rendered must_total=N must_green=M` +
 `asama-20-mock-cleanup-resolved` + `asama-20-complete`.
 
-## Discipline
+### Hook enforcement (1.0.30)
 
-`subagent_rubber_duck: true`.
+- `asama-20-spec-coverage-rendered` → **hook auto-emits** (side_audit)
+  using the `spec_must` API (`must_ids()` + `uncovered_musts()`).
+  Deterministic count; no model-creativity risk. Idempotent.
+- `asama-20-mock-cleanup-resolved` → model emits text-trigger after
+  Bash/Edit cleanup; hook captures.
+- `asama-20-complete` → model emits via the existing text-trigger
+  channel.
+- **gate_spec `required_audits_all` (AND)**: all three required. The
+  old OR semantics allowed `mock-cleanup-resolved` alone to pass the
+  gate, leaving spec coverage unreported; 1.0.30 closed that bypass.
 
 ## Anti-patterns
 
