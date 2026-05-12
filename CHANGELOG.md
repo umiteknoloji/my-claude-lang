@@ -5,6 +5,56 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.15] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **Multi-subagent akışta `asama-N-complete` text-trigger kayıp
+  sorunu — 15 aşamayı etkiliyordu** — model tipik akışta bir turda
+  hem `asama-N-complete` trigger emit ediyor hem `Task` tool ile
+  yeni `mycl-phase-runner` subagent dispatch ediyor. Claude Code'un
+  `Stop` event'i fire eden koşul: model artık tool çağırmıyor →
+  bu turda fire **etmez** (Task var). Sonuç: trigger kanalı
+  kayboldu.
+
+  22 aşamanın detaylı analizi (kullanıcı raporu): askq açan
+  aşamalar (1, 2, 4, 7, 10, 19) `post_tool` stop-trigger kanalı
+  ile kurtuluyor. Aşama 3 silent (1.0.14 fix). Aşama 6, 9
+  mutating + askq karışık. Geriye kalan **15 aşama** (5, 8, 11-18,
+  20-22) askq açmıyor, model emit ediyor → multi-subagent akışta
+  kayıp. Ana semptom: state cp=2'de stuck + Aşama 4 spec onay
+  askq'sının `_spec_approve_flow` cp==4 kontrolüne takılması →
+  spec_approved=False → Bash deny.
+
+  Düzeltme: `hooks/subagent_stop.py::main()` `SubagentStop` event'i
+  her subagent dönüşünde fire ediyor → bu doğru tetik noktası.
+  Stop hook'taki `_detect_phase_complete_trigger` +
+  `_run_completeness_loop` mantığı paralel ek path olarak
+  çağrılıyor. İdempotent: `existing audits` set check çift emit'i
+  engeller (1.0.8'den beri pattern), Stop + SubagentStop iki
+  kanaldan aynı audit yazılma riski no-op.
+
+  Private function import (`from hooks.stop import ...`) bilinçli
+  seçim — bu mantığı `hooks/lib/`'e taşımak büyük refactor,
+  1.0.16+ değerlendirilebilir.
+
+### Test
+
+- 605 test (değişmedi — `_detect_phase_complete_trigger` 6 case +
+  `_run_completeness_loop` silent_phase 4 case zaten kapsıyor;
+  subagent_stop.py'da sadece import + iki fonksiyon çağrısı
+  eklendi, pytest import doğrulamasıyla yeterli kapsam).
+
+### Sonraki release'ler (gözlem)
+
+- 1.0.16: Aşama 22 (Tamlık Denetimi) hook implementation — şu an
+  silent_phase yok, ne model ne hook yazıyor (boşluk).
+- 1.0.17: Model davranışı — orchestration olmayan aşamalarda
+  model'in subagent dispatch'ten kaçınması için skill + DSI
+  directive güçlendirme.
+
+[1.0.15]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.15
+
 ## [1.0.14] — 2026-05-12
 
 ### Düzeltilen / Fixed

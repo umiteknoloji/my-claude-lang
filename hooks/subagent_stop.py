@@ -180,6 +180,25 @@ def main() -> int:
 
     transcript_path = str(payload.get("transcript_path") or "")
     _detect_subagent_phase_output(transcript_path, project_dir)
+
+    # 1.0.15 — multi-subagent akışta `asama-N-complete` text-trigger
+    # kayıp sorunu: model bir turda hem trigger emit ediyor hem Task
+    # tool çağırıyor → Claude Code Stop event fire etmez (tool var) →
+    # trigger kanalı kayıp. SubagentStop her subagent dönüşünde fire
+    # ediyor; burada Stop hook'un text-trigger detect + completeness
+    # loop mantığını paralel ek path olarak çalıştırıyoruz.
+    #
+    # Idempotent: Stop ve SubagentStop ikisi de aynı turda fire
+    # ederse `existing audits` set check çift emit'i engeller; ilki
+    # yazar, ikincisi no-op. stop.py'daki private fonksiyonların
+    # public re-export'una gerek yok — aynı modül çatısı altında
+    # private erişim Python'da legal.
+    from hooks.stop import (  # noqa: E402
+        _detect_phase_complete_trigger,
+        _run_completeness_loop,
+    )
+    _detect_phase_complete_trigger(transcript_path, project_dir)
+    _run_completeness_loop(project_dir)
     return 0
 
 
