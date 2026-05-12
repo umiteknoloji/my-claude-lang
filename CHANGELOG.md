@@ -5,6 +5,57 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.28] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 15-18 Test Boru Hattı text-trigger zinciri bağlandı** —
+  Subagent (Sonnet 4.6, 10 lens) Aşama 15-18'in `scan count=K` ve
+  `test-M-added` trigger'larının `_PHASE_QUALITY_PHASES = {11,12,13,14}`
+  scope dışında kaldığını; ayrıca **`asama-18-scenario-N-passed` ve
+  `asama-18-target-missed`** trigger'larının skill dosyalarında
+  açıkça belgelenmiş ama hiç implement edilmediğini tespit etti.
+  Aşama 11/14 ile aynı "declared but not implemented" deseni.
+- **`asama-18-target-missed`** — NFR ölçümü hedefi karşılamadığında
+  yakalanır; **reentry mantığı model sorumluluğunda** (hook yalnızca
+  audit yazar). Skill kontratı reentry'i Aşama 13'e bırakır.
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_PHASE_TESTING_PHASES = frozenset({15, 16, 17, 18})`**
+  + 3 yeni regex:
+  - `_PHASE_TEST_ADDED_RE`: `asama-N-test-M-added` (Aşama 15-17)
+  - `_PHASE_SCENARIO_PASSED_RE`: `asama-N-scenario-M-passed` (Aşama 18)
+  - `_PHASE_TARGET_MISSED_RE`: `asama-N-target-missed` (Aşama 18)
+  - `_PHASE_SCAN_TRIGGER_RE` paylaşılır (Quality Pipeline ile),
+    scope filter yeni helper içinde.
+- **`hooks/stop.py::_detect_phase_testing_triggers`** — idempotent
+  audit emit; hiçbir auto-emit yok (`complete`, `not-applicable`,
+  `end-green`, `end-target-met`, `target-missed` tetikleyicisi model
+  narrative'ı kalır).
+- **`skills/mycl/asama15-birim-test.md` "Hook enforcement (1.0.28)"**
+  bölümü TR + EN. Aşama 16, 17, 18 skill'lerinde Aşama 15'e referans.
+- **Aşama 18 skill ek not**: `scenario-M-passed` ile `test-M-added`
+  farkı, hook'un `target-missed`'i kaydedip reentry'i tetiklemediği
+  açıkça belgelendi.
+
+### Boundary korunumu / Boundary
+
+- Aşama 18 `test-M-added` kullanmaz; helper Aşama 18 için bu trigger'ı
+  YAKALAMAZ (regex jenerik, scope filtre {15,16,17} ile sınırlı).
+- end-* trigger'lar 1.0.21 extended trigger'da yakalanmaya devam eder;
+  yeni helper onlara dokunmaz.
+- Hook auto-emit yok (1.0.26+1.0.27 sözleşmesi).
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.27 → 1.0.28, `.claude-plugin/plugin.json` 1.0.28.
+- `README.md` + `README.tr.md` test sayısı 699 → 712.
+- 13 yeni test: `tests/test_phase15_refactor.py` (Aşama 15 scan/test,
+  Aşama 16/17 generic, Aşama 18 scenario/target-missed, Aşama 18'in
+  test-M-added kullanmadığı, Aşama 11/14'ün scope dışı kaldığı,
+  idempotency, full zincir).
+
 ## [1.0.27] — 2026-05-13
 
 ### Düzeltilen / Fixed

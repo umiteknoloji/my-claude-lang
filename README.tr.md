@@ -1,4 +1,4 @@
-# MyCL — my-claude-lang 1.0.27
+# MyCL — my-claude-lang 1.0.28
 
 Claude Code üstüne anlam-doğrulama katmanı. MyCL 22 fazlı bir
 geliştirme boru hattı dayatır, audit zincirleriyle disiplini sıkar
@@ -161,7 +161,7 @@ yok, graceful degradation yok.
 python3 -m pytest tests/ -v
 ```
 
-699 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
+712 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
 matrix'i (state × tool, STRICT no-fail-open, state lock,
 completeness loop, DSI integration, PreCompact snapshot, reinforcement
 reminder, Agent tool globally allowed, stale-emit sessiz) kapsar.

@@ -51,6 +51,26 @@ asama-15-end-green (tam suite YEŞİL)
 asama-15-not-applicable reason=<sebep>
 ```
 
+### Hook enforcement (1.0.28)
+
+Hook, asistan metninde aşağıdaki text-trigger'ları line-anchored regex
+ile yakalar (Aşama 15-18 ortak):
+
+- `asama-15-scan count=K` → audit emit
+- `asama-15-test-M-added` → audit emit (her test ayrı kayıt; Aşama
+  15-17 için; Aşama 18 bunun yerine `asama-18-scenario-M-passed`
+  kullanır)
+- Aşama 18'e özel: `asama-18-scenario-M-passed` + `asama-18-target-missed`
+- `end-green`, `end-target-met`, `not-applicable`, `skipped` zaten
+  1.0.21 extended trigger'da yakalanıyor — Aşama 15-18 bitiş sinyalleri
+  burayı kullanır
+
+**Hook auto-emit YOK** — `asama-15-complete`, `not-applicable`,
+`end-green` audit'lerini **model** kendi cevabında yazar; hook sadece
+yakalar. 1.0.26 Quality Pipeline sözleşmesiyle simetrik.
+
+Tüm trigger'lar idempotent.
+
 ## Anti-pattern
 
 - ❌ Coverage % hedefini "100" gibi mutlak yap → trivial getter
@@ -98,6 +118,26 @@ No fixed % (Goodhart risk) — critical paths 100%, getter/setter 0% OK.
 
 `asama-15-scan count=K` → `asama-15-test-N-added` →
 `asama-15-end-green` | `asama-15-not-applicable`.
+
+### Hook enforcement (1.0.28)
+
+Hook scans assistant text for the following text-triggers via
+line-anchored regex (shared by Phases 15-18):
+
+- `asama-15-scan count=K` → audit
+- `asama-15-test-M-added` → audit (one per test; Phases 15-17 only;
+  Phase 18 uses `asama-18-scenario-M-passed` instead)
+- Phase 18 only: `asama-18-scenario-M-passed` and
+  `asama-18-target-missed`
+- `end-green`, `end-target-met`, `not-applicable`, `skipped` are
+  already captured by the 1.0.21 extended trigger — Phases 15-18 end
+  signals use that channel
+
+**Hook does NOT auto-emit** `asama-15-complete`, `not-applicable`, or
+`end-green`; the **model** writes them in its reply, the hook only
+captures. Symmetric with the 1.0.26 Quality Pipeline contract.
+
+All triggers are idempotent.
 
 ## Anti-patterns
 

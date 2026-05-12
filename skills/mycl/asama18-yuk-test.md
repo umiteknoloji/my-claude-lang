@@ -59,6 +59,25 @@ asama-18-target-missed metric=p99 actual=120ms target=50ms
   → Aşama 13 reentry
 ```
 
+### Hook enforcement (1.0.28)
+
+Hook Aşama 18'e özel text-trigger'ları yakalar:
+
+- `asama-18-scan count=K` → audit
+- `asama-18-scenario-M-passed` → audit (yük senaryosu başarılı; metric/
+  target/actual yan veri modelin narrative'ı, audit detail'a aktarılmaz)
+- `asama-18-target-missed` → audit (NFR karşılanmadı; **reentry mantığı
+  model sorumluluğunda** — hook yalnızca audit yazar, Aşama 13'e
+  otomatik düşmez)
+
+Aşama 18, `asama-18-test-M-added` kullanmaz — yerine `scenario-M-passed`
+ile her yük senaryosu kaydedilir. `end-target-met` ve `not-applicable`
+1.0.21 extended trigger'da yakalanır.
+
+Hook auto-emit YOK; `asama-18-complete`, `end-target-met`,
+`not-applicable`, `target-missed` audit'lerinin tetikleyicisi modelin
+narrative'ı kalır.
+
 ## Anti-pattern
 
 - ❌ NFR uydurma — spec'te yoksa Aşama 18 atlanır, NFR uydurmak

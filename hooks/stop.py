@@ -829,6 +829,160 @@ def _detect_phase_quality_triggers(
     return wrote
 
 
+# 1.0.28: Aşama 15-18 Test Boru Hattı trigger'ları — generic regex.
+# Pseudocode (satır 390-410): her test fazı aynı 4-step döngü:
+# scan count=K → test-N-added (15-17) | scenario-N-passed (18) →
+# end-green | end-target-met | not-applicable (mevcut extended trigger).
+# Aşama 18 ek olarak target-missed yakalanır (skill dosyası belgeli ama
+# 1.0.27'ye kadar declared-but-not-implemented'tı).
+_PHASE_TESTING_PHASES = frozenset({15, 16, 17, 18})
+_PHASE_TEST_ADDED_RE = re.compile(
+    r"\basama-(\d+)-test-(\d+)-added\b",
+    re.IGNORECASE,
+)
+_PHASE_SCENARIO_PASSED_RE = re.compile(
+    r"\basama-(\d+)-scenario-(\d+)-passed\b",
+    re.IGNORECASE,
+)
+_PHASE_TARGET_MISSED_RE = re.compile(
+    r"\basama-(\d+)-target-missed\b",
+    re.IGNORECASE,
+)
+
+
+def _detect_phase_testing_triggers(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """1.0.28: Aşama 15-18 Test Boru Hattı text-trigger'ları.
+
+    Yakalanan trigger'lar:
+      - Aşama 15-18 ortak: `asama-N-scan count=K` (eksik test sayısı)
+      - Aşama 15-17: `asama-N-test-M-added` (her yeni test)
+      - Aşama 18: `asama-18-scenario-M-passed` (her yük senaryosu)
+      - Aşama 18: `asama-18-target-missed` (NFR ölçümü hedefi karşılamadı,
+        skill dosyasına göre → Aşama 13 reentry; reentry mantığı model
+        sorumluluğunda, hook sadece audit yazar)
+
+    `end-green`, `end-target-met`, `not-applicable`, `skipped` zaten
+    `_PHASE_EXTENDED_TRIGGER_RE` (1.0.21) ile yakalanıyor — bu helper
+    onlara dokunmaz.
+
+    Hook auto-emit YOK — `asama-N-complete`, `not-applicable`,
+    `end-target-met` model sorumluluğunda. Quality helper'ın 1.0.26
+    sözleşmesiyle simetrik.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(
+            _PHASE_SCAN_TRIGGER_RE.search(t)
+            or _PHASE_TEST_ADDED_RE.search(t)
+            or _PHASE_SCENARIO_PASSED_RE.search(t)
+            or _PHASE_TARGET_MISSED_RE.search(t)
+        ),
+        transcript_path,
+    )
+    if not text:
+        return False
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    wrote = False
+
+    seen_scan: set[int] = set()
+    for n_str, count_str in _PHASE_SCAN_TRIGGER_RE.findall(text):
+        try:
+            n = int(n_str)
+            count = int(count_str)
+        except ValueError:
+            continue
+        if n not in _PHASE_TESTING_PHASES or n in seen_scan:
+            continue
+        seen_scan.add(n)
+        audit_name = f"asama-{n}-scan"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"testing-pipeline scan phase={n} count={count}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+
+    seen_test: set[tuple[int, int]] = set()
+    for n_str, m_str in _PHASE_TEST_ADDED_RE.findall(text):
+        try:
+            n = int(n_str)
+            m = int(m_str)
+        except ValueError:
+            continue
+        # Aşama 18 `test-N-added` kullanmaz (scenario-N-passed kullanır).
+        # Skill dosyalarına göre 15-17 unit/integration/E2E için.
+        key = (n, m)
+        if n not in {15, 16, 17} or key in seen_test:
+            continue
+        seen_test.add(key)
+        audit_name = f"asama-{n}-test-{m}-added"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"testing-pipeline test-added phase={n} test={m}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+
+    seen_scenario: set[tuple[int, int]] = set()
+    for n_str, m_str in _PHASE_SCENARIO_PASSED_RE.findall(text):
+        try:
+            n = int(n_str)
+            m = int(m_str)
+        except ValueError:
+            continue
+        # Aşama 18'e özel; yük testi senaryosu (metric/target/actual
+        # yan veri, audit detay'ına yazılmaz — skill kontratı her
+        # senaryo başına ayrı audit).
+        key = (n, m)
+        if n != 18 or key in seen_scenario:
+            continue
+        seen_scenario.add(key)
+        audit_name = f"asama-{n}-scenario-{m}-passed"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"testing-pipeline scenario-passed phase={n} scenario={m}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+
+    seen_missed: set[int] = set()
+    for n_str in _PHASE_TARGET_MISSED_RE.findall(text):
+        try:
+            n = int(n_str)
+        except ValueError:
+            continue
+        # Aşama 18'e özel; NFR hedefi karşılanmadı. Skill kontratı bunu
+        # Aşama 13 reentry tetikleyicisi olarak işaret eder — reentry
+        # mantığı model sorumluluğunda, hook yalnızca audit yazar.
+        if n != 18 or n in seen_missed:
+            continue
+        seen_missed.add(n)
+        audit_name = f"asama-{n}-target-missed"
+        if audit_name not in existing:
+            audit.log_event(
+                audit_name, "stop.py",
+                f"testing-pipeline target-missed phase={n}",
+                project_root=project_dir,
+            )
+            existing.add(audit_name)
+            wrote = True
+
+    return wrote
+
+
 def _check_phase6_browser(detail: str, project_dir: str) -> None:
     """1.0.21: Aşama 6 `asama-6-end` detail parametrelerini incele.
 
@@ -1093,6 +1247,12 @@ def main() -> int:
     # Hook auto-emit YOK — `asama-N-complete` ve `escalation-needed`
     # model sorumluluğunda.
     _detect_phase_quality_triggers(transcript_path, project_dir)
+
+    # 1.0.28: Aşama 15-18 Test Boru Hattı text-trigger'ları (scan /
+    # test-M-added (15-17) / scenario-M-passed (18) / target-missed
+    # (18)). end-* trigger'ları zaten 1.0.21 extended trigger'da
+    # yakalanıyor. Hook auto-emit YOK.
+    _detect_phase_testing_triggers(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)
     _run_completeness_loop(project_dir)

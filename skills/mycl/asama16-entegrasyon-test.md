@@ -57,6 +57,14 @@ asama-16-end-green
 asama-16-not-applicable reason=<sebep>
 ```
 
+### Hook enforcement (1.0.28)
+
+Hook, Aşama 15 ile aynı generic text-trigger setini kullanır
+(`asama-16-scan / test-M-added`). `end-green` ve `not-applicable` 1.0.21
+extended trigger'da yakalanır. Detay: Aşama 15 skill "Hook enforcement
+(1.0.28)" bölümü. Hook auto-emit YOK.
+
+
 ## Anti-pattern
 
 - ❌ Mock-everything yaklaşımı — prod farkı gizlenir
