@@ -5,6 +5,61 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.16] — 2026-05-12
+
+### Değişen / Changed
+
+- **Aşama 1 (Niyet Toplama) over-engineering temizliği** — `Task`
+  subagent dispatch (`mycl-phase-runner`) Aşama 1'den **kaldırıldı**.
+  Pseudocode §3 "POC" notu 1.0.1'de "zorunlu" diye yanlış yorumlanmıştı.
+  Niyet toplama küçük scope (kısa askq diyaloğu), bağlam şişmez —
+  Anthropic doc'una göre subagent "büyük dosya içeriği / arama
+  sonuçları" için. Ana bağlamda Skill + AskUserQuestion + (global)
+  Read/Glob/Grep yeterli. Sonuç: 1 tur daha az, parsing-fail riski
+  yok, daha hızlı.
+
+  - `data/gate_spec.json` Aşama 1: `allowed_tools` `["Task",
+    "AskUserQuestion"]` → `["AskUserQuestion"]`. `subagent_orchestration:
+    true` field silindi. `_note` güncellendi.
+  - `agents/mycl-phase-runner.md` Aşama 1 referansları kaldırıldı,
+    "Phase 10/14 parallel review scope" olarak daraltıldı.
+  - `skills/mycl/asama01-niyet.md` çelişki tarama kategorileri
+    netleştirildi (state modeli / zaman modeli / veri tutarlılığı —
+    exhaustive değil, ipucu listesi). Plus "`Task` Aşama 1'de yasak"
+    notu eklendi.
+
+### Eklenen / Added
+
+- **Multi-askq audit guard (`pre_tool.py::_count_askq_in_last_assistant_turn`)**
+  — Aşama 1 skill "tek soru per turn" dictat (pseudocode §3). Model
+  tek mesajda paralel askq açarsa `multi-askq-attempt` audit yazılır.
+  **Audit-only, deny YOK** — Claude Code parallel tool calls race
+  condition oluşturur. Plan'da "deny + audit" denmişti, implementasyona
+  geçince race risk fark edildi; audit-only güvenli. Görünürlük sinyali,
+  bir sonraki sürümde sıkılaştırma için zemin.
+
+- **Stuck state soft warning (`activate.py::_check_stuck_state`)** —
+  Yeni oturumda `/mycl` ile aktive edilen state `current_phase >= 4 +
+  spec_approved == False` ise `<mycl_stuck_state_warning>` blok emit
+  edilir. Recovery yolu önerisi: `.mycl + .git` temizle veya manuel
+  `audit.log_event('asama-4-complete', 'recovery')`. Hard deny YOK,
+  soft guidance.
+
+### Test
+
+- 605 → 613 test (+8: `test_phase1_refactor.py` — allowed_tools, no
+  subagent_orchestration, multi-askq count [single/multi/only-last],
+  stuck state [phase>=4/phase<4/spec_approved]).
+
+### Backward compat
+
+- Mevcut açık oturum varsa (örn. `~/mycl_bo/.mycl/state.json` cp=5 +
+  spec_approved=false) `/mycl` ile aktive olunca stuck warning görür,
+  kullanıcı `.mycl + .git` temizleyip baştan başlamalı. Migration
+  script yok (overkill); soft guidance ile manuel recovery yeterli.
+
+[1.0.16]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.16
+
 ## [1.0.15] — 2026-05-12
 
 ### Düzeltilen / Fixed

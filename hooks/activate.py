@@ -63,6 +63,39 @@ def _is_self_project(project_dir: str) -> bool:
     return cwd == myc
 
 
+def _check_stuck_state(project_root: str) -> str | None:
+    """Önceki oturum stuck state bıraktıysa soft warning üret.
+
+    1.0.16: Aşama 4'ten ileride `spec_approved == False` → stuck.
+    Yeni oturumda kullanıcı `/mycl` ile aktive ederse eski state
+    yüklü; spec_approved=False ile mutating tool deny edilir,
+    pipeline ilerleyemez. Soft warning: kullanıcı durumu görsün
+    + recovery yolu önerilsin. Hard deny YOK.
+    """
+    cp = state.get("current_phase", 1, project_root=project_root)
+    spec_approved = bool(
+        state.get("spec_approved", False, project_root=project_root)
+    )
+    if cp >= 4 and not spec_approved:
+        return (
+            f"⚠️ Önceki oturum stuck state bıraktı: current_phase={cp} "
+            "+ spec_approved=False. Aşama 4 spec onayı yapılmamış, "
+            "Aşama 5+ ilerleyemez. Önerim: `.mycl` ve `.git` "
+            "dizinlerini sil + yeniden `/mycl <niyet>` ile başla. "
+            "Alternatif manuel kurtarma: `python3 -c \"from hooks.lib "
+            "import audit; audit.log_event('asama-4-complete', "
+            "'recovery', 'manual')\"`.\n\n"
+            f"⚠️ Previous session left stuck state: current_phase={cp} "
+            "+ spec_approved=False. Phase 4 spec approval missing, "
+            "Phase 5+ cannot advance. Suggestion: delete `.mycl` and "
+            "`.git`, restart with `/mycl <intent>`. Manual recovery "
+            "alternative: `python3 -c \"from hooks.lib import audit; "
+            "audit.log_event('asama-4-complete', 'recovery', "
+            "'manual')\"`."
+        )
+    return None
+
+
 def _read_input() -> dict:
     """stdin'den Claude Code JSON input."""
     try:
@@ -273,6 +306,14 @@ def main() -> int:
             f"{note_tr}\n\n{note_en}\n"
             "</mycl_activation_note>"
         )
+        # 1.0.16: Stuck state soft warning — yalnızca aktivasyon turunda
+        stuck_msg = _check_stuck_state(project_dir)
+        if stuck_msg:
+            parts.append(
+                "<mycl_stuck_state_warning>\n"
+                f"{stuck_msg}\n"
+                "</mycl_stuck_state_warning>"
+            )
     main_ctx = _build_context(project_dir, turn_tokens=turn_tokens)
     if main_ctx:
         parts.append(main_ctx)

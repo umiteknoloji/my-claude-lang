@@ -142,15 +142,44 @@ def test_build_prompt_includes_state_snapshot_fields():
 # ---------- is_orchestration_enabled ----------
 
 
-def test_orchestration_enabled_phase_1():
-    """Aşama 1 gate_spec'te subagent_orchestration: true."""
+def test_orchestration_enabled_phase_10():
+    """Aşama 10 (Risk İncelemesi) — paralel 4 mercek için subagent_orchestration: true.
+
+    1.0.16: Aşama 1'den taşındı; pseudocode §3 Aşama 10 paralel mercek
+    (Code Review/Simplify/Performance/Security) için subagent dispatch
+    doğal yer.
+    """
     os.environ["MYCL_DATA_DIR"] = str(
         os.path.join(os.path.dirname(__file__), "..", "data")
     )
-    # Cache temizle
     from hooks.lib import gate
     gate._gate_spec_cache = None
-    assert orchestrator.is_orchestration_enabled(1) is True
+    assert orchestrator.is_orchestration_enabled(10) is True
+
+
+def test_orchestration_enabled_phase_14():
+    """Aşama 14 (Güvenlik) — proje genelinde subagent_orchestration: true (1.0.16)."""
+    os.environ["MYCL_DATA_DIR"] = str(
+        os.path.join(os.path.dirname(__file__), "..", "data")
+    )
+    from hooks.lib import gate
+    gate._gate_spec_cache = None
+    assert orchestrator.is_orchestration_enabled(14) is True
+
+
+def test_orchestration_disabled_phase_1():
+    """1.0.16: Aşama 1 subagent_orchestration kaldırıldı (over-engineering temizliği).
+
+    Pseudocode §3 'POC' notu 1.0.1'de 'zorunlu' diye yanlış yorumlanmıştı;
+    niyet toplama küçük scope (kısa askq diyaloğu), bağlam şişmez → ana
+    bağlamda Skill + AskUserQuestion yeterli.
+    """
+    os.environ["MYCL_DATA_DIR"] = str(
+        os.path.join(os.path.dirname(__file__), "..", "data")
+    )
+    from hooks.lib import gate
+    gate._gate_spec_cache = None
+    assert orchestrator.is_orchestration_enabled(1) is False
 
 
 def test_orchestration_disabled_phase_2():

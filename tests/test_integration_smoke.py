@@ -309,17 +309,19 @@ def test_activate_skips_consent_when_git_exists(tmp_path):
 
 
 def test_production_sim_empty_project_phase_1_intent(tmp_path):
-    """Boş proje + activate → Aşama 1 POC subagent directive + phase status.
+    """Boş proje + activate → Aşama 1 DSI directive + phase status.
 
-    Aşama 1 orchestration aktif → DSI directive yerine
-    mycl_phase_subagent_directive emit edilir; phase_status hâlâ DSI
-    bloğunda görünür (bilgi katmanı).
+    1.0.16: Aşama 1 subagent_orchestration kaldırıldı (over-engineering).
+    DSI directive ana bağlamda emit edilir (subagent dispatch yok);
+    phase_status faz takipçisi olarak görünür.
     """
     out = _run(_ACTIVATE, {"cwd": str(tmp_path)}, _env_with(tmp_path))
     payload = json.loads(out)
     ctx = payload["hookSpecificOutput"]["additionalContext"]
-    # Subagent directive (Aşama 1 POC) — DSI directive yerine
-    assert "<mycl_phase_subagent_directive>" in ctx
-    assert "mycl-phase-runner" in ctx
-    # Phase status hâlâ görünür
+    # DSI directive (Aşama 1 ana bağlamda) — subagent dispatch yok
+    assert "<mycl_active_phase_directive>" in ctx
+    assert "Aşama 1" in ctx or "Phase 1" in ctx
+    # Subagent directive emit EDİLMEZ (orchestration kapalı)
+    assert "<mycl_phase_subagent_directive>" not in ctx
+    # Phase status görünür
     assert "[1⏳]" in ctx

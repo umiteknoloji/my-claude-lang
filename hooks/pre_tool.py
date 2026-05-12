@@ -161,6 +161,44 @@ def _bilingual_block(key: str, **kwargs) -> str:
     return text if text and not text.startswith("[") else ""
 
 
+def _count_askq_in_last_assistant_turn(transcript_path: str) -> int:
+    """Son assistant message içinde kaç AskUserQuestion tool_use var.
+
+    1.0.16: Aşama 1 skill 'tek soru per turn' diyor (pseudocode §3
+    Aşama 1 dictat). Model bu kuralı görmezden geliyorsa tek mesajda
+    paralel askq açar. Deny yapamayız — Claude Code parallel tool
+    calls feature'ı race condition oluşturur. Audit-only sinyal:
+    `multi-askq-attempt` log'a yazılır, bir sonraki sürümde sıkılaştırma
+    için zemin hazırlar.
+    """
+    from hooks.lib import transcript as _t
+    last_msg = None
+    for msg in _t.iter_messages(transcript_path):
+        is_assistant = (
+            msg.get("type") == "assistant"
+            or (isinstance(msg.get("message"), dict)
+                and msg["message"].get("role") == "assistant")
+        )
+        if is_assistant:
+            last_msg = msg
+    if not last_msg:
+        return 0
+    inner = (
+        last_msg.get("message")
+        if isinstance(last_msg.get("message"), dict)
+        else last_msg
+    )
+    content = inner.get("content") if isinstance(inner, dict) else []
+    if not isinstance(content, list):
+        return 0
+    return sum(
+        1 for c in content
+        if isinstance(c, dict)
+        and c.get("type") == "tool_use"
+        and c.get("name") == "AskUserQuestion"
+    )
+
+
 def _record_strike_and_escalation(
     block_kind: str, tool: str, project_root: str,
 ) -> None:
@@ -306,6 +344,23 @@ def main() -> int:
     # .mycl`) destekli (1.0.11).
     if tool_name == "Bash" and _is_bootstrap_command(bash_cmd):
         return _allow()
+
+    # ---------- 4.7. Multi-askq audit (1.0.16) ----------
+    # Aşama 1 skill 'tek soru per turn' (pseudocode dictat). Model tek
+    # mesajda paralel askq açarsa görünürlük sinyali yaz. Deny YOK —
+    # Claude Code parallel tool calls race condition oluşturur; audit
+    # log'da trail kalır, gelecek sürümde sıkılaştırma için zemin.
+    if tool_name == "AskUserQuestion":
+        transcript_path = str(payload.get("transcript_path") or "")
+        if transcript_path:
+            askq_count = _count_askq_in_last_assistant_turn(transcript_path)
+            if askq_count > 1:
+                cp = state.get("current_phase", 1, project_root=project_dir)
+                audit.log_event(
+                    "multi-askq-attempt", "pre_tool.py",
+                    f"phase={cp} count={askq_count}",
+                    project_root=project_dir,
+                )
 
     # ---------- 5. Layer B (gate.evaluate) ----------
     file_path = tool_input.get("file_path") or tool_input.get("path") or ""

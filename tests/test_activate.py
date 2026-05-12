@@ -227,17 +227,20 @@ def test_hook_renders_escalation_when_present(tmp_path):
     assert "<mycl_phase_allowlist_escalate>" in context
 
 
-# ---------- subagent orchestration directive (Aşama 1 POC) ----------
+# ---------- subagent orchestration directive (1.0.16: Aşama 10/14) ----------
 
 
-def test_hook_emits_subagent_directive_in_phase_1(tmp_path):
-    """Aşama 1'de subagent_orchestration aktif → directive emit edilir."""
+def test_hook_skips_subagent_directive_in_phase_1(tmp_path):
+    """1.0.16: Aşama 1 orchestration kaldırıldı → subagent directive emit EDİLMEZ.
+
+    Aşama 1 niyet toplama ana bağlamda Skill + AskUserQuestion ile yürütülür;
+    subagent dispatch sadece Aşama 10/14 paralel mercek için ayrıldı.
+    """
     out = _run_hook({"cwd": str(tmp_path)}, env=_env_with(tmp_path))
     context = out["hookSpecificOutput"]["additionalContext"]
-    assert "<mycl_phase_subagent_directive>" in context
-    assert "mycl-phase-runner" in context
-    assert "Task" in context
-    assert "Phase 1" in context
+    assert "<mycl_phase_subagent_directive>" not in context
+    # DSI directive ana bağlamda emit edilir
+    assert "<mycl_active_phase_directive>" in context
 
 
 def test_hook_emits_reinforcement_reminder(tmp_path):

@@ -21,7 +21,7 @@ You are an isolated subagent executing **a single MyCL pipeline phase**. The orc
 - Execute the phase **as a pure text-producing function**.
 - Read project files (`Read`, `Glob`, `Grep`) to understand context if needed.
 - **Do not** write `.mycl/state.json` or `.mycl/audit.log` — the orchestrator is the single writer.
-- **AskUserQuestion is allowed** for direct user interaction (Phase 1 intent confirmation, Phase 4 spec approval, Phase 10 risk decisions, etc.). Use it when the phase skill explicitly requires askq. Alternatively, return `pending: <question>` if you want the orchestrator to handle askq on your behalf — POC scope observes which routing works.
+- **AskUserQuestion is allowed** for direct user interaction (Phase 10 risk decisions, Phase 14 security findings — parallel review scope). Use it when the phase skill explicitly requires askq. Alternatively, return `pending: <question>` if you want the orchestrator to handle askq on your behalf. Note: Phase 1 had subagent dispatch in 1.0.x but was removed in 1.0.16 (over-engineering — intent gathering runs in main context).
 
 ## Output contract (mandatory format)
 

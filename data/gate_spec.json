@@ -23,14 +23,13 @@
     "1": {
       "name": "Niyet Toplama",
       "name_en": "Intent Gathering",
-      "allowed_tools": ["Task", "AskUserQuestion"],
+      "allowed_tools": ["AskUserQuestion"],
       "denied_paths": [],
       "required_audits_any": ["summary-confirm-approve", "asama-1-complete"],
       "fail_open": false,
       "self_critique_required": false,
       "public_commitment_required": false,
-      "subagent_orchestration": true,
-      "_note": "subagent_orchestration aktif → tercih Task; AskUserQuestion da izinli (pseudocode §3 satır 527: Aşama 1 allowed_tools = [AskUserQuestion] ✓). H-3 fix."
+      "_note": "1.0.16 — Task subagent kaldırıldı (over-engineering). Pseudocode §3 'POC' notu 'zorunlu' diye yanlış yorumlanmıştı. Aşama 1 ana bağlamda Skill + AskUserQuestion + (global) Read/Glob/Grep ile yürütülür. Subagent dispatch sadece Aşama 10/14 paralel mercek için."
     },
     "2": {
       "name": "Hassasiyet Denetimi",
@@ -150,7 +149,7 @@
     "10": {
       "name": "Risk İncelemesi",
       "name_en": "Risk Review",
-      "allowed_tools": ["AskUserQuestion", "Edit", "MultiEdit", "Write", "Bash"],
+      "allowed_tools": ["Task", "AskUserQuestion", "Edit", "MultiEdit", "Write", "Bash"],
       "denied_paths": [],
       "required_audits_any": [
         "asama-10-complete",
@@ -161,7 +160,9 @@
       "self_critique_required": true,
       "public_commitment_required": true,
       "mid_pipeline_reconfirm": true,
-      "subagent_rubber_duck": true
+      "subagent_rubber_duck": true,
+      "subagent_orchestration": true,
+      "_note": "1.0.16 — subagent_orchestration aktif: paralel 4 mercek (Code Review, Simplify, Performance, Security) Task tool ile dispatch edilir. Aşama 1'den taşındı (Aşama 1 over-engineered'di)."
     },
     "11": {
       "name": "Kod İncelemesi",
@@ -211,7 +212,7 @@
     "14": {
       "name": "Güvenlik",
       "name_en": "Security",
-      "allowed_tools": ["Edit", "MultiEdit", "Write", "Bash"],
+      "allowed_tools": ["Task", "Edit", "MultiEdit", "Write", "Bash"],
       "denied_paths": [],
       "required_audits_any": [
         "asama-14-complete",
@@ -222,7 +223,9 @@
       "self_critique_required": true,
       "public_commitment_required": false,
       "auto_fix_only": true,
-      "scope": "project_wide"
+      "scope": "project_wide",
+      "subagent_orchestration": true,
+      "_note": "1.0.16 — subagent_orchestration aktif: tüm proje genelinde semgrep SAST + npm audit izole subagent context'te çalışır (ana bağlamı şişirmez). Aşama 1'den taşındı."
     },
     "15": {
       "name": "Birim Testler",

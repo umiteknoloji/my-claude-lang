@@ -21,10 +21,16 @@ Aşama 4 spec'i bu niyetten türetilecek; gri alan kalırsa spec yanlış
    - AskUserQuestion ile onay iste
 
 3. **Çelişki tespit et:** Niyette mantıksal çatışma varsa yüzeye çıkar
-   ve hangisini kastettiğini sor. Örnek:
-   - "JWT auth + server-side session state" → ikisi tek seçilmeli
-   - "Real-time + cron-based" → ikisi tek seçilmeli
-   - "PostgreSQL + denormalized JSON" → tasarım kararı netleşsin
+   ve hangisini kastettiğini sor. Örnek kategoriler (exhaustive değil):
+   - **State modeli:** "JWT auth + server-side session state" → ikisi
+     bir arada olmaz; stateless mi stateful mi tek seçilmeli
+   - **Zaman modeli:** "Real-time + cron-based" → push mu pull mu
+     tek seçilmeli
+   - **Veri tutarlılığı:** "PostgreSQL + denormalized JSON" →
+     ilişkisel mi NoSQL mi, tasarım kararı netleşsin
+
+   Bu kategoriler ipucu — yeni çelişki türü görürsen onu da yüzeye
+   çıkar (deployment modeli, ölçek beklentisi, güvenlik modeli, vb.).
 
 ## AskUserQuestion prefix
 
@@ -40,6 +46,11 @@ allowlist'te — niyet doğrulamak için codebase okuyabilirsin.
 
 `Write/Edit/Bash` Aşama 1'de **yasak** — kod yazımı Aşama 4 spec onayı
 sonrası başlar.
+
+`Task` (subagent dispatch) Aşama 1'de **yasak** (1.0.16 — over-engineering
+temizliği). Niyet toplama küçük scope; ana bağlamda Skill + AskUserQuestion
+yeterli. Bağlam şişmez. Subagent dispatch sadece Aşama 10/14 paralel
+mercek için ayrılmış.
 
 ## Çıktı (audit)
 
