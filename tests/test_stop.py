@@ -302,12 +302,19 @@ def test_completeness_no_advance_without_audit(tmp_path):
 
 
 def test_completeness_chain_advances_multiple_phases(tmp_path):
-    """Birden fazla phase audit zinciri → ardışık advance."""
+    """Birden fazla phase audit zinciri → ardışık advance.
+
+    1.0.17: Aşama 2 `required_audits_all` (AND) — `asama-2-complete`
+    + `precision-audit` ikisi de zorunlu. Hook normal akışta side_audits
+    ile otomatik yazar; bu test seed audit kullandığı için ikisini de
+    açıkça yerleştirir.
+    """
     _write_state(tmp_path, current_phase=1)
     _seed_audit(
         tmp_path,
         "asama-1-complete",
         "asama-2-complete",
+        "precision-audit",  # Aşama 2 AND zorunluluğu (1.0.17)
         "asama-3-complete",
     )
     rc = _run_hook(

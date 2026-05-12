@@ -227,7 +227,11 @@ def _silent_phase_auto_emit(
     invariant'a uyumlu — sentinel atlama yok, `gate.advance()`
     bir sonraki iterasyonda normal akışla çalışır.
     """
-    required = phase_def.get("required_audits_any") or []
+    required = (
+        phase_def.get("required_audits_all")
+        or phase_def.get("required_audits_any")
+        or []
+    )
     if not required:
         return
     existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
@@ -242,15 +246,24 @@ def _silent_phase_auto_emit(
 
 
 def _is_phase_complete(phase: int, project_dir: str) -> bool:
-    """Faz `phase` için required_audits_any audit log'da var mı?"""
+    """Faz `phase` için required audit'ler log'da var mı?
+
+    1.0.17: `required_audits_all` öncelikli (AND mantığı — Aşama 2
+    `precision-audit + asama-2-complete` ikisi de yazılmalı, OR
+    bypass riski kapatılır). Yoksa `required_audits_any` fallback
+    (OR mantığı — diğer fazlar).
+    """
     spec = gate.load_gate_spec()
     phase_def = spec.get("phases", {}).get(str(phase))
     if not isinstance(phase_def, dict):
         return False
+    existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
+    required_all = phase_def.get("required_audits_all") or []
+    if required_all:
+        return all(name in existing for name in required_all)
     required = phase_def.get("required_audits_any") or []
     if not required:
         return False
-    existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
     return any(name in existing for name in required)
 
 
@@ -321,6 +334,24 @@ def _detect_phase_complete_trigger(
             )
             existing.add(audit_name)
             wrote = True
+            # 1.0.17: side_audits — fazın yan audit'leri hook paralel
+            # emit eder (model yazmaz). Aşama 2 için `precision-audit`
+            # gibi. Generic feature; gate_spec'te `side_audits` listesi
+            # tanımlanmış fazlar için fire eder.
+            spec_def = gate.load_gate_spec().get("phases", {}).get(str(n))
+            side_audits = (
+                spec_def.get("side_audits", [])
+                if isinstance(spec_def, dict) else []
+            )
+            for side_name in side_audits:
+                if side_name in existing:
+                    continue
+                audit.log_event(
+                    side_name, "stop.py",
+                    f"side-audit-emit phase={n}",
+                    project_root=project_dir,
+                )
+                existing.add(side_name)
             cp = n + 1  # lokal advance — gerçek state advance completeness loop'ta
         elif n > cp:
             audit.log_event(

@@ -160,7 +160,7 @@ no "let it pass after N strikes," no graceful degradation.
 python3 -m pytest tests/ -v
 ```
 
-615 tests cover lib units (every module), each hook (subprocess
+622 tests cover lib units (every module), each hook (subprocess
 chain), and a smoke matrix that exercises pseudocode invariants
 (state × tool, STRICT no-fail-open, state lock, completeness loop,
 DSI integration, PreCompact snapshot, reinforcement reminder,

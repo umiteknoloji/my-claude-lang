@@ -36,10 +36,12 @@
       "name_en": "Precision Audit",
       "allowed_tools": ["AskUserQuestion"],
       "denied_paths": [],
-      "required_audits_any": ["asama-2-complete", "precision-audit"],
+      "required_audits_all": ["asama-2-complete", "precision-audit"],
+      "side_audits": ["precision-audit"],
       "fail_open": false,
       "self_critique_required": true,
-      "public_commitment_required": false
+      "public_commitment_required": false,
+      "_note": "1.0.17 — required_audits_all (AND): asama-2-complete + precision-audit ikisi de zorunlu, OR bypass riski kapandı. side_audits: hook 'asama-2-complete' text-trigger sonrası 'precision-audit' yan audit'i paralel emit eder (model yazmaz)."
     },
     "3": {
       "name": "Mühendislik Özeti",

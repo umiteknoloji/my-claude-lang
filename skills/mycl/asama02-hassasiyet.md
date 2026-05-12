@@ -38,15 +38,40 @@ MyCL <version> | Aşama 2 — Precision-audit niyet onayı
 MyCL <version> | Phase 2 — Precision-audit intent confirmation
 ```
 
+## Multi-GATE durumu (1.0.17)
+
+Birden fazla boyut GATE çıkarsa **tek `AskUserQuestion` çağrısında**
+2-4 madde olarak sun (Anthropic native multi-question desteği).
+Ayrı askq turlarına bölme — kullanıcı'yı yorar, akış kırılır.
+
+Örnek tek-askq + 3 GATE:
+
+```
+MyCL 1.0.17 | Aşama 2 — Precision-audit niyet onayı
+
+3 boyutta tasarım kararı gerekli — hepsini birlikte yanıtla:
+
+Boyut 1 (Yetki): API endpoint'leri kim çağırabilir?
+Boyut 4 (PII): Kullanıcı e-postası log'lara yazılmalı mı?
+Boyut 6 (SLA): p99 latency hedefi var mı?
+```
+
 ## İzinli tool'lar (Layer B)
 
 `AskUserQuestion` + global readonly. Write/Edit/Bash yasak.
 
 ## Çıktı (audit)
 
-> **Model:** `asama-2-complete` cevap metninde düz yazıyla — sıralı eşleşmede hook kabul eder.
-> **Hook:** `precision-audit` ve diğer yan audit'ler — model bunları yazmaz.
+> **Model:** `asama-2-complete` cevap metninde düz yazıyla — sıralı
+> eşleşmede hook kabul eder.
+> **Hook:** `precision-audit` yan audit'ini stop.py side_audits
+> mekanizması ile (1.0.17) paralel emit eder — model yazmaz.
 > **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+
+`required_audits_all` (1.0.17): `asama-2-complete` + `precision-audit`
+**ikisi de** audit log'da olmalı; OR bypass riski yok. Hook ikisini de
+otomatik yazar (model `asama-2-complete` yazınca yan emit zinciri
+tetiklenir).
 
 ```
 precision-audit

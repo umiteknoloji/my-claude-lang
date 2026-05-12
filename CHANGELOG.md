@@ -5,6 +5,55 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.17] — 2026-05-12
+
+### Değişen / Changed
+
+- **Aşama 2 (Hassasiyet Denetimi) mimari fix** — `required_audits_any`
+  (OR) → `required_audits_all` (AND). Eski mantıkta `asama-2-complete`
+  veya `precision-audit` audit'inden **biri yeterliydi** — model
+  sadece `asama-2-complete` yazıp 7 boyut taramasını atlayabiliyordu.
+  AND zorunluluğu ile bypass kapatıldı. Subagent kararı (Sonnet 4.6,
+  10 lens) doğrultusunda.
+
+### Eklenen / Added
+
+- **`required_audits_all` (AND) mantığı** (`hooks/stop.py::_is_phase_complete`)
+  — `_all` öncelikli, `_any` fallback. Mevcut fazlar için backward
+  compat ✓ (sadece Aşama 2 `_all` kullanır şu an, diğerleri `_any`).
+- **`side_audits` generic feature** (`hooks/stop.py::_detect_phase_complete_trigger`)
+  — fazın yan audit'leri text-trigger sonrası hook tarafından paralel
+  emit edilir. Model yazmaz, hook yazar. Aşama 2'de `precision-audit`
+  yan audit; gelecek fazlarda da kullanılabilir (Aşama 9 TDD'nin
+  `red/green/refactor` audit'leri için zemin).
+- **Aşama 2 multi-GATE skill açıklaması** (`asama02-hassasiyet.md`)
+  — birden fazla boyut GATE çıkarsa **tek AskUserQuestion** içinde
+  2-4 madde olarak sun (Anthropic native multi-question desteği).
+  Ayrı askq turlarına bölme.
+
+### Subagent ile farkım (ertelendi)
+
+Subagent (Sonnet 4.6) `state.precision_audit_decisions` listesi
+yazımı önerdi (Aşama 4 spec'e `[assumed: X]` etiketlemek için). Bu
+büyük scope — Aşama 4 turunda `spec_must.py` refactor'la birlikte
+daha doğal. **1.0.17'de ertelendi**, scope minimum tutuldu (Aşama 1
+ile tutarlı).
+
+### Test
+
+- 615 → 622 test (+7: `test_phase2_refactor.py` — `required_audits_all`
+  semantics [pass/partial fail], `side_audits` config, side audit emit
+  on trigger, idempotent, gate_spec entry checks).
+
+### Backward compat
+
+- Mevcut fazlarda `_all` yok → `_any` fallback çalışır, etkilenmez.
+- Mevcut açık oturumlarda Aşama 2 önceden geçilmişse `phase-advance`
+  audit'i geçerli kalır (geçmiş ileri-akış korunur). Yeni Aşama 2
+  geçişlerinde AND zorunluluğu aktif.
+
+[1.0.17]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.17
+
 ## [1.0.16] — 2026-05-12
 
 ### Değişen / Changed

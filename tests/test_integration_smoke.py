@@ -241,13 +241,20 @@ def test_phase_transition_bash_denied(tmp_path):
 
 
 def test_completeness_loop_advances_through_audit_chain(tmp_path):
-    """state=1 + 1, 2, 3 audit'leri → universal loop 4'e advance."""
+    """state=1 + 1, 2, 3 audit'leri → universal loop 4'e advance.
+
+    1.0.17: Aşama 2 `required_audits_all` (AND) — `precision-audit`
+    yan audit'i de zorunlu. Hook normal akışta side_audits ile
+    otomatik emit eder; bu integration smoke seed kullandığı için
+    açık olarak yerleştirir.
+    """
     _write_state(tmp_path, current_phase=1)
     audit_log = tmp_path / ".mycl" / "audit.log"
     audit_log.parent.mkdir(parents=True, exist_ok=True)
     audit_log.write_text(
         "2026-05-09T20:00:00Z | asama-1-complete | seed | -\n"
         "2026-05-09T20:00:01Z | asama-2-complete | seed | -\n"
+        "2026-05-09T20:00:01Z | precision-audit | seed | -\n"
         "2026-05-09T20:00:02Z | asama-3-complete | seed | -\n",
         encoding="utf-8",
     )
