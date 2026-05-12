@@ -84,9 +84,10 @@ MYCL_DIR="$CLAUDE_DIR/mycl"
 SKILLS_DIR="$CLAUDE_DIR/skills"
 DATA_DIR="$CLAUDE_DIR/data"
 AGENTS_DIR="$CLAUDE_DIR/agents"
+COMMANDS_DIR="$CLAUDE_DIR/commands"
 SETTINGS="$CLAUDE_DIR/settings.json"
 
-run mkdir -p "$MYCL_DIR" "$SKILLS_DIR/mycl/ortak" "$DATA_DIR" "$AGENTS_DIR"
+run mkdir -p "$MYCL_DIR" "$SKILLS_DIR/mycl/ortak" "$DATA_DIR" "$AGENTS_DIR" "$COMMANDS_DIR"
 
 # 3. ~/.claude/mycl/ — repo kopyası (hooks + skills + data + lib)
 echo "→ ~/.claude/mycl/ — repo klonlanıyor"
@@ -179,6 +180,14 @@ echo "→ ~/.claude/agents/ — agent definitions"
 for f in "$SCRIPT_DIR"/agents/*.md; do
   [ -f "$f" ] || continue
   copy_file "$f" "$AGENTS_DIR/$(basename "$f")"
+done
+
+# 5.6. ~/.claude/commands/ — slash command definitions
+# `/mycl` slash command (1.0.5+ opt-in session trigger) buradan yüklenir
+echo "→ ~/.claude/commands/ — slash commands"
+for f in "$SCRIPT_DIR"/commands/*.md; do
+  [ -f "$f" ] || continue
+  copy_file "$f" "$COMMANDS_DIR/$(basename "$f")"
 done
 
 # 6. settings.json hook merge (Python — JSON merge atomik)
@@ -288,14 +297,16 @@ echo
 echo "Sonraki adımlar:"
 echo "  1. Yeni bir Claude Code oturumu başlat"
 echo "  2. Bir proje dizinine git: cd ~/projects/yeni-app"
-echo "  3. \"todo app yap\" gibi bir niyet yaz — MyCL Aşama 1'i tetikleyecek"
+echo "  3. \"/mycl todo app yap\" yaz — MyCL bu oturumda aktive olur ve Aşama 1'i tetikler"
+echo "     (Aktivasyon olmadan MyCL pasif kalır; her yeni oturumda bir kez gerekir)"
 echo
 echo "✅ MyCL $MYCL_VERSION installation complete."
 echo
 echo "Next steps:"
 echo "  1. Start a new Claude Code session"
 echo "  2. cd into a project: cd ~/projects/new-app"
-echo "  3. Type an intent like \"build a todo app\" — MyCL will trigger Phase 1"
+echo "  3. Type \"/mycl build a todo app\" — MyCL activates for the session and triggers Phase 1"
+echo "     (Without activation MyCL stays passive; required once per new session)"
 echo
 echo "Devre dışı bırakma / Disable:"
 echo "  ~/.claude/settings.json'dan 'mycl' içeren hook girişlerini sil."

@@ -5,6 +5,62 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] — 2026-05-12
+
+### Eklenenler / Added
+
+- **Opt-in `/mycl` session trigger (re-introduced)** — MyCL artık her
+  promptta otomatik aktif değil. Oturum başına bir kez `/mycl`
+  (veya `/mycl <prompt>`) ile etkinleştirilir; tüm hook'lar (banner,
+  deny, audit, snapshot) o turdan sonra çalışır. Aktivasyon
+  `.mycl/active_session.txt`'e session_id olarak yazılır; yeni
+  Claude Code oturumu yeni session_id'ye sahip olduğu için pasif
+  başlar. `/mycl` token'ı prompt'tan sıyrılır; sıyrılmış mesaj
+  `<mycl_activation_note>` bloğunda model'e iletilir.
+- **`commands/mycl.md` slash command dosyası** — 747591d'nin (1.0.5
+  feat) **eksik parçası**. Claude Code slash command sistemi
+  `~/.claude/commands/<name>.md` dosyası gerektirir; bu dosya
+  olmadan `/mycl` "Unknown command" hatası veriyordu (8b16103
+  revert nedeni). Template `/mycl $ARGUMENTS` — args slash sonrasına
+  düşer, hook extract_trigger ile yakalar.
+- **`hooks/lib/activation.py`** — `extract_trigger`, `activate_session`,
+  `is_session_active`, `deactivate` API. Trigger regex `^\s*/mycl(?:\b|$)`
+  (sadece prompt prefix'i, orta satırdaki `/mycl` sıyrılmaz).
+- **`setup.sh` → `~/.claude/commands/` kopyalama bloğu** (`COMMANDS_DIR`
+  değişkeni + 5.6. bölüm). Next-steps mesajları `/mycl <intent>`
+  kullanımını anlatır (TR + EN).
+
+### Değişen / Changed
+
+- **5 hook erken-return** — `pre_tool.py`, `post_tool.py`, `stop.py`,
+  `pre_compact.py`: session aktif değilse no-op. `activate.py`:
+  trigger varsa session'ı aktif eder + sıyrılmış prompt'u
+  `<mycl_activation_note>` ile iletir, aktif değilse silent.
+- **`tests/conftest.py`** — autouse fixture `MYCL_TEST_FORCE_ACTIVE=1`
+  env set eder, mevcut tüm hook test'leri eski semantikte kalır
+  (test bypass; runtime'da set edilmez).
+- **`README.md` + `README.tr.md`** — "Activation (1.0.5+)" /
+  "Aktivasyon (1.0.5+)" bölümü, opt-in vurgusu, 587 → 591 test sayısı.
+- **`.claude-plugin/plugin.json`** — version 1.0.5 → 1.0.7, description
+  "opt-in" vurgusu, keywords `opt-in` + `slash-command` eklendi.
+
+### Test
+
+- 572 → 591 test (+19: `test_activation.py` 14 case [extract matrix,
+  roundtrip, oturum-geçici semantik, force-active env bypass] +
+  `test_activate.py` +5 case [trigger detect, activation note,
+  inactive silent]).
+
+### Why this isn't just 747591d redux
+
+747591d (önceki 1.0.5 feat) "izinsiz + bozuk" gerekçesiyle 8b16103
+ile revert edilmişti. "Bozuk" = `commands/mycl.md` slash command
+dosyası yoktu → Claude Code "Unknown command: /mycl". 1.0.7 hem
+o eksik dosyayı ekliyor hem setup.sh kopyalama bloğunu hem next-steps
+talimatını içeriyor. Tasarım aynı; eksik parça tamamlandı.
+
+[1.0.7]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.7
+
 ## [1.0.6] — 2026-05-12
 
 ### Düzeltilen / Fixed
