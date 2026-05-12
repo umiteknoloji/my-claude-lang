@@ -57,10 +57,16 @@ Aşama 10 gibi sınırsız — etki listesi 30 maddeyse 30 askq açılır.
 
 ## Mid-pipeline reconfirmation (#13)
 
-Etki listesi uzunsa (>10 madde) hook "hâlâ bu yönde mi?" askq açar:
+Etki listesi 10. maddeyi aştığında hook `asama-19-mid-reconfirm-needed`
+audit'i yazar; DSI direktifi modele askq açma yönlendirmesi gönderir:
 ```
 MyCL <version> | Aşama 19 ortası — hâlâ bu yönde mi ilerleyelim?
 ```
+Geliştirici cevapladıktan sonra model cevabına
+`asama-19-mid-reconfirm-acked` text-trigger'ını yazar; hook yakalar,
+direktif susar. **Soft guidance**: askq açılmasını hook deny ile
+zorlamaz — geliştirici context'i bilir, gerekirse direktifi ihmal
+edebilir.
 
 ## İzinli tool'lar (Layer B)
 
@@ -79,6 +85,31 @@ asama-19-item-2-resolved decision=skip
 ...
 asama-19-complete
 ```
+
+### Hook enforcement (1.0.29)
+
+- `asama-19-items-declared count=K` → audit emit **ve**
+  `state.open_impact_count = K` (Aşama 22 tamlık denetimi okur). Aşama
+  10'a özel `state.open_severity_count`'tan ayrı; karışmaz.
+- `asama-19-item-M-resolved decision=apply|skip|rule` → audit emit;
+  `decision=rule` ek `asama-19-rule-capture-M` audit (1.0.25
+  Aşama 10 ile ortak generic kanal).
+- Audit log'da `asama-19-item-M-resolved` sayısı 10'a ulaşınca hook
+  idempotent `asama-19-mid-reconfirm-needed` emit eder; DSI direktifi
+  modele askq açma yönlendirmesi gönderir.
+- Model askq sonrası `asama-19-mid-reconfirm-acked` text-trigger'ı
+  yazar; hook yakalar, direktif susar.
+
+**Hook auto-emit YOK** (`complete`, `escalation`, vb. model
+sorumluluğunda — 1.0.26+ sözleşmesi).
+
+## Aspirational flag'ler (gelecek tur)
+
+`gate_spec.json` Aşama 19'da `self_critique_required: true` ve
+`public_commitment_required: true` set edilmiş ama şu an hiçbir hook
+tarafından enforce edilmiyor. `hooks/lib/selfcritique.py` modülü
+mevcut, API tam — ama hook bağlantısı eksik. Aşama 14 _note'unda
+aynı durum belgelendi; ileri tur ayrı kapsam.
 
 ## Anti-pattern
 
@@ -129,6 +160,27 @@ Same one-by-one pattern as Phase 10. Options: Skip / Fix / Rule
 
 `asama-19-items-declared count=K` → `asama-19-item-N-resolved
 decision=apply|skip|rule` → `asama-19-complete`.
+
+### Hook enforcement (1.0.29)
+
+- `asama-19-items-declared count=K` → audit + `state.open_impact_count = K`.
+- `asama-19-item-M-resolved decision=...` → audit; `decision=rule`
+  emits an extra `asama-19-rule-capture-M`.
+- When 10+ `asama-19-item-M-resolved` audits exist, hook emits
+  `asama-19-mid-reconfirm-needed` (idempotent); DSI directive prompts
+  model to open an askq.
+- Model emits `asama-19-mid-reconfirm-acked` text-trigger after the
+  developer answers; hook captures it and the directive falls silent.
+- Hook does NOT auto-emit `complete` or `escalation-needed`
+  (model-responsibility boundary preserved from 1.0.26+).
+
+## Aspirational flags (next turn)
+
+`gate_spec.json` Phase 19 has `self_critique_required: true` and
+`public_commitment_required: true`, but no hook enforces them.
+`hooks/lib/selfcritique.py` exists with a complete API but is not
+wired in. Same situation as Phase 14 _note; out of scope for this
+turn.
 
 ## Anti-patterns
 

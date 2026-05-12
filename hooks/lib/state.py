@@ -60,6 +60,11 @@ _DEFAULT_STATE: dict[str, Any] = {
     "risk_review_state": None,
     "quality_review_state": None,
     "open_severity_count": 0,
+    # 1.0.29 — Aşama 19 etki maddesi sayısı (items-declared count=K
+    # text-trigger'ından yazılır). Aşama 22 tamlık denetimi okur.
+    # `open_severity_count` Aşama 10 için, `open_impact_count` Aşama 19
+    # için; ayrı alanlar olduğu için karışmaz.
+    "open_impact_count": 0,
     "tdd_compliance_score": None,
     "rollback_sha": None,
     "rollback_notice_shown": False,

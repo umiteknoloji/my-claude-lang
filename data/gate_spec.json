@@ -304,7 +304,7 @@
       "self_critique_required": true,
       "public_commitment_required": true,
       "mid_pipeline_reconfirm": true,
-      "_note": "1.0.25 — `{n}` template literal'leri kaldırıldı (Aşama 10 ile aynı pattern). Aşama 19 turunda detay refactor yapılacak; bu turda sadece gate_spec temizliği (gate bypass riski kapandı)."
+      "_note": "1.0.29 — mid_pipeline_reconfirm gerçek implementasyon kazandı: hook 10+ item-resolved tespit edince `asama-19-mid-reconfirm-needed` audit yazar, DSI direktifi modele askq yönlendirmesi gönderir; `asama-19-mid-reconfirm-acked` text-trigger ile susar. state.open_impact_count items-declared count=K'dan yazılır (Aşama 22 okur). self_critique_required ve public_commitment_required hâlâ aspirational — selfcritique.py modülü mevcut ama hook bağlantısı eksik; ileri tur ayrı kapsam (Aşama 14 _note'undaki durumla aynı)."
     },
     "20": {
       "name": "Doğrulama Raporu + Sahte Veri Temizliği",

@@ -633,12 +633,17 @@ def _detect_phase_items_triggers(
             )
             existing.add(audit_name)
             wrote = True
-        # Aşama 10 için state.open_severity_count yaz (Aşama 19 için
-        # ileri release'te ayrı state alanı tanımlanabilir; şu an Aşama
-        # 19 hash sayım Aşama 22 turunda).
+        # Aşama 10 → state.open_severity_count, Aşama 19 →
+        # state.open_impact_count (1.0.29). Ayrı alanlar; Aşama 22
+        # tamlık denetimi her iki sayıyı da okur.
         if n == 10:
             state.set_field(
                 "open_severity_count", count,
+                project_root=project_dir,
+            )
+        elif n == 19:
+            state.set_field(
+                "open_impact_count", count,
                 project_root=project_dir,
             )
 
@@ -827,6 +832,85 @@ def _detect_phase_quality_triggers(
             wrote = True
 
     return wrote
+
+
+# 1.0.29: Aşama 19 mid-pipeline reconfirmation (sınırsız soru fazı).
+# Skill: etki listesi 10+ maddeye ulaşırsa "hâlâ bu yönde mi?" askq
+# açılır. Mekanizma: hook audit log'da 10+ `asama-19-item-M-resolved`
+# tespit ederse `asama-19-mid-reconfirm-needed` audit yazar; DSI
+# direktifi modele "askq aç" yönlendirmesi enjekte eder; model askq
+# açar; geliştirici cevapladığında model `asama-19-mid-reconfirm-acked`
+# text-trigger'ı yazar; hook yakalar, direktif susar.
+_PHASE_19_RECONFIRM_THRESHOLD = 10
+_PHASE_19_MID_RECONFIRM_ACKED_RE = re.compile(
+    r"\basama-19-mid-reconfirm-acked\b",
+    re.IGNORECASE,
+)
+
+
+def _maybe_emit_mid_reconfirm(project_dir: str) -> bool:
+    """1.0.29: Aşama 19 mid-pipeline reconfirmation tetikleyicisi.
+
+    Audit log'da `asama-19-item-M-resolved` audit sayısı 10'a
+    ulaştıysa ve `asama-19-mid-reconfirm-needed` audit'i daha önce
+    yazılmamışsa, idempotent emit. Sayım audit log'dan — transcript
+    değil — çünkü resolved item'ların kalıcı kanalı audit.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    if cp != 19:
+        return False
+    events = audit.read_all(project_root=project_dir)
+    resolved = sum(
+        1 for ev in events
+        if isinstance(ev.get("name"), str)
+        and ev["name"].startswith("asama-19-item-")
+        and ev["name"].endswith("-resolved")
+    )
+    if resolved < _PHASE_19_RECONFIRM_THRESHOLD:
+        return False
+    existing = {ev.get("name") for ev in events}
+    if "asama-19-mid-reconfirm-needed" in existing:
+        return False
+    audit.log_event(
+        "asama-19-mid-reconfirm-needed", "stop.py",
+        f"phase=19 resolved_items={resolved} threshold={_PHASE_19_RECONFIRM_THRESHOLD}",
+        project_root=project_dir,
+    )
+    return True
+
+
+def _detect_mid_reconfirm_acked(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """1.0.29: model `asama-19-mid-reconfirm-acked` yazdıysa yakala.
+
+    Geliştirici mid-reconfirm askq'sını cevapladıktan sonra model
+    bu trigger'ı yazar; hook audit emit eder ki DSI direktifi
+    bir daha çıkmasın. Idempotent.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(_PHASE_19_MID_RECONFIRM_ACKED_RE.search(t)),
+        transcript_path,
+    )
+    if not text:
+        return False
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    if "asama-19-mid-reconfirm-acked" in existing:
+        return False
+    audit.log_event(
+        "asama-19-mid-reconfirm-acked", "stop.py",
+        "phase=19 mid-pipeline reconfirmation acknowledged by developer",
+        project_root=project_dir,
+    )
+    return True
 
 
 # 1.0.28: Aşama 15-18 Test Boru Hattı trigger'ları — generic regex.
@@ -1253,6 +1337,14 @@ def main() -> int:
     # (18)). end-* trigger'ları zaten 1.0.21 extended trigger'da
     # yakalanıyor. Hook auto-emit YOK.
     _detect_phase_testing_triggers(transcript_path, project_dir)
+
+    # 1.0.29: Aşama 19 mid-pipeline reconfirmation. 10+ item-resolved
+    # tespit edilirse `asama-19-mid-reconfirm-needed` audit yazılır;
+    # DSI direktifi modele askq açma yönlendirmesi enjekte eder.
+    # Geliştirici cevapladıktan sonra model
+    # `asama-19-mid-reconfirm-acked` text-trigger yazar; hook yakalar.
+    _maybe_emit_mid_reconfirm(project_dir)
+    _detect_mid_reconfirm_acked(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)
     _run_completeness_loop(project_dir)

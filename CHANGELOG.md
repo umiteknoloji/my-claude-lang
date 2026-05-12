@@ -5,6 +5,67 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.29] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 19 (Etki İncelemesi) `mid_pipeline_reconfirm` bayrağı
+  fiilen çalışmıyordu** — Subagent (Sonnet 4.6, 10 lens) tespit etti:
+  `gate_spec.json` Aşama 19'da `mid_pipeline_reconfirm: true`,
+  skill dosyası "hook etki listesi 10+ olunca askq açar" diyor, ama
+  hiçbir hook bu flag'i okumuyordu. Aşama 14 ile aynı declared-but-
+  not-implemented deseni.
+- **`state.open_impact_count` alanı yoktu** — Aşama 22 tamlık
+  denetimi Aşama 19 etki sayısını okuyacak ama veri yazılmıyordu.
+  Aşama 10'un `open_severity_count` alanına paralel.
+
+### Eklenen / Added
+
+- **`hooks/lib/state.py::_DEFAULT_STATE`**: `open_impact_count: 0`
+  yeni alan. Aşama 19 items-declared count=K'dan yazılır.
+- **`hooks/stop.py::_maybe_emit_mid_reconfirm`**: audit log'da
+  `asama-19-item-M-resolved` sayısı 10'a ulaşırsa idempotent
+  `asama-19-mid-reconfirm-needed` audit emit eder. Yalnızca Aşama 19'da
+  (current_phase == 19 guard).
+- **`hooks/stop.py::_detect_mid_reconfirm_acked`**: model
+  `asama-19-mid-reconfirm-acked` text-trigger yazınca yakalar; audit
+  emit (idempotent).
+- **`hooks/stop.py::_PHASE_19_MID_RECONFIRM_ACKED_RE`**: word-boundary
+  regex.
+- **`hooks/stop.py::_PHASE_19_RECONFIRM_THRESHOLD = 10`**: skill
+  belgelendirmesine göre sabit (hardcoded; gelecekte int gate_spec
+  alanı olarak okunabilir).
+- **`hooks/lib/dsi.py::render_mid_reconfirm_notice`**: needed audit
+  var ve acked yoksa modele bilingual askq açma yönlendirmesi
+  enjekte eder; acked sonrası susar. Soft guidance (deny değil).
+- **`render_full_dsi`** çağırıyor — direktif paketin parçası.
+
+### Sözleşme / Contract
+
+- **Sayım kanalı: audit log** (transcript değil). `asama-19-item-M-
+  resolved` audit'lerinin sayısı kalıcı; her tur tekrar sayım.
+- **Soft guidance**: hook askq açmak için PreToolUse deny eklemez;
+  direktif suggest, model context'i bilir.
+- **Hook auto-emit yok**: `asama-19-complete`, `escalation-needed`,
+  `mid-reconfirm-acked` (text-trigger'a dayalı) sorumluluğu modelde.
+
+### Aspirational flag'ler (kapsam dışı, doc-truth)
+
+- `self_critique_required: true` ve `public_commitment_required: true`
+  Aşama 19'da set edilmiş ama hâlâ enforce edilmiyor (Aşama 14
+  _note'undaki durumla aynı). skill dosyasında "gelecek tur" olarak
+  belgelendi. `hooks/lib/selfcritique.py` modülü mevcut ama hook
+  bağlantısı yok; ileri tur ayrı kapsam.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.28 → 1.0.29, `.claude-plugin/plugin.json` 1.0.29.
+- `README.md` + `README.tr.md` test sayısı 712 → 725.
+- 13 yeni test: `tests/test_phase19_refactor.py` (items-declared →
+  open_impact_count, mid-reconfirm threshold/idempotency/scope,
+  mid-reconfirm-acked text-trigger, DSI direktifi koşulları, full_dsi
+  entegrasyonu, Aşama 19 dışı no-op).
+
 ## [1.0.28] — 2026-05-13
 
 ### Düzeltilen / Fixed

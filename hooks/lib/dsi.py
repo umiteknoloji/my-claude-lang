@@ -130,6 +130,42 @@ def render_phase_allowlist_escalate(
     )
 
 
+def render_mid_reconfirm_notice(
+    project_root: str | None = None,
+) -> str:
+    """1.0.29: Aşama 19 mid-pipeline reconfirmation direktifi.
+
+    Audit log'da `asama-19-mid-reconfirm-needed` varsa ve
+    `asama-19-mid-reconfirm-acked` yoksa, modele "askq aç" yönlendirmesi
+    emit eder. Acked sonrası direktif susar.
+
+    Soft guidance — hard deny değil; CLAUDE.md "soft guidance over
+    fail-fast" kuralı.
+    """
+    needed = False
+    acked = False
+    for ev in audit.read_all(project_root=project_root):
+        name = ev.get("name", "")
+        if name == "asama-19-mid-reconfirm-needed":
+            needed = True
+        elif name == "asama-19-mid-reconfirm-acked":
+            acked = True
+    if not needed or acked:
+        return ""
+    return (
+        "<mycl_mid_reconfirm_notice>\n"
+        "Aşama 19 etki listesi 10+ maddeye ulaştı. Devam etmeden önce "
+        "geliştiriciye AskUserQuestion ile 'hâlâ bu yönde mi ilerleyelim?' "
+        "sor; cevap alındığında metnine `asama-19-mid-reconfirm-acked` "
+        "yaz.\n\n"
+        "Phase 19 impact list reached 10+ items. Before continuing, open "
+        "an AskUserQuestion asking the developer 'still on this path?'; "
+        "after the answer, emit `asama-19-mid-reconfirm-acked` in your "
+        "reply text.\n"
+        "</mycl_mid_reconfirm_notice>"
+    )
+
+
 def render_token_visibility(
     turn_tokens: int,
     project_root: str | None = None,
@@ -181,6 +217,12 @@ def render_full_dsi(
     escalate = render_phase_allowlist_escalate(project_root=project_root)
     if escalate:
         blocks.append(escalate)
+
+    # 1.0.29: Aşama 19 mid-pipeline reconfirmation (10+ item-resolved
+    # eşiği aşıldıysa askq yönlendirmesi).
+    mid_reconfirm = render_mid_reconfirm_notice(project_root=project_root)
+    if mid_reconfirm:
+        blocks.append(mid_reconfirm)
 
     if turn_tokens > 0:
         tok = render_token_visibility(turn_tokens, project_root=project_root)
