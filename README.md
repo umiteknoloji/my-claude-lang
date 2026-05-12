@@ -10,9 +10,9 @@ agent frameworks, no MCP servers.
 
 ## What MyCL is (and isn't)
 
-MyCL **is** five Python hooks (`UserPromptSubmit`, `PreToolUse`,
-`PostToolUse`, `Stop`, `PreCompact`) that, **once activated with
-`/mycl`**:
+MyCL **is** six Python hooks (`UserPromptSubmit`, `PreToolUse`,
+`PostToolUse`, `Stop`, `SubagentStop`, `PreCompact`) that, **once
+activated with `/mycl`**:
 
 - Track the active phase in `.mycl/state.json`
 - Seal each phase with an audit entry in `.mycl/audit.log`
@@ -23,7 +23,7 @@ MyCL **is** five Python hooks (`UserPromptSubmit`, `PreToolUse`,
   `<mycl_phase_status>`, `<mycl_phase_allowlist_escalate>`) every turn
 - Speak TR + EN bilingually (no labels, blank-line separated)
 
-**Before activation** (default state for any new session): all five
+**Before activation** (default state for any new session): all six
 hooks no-op — banner, deny, audit, snapshot — nothing fires. Claude
 Code behaves exactly as without MyCL installed.
 
@@ -48,7 +48,7 @@ The installer:
 2. Copies the repo to `~/.claude/mycl/`
 3. Registers `mycl.md` skill in `~/.claude/skills/`
 4. Drops data files into `~/.claude/data/`
-5. Merges 5 hooks into `~/.claude/settings.json` (idempotent — safe
+5. Merges 6 hooks into `~/.claude/settings.json` (idempotent — safe
    to re-run)
 6. Smoke-tests `py_compile` + lib imports
 
@@ -160,7 +160,7 @@ no "let it pass after N strikes," no graceful degradation.
 python3 -m pytest tests/ -v
 ```
 
-591 tests cover lib units (every module), each hook (subprocess
+599 tests cover lib units (every module), each hook (subprocess
 chain), and a smoke matrix that exercises pseudocode invariants
 (state × tool, STRICT no-fail-open, state lock, completeness loop,
 DSI integration, PreCompact snapshot, reinforcement reminder,

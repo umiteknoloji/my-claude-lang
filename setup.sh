@@ -209,6 +209,7 @@ mycl_hooks = {
     "PreToolUse":       str(hooks_root / "pre_tool.py"),
     "PostToolUse":      str(hooks_root / "post_tool.py"),
     "Stop":             str(hooks_root / "stop.py"),
+    "SubagentStop":     str(hooks_root / "subagent_stop.py"),
     "PreCompact":       str(hooks_root / "pre_compact.py"),
 }
 

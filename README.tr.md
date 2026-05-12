@@ -10,9 +10,9 @@ MCP server yok.
 
 ## MyCL nedir (ne değildir)
 
-MyCL **şudur**: beş Python kanca (`UserPromptSubmit`, `PreToolUse`,
-`PostToolUse`, `Stop`, `PreCompact`) ki **`/mycl` ile aktive
-edildikten sonra**:
+MyCL **şudur**: altı Python kanca (`UserPromptSubmit`, `PreToolUse`,
+`PostToolUse`, `Stop`, `SubagentStop`, `PreCompact`) ki **`/mycl` ile
+aktive edildikten sonra**:
 
 - Aktif fazı `.mycl/state.json`'da takip eder
 - Her fazı `.mycl/audit.log`'da bir audit ile mühürler
@@ -25,7 +25,7 @@ edildikten sonra**:
   `<mycl_phase_allowlist_escalate>`)
 - TR + EN çift dil konuşur (etiket yok, boş satır ayrılı)
 
-**Aktivasyon öncesi** (varsayılan, her yeni oturumda): beş kanca da
+**Aktivasyon öncesi** (varsayılan, her yeni oturumda): altı kanca da
 no-op — banner, deny, audit, snapshot, hiçbiri çalışmaz. Claude Code
 MyCL kurulu değilmiş gibi davranır.
 
@@ -49,7 +49,7 @@ Kurulum:
 2. Repo'yu `~/.claude/mycl/` altına kopyalar
 3. `mycl.md` skill'ini `~/.claude/skills/`'e tanıtır
 4. Veri dosyalarını `~/.claude/data/`'ya bırakır
-5. 5 kancayı `~/.claude/settings.json`'a MERGE eder (idempotent —
+5. 6 kancayı `~/.claude/settings.json`'a MERGE eder (idempotent —
    tekrar çalıştırılabilir)
 6. Smoke test (py_compile + lib import)
 
@@ -109,7 +109,7 @@ Her faz için: `skills/mycl/asama<NN>-*.md`.
 ```
 KULLANICI  ←→  MyCL (anlam doğrulama)  ←→  CLAUDE CODE (model + tools)
                   │
-                  ├─ 5 kanca (Claude Code çağırır)
+                  ├─ 6 kanca (Claude Code çağırır)
                   ├─ state.json (current_phase, spec_approved, ...)
                   ├─ audit.log (append-only olay kaydı)
                   ├─ 22 faz veri olarak (gate_spec.json)
@@ -117,7 +117,7 @@ KULLANICI  ←→  MyCL (anlam doğrulama)  ←→  CLAUDE CODE (model + tools)
 ```
 
 Kancalar **dolaylı** iletişim kurar — `state.json` + `audit.log`
-üzerinden. Birbirini import etmez. Beş kanca da `hooks/lib/*`
+üzerinden. Birbirini import etmez. Altı kanca da `hooks/lib/*`
 modüllerini kullanır (state, audit, gate, askq, spec_detect,
 transcript, bilingual, dsi, plugin, …).
 
@@ -161,7 +161,7 @@ yok, graceful degradation yok.
 python3 -m pytest tests/ -v
 ```
 
-591 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
+599 test lib birimlerini, her kancayı (subprocess zinciri) ve smoke
 matrix'i (state × tool, STRICT no-fail-open, state lock,
 completeness loop, DSI integration, PreCompact snapshot, reinforcement
 reminder, Agent tool globally allowed, stale-emit sessiz) kapsar.

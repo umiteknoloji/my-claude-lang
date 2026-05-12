@@ -5,6 +5,54 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] — 2026-05-12
+
+### Eklenenler / Added
+
+- **`SubagentStop` hook** (`hooks/subagent_stop.py`) — Claude Code'un
+  AGENTIC LOOP içindeki native `SubagentStop` event'ine bağlı. `Task`
+  tool ile `mycl-phase-runner` subagent dispatch'i bittiğinde fire
+  eder; transcript'ten son tool_result'ı okur, `orchestrator.parse_phase_output`
+  ile parse eder, audit emit + `state.last_phase_output` set yapar.
+  Hook listesi 5 → 6 (`settings.json` merge `SubagentStop` event'ini
+  ekler).
+- **`tests/test_subagent_stop.py`** — 8 case: complete, skipped,
+  pending, error, idempotent re-fire, no-orchestration-phase,
+  no-transcript-path, no-subagent-output.
+
+### Tasarım kararları / Design
+
+- **Open/Closed: Stop hook'taki subagent kanalı SİLİNMEDİ.** Mevcut
+  `stop.py::_detect_subagent_phase_output` çalışıyor; SubagentStop
+  paralel **ek path** olarak eklendi. İki kanal aynı audit'i
+  yazmaya çalıştığında `existing audits` set check ile idempotent —
+  ilk fire eden kazanır, ikincisi no-op. 1.0.9'da Stop kanalını
+  silme kararı stabilite kanıtı sonrası ayrı release'de değerlendirilir.
+- **`UserPromptExpansion` hook EKLENMEDİ.** `activate.py::extract_trigger`
+  regex'i slash command sonrası prompt'taki `/mycl` prefix'ini zaten
+  doğru yakalıyor; native event'in kazanımı sadece semantik temizlik,
+  fonksiyonel değer marjinal. Invisible-feature anti-paternine
+  yakın olduğu için ertelendi.
+- **Halüsinasyon kontrolü kapatıldı:** Anthropic'in resmi hooks
+  lifecycle diyagramı (`hooks-lifecycle.svg`) `SubagentStart` /
+  `SubagentStop` event'lerinin AGENTIC LOOP içinde gerçek olduğunu
+  teyit etti. Plan critique #6'nın doğrulama hook'u adımı gereksiz.
+
+### Devtime plan critique
+
+Sonnet 4.6 (extended thinking) + 10 lens ile plan kritik edildi.
+3 bulgu kabul:
+1. Open/Closed (#8) → Stop kanalı korundu.
+2. Halüsinasyon (#6) → SVG ile doğrulandı.
+3. Çift-aktivasyon riski (#7) → UserPromptExpansion erteleme ile
+   problem yüzeyi sıfırlandı.
+
+### Test
+
+- 591 → 599 test (+8: `test_subagent_stop.py`).
+
+[1.0.8]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.8
+
 ## [1.0.7] — 2026-05-12
 
 ### Eklenenler / Added
