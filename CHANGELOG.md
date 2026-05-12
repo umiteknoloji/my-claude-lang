@@ -5,6 +5,54 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.14] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **`silent_phase` implementation gap — Aşama 3 stuck'in kök sebebi**
+  — `data/gate_spec.json::phases.3.silent_phase: true` flag tanımlıydı
+  ama `grep silent_phase hooks/` tek tanımı (gate_spec.json) buluyordu;
+  **hiçbir hook bu flag'i okumuyordu**. `asama03-ozet.md` skill diyor
+  ki "hook universal completeness loop ile otomatik geçirir" ama
+  implementation yoktu. Sonuç: Aşama 3 `required_audits_any`
+  (`asama-3-complete`, `engineering-brief`) hiçbir yerden yazılmıyor
+  → completeness loop break → state cp=3'te stuck → Aşama 4 spec
+  onayı `_spec_approve_flow`'un `cp == 4` kontrolüne takılıyor →
+  `spec_approved=False` → Bash deny zinciri.
+
+  Düzeltme: `hooks/stop.py::_run_completeness_loop` her iterasyonda
+  `phase_def.silent_phase` kontrolü yapar; True ise
+  `_silent_phase_auto_emit` helper'ı çağrılır — `required_audits_any`
+  listesindeki **ilk** audit'i (gate_spec.json'da semantic sıralı —
+  Aşama 3 için `asama-3-complete`) hook kendisi emit eder. Idempotent
+  guard mevcut audit'leri korur. CLAUDE.md sequential invariant'a
+  uyumlu — sentinel atlama yok, `gate.advance()` normal akışla
+  çalışır.
+
+- **`asama04-spec.md` anti-pattern: özel başlık tuzağı** — model
+  `📋 Spec — <title>:` şablonu yerine `Teknik Spec — Node.js Todo
+  Uygulaması` gibi özel başlık yazdığında `spec_detect.contains`
+  regex (`^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?(?:\U0001F4CB[ \t]+)?Spec\b[^\n:]*:`)
+  matchlemiyor (başında `Teknik ` prefix kelimesi pattern'de
+  izinli değil). Skill anti-pattern bölümüne explicit yasak +
+  regex açıklaması eklendi. Detection regex'i tasarım invariant'ı
+  (CLAUDE.md captured rule) — gevşetme reddedildi, doğru çözüm
+  skill'i sıkı dayatmak.
+
+### Test
+
+- 601 → 605 test (+4: `test_stop_silent_phase.py` — auto-emit,
+  idempotent, non-silent-no-emit, empty-required-noop).
+
+### Recovery (mevcut bozuk state için)
+
+Eğer `.mycl/state.json` cp=3'te takılıysa: ya `.mycl/` + `.git/`
+temizle ve baştan dene, ya da kurtarma yolu (`audit.log_event`)
+ile elle `asama-3-complete` audit yaz; bir sonraki turda hook
+universal completeness loop devam eder.
+
+[1.0.14]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.14
+
 ## [1.0.13] — 2026-05-12
 
 ### Düzeltilen / Fixed

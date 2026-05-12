@@ -116,6 +116,21 @@ asama-4-ac-count must=N should=M
   yürür
 - ❌ Türkçe spec — pseudocode kuralı: spec body İngilizce; özet
   kullanıcı dilinde
+- ❌ **Özel başlık** — `Teknik Spec — X`, `Engineering Spec`,
+  `## Spec for X`, `Final Spec:` gibi özel formlar yasak. Spec başlığı
+  **tam olarak** şu şablonu kullanır:
+
+  ```
+  📋 Spec — <one-line title>:
+  ```
+
+  Başlık başında `📋` emoji + boşluk + `Spec` kelimesi + ` — `
+  + tek satır başlık + `:`. `spec_detect.contains` regex'i
+  (`^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?(?:\U0001F4CB[ \t]+)?Spec\b[^\n:]*:`)
+  bu format'ı yakalar; `Teknik Spec — ...` başında `Teknik` kelimesi
+  olduğu için **matchlemez** → `spec_hash=null` → `_spec_approve_flow`
+  no-op → `spec_approved=False` → Bash deny zinciri. Format şablona
+  birebir uy.
 
 ---
 

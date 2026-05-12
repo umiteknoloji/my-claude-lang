@@ -177,23 +177,68 @@ def _run_completeness_loop(project_dir: str) -> int:
 
     Her iterasyonda:
       1. current_phase oku
-      2. gate.is_phase_complete (required_audits_any var mı audit'te?)
-      3. Var → gate.advance() → +1
-      4. Yok → break
+      2. silent_phase: true ise ve required audit yoksa hook otomatik
+         emit (1.0.14 — pseudocode "hook auto-completes" tasarımı,
+         önceden gate_spec flag tanımlıydı ama hiçbir hook okumuyordu)
+      3. gate.is_phase_complete (required_audits_any var mı audit'te?)
+      4. Var → gate.advance() → +1
+      5. Yok → break
 
     Returns: tamamlanan advance sayısı.
     """
+    spec = gate.load_gate_spec()
     advance_count = 0
     # Sonsuz döngü koruması: max 22 iterasyon
     for _ in range(22):
         cp = state.get("current_phase", 1, project_root=project_dir)
         if cp >= 22:
             break
+        phase_def = spec.get("phases", {}).get(str(cp), {})
+        if isinstance(phase_def, dict) and phase_def.get("silent_phase"):
+            _silent_phase_auto_emit(cp, phase_def, project_dir)
         if not _is_phase_complete(cp, project_dir):
             break
         gate.advance(project_root=project_dir, caller="stop.py")
         advance_count += 1
     return advance_count
+
+
+def _silent_phase_auto_emit(
+    phase: int, phase_def: dict, project_dir: str,
+) -> None:
+    """Silent phase için hook otomatik audit emit.
+
+    Pseudocode: SESSİZ faz (Aşama 3 Mühendislik Özeti) — model
+    `asama-N-complete` emit etmez, askq açılmaz; hook universal
+    completeness loop sırasında otomatik geçirir.
+
+    Implementation gap (1.0.14 öncesi): `silent_phase: true` flag
+    `gate_spec.json`'da tanımlıydı ama hiçbir hook okumuyordu →
+    Aşama 3 `required_audits_any` (`asama-3-complete` veya
+    `engineering-brief`) hiçbir yerden yazılmıyor → completeness
+    loop break → state cp=3'te stuck → Aşama 4 spec onayı askq'sı
+    `_spec_approve_flow`'un `cp == 4` kontrolüne takılıyor →
+    `spec_approved=False` → Bash deny.
+
+    Strategy: `required_audits_any` listesindeki **ilk** audit'i
+    hook yazar (gate_spec.json'da semantic sıralı tanımlanmış —
+    Aşama 3 için `["asama-3-complete", "engineering-brief"]`).
+    Audit zaten varsa no-op (idempotent). CLAUDE.md sequential
+    invariant'a uyumlu — sentinel atlama yok, `gate.advance()`
+    bir sonraki iterasyonda normal akışla çalışır.
+    """
+    required = phase_def.get("required_audits_any") or []
+    if not required:
+        return
+    existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
+    for name in required:
+        if name in existing:
+            return  # idempotent — zaten emit edilmiş
+    audit.log_event(
+        required[0], "stop.py",
+        f"silent-phase-auto-emit phase={phase}",
+        project_root=project_dir,
+    )
 
 
 def _is_phase_complete(phase: int, project_dir: str) -> bool:
