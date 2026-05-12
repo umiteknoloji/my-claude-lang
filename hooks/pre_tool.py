@@ -36,6 +36,18 @@ if str(_REPO_ROOT) not in sys.path:
 
 from hooks.lib import activation, audit, bilingual, gate, state  # noqa: E402
 
+
+def _read_version() -> str:
+    """VERSION dosyasından sürümü oku — banner/block prefix'leri için."""
+    version_file = _REPO_ROOT / "VERSION"
+    try:
+        return version_file.read_text(encoding="utf-8").strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
+
+
+_MYCL_VERSION = _read_version()
+
 _STRIKE_ESCALATION_THRESHOLD = 5
 
 # Mutating Bash detection
@@ -118,7 +130,12 @@ def _is_git_init_only(cmd: str) -> bool:
 
 
 def _bilingual_block(key: str, **kwargs) -> str:
-    """bilingual.render — fail-safe (eksik key → key adı)."""
+    """bilingual.render — fail-safe (eksik key → key adı).
+
+    1.0.9: `version` placeholder otomatik enjekte edilir — block
+    template'lerinde `MyCL {version} | ` prefix kullanılır.
+    """
+    kwargs.setdefault("version", _MYCL_VERSION)
     text = bilingual.render(key, **kwargs)
     return text if text and not text.startswith("[") else ""
 

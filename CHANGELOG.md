@@ -5,6 +5,37 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **`ToolSearch` faz-allowlist'te eksikti** — Sonnet 4.6 ve diğer
+  modeller `Task` (subagent dispatch) öncesi `ToolSearch` ile deferred
+  tool schema yükleyebiliyor. Bu read-only meta-tool her fazda izinli
+  olmalı; `data/gate_spec.json::_global_always_allowed_tools` listesine
+  eklendi (`Agent`, `Skill`, `TodoWrite` ile aynı kategori — read-only
+  global allow). 1.0.2'deki `Agent` global allow fix'i ile aynı
+  desen.
+- **Block mesajlarında MyCL sürümü görünmüyordu** — kullanıcı bir
+  pre-tool deny aldığında hangi MyCL sürümünün çalıştığını
+  anlayamıyordu (sadece askq prompt'larında `MyCL X.Y.Z | Aşama N`
+  prefix vardı). 5 block template'ine `MyCL {version} | ` prefix
+  eklendi: `phase_allowlist_block`, `phase_path_block`,
+  `spec_approval_block`, `spec_approval_escalation`,
+  `state_mutation_block`. `hooks/pre_tool.py::_bilingual_block`
+  helper'ı `version=_MYCL_VERSION`'ı otomatik enjekte eder
+  (`kwargs.setdefault`). `spec_approval_block` ve `state_mutation_block`'taki
+  "MyCL kilidi"/"MyCL STATE LOCK" tekrar prefix'leri "Kilit"/"STATE
+  LOCK" olarak kısaltıldı (çift `MyCL` kelimesini engellemek için).
+
+### Test
+
+- 599 test (değişmedi — template prefix string content extension; mevcut
+  testler "yol yasak", "izin verilmez" gibi contains-check yapıyor,
+  prefix etkilemiyor).
+
+[1.0.9]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.9
+
 ## [1.0.8] — 2026-05-12
 
 ### Eklenenler / Added

@@ -14,7 +14,8 @@
     "Task",
     "Agent",
     "Skill",
-    "TodoWrite"
+    "TodoWrite",
+    "ToolSearch"
   ],
   "_global_bash_audit_emit_allowed": true,
   "_global_git_init_allowed": true,

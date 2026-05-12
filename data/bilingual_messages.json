@@ -17,24 +17,24 @@
       "en": "↷ Phase {phase} skipped ({reason}). → Phase {next_phase} starting."
     },
     "spec_approval_block": {
-      "tr": "MyCL kilidi — spec onayı yok. Mutating tool `{tool}` engellendi. Önce Aşama 1 (niyet) → 2 (kontrol) → 3 (özet) → 4 (spec onayı) sırasıyla ilerleyin. Spec onaylanınca `{tool}` otomatik açılır.",
-      "en": "MyCL lock — no spec approval. Mutating tool `{tool}` blocked. First proceed Phase 1 (intent) → 2 (precision) → 3 (brief) → 4 (spec approval). Once approved, `{tool}` opens automatically."
+      "tr": "MyCL {version} | Kilit — spec onayı yok. Mutating tool `{tool}` engellendi. Önce Aşama 1 (niyet) → 2 (kontrol) → 3 (özet) → 4 (spec onayı) sırasıyla ilerleyin. Spec onaylanınca `{tool}` otomatik açılır.",
+      "en": "MyCL {version} | Lock — no spec approval. Mutating tool `{tool}` blocked. First proceed Phase 1 (intent) → 2 (precision) → 3 (brief) → 4 (spec approval). Once approved, `{tool}` opens automatically."
     },
     "spec_approval_escalation": {
-      "tr": "⚠️ Aşama 4 spec onayı 5+ strike — geliştirici müdahalesi gerekiyor. Pipeline hâlâ açılmıyor. AskUserQuestion ile spec onayı talep edin veya `python3 -c \"from hooks.lib import audit; audit.log_event('asama-4-complete', 'recovery', '<detay>')\"` ile manuel emit edin.",
-      "en": "⚠️ Phase 4 spec approval has hit 5+ strikes — developer intervention required. Pipeline remains closed. Re-emit AskUserQuestion for spec approval or manually emit via `python3 -c \"from hooks.lib import audit; audit.log_event('asama-4-complete', 'recovery', '<detail>')\"`."
+      "tr": "MyCL {version} | ⚠️ Aşama 4 spec onayı 5+ strike — geliştirici müdahalesi gerekiyor. Pipeline hâlâ açılmıyor. AskUserQuestion ile spec onayı talep edin veya `python3 -c \"from hooks.lib import audit; audit.log_event('asama-4-complete', 'recovery', '<detay>')\"` ile manuel emit edin.",
+      "en": "MyCL {version} | ⚠️ Phase 4 spec approval has hit 5+ strikes — developer intervention required. Pipeline remains closed. Re-emit AskUserQuestion for spec approval or manually emit via `python3 -c \"from hooks.lib import audit; audit.log_event('asama-4-complete', 'recovery', '<detail>')\"`."
     },
     "phase_allowlist_block": {
-      "tr": "Aşama {phase}'de `{tool}` tool'una izin verilmez. İzinli tool'lar: {allowed}. Bir sonraki faza geçmek için `asama-{phase}-complete` audit emit edilmeli.",
-      "en": "In Phase {phase}, tool `{tool}` is not permitted. Allowed: {allowed}. To advance, emit audit `asama-{phase}-complete`."
+      "tr": "MyCL {version} | Aşama {phase}'de `{tool}` tool'una izin verilmez. İzinli tool'lar: {allowed}. Bir sonraki faza geçmek için `asama-{phase}-complete` audit emit edilmeli.",
+      "en": "MyCL {version} | In Phase {phase}, tool `{tool}` is not permitted. Allowed: {allowed}. To advance, emit audit `asama-{phase}-complete`."
     },
     "phase_path_block": {
-      "tr": "Aşama {phase}'de bu yol yasak: `{path}`. Yasaklı yollar: {denied}. (Örnek: Aşama 6 UI Build, backend yollarını yasaklar — backend Aşama 8 veya 9'da yazılır.)",
-      "en": "In Phase {phase}, this path is forbidden: `{path}`. Denied paths: {denied}. (Example: Phase 6 UI Build forbids backend paths — backend goes to Phase 8 or 9.)"
+      "tr": "MyCL {version} | Aşama {phase}'de bu yol yasak: `{path}`. Yasaklı yollar: {denied}. (Örnek: Aşama 6 UI Build, backend yollarını yasaklar — backend Aşama 8 veya 9'da yazılır.)",
+      "en": "MyCL {version} | In Phase {phase}, this path is forbidden: `{path}`. Denied paths: {denied}. (Example: Phase 6 UI Build forbids backend paths — backend goes to Phase 8 or 9.)"
     },
     "state_mutation_block": {
-      "tr": "MyCL STATE LOCK — Python `state.set_field` / `state.update` / `state.reset` Bash kanalından çağrılamaz. State faz mantığının iç invariantı; sadece hook'lar mutate eder. Recovery (legitim): `python3 -c \"from hooks.lib import audit; audit.log_event('asama-N-complete', 'recovery', '<detay>')\"` ile audit emit.",
-      "en": "MyCL STATE LOCK — Python `state.set_field` / `state.update` / `state.reset` cannot be called via the Bash channel. State is the inner invariant of phase logic; only hooks mutate it. Recovery (legitimate): emit audit via `python3 -c \"from hooks.lib import audit; audit.log_event('asama-N-complete', 'recovery', '<detail>')\"`."
+      "tr": "MyCL {version} | STATE LOCK — Python `state.set_field` / `state.update` / `state.reset` Bash kanalından çağrılamaz. State faz mantığının iç invariantı; sadece hook'lar mutate eder. Recovery (legitim): `python3 -c \"from hooks.lib import audit; audit.log_event('asama-N-complete', 'recovery', '<detay>')\"` ile audit emit.",
+      "en": "MyCL {version} | STATE LOCK — Python `state.set_field` / `state.update` / `state.reset` cannot be called via the Bash channel. State is the inner invariant of phase logic; only hooks mutate it. Recovery (legitimate): emit audit via `python3 -c \"from hooks.lib import audit; audit.log_event('asama-N-complete', 'recovery', '<detail>')\"`."
     },
     "git_init_consent_request": {
       "tr": "MyCL plugin orkestrasyonu için yerel `git init` çalıştırılsın mı? (Sadece yerel: remote eklenmez, push yapılmaz, otomatik commit atılmaz.)",
