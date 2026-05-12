@@ -157,14 +157,19 @@ def test_orchestration_enabled_phase_10():
     assert orchestrator.is_orchestration_enabled(10) is True
 
 
-def test_orchestration_enabled_phase_14():
-    """Aşama 14 (Güvenlik) — proje genelinde subagent_orchestration: true (1.0.16)."""
+def test_orchestration_disabled_phase_14():
+    """1.0.27: Aşama 14 (Güvenlik) subagent_orchestration bayrağı
+    KALDIRILDI. Gerekçe: mycl-phase-runner read-only (Bash yok), bu
+    yüzden semgrep/npm audit/secret scanner subagent altında
+    çalıştırılamıyordu. 1.0.16'da eklenen bayrak declared-but-not-
+    implemented örneğiydi; Aşama 11-13 ile aynı text-trigger kanalı
+    kullanılır artık (hooks/stop.py _PHASE_QUALITY_PHASES ⊇ {14})."""
     os.environ["MYCL_DATA_DIR"] = str(
         os.path.join(os.path.dirname(__file__), "..", "data")
     )
     from hooks.lib import gate
     gate._gate_spec_cache = None
-    assert orchestrator.is_orchestration_enabled(14) is True
+    assert orchestrator.is_orchestration_enabled(14) is False
 
 
 def test_orchestration_disabled_phase_1():

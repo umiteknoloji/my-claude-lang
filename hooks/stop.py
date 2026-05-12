@@ -680,12 +680,16 @@ def _detect_phase_items_triggers(
 
 
 # 1.0.26: Aşama 11-13 Kalite Boru Hattı trigger'ları — generic regex.
+# 1.0.27: Aşama 14 (Güvenlik) scope'a dahil edildi. Gerekçe:
+# mycl-phase-runner subagent Bash kullanamadığı için semgrep/npm
+# audit/secret scanner çalıştıramıyordu; eski subagent_orchestration:
+# true bayrağı fiilen kırıktı. Şimdi Aşama 11-13 ile aynı text-trigger
+# kanalı kullanılır; model ana context'te semgrep'i Bash ile koşar,
+# JSON output'u parse eder, audit emit eder.
 # Pseudocode (satır 354-386): her kalite fazı aynı 3-step döngü:
 # scan count=K → issue-N-fixed → rescan count=K' → ... → rescan count=0.
 # Max 5 rescan aşıldıysa model asama-N-escalation-needed yazar.
-# Aşama 14 subagent_orchestration kanalıyla geldiği için scope dışı
-# (audit double-emit riski).
-_PHASE_QUALITY_PHASES = frozenset({11, 12, 13})
+_PHASE_QUALITY_PHASES = frozenset({11, 12, 13, 14})
 _PHASE_SCAN_TRIGGER_RE = re.compile(
     r"\basama-(\d+)-scan\s+count=(\d+)\b",
     re.IGNORECASE,
@@ -707,9 +711,9 @@ _PHASE_ESCALATION_TRIGGER_RE = re.compile(
 def _detect_phase_quality_triggers(
     transcript_path: str, project_dir: str,
 ) -> bool:
-    """1.0.26: Aşama 11-13 Kalite Boru Hattı text-trigger'ları.
+    """1.0.26+1.0.27: Aşama 11-14 Kalite Boru Hattı text-trigger'ları.
 
-    Yakalanan trigger'lar (Aşama 14 hariç — subagent kanalı kullanıyor):
+    Yakalanan trigger'lar (Aşama 11, 12, 13, 14 ortak):
       - `asama-N-scan count=K` → yeni tarama döngüsü, K issue tespit
       - `asama-N-issue-M-fixed` → tek issue auto-fix
       - `asama-N-rescan count=K` → fix sonrası yeniden tarama; K=0
@@ -1083,10 +1087,11 @@ def main() -> int:
     # rule-capture audit (CLAUDE.md captured-rules zemini).
     _detect_phase_items_triggers(transcript_path, project_dir)
 
-    # 1.0.26: Aşama 11-13 Kalite Boru Hattı text-trigger'ları (scan /
-    # issue-fixed / rescan / escalation-needed). Aşama 14 subagent
-    # kanalıyla geldiği için scope dışı. Hook auto-emit YOK —
-    # `asama-N-complete` ve `escalation-needed` model sorumluluğunda.
+    # 1.0.26+1.0.27: Aşama 11-14 Kalite Boru Hattı text-trigger'ları
+    # (scan / issue-fixed / rescan / escalation-needed). 1.0.27'de
+    # Aşama 14 de scope'a alındı — eski subagent_orch bayrağı kırıktı.
+    # Hook auto-emit YOK — `asama-N-complete` ve `escalation-needed`
+    # model sorumluluğunda.
     _detect_phase_quality_triggers(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)

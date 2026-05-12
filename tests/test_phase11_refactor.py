@@ -157,14 +157,21 @@ def test_phase_13_generic_regex_works(tmp_project):
     assert "asama-13-scan" in names
 
 
-def test_phase_14_outside_scope_no_audit(tmp_project):
-    """Aşama 14 subagent kanalıyla yakalanıyor; quality helper scope dışı.
-    Double-emit önleme için asama-14-scan text-trigger'ı bu helper'da
-    yakalanmaz."""
+def test_phase_14_inside_quality_scope(tmp_project):
+    """1.0.27: Aşama 14 (Güvenlik) generic helper scope'una alındı.
+    Eski subagent_orchestration bayrağı mycl-phase-runner'ın no-Bash
+    kısıtı yüzünden fiilen çalışmıyordu (declared but not implemented);
+    şimdi Aşama 11-13 ile aynı text-trigger kanalı kullanılır."""
     state.set_field("current_phase", 14, project_root=str(tmp_project))
     transcript_path = tmp_project / "transcript.jsonl"
     _write_jsonl(transcript_path, [
-        _assistant_text("asama-14-scan count=3"),
+        _assistant_text(
+            "Güvenlik taraması bitti:\n"
+            "asama-14-scan count=2\n"
+            "asama-14-issue-1-fixed\n"
+            "asama-14-issue-2-fixed\n"
+            "asama-14-rescan count=0\n"
+        ),
     ])
 
     _detect_phase_quality_triggers(str(transcript_path), str(tmp_project))
@@ -172,8 +179,10 @@ def test_phase_14_outside_scope_no_audit(tmp_project):
     names = [
         ev.get("name") for ev in audit.read_all(project_root=str(tmp_project))
     ]
-    # Helper Aşama 14'ü filtreleyerek scope dışı bırakır
-    assert "asama-14-scan" not in names
+    assert "asama-14-scan" in names
+    assert "asama-14-issue-1-fixed" in names
+    assert "asama-14-issue-2-fixed" in names
+    assert "asama-14-rescan" in names
 
 
 def test_phase_quality_triggers_idempotent(tmp_project):

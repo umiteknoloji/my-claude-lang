@@ -5,6 +5,50 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.27] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 14 (Güvenlik) declared-but-not-implemented bayrağı** —
+  Subagent (Sonnet 4.6, 10 lens) Aşama 14'ün `subagent_orchestration:
+  true` bayrağıyla `mycl-phase-runner`'a yönlendirildiğini, ama bu
+  subagent'ın allowed_tools listesinde `Read/Glob/Grep/AskUserQuestion`
+  dışında bir şey olmadığını (özellikle `Bash` yok) tespit etti. Sonuç:
+  semgrep / npm audit / pip-audit / gitleaks / truffleHog'un hiçbiri
+  subagent altında çalıştırılamıyordu; bayrak 1.0.16'da eklenmişti ve
+  o günden beri Aşama 14 fiilen "model zorunlu olarak boş subagent
+  döngüsüne giriyor, ya `error:` ya `complete:` döndürüyor" durumundaydı.
+
+### Değiştirilen / Changed
+
+- **`data/gate_spec.json` Aşama 14**:
+  - `subagent_orchestration: true` KALDIRILDI.
+  - `allowed_tools`'tan `"Task"` çıkarıldı (Edit/MultiEdit/Write/Bash
+    kaldı — semgrep ana context'te `Bash` ile koşulur).
+  - `_note` güncellendi: 1.0.16 kararının gerekçe revizyonu ve
+    `self_critique_required: true` ile Plugin Kural B'nin şu an
+    enforce edilmediği açık şekilde belgelendi.
+- **`hooks/stop.py::_PHASE_QUALITY_PHASES`**: `{11, 12, 13}` →
+  `{11, 12, 13, 14}`. Aşama 11-13'le aynı generic text-trigger zinciri
+  Aşama 14 için de çalışır. Hook auto-emit yine YOK
+  (`asama-14-complete` ve `escalation-needed` modelin sorumluluğunda).
+- **`skills/mycl/asama14-guvenlik.md`**: "Hook enforcement (1.0.27)"
+  bölümü TR + EN; "Araç kurulu değilse `asama-14-not-applicable
+  reason=tool-not-installed`" davranışı eklendi; Plugin Kural B'nin
+  şu an aspirational olduğu doc-truth ile yansıtıldı (eski "sessizce
+  çalıştırılır" ifadesi tarihsel olarak yanıltıcıydı).
+- **`tests/test_phase11_refactor.py`**: `test_phase_14_outside_scope_no_audit`
+  testi → `test_phase_14_inside_quality_scope` (assertion tersine).
+- **`tests/test_orchestrator.py`**: `test_orchestration_enabled_phase_14`
+  testi → `test_orchestration_disabled_phase_14` (assertion tersine).
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.26 → 1.0.27, `.claude-plugin/plugin.json` 1.0.27.
+- `README.md` + `README.tr.md` başlık sürümü güncellendi.
+- Toplam test sayısı: 699 (yeni test eklenmedi; iki mevcut test
+  davranışsal olarak tersine çevrildi).
+
 ## [1.0.26] — 2026-05-13
 
 ### Düzeltilen / Fixed

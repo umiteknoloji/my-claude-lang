@@ -50,6 +50,12 @@ gitleaks detect
    - Vulnerable dep → bump version
 3. **Yeniden tara** → K=0 olana kadar tekrar
 
+**Araç kurulu değilse:** `asama-14-not-applicable reason=tool-not-installed`
+emit edip devam et. Tek araç eksikse en az bir alternatif denenir
+(örn. semgrep yoksa stack-spesifik linter; pip-audit yoksa
+`pip list --outdated`). Hiç araç yoksa skip; bu durum Aşama 22
+tamlık denetiminde "Açık Konular"'a düşer.
+
 ## Aşama 10 ile bağlantı
 
 HIGH/MEDIUM bulgular **otomatik fix edilir**; ancak çözüm belirsizse
@@ -74,11 +80,32 @@ asama-14-rescan count=0
 asama-14-complete
 ```
 
-## Plugin Kural B uygulaması
+### Hook enforcement (1.0.27)
 
-Curated security plugin'ler (semgrep dışında — örn. snyk, sonarqube
-CLI) sessizce çalıştırılır. Bulgular dedupe edilir, conflict'ler
-Aşama 10'a escalate.
+Aşama 14, 1.0.27 itibarıyla **Aşama 11-13 ile aynı generic text-trigger
+kanalını kullanır**. Eski tasarım `subagent_orchestration: true`
+bayrağıyla `mycl-phase-runner` subagent'ına yönlendiriyordu; ancak
+subagent read-only (`Read/Glob/Grep/AskUserQuestion`) — `Bash`
+çalıştıramadığı için semgrep/npm audit/secret scanner fiilen
+çağrılamıyordu. Şu an:
+
+- Model ana context'te semgrep/npm audit/gitleaks'i `Bash` ile koşar
+- JSON çıktısını parse eder
+- HIGH/MEDIUM bulguları auto-fix uygular
+- Her bulgu için `asama-14-issue-M-fixed` text-trigger yazar
+- Tarama döngüsü için `asama-14-scan count=K` + `asama-14-rescan count=K`
+- Bitişte model `asama-14-complete` yazar; hook bunu mevcut text-trigger
+  kanalında yakalar (hook auto-emit YAPMAZ)
+
+## Plugin Kural B (gelecek tur)
+
+Curated security plugin'lerin (snyk, sonarqube CLI vb.) sessizce
+dispatch'i şu an **enforce edilmiyor** — `hooks/lib/plugin.py` curated
+plugin query API'sini sağlıyor ama dispatch döngüsü hiçbir hook'tan
+çağrılmıyor. Skill, model davranış önceliği olarak bu plugin'leri
+dikkate alabilir ama otomatik orkestrasyon ileri tur konusu
+(captured-rule: "behavioral feature without hook enforcement is
+incomplete").
 
 ## Anti-pattern
 
@@ -131,10 +158,27 @@ When auto-fix is unsafe, surface as a Phase 10 risk dialog item.
 `asama-14-scan count=K` → `asama-14-issue-N-fixed` →
 `asama-14-rescan count=0` → `asama-14-complete`.
 
-## Plugin Rule B
+### Hook enforcement (1.0.27)
 
-Curated security plugins (besides semgrep) dispatched silently;
-findings dedup; conflicts → Phase 10 risk.
+Phase 14 now uses the **same generic quality text-trigger channel as
+Phases 11-13**. The old `subagent_orchestration: true` flag routed
+execution to `mycl-phase-runner`, but that subagent is read-only
+(`Read/Glob/Grep/AskUserQuestion` — no `Bash`), making
+semgrep/npm-audit/gitleaks impossible. Now the model runs scanners
+via `Bash` in the main context, parses JSON output, auto-fixes
+HIGH/MEDIUM findings, and emits the standard quality pipeline
+text-triggers (`asama-14-scan / issue-M-fixed / rescan / complete`).
+Hook does NOT auto-emit `asama-14-complete` or `asama-14-escalation-
+needed` (boundary preserved from 1.0.26).
+
+## Plugin Rule B (deferred)
+
+Curated security plugin dispatch (snyk, sonarqube CLI, etc.) is **not
+enforced** yet — `hooks/lib/plugin.py` provides curated-plugin query
+APIs but no hook calls a dispatch loop. Skill prose may treat these
+as model behavioral guidance, but automatic orchestration is a future
+release (captured rule: "behavioral feature without hook enforcement
+is incomplete").
 
 ## Anti-patterns
 

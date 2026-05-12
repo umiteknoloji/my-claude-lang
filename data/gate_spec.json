@@ -214,7 +214,7 @@
     "14": {
       "name": "Güvenlik",
       "name_en": "Security",
-      "allowed_tools": ["Task", "Edit", "MultiEdit", "Write", "Bash"],
+      "allowed_tools": ["Edit", "MultiEdit", "Write", "Bash"],
       "denied_paths": [],
       "required_audits_any": [
         "asama-14-complete",
@@ -226,8 +226,7 @@
       "public_commitment_required": false,
       "auto_fix_only": true,
       "scope": "project_wide",
-      "subagent_orchestration": true,
-      "_note": "1.0.16 — subagent_orchestration aktif: tüm proje genelinde semgrep SAST + npm audit izole subagent context'te çalışır (ana bağlamı şişirmez). Aşama 1'den taşındı."
+      "_note": "1.0.27 — subagent_orchestration KALDIRILDI. Gerekçe: mycl-phase-runner read-only (Read/Glob/Grep/AskUserQuestion), Bash yok → semgrep/npm audit/secret scanner çalıştıramıyordu. 1.0.16'da eklenen bayrak fiilen kırıktı (declared but not implemented). Aşama 11-13 ile aynı text-trigger kanalı (`asama-14-scan / issue-M-fixed / rescan / escalation-needed`) hooks/stop.py'da yakalanır. `self_critique_required: true` şu an enforce edilmiyor — selfcritique.py modülü mevcut ama hook bağlantısı eksik; ileri tur ayrı kapsam."
     },
     "15": {
       "name": "Birim Testler",
