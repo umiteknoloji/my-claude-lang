@@ -124,9 +124,30 @@ def _is_bash_mutating(cmd: str) -> bool:
     return any(p.search(cmd) for p in _BASH_MUTATING_PATTERNS)
 
 
-def _is_git_init_only(cmd: str) -> bool:
-    """Sadece tek başına `git init` mi (Plugin Kural A bootstrap istisnası)?"""
-    return bool(re.match(r"^\s*git\s+init\s*$", cmd or ""))
+_BOOTSTRAP_CMD_PATTERNS = [
+    re.compile(r"^\s*git\s+init\s*$"),
+    re.compile(r"^\s*mkdir(?:\s+-p)?\s+\.mycl(?:/[^\s]*)?\s*$"),
+]
+
+
+def _is_bootstrap_command(cmd: str) -> bool:
+    """Plugin Kural A bootstrap için izinli komut(lar) mı?
+
+    Kabul: `git init`, `mkdir [-p] .mycl[/sub]`. Compound separator'lar
+    `&&` ve `;` desteklenir — her parça allowlist'ten birini matchlemeli.
+    Pipe (`|`) ve OR (`||`) reddedilir (riskli akış kontrolü).
+
+    1.0.11: 1.0.10'daki `_is_git_init_only` `git init && mkdir -p .mycl`
+    gibi compound bootstrap'leri kaçırıyordu; model'in tek turda hem
+    git init hem `.mycl/` setup yapması doğal → kapsam genişletildi.
+    """
+    if not cmd:
+        return False
+    parts = re.split(r"\s*(?:&&|;)\s*", cmd.strip())
+    return bool(parts) and all(
+        any(p.match(part) for p in _BOOTSTRAP_CMD_PATTERNS)
+        for part in parts if part
+    )
 
 
 def _bilingual_block(key: str, **kwargs) -> str:
@@ -244,8 +265,8 @@ def main() -> int:
         # Mutating tool mu? (Write/Edit/MultiEdit/NotebookEdit veya mutating Bash)
         is_mutating = tool_name in {"Write", "Edit", "MultiEdit", "NotebookEdit"}
         if tool_name == "Bash" and _is_bash_mutating(bash_cmd):
-            # git init Plugin Kural A bootstrap istisnası
-            if _is_git_init_only(bash_cmd):
+            # Plugin Kural A bootstrap istisnası (git init + .mycl mkdir)
+            if _is_bootstrap_command(bash_cmd):
                 is_mutating = False
             else:
                 is_mutating = True
@@ -258,12 +279,14 @@ def main() -> int:
                 or f"Spec onayı yok; `{tool_name}` engellendi."
             )
 
-    # ---------- 4.5. git init bootstrap istisnası — Plugin Kural A ----------
-    # `git init` zararsız (remote yok, push yok); consent prompt'u
-    # activate.py'de zaten gösteriliyor. Faz allowlist'inin Bash'i
-    # kapsamadığı Aşama 1 dahil her durumda allow et — başarılı çağrı
-    # sonrası post_tool.py consent'i `approved` olarak işaretler.
-    if tool_name == "Bash" and _is_git_init_only(bash_cmd):
+    # ---------- 4.5. Plugin Kural A bootstrap istisnası ----------
+    # `git init` ve `.mycl/` mkdir zararsız (remote yok, push yok);
+    # consent prompt'u activate.py'de zaten gösteriliyor. Faz
+    # allowlist'inin Bash'i kapsamadığı Aşama 1 dahil her durumda
+    # allow et — başarılı çağrı sonrası post_tool.py consent'i
+    # `approved` olarak işaretler. Compound (`git init && mkdir -p
+    # .mycl`) destekli (1.0.11).
+    if tool_name == "Bash" and _is_bootstrap_command(bash_cmd):
         return _allow()
 
     # ---------- 5. Layer B (gate.evaluate) ----------

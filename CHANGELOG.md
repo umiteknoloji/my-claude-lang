@@ -5,6 +5,29 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.11] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **Compound bootstrap komutu spec-approval block tarafından deny
+  ediliyordu** — model `Bash(git init && mkdir -p .mycl)` çağırdığında
+  1.0.10'daki `_is_git_init_only` istisnası `^\s*git\s+init\s*$`
+  regex'i ile sadece **tek başına `git init`**'i matchliyor, compound'u
+  kaçırıyordu → spec-approval block `MyCL kilidi — spec onayı yok`
+  deny veriyordu. Model'in tek turda hem repo init hem `.mycl/` setup
+  yapması doğal akış. `_is_git_init_only` → `_is_bootstrap_command`
+  rename + içerik genişletildi: compound separator'lar `&&` ve `;`
+  desteklenir, her parça allowlist'ten birini matchlemeli (`git init`
+  veya `mkdir [-p] .mycl[/sub]`). Pipe (`|`) ve OR (`||`)
+  reddedilir — `git init && rm -rf /` allow olmaz.
+
+### Test
+
+- 599 test (değişmedi — helper davranışı genişledi, mevcut testler
+  tek-komut bootstrap için hala geçer).
+
+[1.0.11]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.11
+
 ## [1.0.10] — 2026-05-12
 
 ### Düzeltilen / Fixed
