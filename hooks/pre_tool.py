@@ -258,6 +258,14 @@ def main() -> int:
                 or f"Spec onayı yok; `{tool_name}` engellendi."
             )
 
+    # ---------- 4.5. git init bootstrap istisnası — Plugin Kural A ----------
+    # `git init` zararsız (remote yok, push yok); consent prompt'u
+    # activate.py'de zaten gösteriliyor. Faz allowlist'inin Bash'i
+    # kapsamadığı Aşama 1 dahil her durumda allow et — başarılı çağrı
+    # sonrası post_tool.py consent'i `approved` olarak işaretler.
+    if tool_name == "Bash" and _is_git_init_only(bash_cmd):
+        return _allow()
+
     # ---------- 5. Layer B (gate.evaluate) ----------
     file_path = tool_input.get("file_path") or tool_input.get("path") or ""
     allowed, reason = gate.evaluate(

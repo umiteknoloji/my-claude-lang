@@ -5,6 +5,37 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **`git init` Aşama 1'de Layer B'de deny ediliyordu** — Plugin Kural
+  A consent prompt'u UI'da gösterilse de model `Bash(git init <path>)`
+  çağırınca `phase_allowlist_block` veriliyordu. `_is_git_init_only`
+  istisnası sadece spec-approval block'ta vardı, Layer B
+  (`gate.evaluate`) bunu bilmiyordu. `hooks/pre_tool.py`'a Layer
+  B'den **önce** çalışan `4.5. git init bootstrap istisnası` bloğu
+  eklendi: `tool_name == "Bash"` + `_is_git_init_only(bash_cmd)` →
+  `_allow()` (consent state'inden bağımsız; `git init` zararsız —
+  remote yok, push yok).
+- **`set_git_init_consent` hiçbir hook'tan çağrılmıyordu** — kullanıcı
+  consent prompt'unu onaylasa da `plugin.git_init_consent` hep `None`
+  kalıyordu → `activate.py::should_ask_git_init_consent` her
+  UserPromptSubmit'te yine `True` döndürüp prompt'u tekrar emit
+  ediyordu (sonsuz sorma döngüsü). `hooks/post_tool.py`'a
+  `_maybe_set_git_init_consent` helper eklendi: Bash + `git init`
+  prefix'li komut başarıyla (`exit_code == 0`) tamamlanırsa
+  `plugin.set_git_init_consent("approved")` çağrılır + audit
+  (`git-init-consent-recorded`) yazılır. Sonraki turlarda prompt
+  bir daha gösterilmez.
+
+### Test
+
+- 599 test (değişmedi — değişiklikler hook-level davranış; mevcut
+  testler Layer B path-deny ve regression-clear akışlarını koruyor).
+
+[1.0.10]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.10
+
 ## [1.0.9] — 2026-05-12
 
 ### Düzeltilen / Fixed

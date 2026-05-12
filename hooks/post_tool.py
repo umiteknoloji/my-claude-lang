@@ -32,7 +32,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hooks.lib import activation, audit, state  # noqa: E402
+from hooks.lib import activation, audit, plugin, state  # noqa: E402
 
 _WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
@@ -161,6 +161,36 @@ def _maybe_clear_regression_block(
         )
 
 
+_GIT_INIT_CMD_RE = re.compile(r"^\s*git\s+init\b")
+
+
+def _maybe_set_git_init_consent(
+    tool_name: str, tool_input: dict, success: bool, project_dir: str,
+) -> None:
+    """`git init` Bash başarılı çalıştırılırsa Plugin Kural A consent'i
+    `approved` olarak işaretle.
+
+    1.0.10 öncesi `plugin.set_git_init_consent` hiçbir hook'tan
+    çağrılmıyordu → consent hep None kalıyor, activate.py her
+    UserPromptSubmit'te consent prompt'u tekrar emit ediyordu. Bu
+    helper boşluğu kapatır: bir kez `git init` başarıyla çalışınca
+    consent kalıcı `approved` olur, prompt bir daha gösterilmez.
+    """
+    if tool_name != "Bash" or not success:
+        return
+    cmd = str(tool_input.get("command", ""))
+    if not _GIT_INIT_CMD_RE.match(cmd):
+        return
+    if plugin.git_init_consent(project_root=project_dir) == "approved":
+        return
+    plugin.set_git_init_consent("approved", project_root=project_dir)
+    audit.log_event(
+        "git-init-consent-recorded", "post_tool.py",
+        "Plugin Kural A — bash git init success → consent=approved",
+        project_root=project_dir,
+    )
+
+
 def _trigger_stop_after_askq(
     tool_name: str, payload: dict, project_dir: str,
 ) -> None:
@@ -226,6 +256,7 @@ def main() -> int:
     _update_last_write_ts(tool_name, success, project_dir)
     _update_ui_flow_active(tool_name, tool_input, success, project_dir)
     _maybe_clear_regression_block(tool_name, tool_input, success, project_dir)
+    _maybe_set_git_init_consent(tool_name, tool_input, success, project_dir)
 
     # AskUserQuestion sonrası stop.py manuel tetikle (Bug 2)
     _trigger_stop_after_askq(tool_name, payload, project_dir)
