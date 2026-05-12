@@ -116,3 +116,68 @@ def test_idempotent_no_duplicate_emit(tmp_project):
         ev for ev in events if ev.get("name") == "asama-1-complete"
     ]
     assert len(completes) == 1
+
+
+def test_multi_trigger_chain_advances_locally(tmp_project):
+    """Tek cevapta `asama-5-complete asama-6-complete asama-7-complete`
+    zinciri → her biri sıralı emit, hiç `phase-skip-attempt` yok.
+
+    1.0.13 öncesi: cp lokal güncellenmiyor, ilki audit + kalan 2'si
+    phase-skip-attempt → DSI bir sonraki turda yanlış fazda kalır.
+    """
+    transcript_path = tmp_project / "transcript.jsonl"
+    _write_jsonl(transcript_path, [
+        _assistant_text(
+            "asama-5-complete asama-6-complete asama-7-complete"
+        ),
+    ])
+    state.set_field("current_phase", 5, project_root=str(tmp_project))
+
+    result = _detect_phase_complete_trigger(
+        str(transcript_path), str(tmp_project)
+    )
+
+    assert result is True
+    events = audit.read_all(project_root=str(tmp_project))
+    names = [ev.get("name") for ev in events]
+    assert "asama-5-complete" in names
+    assert "asama-6-complete" in names
+    assert "asama-7-complete" in names
+    skip_attempts = [
+        ev for ev in events if ev.get("name") == "phase-skip-attempt"
+    ]
+    assert skip_attempts == []
+
+
+def test_multi_trigger_dedupe_and_out_of_order(tmp_project):
+    """Duplicate ve ters sıralı trigger'lar dedupe + ascending sorted.
+
+    `asama-7 asama-5 asama-5 asama-6` → unique sorted [5,6,7], cp=5
+    başlıyor → 5 emit + cp_local=6 → 6 emit + cp_local=7 → 7 emit.
+    """
+    transcript_path = tmp_project / "transcript.jsonl"
+    _write_jsonl(transcript_path, [
+        _assistant_text(
+            "asama-7-complete asama-5-complete asama-5-complete "
+            "asama-6-complete"
+        ),
+    ])
+    state.set_field("current_phase", 5, project_root=str(tmp_project))
+
+    result = _detect_phase_complete_trigger(
+        str(transcript_path), str(tmp_project)
+    )
+
+    assert result is True
+    events = audit.read_all(project_root=str(tmp_project))
+    # Her biri tek emit (dedupe)
+    for n in (5, 6, 7):
+        completes = [
+            ev for ev in events if ev.get("name") == f"asama-{n}-complete"
+        ]
+        assert len(completes) == 1
+    # phase-skip-attempt yok — sorted sayesinde zincir doğal
+    skip_attempts = [
+        ev for ev in events if ev.get("name") == "phase-skip-attempt"
+    ]
+    assert skip_attempts == []

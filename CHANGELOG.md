@@ -5,6 +5,34 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.13] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **Multi-trigger zincirinde local `cp` ilerletilmiyordu** —
+  `hooks/stop.py::_detect_phase_complete_trigger`: model tek cevapta
+  `asama-5-complete asama-6-complete asama-7-complete` zinciri
+  yazdığında **sadece ilki** audit'e yazılıyor, kalan ikisi
+  `phase-skip-attempt` olarak işaretleniyordu çünkü `cp` lokal
+  güncellenmiyordu (hep state'deki değerle karşılaştırılıyordu).
+  Sonuç: completeness loop ilk advance'ten sonra break ediyor, DSI
+  bir sonraki turda yanlış fazda kalıyor → model "kanca dondurmuş"
+  sanıp self-debug moduna giriyor (kullanıcı raporunda 14m
+  thinking, 42k token, `spec_detect.py` okuma).
+
+  Düzeltme: matches dedupe + ascending sort + her başarılı emit
+  sonrası `cp = n + 1` lokal advance. Idempotent durumda da `cp`
+  ilerletilir ki zincirdeki sonraki trigger'lar düşmesin. Gerçek
+  state advance hâlâ completeness loop'ta (`gate.advance()` audit-
+  driven walk) — burası sadece sıralı emit garanti eder.
+
+### Test
+
+- 599 → 601 test (+2: `test_multi_trigger_chain_advances_locally`,
+  `test_multi_trigger_dedupe_and_out_of_order`).
+
+[1.0.13]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.13
+
 ## [1.0.12] — 2026-05-12
 
 ### Düzeltilen / Fixed

@@ -252,15 +252,22 @@ def _detect_phase_complete_trigger(
         return False
     cp = state.get("current_phase", 1, project_root=project_dir)
     existing = {ev.get("name") for ev in audit.read_all(project_root=project_dir)}
+    # Dedupe + ascending sort — model tek cevapta `asama-5-complete
+    # asama-6-complete asama-7-complete` zinciri yazarsa her birini
+    # sıralı işle. 1.0.13 öncesi `cp` lokal güncellenmiyor, sadece
+    # ilki audit olup kalanı `phase-skip-attempt` oluyordu → DSI bir
+    # sonraki turda yanlış fazda kalıyor, model self-debug paniği.
+    unique_nums = sorted({
+        int(n_str) for n_str in matches if n_str.isdigit()
+    })
     wrote = False
-    for n_str in matches:
-        try:
-            n = int(n_str)
-        except ValueError:
-            continue
+    for n in unique_nums:
         if n == cp:
             audit_name = f"asama-{n}-complete"
             if audit_name in existing:
+                # Idempotent — audit zaten var; yine de lokal `cp`'yi
+                # ilerlet ki zincirdeki sonraki trigger'lar düşmesin.
+                cp = n + 1
                 continue
             audit.log_event(
                 audit_name, "stop.py",
@@ -269,6 +276,7 @@ def _detect_phase_complete_trigger(
             )
             existing.add(audit_name)
             wrote = True
+            cp = n + 1  # lokal advance — gerçek state advance completeness loop'ta
         elif n > cp:
             audit.log_event(
                 "phase-skip-attempt", "stop.py",
