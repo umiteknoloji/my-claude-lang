@@ -5,6 +5,65 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.20] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **Aşama 5 (Desen Eşleştirme) iki implementation gap'i** — Subagent
+  (Sonnet 4.6, 10 lens) iki somut boşluk tespit etti. Skill iki dosyada
+  ("hook pattern_summary'i state'e yazar" + "Aşama 9 DSI'da her turda
+  hatırlatılır") dictat'ı vardı ama hiçbiri kodda yoktu.
+
+  1. **`state.pattern_summary` yazımı eksikti** — skill diyordu "hook
+     yazar" ama mekanizma yoktu. Behavioral öncü, hook enforcement yok.
+     CLAUDE.md "dedicated implementation" kuralı ihlali.
+
+  2. **Aşama 9 DSI pattern_rules hatırlatması yoktu** — skill diyordu
+     "her tur başı DSI'da pattern_summary görünür" ama dsi.py emit
+     etmiyordu. Aşama 5'in varoluş amacı (Aşama 9 TDD tutarlılığı)
+     kayboluyor.
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_extract_pattern_summary`** + `_PATTERN_SUMMARY_RE`
+  regex — Aşama 5 text-trigger sonrası cevap metninde `pattern-summary:
+  <özet>` satırı varsa `state.pattern_summary`'e yazar. Regex
+  `^[ \t]*pattern-summary:[ \t]*(.+?)[ \t]*$` (MULTILINE + IGNORECASE);
+  `\s*` newline yutma bug'ı `[ \t]*` ile düzeltildi (test bulgusu).
+- **`data/gate_spec.json` Aşama 5 `side_audits: ["pattern-summary-stored"]`**
+  — Aşama 2 pattern'i. Model `asama-5-complete` emit edince hook
+  `pattern-summary-stored` yan audit'i otomatik emit eder.
+- **`hooks/lib/dsi.py::render_pattern_rules_notice`** — `phase==9 +
+  state.pattern_summary` set ise `<mycl_pattern_rules>` block emit
+  eder (TR + EN bilingual). `render_full_dsi` Aşama 9'da bu render'ı
+  çağırır.
+- **`skills/mycl/asama05-desen.md`** — emit format'ı net (`pattern-summary:
+  <camelCase|snake_case>, <error pattern>, <test framework>`) +
+  Task/Agent yasak notu (Aşama 1/3 pattern'i).
+
+### Test
+
+- 629 → 637 test (+8: `test_phase5_refactor.py` — pattern_summary
+  parse [pass/empty/no-line], phase 5 trigger side_audit + state yaz,
+  gate_spec side_audits config, DSI pattern_rules phase 9/empty/non-9).
+
+### Pre-emptive yan etki taraması (1.0.18+ süreç, 1.0.19 hot-fix'ten ders)
+
+- `test_orchestrator.py:25,28` pattern_summary subagent prompt'a — etkilenmez (Aşama 5'te subagent yok)
+- `test_dsi.py:31,142` Aşama 5 current_phase — etkilenmez (Aşama 9 yeni emit ayrı test'te)
+- `test_state.py` — pattern_summary field zaten var (default None)
+- `test_skill_loader.py` — skill içerik değişikliği load test'i etkilemez
+- `test_subagent_check.py` — Aşama 5 rubber_duck yok zaten
+
+### Backward compat
+
+- `state.pattern_summary` field zaten mevcut (None default) — yeni field değil
+- `side_audits` mevcut generic feature (1.0.17), Aşama 5'e yeni eklendi
+- Aşama 5 davranışı greenfield path için aynı (`asama-5-skipped reason=greenfield`)
+- Dead state field'lar (`pattern_scan_due`, `pattern_ask_pending`) hâlâ dokunulmadı — risk yok, ileri release'te temizleme
+
+[1.0.20]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.20
+
 ## [1.0.19] — 2026-05-12
 
 ### Düzeltilen / Fixed

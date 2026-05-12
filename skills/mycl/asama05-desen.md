@@ -42,15 +42,33 @@ Aşama 9 TDD'de yazılan kod, mevcut kodla **tutarlı görünsün** —
 
 `Read, Glob, Grep, LS` (global allowlist'te). Write/Edit/Bash yasak.
 
-## Çıktı (audit)
+**`Task` ve `Agent` (subagent dispatch) bu fazda YASAK** (Aşama 1/3
+ile tutarlı, 1.0.20). `_global_always_allowed_tools` listesinde
+olsalar bile Aşama 5 küçük scope — Glob/Grep ile codebase tara, 3
+deseni özetle. Subagent gereksiz, bağlam şişmez. Subagent dispatch
+sadece Aşama 10/14 paralel mercek için ayrıldı.
 
-> **Model:** `asama-5-complete` veya `asama-5-skipped reason=...` cevap metninde düz yazıyla — sıralı eşleşmede hook kabul eder.
-> **Hook:** `pattern-summary-stored` ve diğer yan audit'ler — model bunları yazmaz.
-> **Detay:** ana skill "Audit emission kanalı" sözleşmesi.
+## Çıktı (audit + state)
+
+> **Model:** Cevap metnine **iki satır** düz yazıyla yaz:
+> 1. `pattern-summary: <camelCase|snake_case>, <error pattern>, <test framework>`
+> 2. `asama-5-complete` (veya `asama-5-skipped reason=greenfield`)
+>
+> **Hook (1.0.20):** `asama-5-complete` text-trigger yakalandığında:
+> 1. `pattern-summary-stored` yan audit otomatik emit (side_audits)
+> 2. Cevap metninden `pattern-summary: <özet>` satırı parse → `state.pattern_summary` yazılır
+> 3. Aşama 9 TDD'de DSI `<mycl_pattern_rules>` ile her turda hatırlatır
+
+Örnek emit (greenfield değil):
 
 ```
-pattern-summary-stored
+pattern-summary: snake_case dosya adı + camelCase fonksiyon, try/except Result type, pytest fixtures
 asama-5-complete
+```
+
+Greenfield ise sade:
+
+```
 asama-5-skipped reason=greenfield
 ```
 

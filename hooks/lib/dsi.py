@@ -27,7 +27,7 @@ API:
 
 from __future__ import annotations
 
-from hooks.lib import audit, gate, progress, tokens
+from hooks.lib import audit, gate, progress, state, tokens
 
 _ESCALATION_SUFFIX = "escalation-needed"
 
@@ -64,6 +64,38 @@ def render_active_phase_directive(
     if not text:
         return ""
     return f"<mycl_active_phase_directive>\n{text}\n</mycl_active_phase_directive>"
+
+
+def render_pattern_rules_notice(
+    phase: int,
+    project_root: str | None = None,
+) -> str:
+    """<mycl_pattern_rules> — Aşama 5'te depolanan pattern özetini
+    Aşama 9 TDD boyunca her turda model'e hatırlatır.
+
+    1.0.20: skill `asama09-tdd.md:62` ve `asama05-desen.md:62` iki dosyada
+    "her tur başı DSI'da pattern_summary görünür" dictat'ı var; ama
+    dsi.py 1.0.19'a kadar bunu emit etmiyordu. Aşama 5'in varoluş amacı
+    (Aşama 9 TDD tutarlılığı) buraya bağlı.
+
+    Sadece Aşama 9'da + state.pattern_summary set ise emit; aksi halde
+    boş.
+    """
+    if phase != 9:
+        return ""
+    summary = state.get(
+        "pattern_summary", None, project_root=project_root,
+    )
+    if not summary:
+        return ""
+    return (
+        "<mycl_pattern_rules>\n"
+        f"Aşama 5'te öğrenilen proje desenleri (Aşama 9 TDD'de uyulmalı):\n"
+        f"{summary}\n\n"
+        f"Phase 5 patterns (Phase 9 TDD must conform):\n"
+        f"{summary}\n"
+        "</mycl_pattern_rules>"
+    )
 
 
 def render_phase_status(project_root: str | None = None) -> str:
@@ -134,6 +166,13 @@ def render_full_dsi(
         directive = render_active_phase_directive(current, project_root=project_root)
         if directive:
             blocks.append(directive)
+
+    # 1.0.20: Aşama 9 TDD'de pattern_rules hatırlatması (Aşama 5 çıktısı).
+    pattern_block = render_pattern_rules_notice(
+        current, project_root=project_root,
+    )
+    if pattern_block:
+        blocks.append(pattern_block)
 
     status = render_phase_status(project_root=project_root)
     if status:

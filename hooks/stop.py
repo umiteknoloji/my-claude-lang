@@ -287,6 +287,35 @@ def _is_phase_complete(phase: int, project_dir: str) -> bool:
 
 _PHASE_COMPLETE_TRIGGER_RE = re.compile(r"asama-(\d+)-complete", re.IGNORECASE)
 
+# 1.0.20: Aşama 5 emit metninde `pattern-summary: <özet>` satırı varsa
+# state.pattern_summary'e yaz. Skill'de model formatı: `pattern-summary:
+# camelCase, try-catch, jest fixtures`. Aşama 9 DSI bu özeti her turda
+# hatırlatır (dsi.render_pattern_rules_notice).
+_PATTERN_SUMMARY_RE = re.compile(
+    r"^[ \t]*pattern-summary:[ \t]*(.+?)[ \t]*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+# `[ \t]*` (newline yok) — `\s*` newline yutar ve sonraki satırı yanlışlıkla
+# yakalardı. Sadece tab/space whitespace, satır içi.
+
+
+def _extract_pattern_summary(text: str, project_dir: str) -> bool:
+    """`pattern-summary: <özet>` satırı varsa state'e yaz.
+
+    Returns: True if extracted + written; False otherwise (idempotent —
+    aynı özet tekrar yazılır, no-op değil — model güncellerse override).
+    """
+    if not text:
+        return False
+    m = _PATTERN_SUMMARY_RE.search(text)
+    if not m:
+        return False
+    summary = m.group(1).strip()
+    if not summary:
+        return False
+    state.set_field("pattern_summary", summary, project_root=project_dir)
+    return True
+
 
 def _detect_phase_complete_trigger(
     transcript_path: str, project_dir: str,
@@ -367,6 +396,10 @@ def _detect_phase_complete_trigger(
                     project_root=project_dir,
                 )
                 existing.add(side_name)
+            # 1.0.20: Aşama 5 — `pattern-summary: <özet>` satırını
+            # state.pattern_summary'e yaz (DSI Aşama 9'da hatırlatır).
+            if n == 5:
+                _extract_pattern_summary(text, project_dir)
             cp = n + 1  # lokal advance — gerçek state advance completeness loop'ta
         elif n > cp:
             audit.log_event(

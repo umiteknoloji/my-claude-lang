@@ -72,11 +72,13 @@
       "allowed_tools": [],
       "denied_paths": [],
       "required_audits_any": ["asama-5-complete", "pattern-summary-stored", "asama-5-skipped"],
+      "side_audits": ["pattern-summary-stored"],
       "fail_open": false,
       "self_critique_required": false,
       "public_commitment_required": false,
       "skippable": true,
-      "skip_reason": "greenfield"
+      "skip_reason": "greenfield",
+      "_note": "1.0.20 — side_audits: model `asama-5-complete` emit edince hook `pattern-summary-stored` yan audit'i paralel emit eder. Plus stop.py cevap metninde `pattern-summary: <özet>` satırını parse edip state.pattern_summary'e yazar. Aşama 9 TDD'de DSI `<mycl_pattern_rules>` ile her turda hatırlatır."
     },
     "6": {
       "name": "UI Yapımı",
