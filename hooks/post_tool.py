@@ -32,7 +32,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hooks.lib import activation, audit, state  # noqa: E402
+from hooks.lib import audit, state  # noqa: E402
 
 _WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
@@ -207,11 +207,6 @@ def main() -> int:
     project_dir = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
 
     if _is_self_project(project_dir):
-        return 0
-
-    # 1.0.5: opt-in `/mycl` — aktif değilse hook no-op.
-    session_id = str(payload.get("session_id", "") or "")
-    if not activation.is_session_active(session_id, project_root=project_dir):
         return 0
 
     tool_name = str(payload.get("tool_name", ""))
