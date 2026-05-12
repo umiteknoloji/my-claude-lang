@@ -5,6 +5,85 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.24] — 2026-05-12
+
+### Düzeltilen / Fixed
+
+- **Aşama 9 (TDD Yürütme) 6 implementation gap — en derin "declared
+  but not implemented" örneği** — Subagent (Sonnet 4.6, 10 lens):
+  pseudocode + tdd.py modülü + state şeması + Aşama 22 bağlantısı
+  hepsi tasarımda var, ama 6 farklı yerde bağlantı kopuk:
+
+  1. **tdd.py post_tool.py'den hiç çağrılmıyordu** → `tdd_compliance_score`
+     hep `None`. Aşama 22 okuyacak ama sayacak veri yok.
+  2. **`asama-9-ac-{i}-(red|green|refactor)` audit trigger yok** —
+     mevcut `_PHASE_COMPLETE_TRIGGER_RE` ve 1.0.21 extended trigger
+     bu özel format'ı kapsamıyor.
+  3. **gate_spec `required_audits_any` template literal** — `{i}`
+     placeholders gate.py tarafından çözülmüyor, sadece
+     `asama-9-complete` kapıyı geçiriyor; AC audit'leri fiilen
+     kontrol edilmiyor.
+  4. **`regression_block_active=True` set edilmiyor** — sadece clear
+     (GREEN) tarafı vardı. Test runner FAIL hiçbir zaman block aktif
+     etmiyor.
+  5. **`tdd_last_green` state hiç yazılmıyor** — Aşama 22 + Aşama 10
+     TDD yeniden doğrulaması için anlamsız.
+  6. **`spec_must_list` → AC sayısı bağlantısı kırık** — Aşama 22
+     dinamik sayım yapacak; bu turda implement edilmedi (subagent
+     kararı: Aşama 22 turunda birlikte).
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_PHASE_9_AC_TRIGGER_RE` + `_detect_phase_9_ac_trigger`**
+  — özel regex `\basama-9-ac-(\d+)-(red|green|refactor)\b` (word
+  boundary, line anchor yok — diğer trigger regex'leriyle tutarlı).
+  Idempotent audit emit + GREEN stage → `state.tdd_last_green` set.
+- **`hooks/post_tool.py::_maybe_record_tdd_write`** — cp==9 + Write/
+  Edit success → `tdd.record_write(path)` çağrısı → tdd-test-write
+  veya tdd-prod-write audit + `tdd.update_compliance_score()` →
+  `state.tdd_compliance_score` 0-100 güncellenir. Sadece Aşama 9
+  davranışına özel (diğer fazlarda Write skor saymaz).
+- **`hooks/post_tool.py::_maybe_clear_regression_block` genişletme**
+  — Bash test runner success'a göre iki yön:
+  - GREEN → `regression_block_active=False` + `regression-clear` audit
+  - FAIL  → `regression_block_active=True` + `regression-fail` audit
+  1.0.23 öncesi sadece clear tarafı vardı.
+
+### Değişen / Changed
+
+- **`data/gate_spec.json` Aşama 9** — `required_audits_any` `{i}`
+  template literal'leri kaldırıldı, sadece `asama-9-complete`
+  bırakıldı. AC kontrolü Aşama 22 dinamik sayımına devredildi.
+  `subagent_rubber_duck` kaldırıldı (Aşama 1-8 tutarlı politika).
+- **`skills/mycl/asama09-tdd.md`** — Hook enforcement bölümü eklendi
+  (TR + EN: AC trigger, TDD compliance score, regression block).
+  Task/Agent yasak notu (Aşama 1-8 pattern).
+
+### Test
+
+- 663 → 675 test (+12: `test_phase9_refactor.py` — AC trigger
+  red/green/refactor full cycle, idempotent, empty transcript,
+  TDD record cp==9/non-9/test path, regression fail/clear, gate_spec
+  no template literals, subagent_rubber_duck removed).
+
+### Pre-emptive yan etki taraması — yan etki yakalandı
+
+`test_subagent_check.py::test_should_trigger_real_gate_spec`
+Aşama 9 `subagent_rubber_duck=True` bekliyordu. 1.0.19 hot-fix
+pattern'i tekrar (Aşama 4 turunda da olmuştu). Bu sefer aynı turda
+yakalandı + düzeltildi → hot-fix gerekmedi.
+
+### Süreç notu
+
+Aşama 1-7'de "declared but not implemented" pattern her aşamada
+ortalama 2-3 boşluk. Aşama 9 **6 boşluk** ile en derin örnek.
+1.0.21 extended trigger generic fix bunların 2'sini (3 ve gözden
+geçirme) önlemedi — Aşama 9 özel AC format'ı (`asama-9-ac-{i}-...`)
+generic regex'e girmiyor. Aşama 9 turu en geniş kod ekleme
+(~120 satır + 12 test).
+
+[1.0.24]: https://github.com/YZ-LLM/my-claude-lang/releases/tag/mycl-1.0.24
+
 ## [1.0.23] — 2026-05-12
 
 ### Değişen / Changed

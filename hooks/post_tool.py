@@ -144,21 +144,80 @@ def _maybe_clear_regression_block(
     success: bool,
     project_dir: str,
 ) -> None:
-    """Test runner Bash GREEN → regression_block_active=False."""
-    if tool_name != "Bash" or not success:
+    """Test runner Bash sonucuna göre regression_block_active set/clear.
+
+    1.0.24: GREEN clear + FAIL set ikisi de var.
+      - Bash test runner + success=True → regression_block_active=False
+        + `regression-clear` audit
+      - Bash test runner + success=False → regression_block_active=True
+        + `regression-fail` audit (Aşama 9 TDD red aşaması veya genel
+        test fail tespiti)
+    """
+    if tool_name != "Bash":
         return
     cmd = str(tool_input.get("command", ""))
     if not _TEST_RUNNER_RE.search(cmd):
         return
-    if state.get("regression_block_active", False, project_root=project_dir):
-        state.update(
-            {"regression_block_active": False, "regression_output": ""},
-            project_root=project_dir,
-        )
-        audit.log_event(
-            "regression-clear", "post_tool.py",
-            f"runner={cmd[:60]}", project_root=project_dir,
-        )
+    if success:
+        if state.get(
+            "regression_block_active", False, project_root=project_dir
+        ):
+            state.update(
+                {"regression_block_active": False, "regression_output": ""},
+                project_root=project_dir,
+            )
+            audit.log_event(
+                "regression-clear", "post_tool.py",
+                f"runner={cmd[:60]}", project_root=project_dir,
+            )
+    else:
+        # 1.0.24: FAIL durumunda regression block aktif et
+        if not state.get(
+            "regression_block_active", False, project_root=project_dir
+        ):
+            state.set_field(
+                "regression_block_active", True,
+                project_root=project_dir,
+            )
+            audit.log_event(
+                "regression-fail", "post_tool.py",
+                f"runner={cmd[:60]}", project_root=project_dir,
+            )
+
+
+def _maybe_record_tdd_write(
+    tool_name: str,
+    tool_input: dict,
+    success: bool,
+    project_dir: str,
+) -> None:
+    """1.0.24: Aşama 9 TDD compliance score için Write/Edit kayıt.
+
+    Pseudocode: "test yolu → audit: tdd-test-write" + "üretim yolu →
+    audit: tdd-prod-write" + "test'in üretim kodundan önce yazılma
+    oranını state.tdd_compliance_score'a yazar."
+
+    Implementation gap (1.0.23 öncesi): tdd.py modülü mevcut + testleri
+    var, ama post_tool.py'den hiç çağrılmıyordu — "declared but not
+    implemented" pattern (Aşama 5 pattern_summary, Aşama 7 ui_reviewed
+    ile aynı).
+
+    Kapsam: sadece cp==9 (Aşama 9 TDD) — diğer fazlardaki Write'lar
+    skor saymıyor (orta risk: TDD compliance Aşama 9 davranışına özel).
+    """
+    if tool_name not in _WRITE_TOOLS or not success:
+        return
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    if cp != 9:
+        return
+    from hooks.lib import tdd
+    file_path = (
+        tool_input.get("file_path")
+        or tool_input.get("path")
+        or ""
+    )
+    tdd.record_write(file_path, project_root=project_dir)
+    tdd.update_compliance_score(project_root=project_dir)
 
 
 _GIT_INIT_CMD_RE = re.compile(r"^\s*git\s+init\b")
@@ -256,6 +315,7 @@ def main() -> int:
     _update_last_write_ts(tool_name, success, project_dir)
     _update_ui_flow_active(tool_name, tool_input, success, project_dir)
     _maybe_clear_regression_block(tool_name, tool_input, success, project_dir)
+    _maybe_record_tdd_write(tool_name, tool_input, success, project_dir)
     _maybe_set_git_init_consent(tool_name, tool_input, success, project_dir)
 
     # AskUserQuestion sonrası stop.py manuel tetikle (Bug 2)

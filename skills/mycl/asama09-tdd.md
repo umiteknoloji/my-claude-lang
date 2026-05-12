@@ -66,9 +66,29 @@ Her tur başı DSI'da `state.pattern_summary` görünür:
 Bu hatırlatma TDD koduna uygulanır — yeni test mevcut framework +
 fixture düzenine uyar.
 
+## Hook enforcement (1.0.24)
+
+- **AC audit yakalama:** `stop.py::_detect_phase_9_ac_trigger` özel
+  regex (`asama-9-ac-(\d+)-(red|green|refactor)`) ile model'in emit
+  ettiği AC audit'lerini yakalar, idempotent audit emit eder.
+  GREEN stage → `state.tdd_last_green` güncellenir.
+- **TDD compliance score:** `post_tool.py::_maybe_record_tdd_write`
+  cp==9'da her Write/Edit success'i `tdd.record_write`'a iletir →
+  `state.tdd_compliance_score` 0-100 güncellenir (test-before-prod
+  oranı). Aşama 22 tamlık denetimi bu skoru okur.
+- **Regression block (1.0.24):** `post_tool.py::_maybe_clear_regression_block`
+  test runner Bash sonucuna göre `state.regression_block_active`
+  set/clear eder. FAIL → True + `regression-fail` audit; GREEN →
+  False + `regression-clear` audit. 1.0.23 öncesi sadece clear vardı.
+
 ## İzinli tool'lar (Layer B)
 
 `Write, Edit, MultiEdit, Bash, AskUserQuestion` + global readonly.
+
+**`Task` ve `Agent` (subagent dispatch) bu fazda YASAK** (Aşama
+1/3/5/6/7/8 pattern'i). TDD red/green/refactor döngüsü ana bağlamda
+yürür; subagent dispatch gereksiz. Subagent sadece Aşama 10/14 paralel
+mercek için ayrıldı.
 
 ## Çıktı (her AC için 3 audit)
 

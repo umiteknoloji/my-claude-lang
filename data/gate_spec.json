@@ -142,16 +142,13 @@
       "allowed_tools": ["Write", "Edit", "MultiEdit", "Bash", "AskUserQuestion"],
       "denied_paths": [],
       "required_audits_any": [
-        "asama-9-complete",
-        "asama-9-ac-{i}-red",
-        "asama-9-ac-{i}-green",
-        "asama-9-ac-{i}-refactor"
+        "asama-9-complete"
       ],
       "fail_open": false,
       "self_critique_required": true,
       "public_commitment_required": true,
       "tdd_cycle_required": true,
-      "subagent_rubber_duck": true
+      "_note": "1.0.24 — `{i}` template literal'ler kaldırıldı (gate.py template çözmüyor; sadece `asama-9-complete` kapıyı geçiriyor). AC audit'leri (red/green/refactor) per-AC kontrol Aşama 22 tamlık denetiminde dinamik sayım yapacak. subagent_rubber_duck kaldırıldı (Aşama 1-8 ile tutarlı, Aşama 19 ile 1.0.19 pattern). Yeni `_PHASE_9_AC_TRIGGER_RE` (stop.py) AC audit'lerini text-trigger ile yakalar. post_tool.py `_maybe_record_tdd_write` cp==9'da Write/Edit'i tdd.record_write'a iletir → state.tdd_compliance_score güncellenir. `_maybe_clear_regression_block` 1.0.24'te FAIL durumunda regression_block_active=True set ediyor (önce sadece clear vardı)."
     },
     "10": {
       "name": "Risk İncelemesi",

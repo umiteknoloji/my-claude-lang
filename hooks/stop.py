@@ -496,6 +496,74 @@ def _check_phase7_auto_skip(project_dir: str) -> bool:
     return True
 
 
+_PHASE_9_AC_TRIGGER_RE = re.compile(
+    r"\basama-9-ac-(\d+)-(red|green|refactor)\b",
+    re.IGNORECASE,
+)
+# Line anchor yok — diğer trigger regex'leri ile tutarlı
+# (_PHASE_COMPLETE_TRIGGER_RE word boundary kullanıyor).
+
+
+def _detect_phase_9_ac_trigger(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """1.0.24: Aşama 9 TDD AC audit'leri yakala.
+
+    Pseudocode: her AC için 3 audit (red/green/refactor). Mevcut
+    `_PHASE_COMPLETE_TRIGGER_RE` ve `_PHASE_EXTENDED_TRIGGER_RE` özel
+    `asama-9-ac-{i}-(red|green|refactor)` format'ını kapsamıyor.
+
+    Bu helper:
+      - Son assistant text'te pattern'i bul
+      - Her (ac_idx, stage) çifti için audit emit (idempotent)
+      - GREEN stage → `state.tdd_last_green` = `asama-9-ac-{idx}-green`
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(_PHASE_9_AC_TRIGGER_RE.search(t)),
+        transcript_path,
+    )
+    if not text:
+        return False
+    matches = _PHASE_9_AC_TRIGGER_RE.findall(text)
+    if not matches:
+        return False
+    existing = {
+        ev.get("name") for ev in audit.read_all(project_root=project_dir)
+    }
+    wrote = False
+    seen: set[tuple[int, str]] = set()
+    for ac_idx_str, stage in matches:
+        try:
+            ac_idx = int(ac_idx_str)
+        except ValueError:
+            continue
+        stage_lower = stage.lower()
+        key = (ac_idx, stage_lower)
+        if key in seen:
+            continue
+        seen.add(key)
+        audit_name = f"asama-9-ac-{ac_idx}-{stage_lower}"
+        if audit_name in existing:
+            continue
+        audit.log_event(
+            audit_name, "stop.py",
+            f"phase9-tdd-ac-trigger ac={ac_idx} stage={stage_lower}",
+            project_root=project_dir,
+        )
+        existing.add(audit_name)
+        wrote = True
+        if stage_lower == "green":
+            state.set_field(
+                "tdd_last_green", audit_name,
+                project_root=project_dir,
+            )
+    return wrote
+
+
 def _check_phase6_browser(detail: str, project_dir: str) -> None:
     """1.0.21: Aşama 6 `asama-6-end` detail parametrelerini incele.
 
@@ -743,6 +811,11 @@ def main() -> int:
     # `asama-6-end` parametre parse + soft warn; Aşama 5/7/21 skipped
     # de bu kanaldan yakalanır.
     _detect_phase_extended_trigger(transcript_path, project_dir)
+
+    # 1.0.24: Aşama 9 TDD AC audit'leri (red/green/refactor) — özel
+    # format `asama-9-ac-{i}-(red|green|refactor)`. Generic extended
+    # trigger bu format'ı kapsamıyor (ac-{i} ek segment).
+    _detect_phase_9_ac_trigger(transcript_path, project_dir)
 
     # 4. Universal completeness loop (audit-driven walk)
     _run_completeness_loop(project_dir)

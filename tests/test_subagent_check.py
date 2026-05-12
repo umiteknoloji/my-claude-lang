@@ -37,16 +37,18 @@ def test_should_trigger_unknown_phase_returns_false():
 
 
 def test_should_trigger_real_gate_spec():
-    """Production gate_spec.json: 9, 10, 22 rubber-duck.
+    """Production gate_spec.json: 10, 22 rubber-duck.
 
-    1.0.19: Aşama 4 `subagent_rubber_duck` kaldırıldı (Aşama 1/2/3 ile
-    tutarlı subagent politikası). Aşama 4 spec yazımı ana bağlamda
-    Skill + AskUserQuestion + PreToolUse spec format guard ile yürür.
+    1.0.19: Aşama 4 `subagent_rubber_duck` kaldırıldı (Aşama 1/2/3
+    tutarlı politika).
+    1.0.24: Aşama 9 `subagent_rubber_duck` kaldırıldı (Aşama 1-8 ile
+    tutarlı — TDD red/green/refactor ana bağlamda yürür, subagent
+    dispatch gereksiz).
     """
     import hooks.lib.gate as gate
     gate.reset_cache()
     assert subagent_check.should_trigger(4) is False  # 1.0.19 kaldırıldı
-    assert subagent_check.should_trigger(9) is True
+    assert subagent_check.should_trigger(9) is False  # 1.0.24 kaldırıldı
     assert subagent_check.should_trigger(10) is True
     assert subagent_check.should_trigger(22) is True
     assert subagent_check.should_trigger(1) is False
