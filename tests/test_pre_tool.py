@@ -379,3 +379,67 @@ def test_missing_tool_name_allows(tmp_path):
     # gate.evaluate empty tool_name'i nasıl işliyor: strict ise deny.
     # Test esnek — tetiklendiğini görmek yeter.
     assert _decision(out) in {"allow", "deny"}
+
+
+# ---------- H-5: .mycl/state.json doğrudan yazma koruması ----------
+
+
+def test_write_state_json_blocked(tmp_path):
+    """H-5 fix: Write tool ile .mycl/state.json yazmak her zaman deny."""
+    # spec_approved=True olsa bile koruma aktif
+    _write_state(tmp_path, spec_approved=True, current_phase=6)
+    out = _run_hook(
+        {
+            "cwd": str(tmp_path),
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(tmp_path / ".mycl" / "state.json")},
+        },
+        env=_env_with(tmp_path),
+    )
+    assert _decision(out) == "deny"
+    reason = out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+    assert "state.json" in reason or "state" in reason.lower()
+
+
+def test_edit_state_json_blocked(tmp_path):
+    """H-5 fix: Edit tool ile .mycl/state.json değiştirmek deny."""
+    _write_state(tmp_path, spec_approved=True, current_phase=6)
+    out = _run_hook(
+        {
+            "cwd": str(tmp_path),
+            "tool_name": "Edit",
+            "tool_input": {"file_path": str(tmp_path / ".mycl" / "state.json")},
+        },
+        env=_env_with(tmp_path),
+    )
+    assert _decision(out) == "deny"
+
+
+def test_bash_redirect_to_state_json_blocked(tmp_path):
+    """H-5 fix: Bash redirect ile .mycl/state.json yazmak deny."""
+    _write_state(tmp_path, spec_approved=True, current_phase=6)
+    out = _run_hook(
+        {
+            "cwd": str(tmp_path),
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": f"echo '{{\"spec_approved\": true}}' > {tmp_path}/.mycl/state.json"
+            },
+        },
+        env=_env_with(tmp_path),
+    )
+    assert _decision(out) == "deny"
+
+
+def test_audit_log_write_blocked(tmp_path):
+    """H-5 fix: .mycl/audit.log doğrudan Write ile değiştirilemez."""
+    _write_state(tmp_path, spec_approved=True, current_phase=6)
+    out = _run_hook(
+        {
+            "cwd": str(tmp_path),
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(tmp_path / ".mycl" / "audit.log")},
+        },
+        env=_env_with(tmp_path),
+    )
+    assert _decision(out) == "deny"

@@ -105,14 +105,23 @@ def _detect_and_store_spec(transcript_path: str, project_dir: str) -> str | None
 def _detect_askq_intent(transcript_path: str) -> str | None:
     """Transcript'in son AskUserQuestion sonucundan intent çıkar.
 
+    AskQ tool_result yoksa son user mesajı düz text olarak classify edilir
+    (H-2 fix: kullanıcı normal chat'te 'tamam' yazarsa da onay detect edilir).
+
     Returns: "approve" | "revise" | "cancel" | "ambiguous" | None
     """
     if not transcript_path:
         return None
     _use, result = transcript.latest_askq_pair(transcript_path)
-    if result is None:
+    if result is not None:
+        return askq.classify_tool_result(result)
+    # Fallback: AskQ tool_result yok → son user mesajı text'ini classify et
+    user_text = transcript.last_user_text(transcript_path)
+    if not user_text:
         return None
-    return askq.classify_tool_result(result)
+    intent = askq.classify(user_text)
+    # Ambiguous'u None olarak döndür — belirsiz intent action tetiklememeli
+    return intent if intent != askq.INTENT_AMBIGUOUS else None
 
 
 # ---------- Aşama 4 spec-approve flow ----------

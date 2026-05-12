@@ -266,3 +266,39 @@ def test_line_anchored_does_not_match_inline_prose():
     # Regex `^[ \t]*` allow eder ama prose'la başlayan satırda match
     # vermez (regex `^` line başı, başında boşluk değil "Bir" var).
     assert spec_detect.contains(text) is False
+
+
+# ---------- H-1: inline fallback ----------
+
+
+def test_extract_must_list_inline_fallback_uppercase_only():
+    """H-1 fix: section yoksa büyük harf MUST inline taranır."""
+    body = (
+        "📋 Spec: Todo App\n\n"
+        "Uygulama kullanıcı login MUST sağlamalıdır.\n"
+        "Sistem SHOULD pagination desteklemelidir.\n"
+    )
+    items = spec_detect.extract_must_list(body)
+    assert len(items) >= 1
+    ids = [it["id"] for it in items]
+    assert "MUST_1" in ids
+
+
+def test_extract_must_list_inline_lowercase_not_matched():
+    """H-1 fix: küçük harf 'must'/'should' false-positive üretmemeli."""
+    body = "Spec:\nno must section here"
+    items = spec_detect.extract_must_list(body)
+    assert items == []
+
+
+def test_extract_must_list_section_takes_priority_over_inline():
+    """H-1: section var → sadece section öğeleri döner."""
+    body = (
+        "📋 Spec: App\n\n"
+        "MUST Requirements:\n"
+        "- Section item A\n\n"
+        "Uygulama MUST yedekleme yapmalıdır.\n"
+    )
+    items = spec_detect.extract_must_list(body)
+    texts = [it["text"] for it in items]
+    assert "Section item A" in texts

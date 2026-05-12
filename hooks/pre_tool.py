@@ -181,6 +181,41 @@ def main() -> int:
             or "STATE LOCK — state.set_field/update/reset Bash kanalından çağrılamaz."
         )
 
+    # ---------- 3.5. MyCL state dosyaları koruma (H-5 fix) ----------
+    # .mycl/state.json ve .mycl/audit.log doğrudan Write/Edit/Bash ile
+    # değiştirilemez. Elle spec_approved=True yazmak kilidi bypass eder;
+    # bu özel blok faz/spec durumundan bağımsız her zaman aktiftir.
+    _PROTECTED_MYCL_PATTERNS = re.compile(
+        r"\.mycl[\\/](?:state\.json|audit\.log)",
+        re.IGNORECASE,
+    )
+    if tool_name in {"Write", "Edit", "MultiEdit"}:
+        fp_check = str(tool_input.get("file_path") or tool_input.get("path") or "")
+        if _PROTECTED_MYCL_PATTERNS.search(fp_check):
+            audit.log_event(
+                "mycl-state-direct-write-attempt", "pre_tool.py",
+                f"tool={tool_name} path={fp_check}", project_root=project_dir,
+            )
+            return _deny(
+                "MyCL koruma: `.mycl/state.json` ve `.mycl/audit.log` "
+                "doğrudan yazılamaz — state hook'lar tarafından yönetilir.\n\n"
+                "MyCL guard: `.mycl/state.json` and `.mycl/audit.log` "
+                "cannot be written directly — state is managed by hooks."
+            )
+    if tool_name == "Bash" and _PROTECTED_MYCL_PATTERNS.search(bash_cmd):
+        # Bash ile state.json veya audit.log redirect/yazma girişimi
+        if _BASH_REDIRECT_RE.search(bash_cmd) or _BASH_TEE_RE.search(bash_cmd):
+            audit.log_event(
+                "mycl-state-direct-write-attempt", "pre_tool.py",
+                f"tool=Bash cmd_excerpt={bash_cmd[:80]}", project_root=project_dir,
+            )
+            return _deny(
+                "MyCL koruma: `.mycl/state.json` ve `.mycl/audit.log` "
+                "Bash redirect ile yazılamaz — state hook'lar tarafından yönetilir.\n\n"
+                "MyCL guard: `.mycl/state.json` and `.mycl/audit.log` "
+                "cannot be overwritten via Bash redirect — hooks manage state."
+            )
+
     # ---------- 4. Spec-approval block ----------
     spec_approved = bool(state.get("spec_approved", False, project_root=project_dir))
     if not spec_approved:

@@ -22,14 +22,14 @@
     "1": {
       "name": "Niyet Toplama",
       "name_en": "Intent Gathering",
-      "allowed_tools": ["Task"],
+      "allowed_tools": ["Task", "AskUserQuestion"],
       "denied_paths": [],
       "required_audits_any": ["summary-confirm-approve", "asama-1-complete"],
       "fail_open": false,
       "self_critique_required": false,
       "public_commitment_required": false,
       "subagent_orchestration": true,
-      "_note": "subagent_orchestration aktif → allowed_tools yalnız Task; askq subagent içinde çağrılır."
+      "_note": "subagent_orchestration aktif → tercih Task; AskUserQuestion da izinli (pseudocode §3 satır 527: Aşama 1 allowed_tools = [AskUserQuestion] ✓). H-3 fix."
     },
     "2": {
       "name": "Hassasiyet Denetimi",

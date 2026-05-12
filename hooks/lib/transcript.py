@@ -170,3 +170,41 @@ def latest_askq_pair(
         if r.get("tool_use_id") == use_id:
             return last_use, r
     return last_use, None
+
+
+def last_user_text(transcript_path: str | Path) -> Optional[str]:
+    """Son user turn'ünün düz text içeriği (tool_result hariç).
+
+    H-2 fix: AskUserQuestion kullanılmadan gönderilen onay text'lerini
+    stop hook'a taşımak için. Sadece string content veya type=text
+    blokları alınır; tool_result ve diğer structured content atlanır.
+    """
+    last: Optional[str] = None
+    for msg in iter_messages(transcript_path):
+        if not _is_user(msg):
+            continue
+        blocks = _content_blocks(msg)
+        # tool_result içeren user turn'leri atla (bunlar AskQ cevabı)
+        has_tool_result = any(
+            isinstance(b, dict) and b.get("type") == "tool_result"
+            for b in blocks
+        )
+        if has_tool_result:
+            continue
+        parts: list[str] = []
+        for b in blocks:
+            if isinstance(b, dict) and b.get("type") == "text":
+                t = b.get("text")
+                if isinstance(t, str):
+                    parts.append(t)
+            elif isinstance(b, str):
+                parts.append(b)
+        # Düz string content (eski format)
+        if not parts:
+            inner = msg.get("message") if isinstance(msg.get("message"), dict) else msg
+            c = inner.get("content") if isinstance(inner, dict) else None
+            if isinstance(c, str):
+                parts.append(c)
+        if parts:
+            last = "\n".join(parts)
+    return last

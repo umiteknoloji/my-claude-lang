@@ -171,7 +171,71 @@ fragments, fixed technical tokens (MUST/SHOULD).
 
 ---
 
-## 6. Filesystem Layout / Dosya Düzeni
+## 6. Spec Format Kısıtları / Spec Format Constraints
+
+[Türkçe]
+
+Aşama 4'te yazılan spec bloğu `📋 Spec:` başlığıyla başlar (emoji
+opsiyonel, `Spec:` de geçerli). MyCL şu iki format'ı MUST/SHOULD
+çıkarmak için tanır:
+
+**Section format (tercih edilen):**
+```
+📋 Spec: <başlık>
+
+Objective: <amaç>
+
+MUST Requirements:
+- <madde 1>
+- <madde 2>
+
+SHOULD Requirements:
+- <madde 1>
+
+Acceptance Criteria:
+- AC1: <kriter>
+```
+
+**Inline fallback:** Section başlığı yoksa `X MUST Y` ve `X SHOULD Y`
+satır kalıpları taranır. Spec yazarken section format tercih edilmeli;
+inline format ancak yedek stratejidir.
+
+`MUST'lar`, `Zorunlu:`, `Mandatory:`, `SHOULD'lar`, `Önerilen:`,
+`Recommended:` başlıkları da tanınır (TR/EN esneklik).
+
+[English]
+
+The spec block written at Phase 4 starts with a `📋 Spec:` header
+(emoji optional, `Spec:` is also valid). MyCL recognizes two formats
+for MUST/SHOULD extraction:
+
+**Section format (preferred):**
+```
+📋 Spec: <title>
+
+Objective: <goal>
+
+MUST Requirements:
+- <item 1>
+- <item 2>
+
+SHOULD Requirements:
+- <item 1>
+
+Acceptance Criteria:
+- AC1: <criterion>
+```
+
+**Inline fallback:** If no section header is present, lines matching
+`X MUST Y` and `X SHOULD Y` are scanned. Section format is preferred;
+inline is a fallback strategy only.
+
+Turkish aliases `MUST'lar`, `Zorunlu:`, `Mandatory:`, `SHOULD'lar`,
+`Önerilen:`, `Recommended:` are also recognized.
+
+---
+
+## 7. Filesystem Layout / Dosya Düzeni
 
 [Türkçe]
 

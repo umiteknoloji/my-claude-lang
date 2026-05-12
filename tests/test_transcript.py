@@ -345,3 +345,98 @@ def test_handles_top_level_role_format(tmp_path):
         ],
     )
     assert transcript.last_assistant_text(p) == "alt seviye role"
+
+
+# ---------- H-2 fix: last_user_text ----------
+
+
+def test_last_user_text_plain_chat(tmp_path):
+    """H-2 fix: AskQ olmadan gönderilen düz user text'i okunabilir."""
+    p = tmp_path / "t.jsonl"
+    write_jsonl(
+        p,
+        [
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "Spec'i onaylamak ister misin?"}],
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "tamam"}],
+                },
+            },
+        ],
+    )
+    result = transcript.last_user_text(p)
+    assert result == "tamam"
+
+
+def test_last_user_text_skips_tool_result_turns(tmp_path):
+    """H-2 fix: tool_result içeren user turn atlanır (AskQ cevabı)."""
+    p = tmp_path / "t.jsonl"
+    write_jsonl(
+        p,
+        [
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "q1",
+                            "name": "AskUserQuestion",
+                            "input": {"questions": [{"question": "Onay?"}]},
+                        }
+                    ],
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "q1",
+                            "content": "evet",
+                        }
+                    ],
+                },
+            },
+        ],
+    )
+    # tool_result olan turn atlanmalı → None
+    result = transcript.last_user_text(p)
+    assert result is None
+
+
+def test_last_user_text_returns_last_of_multiple(tmp_path):
+    """H-2: birden fazla plain user turn → en son döner."""
+    p = tmp_path / "t.jsonl"
+    write_jsonl(
+        p,
+        [
+            {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "ilk mesaj"}],
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "tamam, onaylıyorum"}],
+                },
+            },
+        ],
+    )
+    result = transcript.last_user_text(p)
+    assert result == "tamam, onaylıyorum"

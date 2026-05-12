@@ -138,6 +138,19 @@ _SECTION_TERM_RE = re.compile(
     r"^[ \t]*(?:#+[ \t]+|[^\W\d_][\w ]*:[ \t]*$)",
     re.MULTILINE | re.UNICODE,
 )
+# H-1 inline fallback: "X MUST Y" ve "X SHOULD Y" satır kalıpları
+# spec_must_extractor.json'daki must_inline_marker / should_inline_marker.
+# Section bulunamazsa devreye girer.
+# NOT: Case-sensitive (sadece BÜYÜK HARF) — küçük harf 'must'/'should'
+# doğal dil cümlelerde çok sık geçer, false-positive üretir.
+_MUST_INLINE_RE = re.compile(
+    r"\b(?:MUST|SHALL|REQUIRED)\b\s+(.+?)(?:\.|$)",
+    re.MULTILINE,
+)
+_SHOULD_INLINE_RE = re.compile(
+    r"\b(?:SHOULD|RECOMMENDED|OUGHT)\b\s+(.+?)(?:\.|$)",
+    re.MULTILINE,
+)
 
 
 def _extract_section_items(body: str, section_re: re.Pattern[str]) -> list[str]:
@@ -160,14 +173,34 @@ def extract_must_list(body: str | None) -> list[dict[str, str]]:
     Aşama 4 spec onayı sonrası state'e yazılır; sonraki faz audit'leri
     `covers=MUST_3,MUST_5` ile bu listedeki ID'lere referans verir.
     Aşama 22 hook kapsanmamış MUST'ları yüzeye çıkarır.
+
+    Strateji (H-1 fix):
+        1. Section-based: "MUST Requirements:" başlığı altındaki maddeleri çıkar.
+        2. Inline fallback (spec_must_extractor.json): Section bulunamazsa
+           "X MUST Y" / "X SHOULD Y" satır kalıpları taranır.
     """
     if not body:
         return []
     items: list[dict[str, str]] = []
     must_texts = _extract_section_items(body, _MUST_SECTION_RE)
+    should_texts = _extract_section_items(body, _SHOULD_SECTION_RE)
+
+    # Inline fallback: section bulunamazsa satır içi MUST/SHOULD kalıpları
+    if not must_texts:
+        must_texts = [
+            m.group(1).strip()
+            for m in _MUST_INLINE_RE.finditer(body)
+            if m.group(1).strip()
+        ]
+    if not should_texts:
+        should_texts = [
+            m.group(1).strip()
+            for m in _SHOULD_INLINE_RE.finditer(body)
+            if m.group(1).strip()
+        ]
+
     for i, txt in enumerate(must_texts, 1):
         items.append({"id": f"MUST_{i}", "text": txt})
-    should_texts = _extract_section_items(body, _SHOULD_SECTION_RE)
     for i, txt in enumerate(should_texts, 1):
         items.append({"id": f"SHOULD_{i}", "text": txt})
     return items

@@ -119,6 +119,9 @@ copy_tree "$SCRIPT_DIR/hooks" "$MYCL_DIR/hooks"
 copy_tree "$SCRIPT_DIR/skills" "$MYCL_DIR/skills"
 copy_tree "$SCRIPT_DIR/data" "$MYCL_DIR/data"
 
+# VERSION dosyası — activate.py _REPO_ROOT/VERSION okur; eksikse '0.0.0' (H-4 fix)
+copy_file "$SCRIPT_DIR/VERSION" "$MYCL_DIR/VERSION"
+
 # Hook'lara executable izin
 if [ "$DRY_RUN" = 0 ]; then
   chmod +x "$MYCL_DIR"/hooks/*.py 2>/dev/null || true

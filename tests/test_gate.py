@@ -362,3 +362,29 @@ def test_evaluate_isolated_per_project(tmp_path, monkeypatch):
     allowed_b, _ = gate.evaluate("Write", project_root=str(b), gate_spec=spec)
     assert allowed_a is False
     assert allowed_b is True
+
+
+# ---------- H-3 fix: Aşama 1'de AskUserQuestion izinli ----------
+
+
+def test_phase1_askuserquestion_allowed_in_prod_spec(tmp_project):
+    """H-3 fix: gerçek gate_spec.json'da Aşama 1 AskUserQuestion izinli."""
+    # Gerçek prod spec'i yükle (cache bypass etmek için path ver)
+    from pathlib import Path
+    import json
+
+    prod_spec_path = Path(__file__).resolve().parent.parent / "data" / "gate_spec.json"
+    if not prod_spec_path.exists():
+        import pytest
+        pytest.skip("gate_spec.json bulunamadı")
+
+    with prod_spec_path.open("r", encoding="utf-8") as f:
+        prod_spec = json.load(f)
+
+    state.set_field("current_phase", 1, project_root=tmp_project)
+    allowed, reason = gate.evaluate(
+        "AskUserQuestion",
+        project_root=tmp_project,
+        gate_spec=prod_spec,
+    )
+    assert allowed is True, f"H-3: Aşama 1'de AskUserQuestion deny: {reason}"
