@@ -1,6 +1,6 @@
 {
   "name": "my-claude-lang",
-  "version": "1.0.38",
+  "version": "1.0.39",
   "description": "MyCL — opt-in 22-phase semantic verification layer for Claude Code. Activate per session via `/mycl`; Turkish intent layer + drift counter-measures (PreCompact + reinforcement reminder). Pure Python, zero SaaS, MIT.",
   "author": {
     "name": "YZ-LLM",

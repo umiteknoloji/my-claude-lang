@@ -5,6 +5,52 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.39] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Faz ilerleme kaybı: tool zinciri ortasında text-trigger yutuluyor**
+  — Canlı kullanıcı raporu: model `asama-1-complete` ve hatta
+  `asama-2-complete` text-trigger'larını **aynı turn içinde** yazdı,
+  ama PostToolUse fire eden Bash/LS tool çağrıları turn'ün devamında
+  olduğu için Stop hook fire etmedi → text-trigger audit'e yazılmadı
+  → faz ilerlemedi → DSI hâlâ "Aşama 1" gösterdi → model tekrar
+  `asama-1-complete` yazdı → sonsuz döngü.
+- Bu, 1.0.15 "multi-subagent text-trigger lost" bug'ının
+  Bash/Read/LS toolları için karşılığı. 1.0.15'te SubagentStop hook'u
+  paralel kanal olarak eklenmişti; benzer çözüm Bash/Read/LS için
+  PostToolUse'da gerekiyordu.
+
+### Eklenen / Added
+
+- **`hooks/post_tool.py::_advance_phase_after_tool(transcript_path,
+  project_dir)`**: stop.py'daki 11 text-trigger detection helper'ını
+  + completeness loop'u in-process import edip her tool sonrası
+  çalıştırır. SubagentStop deseniyle birebir simetrik (aynı modül
+  çatısı altında private erişim legal). Tüm helper'lar audit set
+  check ile idempotent — duplicate emit yok.
+- **`main()` integration**: state mutation'lardan sonra son adım
+  olarak `_advance_phase_after_tool` çağrılır.
+
+### Sözleşme korunumu / Boundary
+
+- **Subprocess yerine in-process**: her tool için subprocess başlatmak
+  12+ ms/tool overhead yaratırdı; in-process call ~µs. subagent_stop.py
+  zaten in-process import ediyor (1.0.15 pattern istikrarlı).
+- **Mevcut `_trigger_stop_after_askq` (subprocess yolu) korundu**:
+  AskUserQuestion onayı için askq classifier akışı stop.py'ya
+  delege edilir; subprocess izolasyonu mantıklı (race condition
+  önleme). Iki kanal paralel; idempotent.
+- **Transcript snapshot boşsa early return** — test fixture'ları
+  veya boş payload'lar etkilenmez.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.38 → 1.0.39, `.claude-plugin/plugin.json` 1.0.39.
+- Test sayısı korundu (kullanıcı isteği gereği bu turda test
+  çalıştırılmadı; mevcut testler etkilenmedi çünkü
+  `_advance_phase_after_tool` transcript_path boşsa no-op).
+
 ## [1.0.38] — 2026-05-13
 
 ### Düzeltilen / Fixed

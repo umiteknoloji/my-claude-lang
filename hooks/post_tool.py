@@ -291,6 +291,63 @@ def _trigger_stop_after_askq(
         )
 
 
+def _advance_phase_after_tool(
+    transcript_path: str, project_dir: str,
+) -> None:
+    """1.0.39: Tool sonrası in-process text-trigger detection + advance.
+
+    Bug: Model **tek turn içinde** `asama-N-complete` yazıp paralel
+    Bash/Read/LS tool çağrıları yapınca Stop hook fire etmez (turn
+    devam ediyor) → text-trigger audit'e yazılmaz → faz ilerlemez →
+    DSI hâlâ eski fazı söyler → model tekrar `asama-N-complete` yazar
+    → sonsuz döngü (canlı kullanıcı raporu).
+
+    Bu, 1.0.15 SubagentStop deseninin Bash/Read/LS toolları için
+    karşılığı. subagent_stop.py zaten stop.py helper'larını
+    in-process import edip aynı detection'ı koşturuyor; bu fonksiyon
+    aynı pattern'i PostToolUse'a getirir.
+
+    Idempotent — `_detect_*` helper'larının hepsi audit set check
+    yapar; aynı text-trigger iki kez audit'e yazılmaz. Completeness
+    loop'u da idempotent (gate satisfied → advance, değilse no-op).
+
+    Subprocess YERİNE in-process çağrı: her tool için subprocess
+    açmak performans maliyeti yaratırdı (12+ ms/tool); in-process
+    direct call ~µs.
+    """
+    if not transcript_path:
+        return
+    # stop.py private helper'larını import et (subagent_stop.py
+    # deseniyle aynı — aynı modül çatısı altında private erişim legal).
+    from hooks.stop import (  # noqa: E402
+        _detect_phase_complete_trigger,
+        _detect_phase_extended_trigger,
+        _detect_phase_9_ac_trigger,
+        _detect_phase_items_triggers,
+        _detect_phase_quality_triggers,
+        _detect_phase_testing_triggers,
+        _detect_mid_reconfirm_acked,
+        _detect_selfcritique_triggers,
+        _detect_commitment_trigger,
+        _detect_phase_20_mock_cleanup,
+        _run_completeness_loop,
+    )
+    # Sırayla tüm trigger kanallarını tara — her biri kendi
+    # idempotency check'ini yapar.
+    _detect_phase_complete_trigger(transcript_path, project_dir)
+    _detect_phase_extended_trigger(transcript_path, project_dir)
+    _detect_phase_9_ac_trigger(transcript_path, project_dir)
+    _detect_phase_items_triggers(transcript_path, project_dir)
+    _detect_phase_quality_triggers(transcript_path, project_dir)
+    _detect_phase_testing_triggers(transcript_path, project_dir)
+    _detect_mid_reconfirm_acked(transcript_path, project_dir)
+    _detect_selfcritique_triggers(transcript_path, project_dir)
+    _detect_commitment_trigger(transcript_path, project_dir)
+    _detect_phase_20_mock_cleanup(transcript_path, project_dir)
+    # Audit'lerden sonra completeness loop ilerletme dener.
+    _run_completeness_loop(project_dir)
+
+
 def main() -> int:
     payload = _read_input()
     project_dir = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
@@ -320,6 +377,13 @@ def main() -> int:
 
     # AskUserQuestion sonrası stop.py manuel tetikle (Bug 2)
     _trigger_stop_after_askq(tool_name, payload, project_dir)
+
+    # 1.0.39: Tool sonrası in-process text-trigger detection +
+    # completeness loop. Model tek turn içinde tool zinciri açıp
+    # `asama-N-complete` yazınca Stop fire etmiyor (turn devam ediyor);
+    # bu hat trigger'ları yakalayıp faz ilerletmeyi garanti eder.
+    transcript_path = str(payload.get("transcript_path") or "")
+    _advance_phase_after_tool(transcript_path, project_dir)
 
     # PostToolUse genelde sessiz — Claude Code "no-op" kabul eder
     return 0
