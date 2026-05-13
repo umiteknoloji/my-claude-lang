@@ -27,7 +27,7 @@ API:
 
 from __future__ import annotations
 
-from hooks.lib import audit, gate, progress, state, tokens
+from hooks.lib import audit, bilingual, gate, progress, state, tokens
 
 _ESCALATION_SUFFIX = "escalation-needed"
 
@@ -130,6 +130,54 @@ def render_phase_allowlist_escalate(
     )
 
 
+def render_selfcritique_notice(
+    project_root: str | None = None,
+) -> str:
+    """1.0.33: self_critique_required disiplin direktifi.
+
+    Audit log'da `selfcritique-needed phase=N` audit'i var ve aynı faz
+    için henüz `selfcritique-passed phase=N` veya `selfcritique-gap-
+    found phase=N` audit'i yoksa, modele yönlendirme enjekte eder.
+    Cevap geldiğinde (passed/gap) direktif susar.
+
+    Soft guidance — hard deny değil; CLAUDE.md "soft guidance over
+    fail-fast" kuralı.
+    """
+    needed_phases: set[int] = set()
+    responded_phases: set[int] = set()
+    for ev in audit.read_all(project_root=project_root):
+        name = ev.get("name", "")
+        detail = ev.get("detail", "")
+        if name == "selfcritique-needed":
+            # phase=N detail'dan parse
+            for token in detail.split():
+                if token.startswith("phase="):
+                    try:
+                        needed_phases.add(int(token[len("phase="):]))
+                    except ValueError:
+                        pass
+        elif name in ("selfcritique-passed", "selfcritique-gap-found"):
+            for token in detail.split():
+                if token.startswith("phase="):
+                    try:
+                        responded_phases.add(int(token[len("phase="):]))
+                    except ValueError:
+                        pass
+    pending = sorted(needed_phases - responded_phases)
+    if not pending:
+        return ""
+    # Bilingual prompt — `self_critique_request` key 1.0.x'ten beri var
+    prompt = bilingual.render("self_critique_request", phase=pending[0])
+    return (
+        "<mycl_selfcritique_notice>\n"
+        f"{prompt}\n"
+        f"Bekleyen faz(lar) / Pending phase(s): {pending}. Cevabını "
+        f"`selfcritique-passed phase=N` veya `selfcritique-gap-found "
+        f"phase=N items=\"...\"` formatında yaz.\n"
+        "</mycl_selfcritique_notice>"
+    )
+
+
 def render_mid_reconfirm_notice(
     project_root: str | None = None,
 ) -> str:
@@ -223,6 +271,14 @@ def render_full_dsi(
     mid_reconfirm = render_mid_reconfirm_notice(project_root=project_root)
     if mid_reconfirm:
         blocks.append(mid_reconfirm)
+
+    # 1.0.33: self_critique_required disiplin direktifi (Aşama
+    # 2/4/8/9/10/14/19 — soft guidance).
+    selfcritique_notice = render_selfcritique_notice(
+        project_root=project_root,
+    )
+    if selfcritique_notice:
+        blocks.append(selfcritique_notice)
 
     if turn_tokens > 0:
         tok = render_token_visibility(turn_tokens, project_root=project_root)

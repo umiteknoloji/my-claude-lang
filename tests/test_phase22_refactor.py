@@ -86,6 +86,11 @@ def _seed_full_pipeline_audits(project_root: str) -> None:
         ("asama-20-mock-cleanup-resolved", "mock cleanup"),
         ("asama-21-skipped", "reason=already-english"),
     ]
+    # 1.0.33: self_critique_required disiplin gerekleri için 7 faz —
+    # fixture'a `selfcritique-passed phase=N` audit'leri eklenmedikçe
+    # Aşama 22 raporu invariant 6 open issue üretir.
+    for n in (2, 4, 8, 9, 10, 14, 19):
+        audits.append((f"selfcritique-passed", f"phase={n}"))
     for name, detail in audits:
         audit.log_event(name, "test", detail, project_root=project_root)
 

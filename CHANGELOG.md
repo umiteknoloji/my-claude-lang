@@ -5,6 +5,75 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.33] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **`self_critique_required` aspirational bayrağı gerçek implemente
+  edildi** — Subagent (Sonnet 4.6, 10 lens) `selfcritique.py` modülünün
+  1.0.x'ten beri tam hazır olduğunu ama hiçbir hook'tan çağrılmadığını
+  doğruladı (declared-but-not-implemented deseni). 7 faz etkili:
+  2 (Hassasiyet), 4 (Spec), 8 (DB), 9 (TDD), 10 (Risk), 14 (Güvenlik),
+  19 (Etki).
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_maybe_emit_selfcritique_needed`**: cp ∈
+  `_SELFCRITIQUE_REQUIRED_PHASES`, faz için passed/gap audit yok ve
+  faz complete edilmediyse `selfcritique-needed phase=N` audit emit
+  eder (idempotent).
+- **`hooks/stop.py::_detect_selfcritique_triggers`**: model asistan
+  metnindeki `selfcritique-passed phase=N` ve `selfcritique-gap-found
+  phase=N items="..."` text-trigger'larını yakalar; `selfcritique.
+  record_passed/gap` üzerinden audit emit eder.
+- **`hooks/stop.py::_PHASE_SELFCRITIQUE_PASSED_RE` +
+  `_PHASE_SELFCRITIQUE_GAP_RE`**: MULTILINE + line-anchored regex
+  (subagent kritiği — `\\b` word-boundary yetmez, prose gömülü
+  eşleşmeleri önlemek için satır başında ankrajlı olmalı; CLAUDE.md
+  captured-rule `spec_detect.contains` pattern'iyle simetrik).
+- **`hooks/lib/dsi.py::render_selfcritique_notice`**: needed audit
+  varsa ve henüz cevap (passed/gap) gelmediyse bilingual direktif
+  (`bilingual.render("self_critique_request")`) enjekte eder. Soft
+  guidance — hard deny değil (CLAUDE.md "soft guidance over fail-fast").
+- **`hooks/lib/dsi.py::render_full_dsi`**: selfcritique notice paketin
+  parçası (cp ile koşullu değil; sadece pending varsa).
+- **`hooks/stop.py::_phase_22_check_selfcritique_required`**: Aşama 22
+  invariant 6 — her `self_critique_required` faz için
+  `selfcritique-passed phase=N` audit'i var mı kontrol; eksikler
+  open issue olarak rapora düşer.
+
+### Değiştirilen / Changed
+
+- **Aşama 22 raporu**: yeni "Disiplin (self_critique_required): K/7"
+  satırı eklendi. Open issues bölümünde eksik faz(lar) listelenir.
+- **`hooks/lib/dsi.py` imports**: `bilingual` modülü eklendi (1.0.32
+  öncesi import yoktu; yeni direktif bilingual key kullanıyor).
+- **`tests/test_phase22_refactor.py::_seed_full_pipeline_audits`**:
+  7 `selfcritique-passed phase=N` audit eklendi — backward compat
+  için fixture backfill (subagent kritiği gereği).
+
+### Sözleşme / Contract
+
+- **Option B (soft guidance)**: hook needed audit yazar, DSI direktif
+  enjekte eder, model passed/gap yazar; hook yakalar. Hard gate YOK.
+  CLAUDE.md captured-rule "soft guidance over fail-fast" + gate_spec
+  4 STRICT kapı tasarımı korunuyor.
+- **Visibility kanalı**: Aşama 22 raporu open issue olarak yüzeye
+  çıkarır. Geliştirici raporu okuyarak hangi fazda disiplin eksik
+  kaldığını görür.
+- **Aspirational kapanış 1/4**: `self_critique_required` artık gerçek.
+  Sıradakiler: `public_commitment_required` (1.0.34), Plugin Kural B
+  dispatch (1.0.35), `subagent_rubber_duck` (1.0.36).
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.32 → 1.0.33, `.claude-plugin/plugin.json` 1.0.33.
+- `README.md` + `README.tr.md` test sayısı 761 → 779.
+- 18 yeni test: `tests/test_phase33_selfcritique.py` (needed emit,
+  idempotency, scope filtreleri, passed/gap text-trigger yakalama,
+  regex satır-ankrajlama, DSI direktif koşulları, Aşama 22 invariant
+  6 + rapor entegrasyonu).
+
 ## [1.0.32] — 2026-05-13
 
 ### Düzeltilen / Fixed

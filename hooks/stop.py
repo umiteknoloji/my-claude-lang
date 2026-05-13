@@ -988,6 +988,41 @@ def _phase_22_check_must_coverage(project_dir: str) -> tuple[int, int, list[str]
     return len(all_ids), len(all_ids) - len(uncovered), uncovered
 
 
+def _phase_22_check_selfcritique_required(
+    events: list[dict],
+) -> list[int]:
+    """1.0.33: Invariant 6 — `self_critique_required: true` olan her faz
+    için `selfcritique-passed phase=N` audit var mı?
+
+    Returns:
+        Eksik fazların listesi (kapsanmamış disiplin gerekleri).
+    """
+    spec = gate.load_gate_spec()
+    passed_phases: set[int] = set()
+    for ev in events:
+        if ev.get("name") != "selfcritique-passed":
+            continue
+        for token in ev.get("detail", "").split():
+            if token.startswith("phase="):
+                try:
+                    passed_phases.add(int(token[len("phase="):]))
+                except ValueError:
+                    pass
+    missing: list[int] = []
+    for n_str, phase_def in spec.get("phases", {}).items():
+        if not isinstance(phase_def, dict):
+            continue
+        if not phase_def.get("self_critique_required"):
+            continue
+        try:
+            n = int(n_str)
+        except ValueError:
+            continue
+        if n not in passed_phases:
+            missing.append(n)
+    return sorted(missing)
+
+
 def _phase_22_check_phase_21_skip(events: list[dict]) -> bool:
     """Aşama 21 skip doğrulama — complete veya skipped audit'i var mı?
 
@@ -1060,6 +1095,8 @@ def _emit_phase_22_completeness_report(project_dir: str) -> bool:
     )
     # 5. Aşama 21 skip
     phase_21_verified = _phase_22_check_phase_21_skip(events)
+    # 6. (1.0.33) self_critique_required disiplin denetimi
+    selfcritique_missing = _phase_22_check_selfcritique_required(events)
 
     # Process Trace özeti
     from hooks.lib import trace
@@ -1121,6 +1158,12 @@ def _emit_phase_22_completeness_report(project_dir: str) -> bool:
             "Aşama 21 silent skip: ne `asama-21-complete` ne "
             "`asama-21-skipped` audit'i log'da."
         )
+    if selfcritique_missing:
+        open_issues.append(
+            f"Disiplin: self_critique_required olan {selfcritique_missing} "
+            "fazları için `selfcritique-passed` audit'i yok "
+            "(soft guidance ihlali)."
+        )
 
     # Bilingual header
     header = bilingual.render("completeness_report_header")
@@ -1139,6 +1182,7 @@ def _emit_phase_22_completeness_report(project_dir: str) -> bool:
         else "ℹ️"
     )
     phase_21_status = "✅" if phase_21_verified else "⚠️"
+    selfcritique_status = "✅" if not selfcritique_missing else "⚠️"
 
     open_issues_block = (
         "\n".join(f"  - {issue}" for issue in open_issues)
@@ -1160,6 +1204,8 @@ def _emit_phase_22_completeness_report(project_dir: str) -> bool:
         f"{must_status} Spec MUST kapsanma: {must_green}/{must_total}\n"
         f"{phase_21_status} Aşama 21 doğrulanmış: "
         f"{'evet' if phase_21_verified else 'hayır (silent skip)'}\n"
+        f"{selfcritique_status} Disiplin (self_critique_required): "
+        f"{7 - len(selfcritique_missing)}/7 faz selfcritique-passed\n"
         f"\n"
         f"Açık Konular / Open Issues:\n"
         f"{open_issues_block}\n"
@@ -1275,6 +1321,131 @@ def _detect_phase_20_mock_cleanup(
         project_root=project_dir,
     )
     return True
+
+
+# 1.0.33: self_critique_required disiplin bayrağı — aspirational
+# halletme. selfcritique.py modülü 1.0.x'ten beri tam hazır ama hiçbir
+# hook çağırmıyordu. Bu turda hook bağlantısı kuruldu (soft guidance):
+# hook needed audit yazar, DSI direktif enjekte eder, model passed/gap
+# text-trigger'ı yazar, hook yakalar. Hard gate YOK — Aşama 22 open
+# issue olarak yüzeye çıkarır.
+_SELFCRITIQUE_REQUIRED_PHASES = frozenset({2, 4, 8, 9, 10, 14, 19})
+# Regex: line-anchored (MULTILINE + leading whitespace) — prose içinde
+# gömülü gerçek-olmayan eşleşmeleri önler. CLAUDE.md captured-rule
+# (spec_detect.contains pattern'iyle simetrik).
+_PHASE_SELFCRITIQUE_PASSED_RE = re.compile(
+    r"^[ \t]*selfcritique-passed\s+phase=(\d+)\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+_PHASE_SELFCRITIQUE_GAP_RE = re.compile(
+    r"^[ \t]*selfcritique-gap-found\s+phase=(\d+)\s+items=\"([^\"]*)\"",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _maybe_emit_selfcritique_needed(project_dir: str) -> bool:
+    """1.0.33: cp ∈ required_set + cp için passed/gap audit yoksa + cp
+    complete edilmediyse → `selfcritique-needed phase=N` audit emit.
+
+    Idempotent (her fazda bir kez yazılır). Soft guidance: hard gate
+    yok; DSI direktifi modeli yönlendirir, model passed/gap text-
+    trigger'ı yazar.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    if cp not in _SELFCRITIQUE_REQUIRED_PHASES:
+        return False
+    events = audit.read_all(project_root=project_dir)
+    existing = {ev.get("name") for ev in events}
+    # Faz zaten complete edilmişse selfcritique kaçırılmış demek; ama
+    # şu an audit'siz ilerlemeyi soft guidance olarak Aşama 22 yüzeye
+    # çıkarır. Yeniden uyarı gereksiz.
+    if f"asama-{cp}-complete" in existing:
+        return False
+    # selfcritique passed/gap audit'i bu faz için var mı?
+    target = f"phase={cp}"
+    already_responded = any(
+        ev.get("name") in ("selfcritique-passed", "selfcritique-gap-found")
+        and target in ev.get("detail", "")
+        for ev in events
+    )
+    if already_responded:
+        return False
+    needed_name = "selfcritique-needed"
+    # Idempotent: aynı faz için tekrar yazma
+    if any(
+        ev.get("name") == needed_name and target in ev.get("detail", "")
+        for ev in events
+    ):
+        return False
+    audit.log_event(
+        needed_name, "stop.py",
+        f"phase={cp} self_critique_required (soft guidance)",
+        project_root=project_dir,
+    )
+    return True
+
+
+def _detect_selfcritique_triggers(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """1.0.33: model asistan metnine yazdığı selfcritique text-
+    trigger'larını yakala.
+
+    Trigger formatları (skill kontratı + selfcritique.py audit isimleri):
+      - `selfcritique-passed phase=N`        → record_passed
+      - `selfcritique-gap-found phase=N items="..."` → record_gap
+
+    İdempotency: `selfcritique.latest_for_phase` ile aynı faz için
+    önceki audit'i kontrol; yoksa yaz.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    from hooks.lib import selfcritique
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(
+            _PHASE_SELFCRITIQUE_PASSED_RE.search(t)
+            or _PHASE_SELFCRITIQUE_GAP_RE.search(t)
+        ),
+        transcript_path,
+    )
+    if not text:
+        return False
+    wrote = False
+    # passed trigger
+    seen_passed: set[int] = set()
+    for n_str in _PHASE_SELFCRITIQUE_PASSED_RE.findall(text):
+        try:
+            n = int(n_str)
+        except ValueError:
+            continue
+        if n in seen_passed:
+            continue
+        seen_passed.add(n)
+        if selfcritique.latest_for_phase(n, project_root=project_dir):
+            continue  # idempotent
+        selfcritique.record_passed(n, caller="stop.py", project_root=project_dir)
+        wrote = True
+    # gap trigger
+    seen_gap: set[int] = set()
+    for n_str, items in _PHASE_SELFCRITIQUE_GAP_RE.findall(text):
+        try:
+            n = int(n_str)
+        except ValueError:
+            continue
+        if n in seen_gap:
+            continue
+        seen_gap.add(n)
+        if selfcritique.latest_for_phase(n, project_root=project_dir):
+            continue
+        selfcritique.record_gap(
+            n, items=items, caller="stop.py", project_root=project_dir,
+        )
+        wrote = True
+    return wrote
 
 
 # 1.0.29: Aşama 19 mid-pipeline reconfirmation (sınırsız soru fazı).
@@ -1788,6 +1959,14 @@ def main() -> int:
     # `asama-19-mid-reconfirm-acked` text-trigger yazar; hook yakalar.
     _maybe_emit_mid_reconfirm(project_dir)
     _detect_mid_reconfirm_acked(transcript_path, project_dir)
+
+    # 1.0.33: self_critique_required disiplin bayrağı — soft guidance.
+    # Hook needed audit yazar, DSI direktif enjekte eder, model
+    # `selfcritique-passed phase=N` veya `selfcritique-gap-found
+    # phase=N items="..."` yazar; hook yakalar, selfcritique.py'ye
+    # aktarır. Aşama 22 invariant 6 open issue yüzeye çıkarır.
+    _maybe_emit_selfcritique_needed(project_dir)
+    _detect_selfcritique_triggers(transcript_path, project_dir)
 
     # 1.0.30: Aşama 20 Doğrulama Raporu. Hook spec_must API'siyle
     # MUST kapsanmasını deterministik sayar (must_total/must_green)
