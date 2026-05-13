@@ -417,6 +417,42 @@ def main() -> int:
                     project_root=project_dir,
                 )
 
+        # 4.7.b-pre — Faz atlama (skip-attempt) tespiti (1.0.43).
+        # CLAUDE.md captured rule: "Always advance MyCL phase state
+        # strictly sequentially: each transition increments
+        # current_phase by exactly one... Sequence violations are
+        # forbidden". Canlı bug: model Aşama 1'de doğrudan `📋 Spec —`
+        # bloğunu yazıp askq açtı → Aşama 4'e atlama. Soft guidance
+        # YETERLİ DEĞİL — sequential invariant ihlali; sıkı DENY +
+        # audit + retry mesajı ile model Aşama N skill kontratına
+        # geri yönlendirilir. Bash deny zinciri burada savunma değil
+        # (askq izinli, Bash sonra gelir; UX şimdi yanıltıcı).
+        # Scope: cp < 4 + AskUserQuestion + last_text'te Spec marker.
+        if cp < 4 and transcript_path:
+            last_text_skip_check = (
+                transcript.last_assistant_text(transcript_path) or ""
+            )
+            if (
+                last_text_skip_check
+                and spec_detect.contains(last_text_skip_check)
+            ):
+                existing_audits = {
+                    ev.get("name")
+                    for ev in audit.read_all(project_root=project_dir)
+                }
+                skip_audit = f"phase-skip-attempt-to-spec-from-{cp}"
+                if skip_audit not in existing_audits:
+                    audit.log_event(
+                        skip_audit, "pre_tool.py",
+                        f"phase={cp} attempted=spec_block "
+                        "(sequential invariant violation)",
+                        project_root=project_dir,
+                    )
+                return _deny(
+                    _bilingual_block("phase_skip_to_spec", phase=cp)
+                    or f"Aşama {cp}'desin; `📋 Spec —` bloğu Aşama 4 işi."
+                )
+
         # 4.7.b — Aşama 4 spec format izleme (1.0.42: soft, 1.0.19'dan
         # devralma). 1.0.19'da DENY semantiğiyle eklenmişti ama
         # transcript timing false-positive üretti: model spec'i markerla

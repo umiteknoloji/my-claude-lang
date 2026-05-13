@@ -5,6 +5,53 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.43] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 1'den Aşama 4'e atlama (canlı kontrat ihlali)** — 1.0.42
+  sonrası canlı test: model `/mycl` prompt'unu görür görmez doğrudan
+  `📋 Spec:` bloğunu yazdı, askq açtı ("Bu spec'i onaylıyor musun?").
+  Aşama 1 (Niyet) → 2 (Hassasiyet) → 3 (Engineering brief) sıralı
+  geçişini ATLADI. CLAUDE.md captured rule "Always advance MyCL
+  phase state strictly sequentially: each transition increments
+  current_phase by exactly one... Sequence violations are forbidden"
+  ihlali.
+- Soft guidance yetersizdi: model askq açıyor, hook izin veriyor,
+  kullanıcı "Onayla başla" derse pipeline cp=1'de takılıyor
+  (`_spec_approve_flow` cp!=4 → no-op) → kullanıcı için yanıltıcı UX.
+
+### Eklenen / Added
+
+- **`hooks/pre_tool.py` 4.7.b-pre faz atlama detection**: cp < 4 +
+  AskUserQuestion + last_text'te `📋 Spec —` marker varsa → STRICT
+  DENY + `phase-skip-attempt-to-spec-from-{cp}` audit (idempotent
+  set check) + bilingual retry mesajı. Model Aşama N skill
+  kontratına geri yönlendirilir.
+- **`data/bilingual_messages.json::phase_skip_to_spec`**: TR + EN.
+  Sıralı pipeline (1→2→3→4) hatırlatması + spec marker'ı kaldırma
+  + mevcut faz `asama-N-complete` audit emit yönergesi.
+
+### Sözleşme / Contract
+
+- **STRICT kapı sayısı korundu**: Bu yeni guard mevcut 4 STRICT
+  kapı (spec-approval, asama-N-skip, ui-review-skip, phase-review-
+  pending) sayısını **arttırmaz** — sequential invariant zaten
+  CLAUDE.md hard rule. Bu PreToolUse deny rule enforcement; STRICT
+  gate değil.
+- **Soft guidance pattern bozulmadı**: 1.0.31/35/36/38/42 soft
+  pattern'i devrede (Aşama 21, Plugin Kural B, subagent_rubber_duck,
+  Aşama 1 niyet özeti, Aşama 4 spec format). Bu skip-attempt **net
+  kontrat ihlali** olduğu için sıkı DENY meşru.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.42 → 1.0.43, `.claude-plugin/plugin.json` 1.0.43.
+- Mevcut testler etkilenmedi (cp=3 test transcript'i spec marker
+  içermez; cp=4 testler bu guard'ın scope'u dışında — cp < 4 koşulu).
+- README.tr.md başlık sürümü düzeltildi (1.0.42 versiyonunda
+  başlığın `#` markdown prefix'i bozulmuştu — doc-truth).
+
 ## [1.0.42] — 2026-05-13
 
 ### Düzeltilen / Fixed
