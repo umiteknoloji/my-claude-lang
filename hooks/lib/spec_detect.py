@@ -34,6 +34,16 @@ SPEC_LINE_RE = re.compile(
     re.MULTILINE,
 )
 
+# 1.0.37: Aşama 1 niyet özeti başlığı — line-anchored, emoji opsiyonel.
+# Aşama 4 spec marker'ıyla simetrik. Eşleşen formlar:
+# "🎯 Niyet özeti:", "Niyet özeti:", "## 🎯 Intent summary:",
+# "- 🎯 Intent summary —:", "Intent summary — TODO app:".
+INTENT_SUMMARY_LINE_RE = re.compile(
+    r"^[ \t]*(?:[-*][ \t]+)?(?:#+[ \t]+)?(?:\U0001F3AF[ \t]+)?"
+    r"(?:Niyet özeti|Intent summary)\b[^\n:]*:",
+    re.MULTILINE | re.IGNORECASE,
+)
+
 # Yeni heading body'nin sonu: line başında # ile başlar
 HEADING_RE = re.compile(r"^#+\s", re.MULTILINE)
 
@@ -43,6 +53,19 @@ def contains(text: str) -> bool:
     if not text:
         return False
     return SPEC_LINE_RE.search(text) is not None
+
+
+def contains_intent_summary(text: str) -> bool:
+    """1.0.37: text içinde Aşama 1 niyet özeti başlığı var mı?
+
+    Aşama 1 skill kontratı: "Tüm değişkenler net olunca özet hazırla
+    + AskUserQuestion onay". Marker olmayan özet, prose içinde
+    karışabilir; line-anchored regex prose-safe detection sağlar.
+    Aşama 4 `contains` deseniyle simetrik.
+    """
+    if not text:
+        return False
+    return INTENT_SUMMARY_LINE_RE.search(text) is not None
 
 
 def extract_body(text: str) -> Optional[str]:

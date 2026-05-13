@@ -17,7 +17,11 @@ Aşama 4 spec'i bu niyetten türetilecek; gri alan kalırsa spec yanlış
    (CLAUDE.md "one solid step per turn"). Cevap gelince sonrakini sor.
 
 2. **Tüm değişkenler net ise:**
-   - Tek bir özet hazırla (~3-5 cümle)
+   - Tek bir özet hazırla (~3-5 cümle) — assistant cevabına **düz metin
+     olarak** yaz, başlık satırı `🎯 Niyet özeti:` (emoji opsiyonel —
+     `Niyet özeti:` de geçerli)
+   - Özet **AskUserQuestion prompt'una gömülmez** — askq prompt'una
+     "onaylıyor musun?" yaz, özet ayrı assistant text'te kal
    - AskUserQuestion ile onay iste
 
 3. **Çelişki tespit et:** Niyette mantıksal çatışma varsa yüzeye çıkar
@@ -38,6 +42,16 @@ Aşama 4 spec'i bu niyetten türetilecek; gri alan kalırsa spec yanlış
 MyCL <version> | Aşama 1 — Niyet özeti onayı
 MyCL <version> | Phase 1 — Intent summary confirmation
 ```
+
+### Hook enforcement (1.0.37)
+
+`pre_tool.py` Aşama 1'de AskUserQuestion çağrısı yapılırken son
+assistant text'te `🎯 Niyet özeti:` (veya `Niyet özeti:` / `Intent
+summary:`) line-anchored marker'ı arar (`spec_detect.contains_
+intent_summary`). Yoksa askq DENY edilir + `intent-summary-format-
+missing` audit yazılır. Aşama 4 spec format guard'ı (1.0.19) ile
+simetrik. Marker olmayan özet, prose içinde gömülürse hook detection
+yapamaz; CLAUDE.md captured rule "line-anchored regex".
 
 ## İzinli tool'lar (Layer B)
 
@@ -98,13 +112,26 @@ derived from this intent; gray areas yield wrong specs.
 
 1. **One question per turn** — wait for answer before next.
 2. **All variables clear → summary (3-5 sentences) + AskUserQuestion
-   approval.**
+   approval.** The summary is plain assistant text headed by
+   `🎯 Intent summary:` (emoji optional — `Intent summary:` also OK).
+   It must NOT be embedded inside the askq prompt; the prompt asks
+   "approve?", the summary lives in the reply text.
 3. **Surface contradictions:** logical conflicts in the intent are
    raised explicitly (e.g., "JWT + server-side session state").
 
 ## AskUserQuestion prefix
 
 `MyCL <version> | Phase 1 — Intent summary confirmation`
+
+### Hook enforcement (1.0.37)
+
+In Phase 1, `pre_tool.py` requires a line-anchored `🎯 Intent summary:`
+(or `Intent summary:` / `Niyet özeti:`) marker in the last assistant
+text before any AskUserQuestion call. If absent, the askq is DENIED
+with `intent-summary-format-missing` audit. Symmetric with the Phase
+4 spec format guard (1.0.19). Per CLAUDE.md captured rule, the regex
+is MULTILINE + line-anchored — prose-embedded summaries don't count
+because they break the hook's marker-based detection.
 
 ## Allowed tools (Layer B)
 

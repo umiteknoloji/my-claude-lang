@@ -5,6 +5,59 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.37] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 1 niyet özeti kontrat ihlali — canlı kullanıcı raporu** —
+  Kullanıcı 1.0.36 sonrası canlı bir oturumda `/mycl full stack todo app`
+  prompt'uyla başladı; model iki sorusunu (frontend tech + git init)
+  cevapladıktan sonra "Yanıtlar netleşti. Şimdi özet hazırlayıp onay
+  alıyorum." dedi, ama **özeti yazmadan doğrudan AskUserQuestion açtı**.
+  Aşama 1 skill kontratı: "Tüm değişkenler net olunca özet ~3-5 cümle
+  hazırla + askq onay" — model özet adımını atladı.
+- 1.0.5 (önceki canlı bug raporundan sonra) Aşama 4 spec format guard'ı
+  PreToolUse'a eklenmişti; Aşama 1 için aynı pattern eksikti.
+
+### Eklenen / Added
+
+- **`hooks/lib/spec_detect.py::INTENT_SUMMARY_LINE_RE`**: line-anchored
+  regex (`🎯 Niyet özeti:` / `Niyet özeti:` / `Intent summary:`, emoji
+  opsiyonel, başında whitespace / liste / heading marker OK, MULTILINE
+  + IGNORECASE). Aşama 4 `SPEC_LINE_RE` deseniyle simetrik.
+- **`hooks/lib/spec_detect.py::contains_intent_summary(text)`**:
+  prose-safe boolean detection — prose içinde gömülü "niyet özeti"
+  kelimeleri yakalanmaz; sadece satır başında marker'lı bloklar.
+- **`hooks/pre_tool.py` 4.7.c guard**: `cp == 1` AND tool ==
+  `AskUserQuestion` → son assistant text'te marker yoksa **DENY**
+  + `intent-summary-format-missing` audit. Aşama 4 spec format
+  guard'ıyla (1.0.19) simetrik.
+- **`data/bilingual_messages.json::intent_summary_missing_block`**:
+  TR + EN deny mesajı; model'e doğru akışı açıkça anlatır (önce
+  özet bloğu, sonra askq).
+
+### Değiştirilen / Changed
+
+- **`skills/mycl/asama01-niyet.md`**: özet kontratı genişletildi —
+  marker `🎯 Niyet özeti:` (emoji opsiyonel) + askq prompt'una
+  gömülmeme şartı + "Hook enforcement (1.0.37)" bölümü TR + EN.
+
+### Sözleşme / Contract
+
+- **Aşama 1 + Aşama 4 simetrik enforcement** — iki kontratlı askq
+  fazı artık aynı pattern: line-anchored marker detection + DENY.
+- **CLAUDE.md captured rule "line-anchored regex"** yeni bir yerde
+  uygulandı; prose-safe detection invariant'ı korunuyor.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.36 → 1.0.37, `.claude-plugin/plugin.json` 1.0.37.
+- `README.md` + `README.tr.md` test sayısı 795 → 808.
+- 13 yeni test: `tests/test_phase37_intent_summary_guard.py`
+  (regex marker varyasyonları, prose-embedded yanlış-pozitif önleme,
+  case-insensitive, subprocess pre_tool davranışı: deny + audit
+  emit, ALLOW + audit yok, faz scope guard'ı).
+
 ## [1.0.36] — 2026-05-13
 
 ### Düzeltilen / Fixed

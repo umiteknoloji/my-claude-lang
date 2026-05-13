@@ -389,6 +389,28 @@ def main() -> int:
                     or "📋 Spec — başlığı assistant cevabında olmalı."
                 )
 
+        # 4.7.c — Aşama 1 niyet özeti format guard (1.0.37). askq
+        # açılmadan ÖNCE son assistant text'te `🎯 Niyet özeti:` veya
+        # `Intent summary:` marker'lı 3-5 cümlelik özet olmalı. Aksi
+        # halde model özeti tamamen atlıyor (canlı gözlem) ya da askq
+        # prompt'una gömüyor. Aşama 4 spec format guard'ıyla simetrik:
+        # marker + line-anchored detection + DENY + retry mesajı.
+        if cp == 1:
+            last_text = (
+                transcript.last_assistant_text(transcript_path)
+                if transcript_path else ""
+            )
+            if not spec_detect.contains_intent_summary(last_text or ""):
+                audit.log_event(
+                    "intent-summary-format-missing", "pre_tool.py",
+                    "phase=1 intent_summary_not_in_assistant_text",
+                    project_root=project_dir,
+                )
+                return _deny(
+                    _bilingual_block("intent_summary_missing_block")
+                    or "🎯 Niyet özeti: başlığı assistant cevabında olmalı."
+                )
+
     # ---------- 5. Layer B (gate.evaluate) ----------
     file_path = tool_input.get("file_path") or tool_input.get("path") or ""
     allowed, reason = gate.evaluate(
