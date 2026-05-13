@@ -304,13 +304,22 @@ def test_phase_4_askq_allowed_with_spec_in_assistant_text(tmp_path):
     assert _decision(out) == "allow"
 
 
-def test_phase_4_askq_denied_when_spec_not_in_assistant_text(tmp_path):
-    """1.0.19: Aşama 4 askq DENY — son assistant text'te `📋 Spec —`
-    bloğu yoksa (model spec'i askq prompt'una gömmüş). PreToolUse
-    deny + retry."""
+def test_phase_4_askq_marker_missing_soft_audit_only(tmp_path):
+    """1.0.42: Aşama 4 askq + son assistant text'te `📋 Spec —` marker'ı
+    yoksa → ALLOW edilir AMA `spec-format-missing` audit yazılır
+    (soft guidance — 1.0.38 Aşama 1 deseniyle simetrik).
+
+    Tarihsel: 1.0.19'da DENY semantiğiyle eklenmişti ama transcript
+    timing false-positive üretti (canlı kullanıcı raporu): model spec'i
+    markerla yazıp askq açtı, PreToolUse fire'da aynı turn'ün text
+    content'i transcript snapshot'ta görünmedi → false-positive deny
+    → gereksiz retry. 1.0.42'de Aşama 1 (1.0.38) ile simetrik soft:
+    güvenlik korunur çünkü spec marker yoksa _spec_approve_flow zaten
+    spec_approved=True yapmaz → Bash/Write deny zinciri ikincil savunma.
+    """
     _write_state(tmp_path, current_phase=4, spec_approved=False)
     transcript = tmp_path / "transcript.jsonl"
-    # Spec yok assistant text'te — model askq body'sine gömmüş varsayımı
+    # Spec marker yok assistant text'te
     transcript.write_text(
         json.dumps({"type": "assistant", "message": {
             "role": "assistant",
@@ -325,12 +334,14 @@ def test_phase_4_askq_denied_when_spec_not_in_assistant_text(tmp_path):
          "transcript_path": str(transcript)},
         env=_env_with(tmp_path),
     )
-    assert _decision(out) == "deny"
-    reason = (
-        out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
-        or out.get("decision", "")
-    )
-    assert "📋 Spec" in reason or "Spec format" in reason
+    # ALLOW: deny olmaması yeterli (soft guidance)
+    assert _decision(out) != "deny"
+    # Visibility kanalına audit düşmüş olmalı
+    from hooks.lib import audit as audit_lib
+    names = [
+        ev.get("name") for ev in audit_lib.read_all(project_root=str(tmp_path))
+    ]
+    assert "spec-format-missing" in names
 
 
 def test_phase_3_askq_not_subject_to_spec_check(tmp_path):

@@ -417,30 +417,39 @@ def main() -> int:
                     project_root=project_dir,
                 )
 
-        # 4.7.b — Aşama 4 spec format guard (1.0.19). askq açılmadan
-        # ÖNCE son assistant text'te `📋 Spec —` bloğu olmalı. Aksi
-        # halde model spec body'sini askq prompt'una gömüyor →
-        # `spec_detect.contains` erişemez → `spec_hash=null` →
-        # `_spec_approve_flow` no-op → Bash deny zinciri. PreToolUse
-        # deny + retry mesajı ile model'i doğru akışa zorla. Spec
-        # format invariant CLAUDE.md captured rule (line-anchored
-        # MULTILINE regex); regex gevşetme yerine skill + hook
-        # deterministik enforcement.
+        # 4.7.b — Aşama 4 spec format izleme (1.0.42: soft, 1.0.19'dan
+        # devralma). 1.0.19'da DENY semantiğiyle eklenmişti ama
+        # transcript timing false-positive üretti: model spec'i markerla
+        # yazıp askq açtı, ama PreToolUse fire'da aynı turn'ün text
+        # content'i transcript snapshot'ta görünmedi (tool_use bloğu
+        # text'ten önce stream'lendi) → contains False → DENY → model
+        # spec'i yeniden yazdı (gereksiz retry; canlı kullanıcı raporu
+        # 1.0.41 sonrası).
+        #
+        # 1.0.42: 1.0.38 Aşama 1 deseniyle simetrik soft guidance.
+        # Güvenlik kayıp YOK çünkü spec marker yoksa `_spec_approve_flow`
+        # zaten spec_approved=True yapmaz (spec_hash null) → Aşama 5+'da
+        # Bash/Write `spec_lock` deny zinciri ikincil savunma olarak
+        # devrede. UX kazancı: false-positive retry kaybolur; gerçek
+        # spec'siz akış Bash deny zincirinde takılır.
         if cp == 4:
             last_text = (
                 transcript.last_assistant_text(transcript_path)
                 if transcript_path else ""
             )
-            if not spec_detect.contains(last_text or ""):
-                audit.log_event(
-                    "spec-format-missing", "pre_tool.py",
-                    "phase=4 spec_body_not_in_assistant_text",
-                    project_root=project_dir,
-                )
-                return _deny(
-                    _bilingual_block("spec_missing_block")
-                    or "📋 Spec — başlığı assistant cevabında olmalı."
-                )
+            # Yalnızca text VAR ama marker YOKSA audit yaz; text boş ise
+            # (transcript snapshot eski olabilir) hiçbir şey yapma.
+            if last_text and not spec_detect.contains(last_text):
+                existing_audits = {
+                    ev.get("name")
+                    for ev in audit.read_all(project_root=project_dir)
+                }
+                if "spec-format-missing" not in existing_audits:
+                    audit.log_event(
+                        "spec-format-missing", "pre_tool.py",
+                        "phase=4 spec_body_marker_absent (soft)",
+                        project_root=project_dir,
+                    )
 
         # 4.7.c — Aşama 1 niyet özeti format izleme (1.0.38: soft).
         # 1.0.37'de Aşama 4 deseninin aynısı DENY ile eklenmişti ama

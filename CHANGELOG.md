@@ -5,6 +5,61 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.42] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 4 spec format DENY → SOFT** — 1.0.19'da PreToolUse'a Aşama
+  4 askq guard'ı eklenmişti (spec marker yoksa deny + retry). Canlı
+  test (1.0.41 sonrası): pipeline akmaya başladı (Aşama 1→2→3→4),
+  Aşama 4 spec yazımında transcript timing false-positive deny çıktı.
+  Model spec'i markerla yazdı (`📋 Spec:`), askq açtı; PreToolUse fire
+  ettiğinde aynı turn'ün text content'i transcript snapshot'ta
+  görünmedi (tool_use bloğu text'ten önce stream'lendi) →
+  `spec_detect.contains` False → DENY → model formatı değiştirip
+  retry yaptı (`📋 Spec — Full-Stack Todo App:`) → 2. denemede
+  transcript timing düzeldi → ALLOW. Gereksiz retry + UX zararı
+  (1.0.37 Aşama 1'de yaşadığımız aynı timing problemi).
+
+### Değiştirilen / Changed
+
+- **`hooks/pre_tool.py` 4.7.b Aşama 4 guard**: DENY KALDIRILDI. 1.0.38
+  Aşama 1 pattern'iyle simetrik soft guidance:
+  - `last_text` boş → no-op (transcript snapshot eski olabilir,
+    false-positive risk).
+  - `last_text` var ama marker yok → tek seferlik (idempotent)
+    `spec-format-missing` audit yaz; **askq ALLOW edilir**.
+  - `last_text` var ve marker var → no-op.
+- **`skills/mycl/asama04-spec.md`**: "Hook enforcement (1.0.42 —
+  soft, 1.0.19 inherited)" başlığı + gerekçe TR + EN. Güvenlik
+  açıklaması: spec marker yoksa `_spec_approve_flow` zaten
+  spec_approved=True yapmaz → Bash/Write deny zinciri ikincil
+  savunma.
+- **`tests/test_pre_tool.py::test_phase_4_askq_denied_when_spec_not_in
+  _assistant_text`** → `test_phase_4_askq_marker_missing_soft_audit_only`:
+  assertion'lar `decision != deny` + audit emit kontrolü (1.0.38
+  Aşama 1 test güncellemesi pattern'i).
+
+### Sözleşme korunumu / Boundary
+
+- **Güvenlik kayıp YOK**: spec marker yoksa spec_approved=False
+  kalır → Aşama 5+'da Bash/Write `spec_lock` deny zinciri zaten
+  devreye girer. Sadece "askq sırasında erken deny" sinyali
+  kaybedildi; "Bash deny zinciri" geç sinyal olarak devrede kalır.
+- **Aşama 1 + Aşama 4 simetrik**: iki kontratlı askq fazı artık
+  aynı soft pattern. CLAUDE.md "soft guidance over fail-fast" +
+  STRICT kapı sınırı (4 kapı, fazla değil) korundu.
+- **`_detect_phase_complete_trigger` Aşama 4 kurtarma (1.0.40)
+  korundu**: `asama-4-complete` text-trigger yakalanırken text'te
+  marker varsa hash + spec_approved kurtarması yapılır. Bu yol
+  spec onayını güvenli şekilde tamamlar.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.41 → 1.0.42, `.claude-plugin/plugin.json` 1.0.42.
+- 1 mevcut test davranışsal güncellendi (deny → allow + audit). Yeni
+  test yok (kullanıcı isteği gereği test sayısı korundu).
+
 ## [1.0.41] — 2026-05-13
 
 ### Düzeltilen / Fixed

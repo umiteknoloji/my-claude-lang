@@ -105,11 +105,21 @@ asama-4-ac-count must=N should=M
 - `public_commitment_required: true` — faz başında "bu fazda yapacağım
   3 şey: spec yaz, ⚠️ uyarıları çıkar, askq onay"
 - `spec_block_required: true` — Spec block olmadan complete edilmez
-- **Hook enforcement (1.0.19):** `pre_tool.py` AskUserQuestion + cp==4
-  öncesi son assistant text'te `📋 Spec —` formatında bloğu arar;
-  yoksa **PreToolUse deny + retry** mesajı. Model spec body'sini
-  askq prompt'una gömerse hook engellemiş olur. Skill talimatı +
-  hook deterministik enforcement birlikte çalışır.
+- **Hook enforcement (1.0.42 — soft, 1.0.19'dan devralma):**
+  `pre_tool.py` AskUserQuestion + cp==4 öncesi son assistant text'te
+  `📋 Spec —` (veya `📋 Spec:`) bloğu arar. Marker yoksa askq
+  **ALLOW edilir** ama `spec-format-missing` audit yazılır
+  (visibility). Güvenlik kayıp YOK: spec marker yoksa
+  `_spec_approve_flow` zaten spec_approved=True yapmaz → Aşama 5+'da
+  Bash/Write `spec_lock` deny zinciri ikincil savunma olarak devrede.
+
+  1.0.19'da DENY semantiğiyle eklenmişti ama transcript timing
+  false-positive üretti: model spec'i markerla yazıp askq açtı,
+  PreToolUse fire'da aynı turn'ün text content'i transcript snapshot'ta
+  görünmedi (tool_use bloğu text'ten önce stream'lendi) → false-
+  positive deny → gereksiz retry (canlı kullanıcı raporu). 1.0.42'de
+  Aşama 1 (1.0.38) ile simetrik soft guidance; CLAUDE.md "soft
+  guidance over fail-fast" kuralı.
 
 ## Anti-pattern
 
@@ -183,11 +193,17 @@ auto-fills audit chain (Phases 1-4), advances state.current_phase to 5.
 ## Discipline requirements
 
 self_critique_required, public_commitment_required, spec_block_required
-— all true. **Hook enforcement (1.0.19):** pre_tool.py runs a PreToolUse
-guard before AskUserQuestion at cp==4 — if the last assistant text
-does not contain a line-anchored `📋 Spec —` block, the askq is
-**denied with a retry prompt**. Skill directive + hook deterministic
-check work in tandem.
+— all true. **Hook enforcement (1.0.42 — soft, 1.0.19 inherited):** pre_tool.py runs a PreToolUse
+soft check before AskUserQuestion at cp==4 — if the last assistant
+text exists but does not contain a line-anchored `📋 Spec —` block,
+the askq is **still ALLOWED** and a `spec-format-missing` audit is
+written (visibility). Security is preserved because without the
+marker `_spec_approve_flow` cannot set `spec_approved=True`
+(spec_hash stays null), so the Bash/Write `spec_lock` deny chain is
+the second line of defense. 1.0.19 used DENY semantics but produced
+transcript-timing false-positives (live user report); 1.0.42 mirrors
+the Phase 1 soft pattern (1.0.38) per CLAUDE.md "soft guidance over
+fail-fast".
 
 ## Anti-patterns
 
