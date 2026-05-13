@@ -97,15 +97,23 @@ subagent read-only (`Read/Glob/Grep/AskUserQuestion`) — `Bash`
 - Bitişte model `asama-14-complete` yazar; hook bunu mevcut text-trigger
   kanalında yakalar (hook auto-emit YAPMAZ)
 
-## Plugin Kural B (gelecek tur)
+## Plugin Kural B (1.0.35 — kapatma)
 
-Curated security plugin'lerin (snyk, sonarqube CLI vb.) sessizce
-dispatch'i şu an **enforce edilmiyor** — `hooks/lib/plugin.py` curated
-plugin query API'sini sağlıyor ama dispatch döngüsü hiçbir hook'tan
-çağrılmıyor. Skill, model davranış önceliği olarak bu plugin'leri
-dikkate alabilir ama otomatik orkestrasyon ileri tur konusu
-(captured-rule: "behavioral feature without hook enforcement is
-incomplete").
+Plugin Kural B **kod implementasyonu yok ve olmayacak**. Claude Code
+hook çıktı şeması, model döngüsü dışından plugin çağrısı tetikleyemez
+— bu mimari kısıt. Gerçek birlikte yaşama deseni:
+
+- `security-guidance` plugin'i kendi `PreToolUse` hook'unu bağımsız
+  çalıştırıyor; Aşama 14 (her Edit/Write/MultiEdit) kapsamı MyCL
+  müdahalesi olmadan örtülü.
+- `code-review` / `feature-dev` / `pr-review-toolkit` kullanıcı-
+  tetiklemeli slash command'lar — model `/code-review` çağırırsa
+  ek-açı kazanılır; istemezse Aşama 11 zaten kendi auto-fix
+  döngüsüyle yeterli.
+- Çakışma → Aşama 10 risk maddesi (mevcut kontratta zaten var).
+
+CLAUDE.md captured-rule 1.0.35'te revize edildi: "Plugin Rule B
+dispatch is model-responsibility; hook coexistence-only."
 
 ## Anti-pattern
 
@@ -171,14 +179,24 @@ text-triggers (`asama-14-scan / issue-M-fixed / rescan / complete`).
 Hook does NOT auto-emit `asama-14-complete` or `asama-14-escalation-
 needed` (boundary preserved from 1.0.26).
 
-## Plugin Rule B (deferred)
+## Plugin Rule B (1.0.35 — closed)
 
-Curated security plugin dispatch (snyk, sonarqube CLI, etc.) is **not
-enforced** yet — `hooks/lib/plugin.py` provides curated-plugin query
-APIs but no hook calls a dispatch loop. Skill prose may treat these
-as model behavioral guidance, but automatic orchestration is a future
-release (captured rule: "behavioral feature without hook enforcement
-is incomplete").
+Plugin Rule B has **no code implementation, by design**. Claude Code
+hook return schemas cannot trigger plugin invocations from outside
+the model loop — that's an architectural constraint. The actual
+coexistence pattern:
+
+- The `security-guidance` plugin runs its own `PreToolUse` hook
+  independently; Phase 14 scope (every Edit/Write/MultiEdit) is
+  already covered without MyCL intervention.
+- `code-review` / `feature-dev` / `pr-review-toolkit` are
+  user-triggered slash commands — if the model invokes
+  `/code-review`, you gain a second angle; otherwise Phase 11's
+  auto-fix loop suffices.
+- Conflicts → Phase 10 risk dialog (already in the existing contract).
+
+CLAUDE.md captured-rule was revised in 1.0.35: "Plugin Rule B dispatch
+is model-responsibility; hook coexistence-only."
 
 ## Anti-patterns
 

@@ -76,6 +76,15 @@ yazar; hook sadece yakalar. STRICT mode bypass ödülünü önlemek için
 Tüm trigger'lar idempotent — aynı transcript yeniden taranınca
 duplicate audit yazılmaz.
 
+### İkinci açı: `/code-review` plugin (opsiyonel, Plugin Kural B)
+
+Anthropic'in `code-review` curated plugin'ini paralel ikinci açı olarak
+kullanmak istersen `/code-review` slash command'ını çağır. MyCL Aşama
+11 zaten auto-fix döngüsünü çalıştırır; plugin çıktısı ek-açı sağlar
+ama zorunlu değil. Bulgular Aşama 10 risk dialogu'na taşınırsa (skill
+kontratı) provenance + her iki gerekçe AskUserQuestion ile yüzeye
+çıkar.
+
 ## Anti-pattern
 
 - ❌ "Sadece spec dosyalarına bak" — Aşama 11 **yeni veya değişen

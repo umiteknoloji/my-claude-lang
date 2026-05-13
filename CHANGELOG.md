@@ -5,6 +5,56 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.35] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Plugin Kural B sözleşmesi gerçekle hizalandı (doc-truth)** —
+  Subagent (Sonnet 4.6, 10 lens) kritiği: Plugin Kural B'nin
+  "hook sessizce dispatch eder" iddiası mimari olarak imkansız.
+  Claude Code hook çıktı şeması model döngüsü dışından plugin çağrısı
+  tetikleyemez. Mevcut durum:
+  - `security-guidance` plugin'i kendi `PreToolUse` hook'unu bağımsız
+    çalıştırıyor (Aşama 14 kapsamı MyCL müdahalesi olmadan örtülü).
+  - `code-review` / `feature-dev` / `pr-review-toolkit` kullanıcı-
+    tetiklemeli slash command'lar.
+  - DSI direktif eklemek gürültü olur (`security-guidance` zaten
+    çalışıyor; diğerleri kullanıcı kararı).
+  - Hook'tan Task tool dispatch detection senaryosu doğrulanmadı —
+    plugin'lerin gerçek invocation pattern'ı slash command, Task
+    değil.
+
+### Değiştirilen / Changed
+
+- **`CLAUDE.md` Plugin Kural B captured-rule revize edildi**: "hook
+  sessizce dispatch eder" → "model-responsibility, hook coexistence-
+  only". Mimari kısıt dürüstçe belgelendi. Çakışma → Aşama 10 risk
+  dialogu (mevcut kontrat) deseni korundu.
+- **`skills/mycl/asama14-guvenlik.md`** "Plugin Kural B (gelecek tur)"
+  bölümü "Plugin Kural B (1.0.35 — kapatma)" olarak güncellendi.
+  `security-guidance` plugin'inin bağımsız hook'uyla Aşama 14
+  kapsamını zaten örttüğü, ek dispatch'in gereksiz olduğu açıklandı
+  (TR + EN).
+- **`skills/mycl/asama11-kod-inceleme.md`**: "İkinci açı: `/code-
+  review` plugin (opsiyonel, Plugin Kural B)" satırı eklendi —
+  kullanıcı plugin'i ek-açı için çağırabilir; zorunlu değil.
+
+### Sözleşme / Contract
+
+- **Kod değişikliği YOK** (1.0.31 Aşama 21 deseni). Sıfır hook
+  modifikasyonu, sıfır yeni test. Pure doc-truth turu.
+- **Plugin Kural C korunuyor**: `plugin.py::is_mcp_plugin` ve
+  `filter_mcp` aktif kullanımda (MCP-server filtreleme). Kural C
+  hook-enforcement'ı meşru ve sürüyor.
+- **Plugin Kural A korunuyor**: `is_git_repo`, `git_init_consent`,
+  `set_git_init_consent` activate hook'u tarafından kullanılıyor.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.34 → 1.0.35, `.claude-plugin/plugin.json` 1.0.35.
+- Test sayısı değişmedi: 795 (sıfır yeni test, sıfır değişen test).
+- Aspirational kapanış 3/4. Sıradaki: `subagent_rubber_duck` (1.0.36).
+
 ## [1.0.34] — 2026-05-13
 
 ### Düzeltilen / Fixed
