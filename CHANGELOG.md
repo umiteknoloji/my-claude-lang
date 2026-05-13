@@ -5,6 +5,55 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.40] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 4 spec onay zinciri kopması → "Kilit" Bash/Write deny
+  bug'ı** — Canlı kullanıcı raporu: model Aşama 4 spec onayı için
+  askq açtı, kullanıcı "Onaylıyorum, kodu yaz" cevapladı, model
+  ardından `asama-4-complete` text-trigger'ını paralel Bash/LS tool
+  çağrılarıyla aynı turn'de yazdı. 1.0.39 PostToolUse advance loop
+  text-trigger'ları yakalayıp faz advance ediyordu AMA
+  `_spec_approve_flow`'u (askq onay sonrası spec_approved=True
+  yapan fonksiyon) çağırmıyordu. Sonuç: `asama-4-complete` audit
+  emit edildi, faz 5'e ilerletildi, ama `state.spec_approved`
+  False kaldı → Aşama 5+'da Bash/Write `spec_lock` deny zinciri
+  → kırmızı "Kilit — spec onayı yok" mesajı → model panikleyip
+  trigger spam'i (`asama-1-complete...asama-6-complete` zinciri
+  tekrar tekrar yazdı).
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_detect_phase_complete_trigger` Aşama 4 kurtarma
+  bloğu**: `asama-4-complete` audit yeni emit edilirken
+  (idempotent guard sonrası), `state.spec_approved=False` ise:
+  - Spec hash henüz hesaplanmamışsa text'te `📋 Spec —` marker'ı
+    aranır (`spec_detect.contains`).
+  - Marker varsa body extract → hash compute → state.spec_hash +
+    spec_must_list atomik update.
+  - Hash mevcut/yeni hesaplanmış ise `state.spec_approved=True`
+    set + `spec-approval-recovered` audit emit (visibility).
+- **Güvenlik**: Marker yoksa kurtarma no-op. PreToolUse 1.0.19 guard'ı
+  askq açılırken zaten marker'ı zorluyor — markerlı text varsa
+  spec body var, askq onayı geldi sayılır.
+
+### Sözleşme korunumu / Boundary
+
+- **Mevcut `_spec_approve_flow` korundu**: askq sonrası post_tool
+  subprocess → stop.py → `_spec_approve_flow` zinciri birincil yol.
+  Kurtarma kodu sadece zincir koparsa (timing/race) devreye girer.
+  İki yol idempotent (spec_approved=True → koşul False → no-op).
+- **CLAUDE.md captured rule "sequential advance"** korundu —
+  text-trigger detector tek tek faz ilerletir, chain spam'i de
+  doğru işler.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.39 → 1.0.40, `.claude-plugin/plugin.json` 1.0.40.
+- Test sayısı korundu (kullanıcı isteği gereği test çalıştırılmadı;
+  kurtarma kodu yeni branch, eski branch'ı bozmaz).
+
 ## [1.0.39] — 2026-05-13
 
 ### Düzeltilen / Fixed

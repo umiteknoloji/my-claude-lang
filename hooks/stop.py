@@ -438,6 +438,64 @@ def _detect_phase_complete_trigger(
             # state.pattern_summary'e yaz (DSI Aşama 9'da hatırlatır).
             if n == 5:
                 _extract_pattern_summary(text, project_dir)
+            # 1.0.40: Aşama 4 spec onay zinciri kopma kurtarma.
+            # Normal akış: `_detect_and_store_spec` (Stop hook'ta) son
+            # assistant text'ten spec_hash hesaplar; sonra
+            # `_spec_approve_flow` cp==4 + spec_hash mevcut + askq
+            # sonrası tetiklenip spec_approved=True yapar. Canlı bug:
+            # model `asama-4-complete` text-trigger'ını paralel
+            # Bash/LS tool çağrılarıyla aynı turn'de yazıyor → Stop
+            # hook fire etmiyor (turn devam ediyor) → bu iki zincir
+            # ÇALIŞMIYOR → spec_approved=False kalır → Aşama 5+'da
+            # Bash/Write deny zinciri (canlı kullanıcı raporu).
+            # 1.0.39 PostToolUse advance loop text-trigger'ları
+            # yakalıyor ama spec_hash + spec_approved tarafı eksikti.
+            # Bu kurtarma: `asama-4-complete` audit emit edilirken
+            # text'te `📋 Spec —` marker varsa hash hesabı + spec_approved
+            # set et. Güvenlik: marker yoksa kurtarma no-op
+            # (PreToolUse 1.0.19 guard askq açılırken zaten marker'ı
+            # zorluyor; markerlı text varsa onay zinciri tamamlanmış
+            # sayılır).
+            if n == 4:
+                spec_approved_now = state.get(
+                    "spec_approved", False, project_root=project_dir,
+                )
+                if not spec_approved_now:
+                    stored_hash = state.get(
+                        "spec_hash", None, project_root=project_dir,
+                    )
+                    # Spec_hash henüz hesaplanmadıysa text'ten dene
+                    if stored_hash is None and spec_detect.contains(text):
+                        body = spec_detect.extract_body(text)
+                        if body:
+                            computed = spec_detect.compute_hash(
+                                spec_detect.normalize(body)
+                            )
+                            if computed:
+                                must_list = (
+                                    spec_detect.extract_must_list(body)
+                                )
+                                state.update(
+                                    {
+                                        "spec_hash": computed,
+                                        "spec_must_list": must_list,
+                                    },
+                                    project_root=project_dir,
+                                )
+                                stored_hash = computed
+                    # Spec_hash artık varsa spec_approved=True
+                    if stored_hash:
+                        state.set_field(
+                            "spec_approved", True,
+                            project_root=project_dir,
+                        )
+                        audit.log_event(
+                            "spec-approval-recovered", "stop.py",
+                            "phase=4 spec_approved=True via "
+                            "asama-4-complete text-trigger + spec marker "
+                            "(stop hook timing recovery)",
+                            project_root=project_dir,
+                        )
             cp = n + 1  # lokal advance — gerçek state advance completeness loop'ta
         elif n > cp:
             audit.log_event(
