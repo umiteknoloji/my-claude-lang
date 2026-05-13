@@ -130,6 +130,50 @@ def render_phase_allowlist_escalate(
     )
 
 
+def render_commitment_notice(
+    project_root: str | None = None,
+) -> str:
+    """1.0.34: public_commitment_required disiplin direktifi.
+
+    Audit log'da `commitment-needed phase=N` audit'i var ve aynı faz
+    için `pre-commitment-stated phase=N` audit'i yoksa, modele
+    yönlendirme enjekte eder (bilingual `pre_commitment_request` key).
+
+    Soft guidance — hard deny değil.
+    """
+    needed_phases: set[int] = set()
+    recorded_phases: set[int] = set()
+    for ev in audit.read_all(project_root=project_root):
+        name = ev.get("name", "")
+        detail = ev.get("detail", "")
+        if name == "commitment-needed":
+            for token in detail.split():
+                if token.startswith("phase="):
+                    try:
+                        needed_phases.add(int(token[len("phase="):]))
+                    except ValueError:
+                        pass
+        elif name == "pre-commitment-stated":
+            for token in detail.split():
+                if token.startswith("phase="):
+                    try:
+                        recorded_phases.add(int(token[len("phase="):]))
+                    except ValueError:
+                        pass
+    pending = sorted(needed_phases - recorded_phases)
+    if not pending:
+        return ""
+    prompt = bilingual.render("pre_commitment_request")
+    return (
+        "<mycl_commitment_notice>\n"
+        f"{prompt}\n"
+        f"Bekleyen faz(lar) / Pending phase(s): {pending}. Söz "
+        f"metnini `commitment-recorded phase=N text=\"...\"` "
+        "formatında yaz.\n"
+        "</mycl_commitment_notice>"
+    )
+
+
 def render_selfcritique_notice(
     project_root: str | None = None,
 ) -> str:
@@ -279,6 +323,14 @@ def render_full_dsi(
     )
     if selfcritique_notice:
         blocks.append(selfcritique_notice)
+
+    # 1.0.34: public_commitment_required disiplin direktifi (Aşama
+    # 4/6/8/9/10/19 — soft guidance).
+    commitment_notice = render_commitment_notice(
+        project_root=project_root,
+    )
+    if commitment_notice:
+        blocks.append(commitment_notice)
 
     if turn_tokens > 0:
         tok = render_token_visibility(turn_tokens, project_root=project_root)

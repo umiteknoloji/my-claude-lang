@@ -1023,6 +1023,41 @@ def _phase_22_check_selfcritique_required(
     return sorted(missing)
 
 
+def _phase_22_check_commitment_required(
+    events: list[dict],
+) -> list[int]:
+    """1.0.34: Invariant 7 — `public_commitment_required: true` olan
+    her faz için `pre-commitment-stated phase=N` audit var mı?
+
+    Returns:
+        Eksik fazların listesi.
+    """
+    spec = gate.load_gate_spec()
+    recorded_phases: set[int] = set()
+    for ev in events:
+        if ev.get("name") != "pre-commitment-stated":
+            continue
+        for token in ev.get("detail", "").split():
+            if token.startswith("phase="):
+                try:
+                    recorded_phases.add(int(token[len("phase="):]))
+                except ValueError:
+                    pass
+    missing: list[int] = []
+    for n_str, phase_def in spec.get("phases", {}).items():
+        if not isinstance(phase_def, dict):
+            continue
+        if not phase_def.get("public_commitment_required"):
+            continue
+        try:
+            n = int(n_str)
+        except ValueError:
+            continue
+        if n not in recorded_phases:
+            missing.append(n)
+    return sorted(missing)
+
+
 def _phase_22_check_phase_21_skip(events: list[dict]) -> bool:
     """Aşama 21 skip doğrulama — complete veya skipped audit'i var mı?
 
@@ -1097,6 +1132,8 @@ def _emit_phase_22_completeness_report(project_dir: str) -> bool:
     phase_21_verified = _phase_22_check_phase_21_skip(events)
     # 6. (1.0.33) self_critique_required disiplin denetimi
     selfcritique_missing = _phase_22_check_selfcritique_required(events)
+    # 7. (1.0.34) public_commitment_required disiplin denetimi
+    commitment_missing = _phase_22_check_commitment_required(events)
 
     # Process Trace özeti
     from hooks.lib import trace
@@ -1164,6 +1201,12 @@ def _emit_phase_22_completeness_report(project_dir: str) -> bool:
             "fazları için `selfcritique-passed` audit'i yok "
             "(soft guidance ihlali)."
         )
+    if commitment_missing:
+        open_issues.append(
+            f"Disiplin: public_commitment_required olan {commitment_missing} "
+            "fazları için `pre-commitment-stated` audit'i yok "
+            "(soft guidance ihlali)."
+        )
 
     # Bilingual header
     header = bilingual.render("completeness_report_header")
@@ -1183,6 +1226,7 @@ def _emit_phase_22_completeness_report(project_dir: str) -> bool:
     )
     phase_21_status = "✅" if phase_21_verified else "⚠️"
     selfcritique_status = "✅" if not selfcritique_missing else "⚠️"
+    commitment_status = "✅" if not commitment_missing else "⚠️"
 
     open_issues_block = (
         "\n".join(f"  - {issue}" for issue in open_issues)
@@ -1206,6 +1250,8 @@ def _emit_phase_22_completeness_report(project_dir: str) -> bool:
         f"{'evet' if phase_21_verified else 'hayır (silent skip)'}\n"
         f"{selfcritique_status} Disiplin (self_critique_required): "
         f"{7 - len(selfcritique_missing)}/7 faz selfcritique-passed\n"
+        f"{commitment_status} Disiplin (public_commitment_required): "
+        f"{6 - len(commitment_missing)}/6 faz pre-commitment-stated\n"
         f"\n"
         f"Açık Konular / Open Issues:\n"
         f"{open_issues_block}\n"
@@ -1321,6 +1367,96 @@ def _detect_phase_20_mock_cleanup(
         project_root=project_dir,
     )
     return True
+
+
+# 1.0.34: public_commitment_required aspirational bayrağı — Disiplin
+# katmanı: modelin faza başlamadan önce "Aşama X'i tamamlayacağım,
+# çünkü ..." şeklinde tek satır söz yazması. commitment.py zaten tam
+# hazır (record_pre_commitment 200 char truncation built-in); bu turda
+# hook bağlantısı kuruldu. Soft guidance (1.0.33 ile aynı desen).
+_COMMITMENT_REQUIRED_PHASES = frozenset({4, 6, 8, 9, 10, 19})
+_PHASE_COMMITMENT_RECORDED_RE = re.compile(
+    r"^[ \t]*commitment-recorded\s+phase=(\d+)\s+text=\"([^\"]*)\"",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _maybe_emit_commitment_needed(project_dir: str) -> bool:
+    """1.0.34: cp ∈ required_set + faz için pre-commitment-stated audit
+    yok + complete yok → `commitment-needed phase=N` audit emit
+    (idempotent).
+
+    Soft guidance — DSI direktifi modele "Aşama X'i tamamlayacağım,
+    çünkü..." sözünü yaz yönlendirmesi gönderir.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    from hooks.lib import commitment
+    cp = state.get("current_phase", 1, project_root=project_dir)
+    if cp not in _COMMITMENT_REQUIRED_PHASES:
+        return False
+    events = audit.read_all(project_root=project_dir)
+    existing = {ev.get("name") for ev in events}
+    if f"asama-{cp}-complete" in existing:
+        return False
+    # commitment.latest_pre_commitment ile bu faz için mevcut söz kontrol
+    if commitment.latest_pre_commitment(cp, project_root=project_dir):
+        return False
+    target = f"phase={cp}"
+    needed_name = "commitment-needed"
+    if any(
+        ev.get("name") == needed_name and target in ev.get("detail", "")
+        for ev in events
+    ):
+        return False
+    audit.log_event(
+        needed_name, "stop.py",
+        f"phase={cp} public_commitment_required (soft guidance)",
+        project_root=project_dir,
+    )
+    return True
+
+
+def _detect_commitment_trigger(
+    transcript_path: str, project_dir: str,
+) -> bool:
+    """1.0.34: model asistan metninde `commitment-recorded phase=N
+    text="..."` yazınca hook yakalar; commitment.record_pre_commitment
+    üzerinden mevcut `pre-commitment-stated` audit kanalına aktarır
+    (subagent kritiği: yeni audit kanalı icat etme, mevcut commitment.py
+    sözleşmesini kullan).
+
+    Idempotent — aynı faz için söz zaten yazıldıysa atla.
+
+    Returns: yeni audit yazıldıysa True.
+    """
+    if not transcript_path:
+        return False
+    from hooks.lib import commitment
+    text = transcript.find_last_assistant_text_matching(
+        lambda t: bool(_PHASE_COMMITMENT_RECORDED_RE.search(t)),
+        transcript_path,
+    )
+    if not text:
+        return False
+    wrote = False
+    seen: set[int] = set()
+    for n_str, commitment_text in _PHASE_COMMITMENT_RECORDED_RE.findall(text):
+        try:
+            n = int(n_str)
+        except ValueError:
+            continue
+        if n in seen:
+            continue
+        seen.add(n)
+        if commitment.latest_pre_commitment(n, project_root=project_dir):
+            continue  # idempotent — söz zaten yazılmış
+        commitment.record_pre_commitment(
+            commitment_text, n,
+            caller="stop.py", project_root=project_dir,
+        )
+        wrote = True
+    return wrote
 
 
 # 1.0.33: self_critique_required disiplin bayrağı — aspirational
@@ -1967,6 +2103,14 @@ def main() -> int:
     # aktarır. Aşama 22 invariant 6 open issue yüzeye çıkarır.
     _maybe_emit_selfcritique_needed(project_dir)
     _detect_selfcritique_triggers(transcript_path, project_dir)
+
+    # 1.0.34: public_commitment_required disiplin bayrağı — soft
+    # guidance. Hook needed audit yazar, DSI direktif enjekte eder,
+    # model `commitment-recorded phase=N text="..."` yazar; hook
+    # yakalar, commitment.record_pre_commitment üzerinden mevcut
+    # `pre-commitment-stated` audit kanalına aktarır.
+    _maybe_emit_commitment_needed(project_dir)
+    _detect_commitment_trigger(transcript_path, project_dir)
 
     # 1.0.30: Aşama 20 Doğrulama Raporu. Hook spec_must API'siyle
     # MUST kapsanmasını deterministik sayar (must_total/must_green)

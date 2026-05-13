@@ -91,6 +91,13 @@ def _seed_full_pipeline_audits(project_root: str) -> None:
     # Aşama 22 raporu invariant 6 open issue üretir.
     for n in (2, 4, 8, 9, 10, 14, 19):
         audits.append((f"selfcritique-passed", f"phase={n}"))
+    # 1.0.34: public_commitment_required için 6 faz — fixture'a
+    # `pre-commitment-stated phase=N text="..."` audit'leri.
+    for n in (4, 6, 8, 9, 10, 19):
+        audits.append((
+            "pre-commitment-stated",
+            f'phase={n} text="Aşama {n} sözü"',
+        ))
     for name, detail in audits:
         audit.log_event(name, "test", detail, project_root=project_root)
 

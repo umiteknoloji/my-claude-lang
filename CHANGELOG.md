@@ -5,6 +5,71 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.34] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **`public_commitment_required` aspirational bayrağı gerçek
+  implemente edildi** — `commitment.py` modülü zaten 200 char
+  truncation ile hazırdı (record_pre_commitment / latest_pre_commitment
+  / record_commitment_kept API'leri); hook bağlantısı eksikti. 6 faz
+  etkili: 4 (Spec), 6 (UI), 8 (DB), 9 (TDD), 10 (Risk), 19 (Etki).
+
+### Eklenen / Added
+
+- **`hooks/stop.py::_maybe_emit_commitment_needed`**: cp ∈
+  `_COMMITMENT_REQUIRED_PHASES`, faz için `pre-commitment-stated`
+  audit yok ve complete yok → `commitment-needed phase=N` audit emit
+  (idempotent).
+- **`hooks/stop.py::_detect_commitment_trigger`**: model asistan
+  metnindeki `commitment-recorded phase=N text="..."` text-trigger'ını
+  yakalar; `commitment.record_pre_commitment` çağırarak mevcut
+  `pre-commitment-stated` audit kanalını kullanır. **Subagent kritiği
+  gereği**: yeni audit adı icat edilmedi; mevcut modülün sözleşmesi
+  korundu.
+- **`hooks/stop.py::_PHASE_COMMITMENT_RECORDED_RE`**: MULTILINE +
+  line-anchored regex (1.0.33 selfcritique deseniyle simetrik —
+  CLAUDE.md captured-rule).
+- **`hooks/lib/dsi.py::render_commitment_notice`**: needed audit var
+  ve henüz `pre-commitment-stated` yoksa bilingual direktif
+  (`bilingual.render("pre_commitment_request")`) enjekte. Soft
+  guidance.
+- **`hooks/lib/dsi.py::render_full_dsi`**: commitment notice paketin
+  parçası.
+- **`hooks/stop.py::_phase_22_check_commitment_required`**: Aşama 22
+  invariant 7 — `public_commitment_required` olan her faz için
+  `pre-commitment-stated phase=N` audit kontrol.
+
+### Değiştirilen / Changed
+
+- **Aşama 22 raporu**: yeni "Disiplin (public_commitment_required):
+  K/6" satırı eklendi. Open issues bölümünde eksik faz(lar)
+  listelenir.
+- **`tests/test_phase22_refactor.py::_seed_full_pipeline_audits`**: 6
+  `pre-commitment-stated phase=N text="..."` audit eklendi (1.0.33
+  selfcritique fixture backfill deseniyle aynı).
+
+### Sözleşme / Contract
+
+- **Mevcut commitment.py kanalı kullanıldı**: yeni audit adı `commit
+  ment-recorded` icat edilmedi (subagent kritiği). Hook text-trigger'ı
+  yakalayıp `commitment.record_pre_commitment` üzerinden mevcut
+  `pre-commitment-stated` audit'ini yazıyor — sözleşme tek kanaldan
+  geçer.
+- **Soft guidance (Option B)**: hard gate YOK. Aşama 22 open issue
+  görünürlüğü.
+- **Aspirational kapanış 2/4**. Sıradakiler: Plugin Kural B (1.0.35),
+  `subagent_rubber_duck` (1.0.36).
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.33 → 1.0.34, `.claude-plugin/plugin.json` 1.0.34.
+- `README.md` + `README.tr.md` test sayısı 779 → 795.
+- 16 yeni test: `tests/test_phase34_commitment.py` (needed emit,
+  idempotency, scope filtreleri, commitment-recorded text-trigger
+  yakalama, 200 char truncation kontrol, regex satır-ankrajlama,
+  DSI direktif koşulları, Aşama 22 invariant 7 + rapor entegrasyonu).
+
 ## [1.0.33] — 2026-05-13
 
 ### Düzeltilen / Fixed
