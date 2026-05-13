@@ -5,6 +5,54 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.41] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **PreToolUse deny → PostToolUse fire etmiyor → state donuyor →
+  sonsuz deny döngüsü (canlı bug)** — 1.0.39'da text-trigger
+  detection sadece PostToolUse'a eklendi. PreToolUse tool'u deny
+  ederse tool çalışmıyor → PostToolUse fire etmiyor → 1.0.39 advance
+  loop hiç çağrılmıyor → state donmuş kalıyor → model retry → aynı
+  deny → sonsuz döngü.
+- Canlı senaryo: kullanıcı Aşama 1 askq onayı verdi, ardından model
+  **tek turn içinde** "asama-1-complete + Faz 2/3 işlemleri +
+  asama-2-complete + Bash çağrısı" yaptı. PreToolUse fire'da state
+  hâlâ cp=1 → Bash deny. PostToolUse fire etmedi → text-trigger'lar
+  audit'e yazılmadı → cp=1 takılı. Model retry → aynı deny.
+
+### Eklenen / Added
+
+- **`hooks/pre_tool.py::_advance_phase_from_transcript`**: stop.py'daki
+  11 text-trigger detector + completeness loop helper'ını in-process
+  çağırır (subagent_stop.py + post_tool.py ile birebir simetrik
+  pattern). main()'de aktivasyon kontrolünden hemen sonra,
+  tool_name çıkarımından önce çağrılır → tüm sonraki kontroller
+  (Bash mutation, phase transition denylist, askq guards,
+  gate.evaluate) advance edilmiş cp ile çalışır.
+
+### Sözleşme korunumu / Boundary
+
+- **Idempotency**: post_tool.py + subagent_stop.py aynı pattern'i
+  zaten kullanıyor, audit set check ile duplicate emit yok. Aynı
+  turn'de hem PreToolUse hem PostToolUse fire ederse iki advance —
+  ama her detector idempotent.
+- **transcript_path boşsa no-op** — test fixture'ları veya boş
+  payload'lar etkilenmez.
+- **Üç paralel kanal**: PreToolUse + PostToolUse + SubagentStop +
+  Stop. Hepsi aynı in-process helper'ları çağırır; hangi event fire
+  ederse advance orada gerçekleşir. Bu mimari, model'in
+  paralel/karışık tool kullanım pattern'lerinde state donmasını
+  önlemek için CLAUDE.md captured rule "soft guidance over
+  fail-fast" pattern'iyle uyumlu.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.40 → 1.0.41, `.claude-plugin/plugin.json` 1.0.41.
+- Test çalıştırılmadı (kullanıcı isteği). PreToolUse advance
+  PostToolUse aynı pattern'i kullandığı için davranışsal olarak
+  test fixture'larını etkilememeli.
+
 ## [1.0.40] — 2026-05-13
 
 ### Düzeltilen / Fixed

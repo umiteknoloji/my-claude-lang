@@ -218,6 +218,52 @@ def _record_strike_and_escalation(
         )
 
 
+def _advance_phase_from_transcript(
+    transcript_path: str, project_dir: str,
+) -> None:
+    """1.0.41: PreToolUse'da text-trigger detection + completeness loop.
+
+    1.0.39 PostToolUse'a aynı pattern eklendi ama PostToolUse **tool
+    deny olunca fire etmiyor** — Bash deny'dan sonra advance hiç
+    çalışmıyor, state donuyor, model retry → sonsuz deny döngüsü
+    (canlı bug).
+
+    Bu fix: PreToolUse'a aynı advance hook'unu ekler ama gate
+    evaluation'dan ÖNCE çağrılır. Model tek turn içinde text-trigger
+    + tool çağrısı yapsa bile state advance edilir, gate doğru
+    faza göre evaluate eder.
+
+    Idempotent (post_tool.py::_advance_phase_after_tool ile aynı
+    pattern — audit set check ile duplicate emit yok).
+    """
+    if not transcript_path:
+        return
+    from hooks.stop import (  # noqa: E402
+        _detect_phase_complete_trigger,
+        _detect_phase_extended_trigger,
+        _detect_phase_9_ac_trigger,
+        _detect_phase_items_triggers,
+        _detect_phase_quality_triggers,
+        _detect_phase_testing_triggers,
+        _detect_mid_reconfirm_acked,
+        _detect_selfcritique_triggers,
+        _detect_commitment_trigger,
+        _detect_phase_20_mock_cleanup,
+        _run_completeness_loop,
+    )
+    _detect_phase_complete_trigger(transcript_path, project_dir)
+    _detect_phase_extended_trigger(transcript_path, project_dir)
+    _detect_phase_9_ac_trigger(transcript_path, project_dir)
+    _detect_phase_items_triggers(transcript_path, project_dir)
+    _detect_phase_quality_triggers(transcript_path, project_dir)
+    _detect_phase_testing_triggers(transcript_path, project_dir)
+    _detect_mid_reconfirm_acked(transcript_path, project_dir)
+    _detect_selfcritique_triggers(transcript_path, project_dir)
+    _detect_commitment_trigger(transcript_path, project_dir)
+    _detect_phase_20_mock_cleanup(transcript_path, project_dir)
+    _run_completeness_loop(project_dir)
+
+
 def main() -> int:
     payload = _read_input()
     project_dir = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
@@ -229,6 +275,13 @@ def main() -> int:
     session_id = str(payload.get("session_id", "") or "")
     if not activation.is_session_active(session_id, project_root=project_dir):
         return _allow()
+
+    # 1.0.41: Gate evaluation öncesi state advance. Model tek turn içinde
+    # `asama-N-complete` text-trigger + tool çağrısı yaparsa, PostToolUse
+    # fire etmeden ÖNCE PreToolUse burada advance eder; gate doğru
+    # cp'ye göre evaluate eder.
+    transcript_path_pre = str(payload.get("transcript_path") or "")
+    _advance_phase_from_transcript(transcript_path_pre, project_dir)
 
     tool_name = str(payload.get("tool_name", ""))
     tool_input = payload.get("tool_input") or {}
