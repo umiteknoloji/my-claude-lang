@@ -15,6 +15,12 @@
     "Agent",
     "Skill",
     "TodoWrite",
+    "TaskCreate",
+    "TaskUpdate",
+    "TaskList",
+    "TaskGet",
+    "TaskOutput",
+    "TaskStop",
     "ToolSearch"
   ],
   "_global_bash_audit_emit_allowed": true,

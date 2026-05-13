@@ -5,6 +5,48 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.44] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **`TaskCreate` ve yeni Task tool ailesi tüm fazlarda DENY** —
+  Canlı kullanıcı raporu (1.0.43 temiz state ile): pipeline doğru
+  aktı (Aşama 1→2→3→4 hepsi sıralı tamamlandı, spec onaylandı,
+  Aşama 5'e geçildi), ama Aşama 5'te (Desen Eşleştirme) model
+  `TaskCreate` çağırınca DENY: "Aşama 5'de TaskCreate tool'una izin
+  verilmez". Model `asama-5-complete` yazıp ilerletmeye çalıştı,
+  cp=6 oldu, ama Aşama 6'da da TaskCreate yok → sonsuz deny döngüsü.
+- Kök neden: `_global_always_allowed_tools` listesinde **`TodoWrite`**
+  (Claude Code'un eski task tool'u) var ama yeni Claude Code v2.1.x
+  ailesinin `TaskCreate / TaskUpdate / TaskList / TaskGet /
+  TaskOutput / TaskStop` tool'ları yok. Bunlar pure planning /
+  inspection tool'ları — dosya veya state değişikliği yapmıyor.
+
+### Değiştirilen / Changed
+
+- **`data/gate_spec.json::_global_always_allowed_tools`** — 6 yeni
+  Task* tool'u global allowlist'e eklendi:
+  `TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`, `TaskOutput`,
+  `TaskStop`. Legacy `TodoWrite` korundu (eski Claude Code
+  versiyonları için backwards-compat).
+
+### Sözleşme korunumu / Boundary
+
+- **Güvenlik etkisi yok**: Task* tool'ları sadece todo-list/task-
+  tracker veri yapısı oluşturuyor ve okuyor; dosya yazma, Bash
+  çalıştırma, state mutation yok. Spec onayı / Bash deny / sequential
+  invariant gate'leri korunuyor.
+- **Aşama-spesifik `allowed_tools` listeleri dokunulmadı**: her faz
+  hâlâ kendi tool listesini tanımlıyor (Write/Edit/Bash vb.). Global
+  allowlist sadece kod yazımı yapmayan inspection/planning tool'lar
+  için.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.43 → 1.0.44, `.claude-plugin/plugin.json` 1.0.44.
+- gate.py kodu değişmedi (data-only fix). Test fixture'lar Read/Bash
+  kullanıyor → mevcut testler etkilenmez.
+
 ## [1.0.43] — 2026-05-13
 
 ### Düzeltilen / Fixed
