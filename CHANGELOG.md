@@ -5,6 +5,58 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.45] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Spec askq tool_input'una gömülmüş — assistant text'te marker yok**
+  — Canlı kullanıcı raporu (1.0.44 sonrası): pipeline Aşama 1→2→3
+  doğru aktı, Aşama 4 askq açıldı ama spec body **askq seçeneklerinin
+  preview/description alanına gömülmüş** ("=== BACKEND SPEC ===" +
+  "22 lines hidden"); assistant text'inde sadece "Faz 4 — Spec
+  (Onay bekleniyor)" var, `📋 Spec —` marker bloğu YOK. Hook
+  spec_hash hesabı için son assistant text'e bakıyor → spec_hash null
+  → kullanıcı "Onayladım" tıklarsa `_spec_approve_flow` no-op →
+  spec_approved=False → Aşama 5+'da Bash deny zinciri.
+- 1.0.42'de soft yaptım (transcript timing false-positive için), ama
+  bu gerçek ihlali de allow ediyor. Akıllı ayırt etme gerekti.
+
+### Eklenen / Added
+
+- **`hooks/pre_tool.py` 4.7.b içinde askq tool_input spec marker
+  detection**: Aşama 4'te assistant text'te marker yok ama askq
+  tool_input içindeki string'lerden birinde spec marker varsa
+  (`_iter_strings` recursive walk + `spec_detect.contains`) →
+  STRICT DENY + `spec-embedded-in-askq` audit + bilingual retry
+  mesajı. Model askq'yı kapatıp spec'i assistant text'e yazmaya
+  yönlendirilir.
+- **`data/bilingual_messages.json::spec_embedded_in_askq`**: TR + EN.
+  Net problem açıklaması (hook sadece assistant text'i tarıyor, askq
+  input'u görmüyor) + çözüm yönergesi (askq'yı kapat, spec'i text'e
+  yaz, sonra yeni askq aç sadece "onaylıyor musun?" prompt'uyla).
+
+### Sözleşme korunumu / Boundary
+
+- **Ayırt etme mantığı**:
+  - Aşama 4 + askq + text yok + askq'da marker yok → no-op (timing
+    toleransı, 1.0.38 deseni)
+  - Aşama 4 + askq + text var + marker var → no-op (doğru akış)
+  - Aşama 4 + askq + text var + marker yok + **askq'da marker yok**
+    → soft audit (1.0.42 davranışı, false-positive toleransı)
+  - Aşama 4 + askq + text var + marker yok + **askq'da marker VAR**
+    → **STRICT DENY** (gerçek ihlal, kontrat dışı akış)
+- **`_iter_strings` recursive walk**: dict/list/str içindeki tüm
+  string'leri orijinal newline'larla iter eder. `json.dumps` kullanmaz
+  (newline escape edilmemesi için).
+- **CLAUDE.md captured rule "line-anchored regex"** uygulandı.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.44 → 1.0.45, `.claude-plugin/plugin.json` 1.0.45.
+- Mevcut testler etkilenmedi: `test_phase_4_askq_marker_missing_soft_
+  audit_only` askq `questions: []` boş fixture → `_iter_strings` hiçbir
+  şey yield etmez → DENY tetiklenmez → soft audit beklentisi korunur.
+
 ## [1.0.44] — 2026-05-13
 
 ### Düzeltilen / Fixed

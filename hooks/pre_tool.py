@@ -476,6 +476,44 @@ def main() -> int:
             # Yalnızca text VAR ama marker YOKSA audit yaz; text boş ise
             # (transcript snapshot eski olabilir) hiçbir şey yapma.
             if last_text and not spec_detect.contains(last_text):
+                # 1.0.45: askq tool_input içinde spec marker var mı?
+                # Eğer varsa model spec'i askq prompt'una/seçeneklerine
+                # gömmüş → assistant text'te yok → spec_hash hesaplanamaz
+                # → onaylansa bile spec_approved=False → Aşama 5+ Bash
+                # deny zinciri. Bu **gerçek kontrat ihlali** (transcript
+                # timing değil) — STRICT DENY ile model'i doğru akışa
+                # zorla.
+                #
+                # Not: json.dumps newline'ları escape ettiği için
+                # MULTILINE regex çalışmaz. tool_input içindeki string
+                # değerleri ayrı ayrı (orijinal newline'larla) kontrol
+                # ediyoruz.
+                def _iter_strings(obj):
+                    if isinstance(obj, str):
+                        yield obj
+                    elif isinstance(obj, dict):
+                        for v in obj.values():
+                            yield from _iter_strings(v)
+                    elif isinstance(obj, list):
+                        for v in obj:
+                            yield from _iter_strings(v)
+                spec_embedded = any(
+                    spec_detect.contains(s)
+                    for s in _iter_strings(tool_input)
+                )
+                if spec_embedded:
+                    audit.log_event(
+                        "spec-embedded-in-askq", "pre_tool.py",
+                        "phase=4 spec_body_in_askq_input "
+                        "(model embedded spec in tool_input)",
+                        project_root=project_dir,
+                    )
+                    return _deny(
+                        _bilingual_block("spec_embedded_in_askq")
+                        or "Spec askq'ya gömülmüş — assistant text'e yaz."
+                    )
+                # Aksi halde soft audit (transcript timing false-positive
+                # toleransı, 1.0.42 davranışı)
                 existing_audits = {
                     ev.get("name")
                     for ev in audit.read_all(project_root=project_dir)
