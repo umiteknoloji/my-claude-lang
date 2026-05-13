@@ -37,21 +37,29 @@ def test_should_trigger_unknown_phase_returns_false():
 
 
 def test_should_trigger_real_gate_spec():
-    """Production gate_spec.json: 10, 22 rubber-duck.
+    """Production gate_spec.json: 1.0.36'da subagent_rubber_duck flag'i
+    Aşama 10 ve 22'den de KALDIRILDI (tüm fazlardan kaldırılma
+    sürecinin son adımı).
 
-    1.0.19: Aşama 4 `subagent_rubber_duck` kaldırıldı (Aşama 1/2/3
-    tutarlı politika).
-    1.0.24: Aşama 9 `subagent_rubber_duck` kaldırıldı (Aşama 1-8 ile
-    tutarlı — TDD red/green/refactor ana bağlamda yürür, subagent
-    dispatch gereksiz).
+    Tarihsel kaldırma:
+    1.0.19: Aşama 4 — Aşama 1/2/3 tutarlı politika.
+    1.0.24: Aşama 9 — Aşama 1-8 ile tutarlı (TDD red/green/refactor
+    ana bağlamda yürür, subagent dispatch gereksiz).
+    1.0.36: Aşama 10 + 22 — selfcritique (1.0.33) Aşama 10'da zaten
+    "model kendi çıktısını eleştiriyor" işlevini görüyor (redundant);
+    Aşama 22 raporu 7 invariant doğrulamasıyla kapsamlı ikinci-göz
+    sağlıyor; ek Haiku dispatch self-loop sorunu + cost artırıcı.
+    `subagent_check.py` modülü mevcut ama hiçbir hook'tan
+    çağrılmıyor (declared-but-not-implemented kapatması — Plugin Kural
+    B / 1.0.35 deseniyle aynı).
     """
     import hooks.lib.gate as gate
     gate.reset_cache()
-    assert subagent_check.should_trigger(4) is False  # 1.0.19 kaldırıldı
-    assert subagent_check.should_trigger(9) is False  # 1.0.24 kaldırıldı
-    assert subagent_check.should_trigger(10) is True
-    assert subagent_check.should_trigger(22) is True
     assert subagent_check.should_trigger(1) is False
+    assert subagent_check.should_trigger(4) is False
+    assert subagent_check.should_trigger(9) is False
+    assert subagent_check.should_trigger(10) is False  # 1.0.36 kaldırıldı
+    assert subagent_check.should_trigger(22) is False  # 1.0.36 kaldırıldı
 
 
 # ---------- rubber_duck_prompt ----------

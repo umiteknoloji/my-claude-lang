@@ -5,6 +5,69 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.36] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **`subagent_rubber_duck` aspirational bayrağı tüm fazlardan
+  kaldırıldı (kapanış 4/4)** — Subagent (Sonnet 4.6, 10 lens) kritiği:
+  - `subagent_check.py` modülü 1.0.x'ten beri var ama hiçbir hook'tan
+    çağrılmıyor (Plugin Kural B / 1.0.35 deseniyle aynı durum).
+  - 1.0.19 Aşama 4, 1.0.24 Aşama 9'dan kaldırılmıştı; Aşama 10 ve 22
+    bırakılmıştı.
+  - Aşama 10'da `self_critique_required: true` (1.0.33) zaten "model
+    kendi çıktısını eleştiriyor" işlevini görüyor → redundant.
+  - Aşama 22 raporu 7 invariant doğrulamasıyla kapsamlı ikinci-göz
+    sağlıyor (1.0.32 + 1.0.33 + 1.0.34).
+  - Phase 22 self-loop sorunu: rubber-duck Phase 22'nin kendi çıktısı
+    üzerinde çalışmalı ama report'tan önce dispatch edilmesi
+    gerekirdi — atomik kapanışı kırardı.
+  - Cost concern: Aşama 10'da onlarca item için ek Haiku dispatch.
+- **Aşama 9 skill `subagent_rubber_duck: true` doc claim mismatch** —
+  gate_spec'te 1.0.24'te kaldırılmıştı, skill'de kalmıştı; 1.0.31
+  Aşama 21 doc-truth deseniyle bu turda silindi.
+
+### Değiştirilen / Changed
+
+- **`data/gate_spec.json` Aşama 10**: `subagent_rubber_duck: true`
+  satırı silindi; `_note` 1.0.36 gerekçesiyle güncellendi.
+- **`data/gate_spec.json` Aşama 22**: `subagent_rubber_duck: true`
+  satırı silindi; `_note` self-loop sorunu + 7 invariant raporun
+  kapsamlı ikinci-göz olduğu açıklamasıyla eklendi.
+- **`skills/mycl/asama09-tdd.md`**: yanlış `subagent_rubber_duck:
+  true` claim'i silindi; `self_critique_required` (1.0.33) ve
+  `public_commitment_required` (1.0.34) hook-enforced bilgisi eklendi.
+- **`skills/mycl/asama10-risk.md`**: `subagent_rubber_duck` satırı
+  silindi; disiplin gerekleri 1.0.33/34 mekanizmalarıyla yeniden
+  yazıldı.
+- **`skills/mycl/asama22-tamlik.md`**: `subagent_rubber_duck` satırı
+  silindi; 7 invariant rapor doğrulamasının ikinci-göz işlevini
+  gördüğü açıklandı.
+- **`tests/test_subagent_check.py::test_should_trigger_real_gate_spec`**:
+  assertion'lar 1.0.36 gerçeğine uydu — Aşama 10 ve 22 için artık
+  `should_trigger` False döner. Tarihsel kaldırma sırası docstring'de
+  belgelendi.
+
+### Sözleşme / Contract
+
+- **Sıfır hook implementation kodu**. `subagent_check.py` modülü
+  silinmedi (mevcut sözleşme korunuyor; gelecekte ihtiyaç olursa
+  kullanılabilir) ama hiçbir hook çağırmıyor.
+- **Aşama 22 7 invariant** zaten kapsamlı ikinci-göz: audit zinciri,
+  TDD, pipeline, MUST, Aşama 21, selfcritique, commitment.
+- **Aspirational kapanış 4/4 TAMAM**:
+  - 1.0.33 → `self_critique_required` (gerçek implementation)
+  - 1.0.34 → `public_commitment_required` (gerçek implementation)
+  - 1.0.35 → Plugin Kural B (doc-truth, mimari kısıt)
+  - 1.0.36 → `subagent_rubber_duck` (doc-truth + flag removal,
+    redundant)
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.35 → 1.0.36, `.claude-plugin/plugin.json` 1.0.36.
+- Test sayısı korundu: 795 (sıfır yeni test, mevcut 1 test
+  güncellenen davranışa uydu).
+
 ## [1.0.35] — 2026-05-13
 
 ### Düzeltilen / Fixed

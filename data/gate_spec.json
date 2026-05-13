@@ -162,9 +162,8 @@
       "self_critique_required": true,
       "public_commitment_required": true,
       "mid_pipeline_reconfirm": true,
-      "subagent_rubber_duck": true,
       "subagent_orchestration": true,
-      "_note": "1.0.25 — `{n}` template literal'leri kaldırıldı (gate.py çözmüyor, gate bypass riskini kapatır). asama-10-items-declared count=K state.open_severity_count'a stop.py'da yazılır; asama-10-item-{n}-resolved decision=apply|skip|rule özel trigger ile yakalanır; decision=rule → asama-10-rule-capture audit + DSI rule capture directive. AC bazlı dinamik kontrol Aşama 22 tamlık denetiminde. 1.0.16 — subagent_orchestration aktif: paralel 4 mercek (Code Review, Simplify, Performance, Security) Task tool ile dispatch."
+      "_note": "1.0.36 — subagent_rubber_duck flag'i KALDIRILDI. Gerekçe: selfcritique disiplini (1.0.33) Aşama 10'da zaten zorunlu (self_critique_required: true) ve 'üretilen çıktıyı modelin kendisi eleştiriyor' işlevini görüyor. Ek Haiku dispatch redundant + cost artırıcı; ayrıca Aşama 10 askq one-by-one akışında developer zaten ikinci-göz rolünde (Skip/Fix/Rule kararı). 1.0.25 — `{n}` template literal'leri kaldırıldı (gate.py çözmüyor, gate bypass riskini kapatır). asama-10-items-declared count=K state.open_severity_count'a stop.py'da yazılır; asama-10-item-{n}-resolved decision=apply|skip|rule özel trigger ile yakalanır; decision=rule → asama-10-rule-capture audit + DSI rule capture directive. AC bazlı dinamik kontrol Aşama 22 tamlık denetiminde. 1.0.16 — subagent_orchestration aktif: paralel 4 mercek (Code Review, Simplify, Performance, Security) Task tool ile dispatch."
     },
     "11": {
       "name": "Kod İncelemesi",
@@ -344,7 +343,7 @@
       "self_critique_required": false,
       "public_commitment_required": false,
       "hook_writes_report": true,
-      "subagent_rubber_duck": true
+      "_note": "1.0.36 — subagent_rubber_duck flag'i KALDIRILDI. Gerekçe: Aşama 22 raporu zaten 7 invariant doğrulaması (1.0.32 + 1.0.33 + 1.0.34) yapıyor (audit zinciri 1-21, TDD derinliği, pipeline derinliği, MUST kapsanma, Aşama 21 skip, selfcritique disiplini, commitment disiplini) ve open issues olarak yüzeye çıkarıyor — kapsamlı ikinci-göz işlevi. Ek Haiku rubber duck dispatch'i (a) self-loop sorunu yaratırdı (Aşama 22'nin kendi çıktısı rubber-duck'a girer ama report'tan önce gönderilmesi gerekirdi); (b) cost artırıcı; (c) selfcritique zaten 7 fazda zorunlu. 1.0.32 — hook_writes_report flag bu fazın benzersiz kontratı: hook tek yazar, model `asama-22-complete` emit edemez (phase-22-illegal-emit-attempt detection)."
     }
   }
 }

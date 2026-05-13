@@ -1,4 +1,4 @@
-# MyCL — my-claude-lang 1.0.35
+# MyCL — my-claude-lang 1.0.36
 
 A semantic-verification layer on top of Claude Code. MyCL imposes a
 22-phase development pipeline, ratchets discipline through audit

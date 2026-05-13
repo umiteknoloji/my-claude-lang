@@ -101,10 +101,20 @@ text-trigger zinciri ile yapılır, gate listesinde değil.
 
 ## Disiplin gerekleri
 
-- `subagent_rubber_duck: true` — Aşama 10 kritik; haiku subagent ile
-  ikinci-göz pair-check
-- Mid-pipeline reconfirmation (#13) — risk listesi uzunsa "hâlâ bu
-  yönde mi?" askq
+- `self_critique_required: true` (1.0.33) — Aşama 10 sonunda model
+  `selfcritique-passed phase=10` veya `selfcritique-gap-found
+  phase=10 items="..."` yazar; Aşama 22 invariant 6 doğrular.
+- `public_commitment_required: true` (1.0.34) — faz başında
+  `commitment-recorded phase=10 text="..."` yazılır.
+- `subagent_orchestration: true` — 4 mercek paralel
+  (Code Review/Simplify/Performance/Security) Task tool ile dispatch.
+- Mid-pipeline reconfirmation (#13) — risk listesi 10+ olunca hook
+  `asama-10-mid-reconfirm-needed` audit (1.0.29 Aşama 19'la simetrik
+  ama Aşama 10 için planlı değil — şu an Aşama 19'a özel).
+- Not (1.0.36): `subagent_rubber_duck` flag'i kaldırıldı.
+  Gerekçe: selfcritique "modelin kendi çıktısını eleştirmesi" işlevini
+  zaten görüyor; ek Haiku dispatch redundant + cost artırıcı;
+  developer askq one-by-one zaten ikinci-göz rolünde.
 
 ## Anti-pattern
 
@@ -175,8 +185,18 @@ runs through the text-trigger chain, not the gate list.
 
 ## Discipline
 
-`subagent_rubber_duck: true` (haiku pair-check). Mid-pipeline
-reconfirmation when risk list is long.
+- `self_critique_required: true` (1.0.33) — model writes
+  `selfcritique-passed phase=10` or `selfcritique-gap-found phase=10
+  items="..."` at phase end; Phase 22 invariant 6 verifies.
+- `public_commitment_required: true` (1.0.34) — at phase entry the
+  model writes `commitment-recorded phase=10 text="..."`.
+- `subagent_orchestration: true` — 4 parallel lenses
+  (Code Review/Simplify/Performance/Security) dispatched via Task.
+- Mid-pipeline reconfirmation when risk list is long.
+- Note (1.0.36): `subagent_rubber_duck` flag was removed. Rationale:
+  selfcritique already covers "model critiques its own output";
+  extra Haiku dispatch is redundant + cost-inducing; developer's
+  one-by-one askq is already the second-eye role.
 
 ## Anti-patterns
 

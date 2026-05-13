@@ -140,8 +140,17 @@ tasarlanmış ama hiçbir hook çalışmıyordu (declared-but-not-implemented).
 
 ## Disiplin gerekleri
 
-`subagent_rubber_duck: true` — Aşama 22 kritik faz; haiku ikinci-göz
-"bu tamlık raporu doğru mu?" check.
+Aşama 22 ikinci-göz işlevini hook'un kendi 7 invariant doğrulaması
+sağlıyor (1.0.32 + 1.0.33 + 1.0.34): audit zinciri 1-21, TDD
+derinliği, kalite-test pipeline derinliği, Spec MUST kapsanma,
+Aşama 21 skip doğrulama, selfcritique disiplini, commitment disiplini.
+Eksiklikler "Açık Konular" olarak yüzeye çıkar.
+
+Not (1.0.36): `subagent_rubber_duck: true` flag'i kaldırıldı.
+Gerekçe: 7 invariant rapor zaten kapsamlı ikinci-göz; ek Haiku
+dispatch (a) self-loop sorunu yaratırdı (Aşama 22 kendi çıktısı
+rubber-duck'a girer ama report'tan önce gönderilmesi gerekirdi);
+(b) cost artırıcı; (c) selfcritique zaten 7 fazda zorunlu.
 
 ## Anti-pattern
 
@@ -227,7 +236,18 @@ declared-but-not-implemented skill).
 
 ## Discipline
 
-`subagent_rubber_duck: true`.
+Phase 22's second-eye role is fulfilled by the hook's own 7-invariant
+verification (1.0.32 + 1.0.33 + 1.0.34): audit chain 1-21, TDD
+depth, quality/test pipeline depth, spec MUST coverage, Phase 21
+skip verification, selfcritique discipline, commitment discipline.
+Gaps surface under "Open Issues".
+
+Note (1.0.36): the `subagent_rubber_duck: true` flag was removed.
+Rationale: the 7-invariant report is already a comprehensive
+second-eye; an extra Haiku dispatch would (a) create a self-loop
+(Phase 22's own output goes into rubber-duck, but it must be sent
+before the report); (b) increase cost; (c) selfcritique is already
+mandatory across 7 phases.
 
 ## Anti-patterns
 

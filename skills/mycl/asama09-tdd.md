@@ -112,8 +112,15 @@ Aşama 10'a advance.
 
 ## Disiplin gerekleri
 
-- `subagent_rubber_duck: true` — kritik faz; haiku subagent ile
-  ikinci-göz pair-check sonda
+- `self_critique_required: true` — 1.0.33'ten itibaren hook
+  enforce'da. Aşama 9 sonunda `selfcritique-passed phase=9` veya
+  `selfcritique-gap-found phase=9 items="..."` yazılır; Aşama 22
+  invariant 6 doğrular.
+- `public_commitment_required: true` — 1.0.34'ten itibaren hook
+  enforce'da. Faz başlarken `commitment-recorded phase=9 text="..."`
+  yazılır.
+- Not (1.0.36): `subagent_rubber_duck` skill claim'i gate_spec'te
+  zaten 1.0.24'te kaldırılmıştı; doc-truth ile burada da silindi.
 
 ## Anti-pattern
 
@@ -173,7 +180,15 @@ code must follow existing patterns.
 
 ## Discipline
 
-`subagent_rubber_duck: true` (haiku pair-check at end).
+- `self_critique_required: true` — hook-enforced since 1.0.33. At
+  Phase 9 end the model writes `selfcritique-passed phase=9` or
+  `selfcritique-gap-found phase=9 items="..."`; Phase 22 invariant 6
+  verifies it.
+- `public_commitment_required: true` — hook-enforced since 1.0.34.
+  At phase entry the model writes `commitment-recorded phase=9
+  text="..."`.
+- Note (1.0.36): the `subagent_rubber_duck` skill claim was already
+  removed from gate_spec in 1.0.24; doc-truth cleanup here.
 
 ## Anti-patterns
 
