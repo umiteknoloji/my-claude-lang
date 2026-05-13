@@ -43,15 +43,25 @@ MyCL <version> | Aşama 1 — Niyet özeti onayı
 MyCL <version> | Phase 1 — Intent summary confirmation
 ```
 
-### Hook enforcement (1.0.37)
+### Hook enforcement (1.0.38 — soft guidance)
 
-`pre_tool.py` Aşama 1'de AskUserQuestion çağrısı yapılırken son
-assistant text'te `🎯 Niyet özeti:` (veya `Niyet özeti:` / `Intent
-summary:`) line-anchored marker'ı arar (`spec_detect.contains_
-intent_summary`). Yoksa askq DENY edilir + `intent-summary-format-
-missing` audit yazılır. Aşama 4 spec format guard'ı (1.0.19) ile
-simetrik. Marker olmayan özet, prose içinde gömülürse hook detection
-yapamaz; CLAUDE.md captured rule "line-anchored regex".
+`pre_tool.py` Aşama 1'de AskUserQuestion çağrılırken son assistant
+text'te `🎯 Niyet özeti:` (veya `Niyet özeti:` / `Intent summary:`)
+line-anchored marker'ı arar (`spec_detect.contains_intent_summary`).
+Marker yoksa **askq ALLOW edilir** ama `intent-summary-format-missing`
+audit yazılır (visibility).
+
+1.0.37'de DENY semantiğiyle eklenmişti ama iki yan etki üretti:
+(1) PreToolUse fire edildiğinde model'in aynı turn'deki text content'i
+transcript snapshot'ta henüz görünmeyebiliyor (tool_use bloğu text'ten
+önce stream'lenir) → marker yazılsa bile false-positive deny;
+(2) Aşama 1 ilk faz — agresif deny "MyCL çalışmıyor" izlenimi yaratır.
+CLAUDE.md captured rule "soft guidance over fail-fast" gereği 1.0.38'de
+deny kaldırıldı.
+
+Aşama 4 spec format guard'ı (1.0.19) sıkı kalır — orada gerçek bypass
+riski var (Bash deny zinciri); Aşama 1'de sadece kontrat hatırlatma.
+Marker eksikliği Aşama 22 raporunda visibility kanalına düşer.
 
 ## İzinli tool'lar (Layer B)
 
@@ -123,15 +133,26 @@ derived from this intent; gray areas yield wrong specs.
 
 `MyCL <version> | Phase 1 — Intent summary confirmation`
 
-### Hook enforcement (1.0.37)
+### Hook enforcement (1.0.38 — soft guidance)
 
-In Phase 1, `pre_tool.py` requires a line-anchored `🎯 Intent summary:`
-(or `Intent summary:` / `Niyet özeti:`) marker in the last assistant
-text before any AskUserQuestion call. If absent, the askq is DENIED
-with `intent-summary-format-missing` audit. Symmetric with the Phase
-4 spec format guard (1.0.19). Per CLAUDE.md captured rule, the regex
-is MULTILINE + line-anchored — prose-embedded summaries don't count
-because they break the hook's marker-based detection.
+In Phase 1, `pre_tool.py` checks the last assistant text for a
+line-anchored `🎯 Intent summary:` (or `Intent summary:` /
+`Niyet özeti:`) marker via `spec_detect.contains_intent_summary`. If
+absent, the askq is **still ALLOWED** but `intent-summary-format-
+missing` audit is written (visibility).
+
+1.0.37 used DENY semantics symmetric with Phase 4 but two false-
+positive side effects emerged: (1) when PreToolUse fires the model's
+same-turn text content may not yet be in the transcript snapshot
+(tool_use blocks can be streamed before text) → marker written but
+deny still triggered; (2) Phase 1 is the first phase — an aggressive
+deny creates a "MyCL is broken" impression. Per CLAUDE.md captured
+rule "soft guidance over fail-fast", deny was removed in 1.0.38.
+
+The Phase 4 spec format guard (1.0.19) stays strict — there's a real
+bypass risk (Bash deny chain); Phase 1 is only a contract reminder.
+Marker absence surfaces in the Phase 22 report via the visibility
+channel.
 
 ## Allowed tools (Layer B)
 

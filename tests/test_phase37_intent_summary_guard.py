@@ -128,8 +128,15 @@ def _write_transcript(path: Path, last_assistant_text: str) -> None:
         f.write(json.dumps(event) + "\n")
 
 
-def test_pre_tool_phase_1_askq_denied_without_marker(tmp_path):
-    """Aşama 1'de AskUserQuestion çağrısı + marker yok → DENY."""
+def test_pre_tool_phase_1_askq_marker_missing_soft_audit_only(tmp_path):
+    """1.0.38: Aşama 1'de AskUserQuestion + marker yok → ALLOW edilir
+    AMA `intent-summary-format-missing` audit yazılır (soft guidance).
+
+    1.0.37 deny semantiği iki false-positive üretti (PreToolUse fire
+    sırasında aynı turn'ün text content'i transcript snapshot'ta
+    görünmeyebiliyor + ilk faz agresif deny "MyCL çalışmıyor" izlenimi).
+    Aşama 4 spec format guard'ı (1.0.19) sıkı kalır; Aşama 1 soft.
+    """
     state.set_field("current_phase", 1, project_root=str(tmp_path))
     transcript_path = tmp_path / "transcript.jsonl"
     _write_transcript(
@@ -156,17 +163,13 @@ def test_pre_tool_phase_1_askq_denied_without_marker(tmp_path):
 
     rc, stdout, _ = _run_pre_tool_subprocess(payload, tmp_path)
 
-    # PreToolUse deny: stdout JSON `decision: "deny"` + reason
+    # ALLOW: deny olmaması yeterli (soft guidance)
     assert rc == 0
     parsed = json.loads(stdout) if stdout.strip() else {}
-    # Hook deny semantic: `decision: deny` veya `hookSpecificOutput.permissionDecision`
-    assert (
-        parsed.get("decision") == "deny"
-        or parsed.get("hookSpecificOutput", {}).get(
-            "permissionDecision"
-        ) == "deny"
-    ), f"Beklenen deny; alınan: {parsed}"
-    # Audit yazıldı mı?
+    assert parsed.get("decision") != "deny"
+    decision = parsed.get("hookSpecificOutput", {}).get("permissionDecision")
+    assert decision != "deny"
+    # Audit kanalına visibility kaydı düşmüş olmalı
     names = [
         ev.get("name") for ev in audit.read_all(project_root=str(tmp_path))
     ]

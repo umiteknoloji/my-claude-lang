@@ -389,27 +389,43 @@ def main() -> int:
                     or "📋 Spec — başlığı assistant cevabında olmalı."
                 )
 
-        # 4.7.c — Aşama 1 niyet özeti format guard (1.0.37). askq
-        # açılmadan ÖNCE son assistant text'te `🎯 Niyet özeti:` veya
-        # `Intent summary:` marker'lı 3-5 cümlelik özet olmalı. Aksi
-        # halde model özeti tamamen atlıyor (canlı gözlem) ya da askq
-        # prompt'una gömüyor. Aşama 4 spec format guard'ıyla simetrik:
-        # marker + line-anchored detection + DENY + retry mesajı.
+        # 4.7.c — Aşama 1 niyet özeti format izleme (1.0.38: soft).
+        # 1.0.37'de Aşama 4 deseninin aynısı DENY ile eklenmişti ama
+        # iki false-positive yan etki üretti:
+        #   1. PreToolUse fire edildiğinde model'in AYNI turn'deki text
+        #      content'i `last_assistant_text` tarafından henüz
+        #      görülmüyor olabilir (tool_use bloğu text'ten önce
+        #      stream'leniyor); marker yazılsa bile deny çıkıyor.
+        #   2. Aşama 1 ilk faz — geliştirici pipeline'ı bilmiyor
+        #      olabilir; agresif deny "MyCL çalışmıyor" izlenimi
+        #      yaratır (CLAUDE.md captured rule "soft guidance over
+        #      fail-fast" + v13.1.3 STRICT kapı tasarımı — sadece 4
+        #      kapı, fazla değil).
+        # 1.0.38: DENY KALDIRILDI; sadece audit kalır (visibility).
+        # Aşama 22 invariant kanalı zaten selfcritique/commitment
+        # gibi disiplin eksikliklerini yüzeye çıkarıyor (1.0.33+).
+        # Aşama 4 spec format guard'ı (1.0.19) sıkı kalır — orada
+        # gerçek bypass riski var (Bash deny zinciri); Aşama 1'de
+        # sadece kontrat hatırlatma.
         if cp == 1:
             last_text = (
                 transcript.last_assistant_text(transcript_path)
                 if transcript_path else ""
             )
-            if not spec_detect.contains_intent_summary(last_text or ""):
-                audit.log_event(
-                    "intent-summary-format-missing", "pre_tool.py",
-                    "phase=1 intent_summary_not_in_assistant_text",
-                    project_root=project_dir,
-                )
-                return _deny(
-                    _bilingual_block("intent_summary_missing_block")
-                    or "🎯 Niyet özeti: başlığı assistant cevabında olmalı."
-                )
+            # Yalnızca text VAR ama marker YOKSA audit yaz; text boş
+            # ise (transcript snapshot eski olabilir) hiçbir şey yapma.
+            if last_text and not spec_detect.contains_intent_summary(last_text):
+                # Idempotent — aynı turda tekrar tekrar yazmasın
+                existing = {
+                    ev.get("name")
+                    for ev in audit.read_all(project_root=project_dir)
+                }
+                if "intent-summary-format-missing" not in existing:
+                    audit.log_event(
+                        "intent-summary-format-missing", "pre_tool.py",
+                        "phase=1 intent_summary_marker_absent (soft)",
+                        project_root=project_dir,
+                    )
 
     # ---------- 5. Layer B (gate.evaluate) ----------
     file_path = tool_input.get("file_path") or tool_input.get("path") or ""

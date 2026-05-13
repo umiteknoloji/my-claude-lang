@@ -5,6 +5,66 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.38] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **1.0.37 Aşama 1 niyet özeti DENY false-positive — canlı kullanıcı
+  raporu** — 1.0.37 deploy edildikten sonra kullanıcı canlı testte:
+  - 1. cevap (özet YOK): DENY çıktı (doğru).
+  - 2. cevap (`Niyet özeti:` VAR): DENY tekrar çıktı (**yanlış**).
+  - 3. denemede askq açıldı (geç).
+  - Kullanıcı: "kırmızı yazılar niye çıktı".
+
+  Kök sebep iki kaynaklı:
+  1. **Transcript snapshot timing**: PreToolUse hook fire edildiğinde
+     model'in **aynı turn'deki** text content'i `transcript.last_
+     assistant_text` tarafından her zaman görülmüyor olabilir
+     (tool_use bloğu text'ten önce stream'lenebilir). Marker yazılsa
+     bile false-positive deny çıkıyor.
+  2. **UX zararı**: Aşama 1 ilk faz — geliştirici pipeline'ı henüz
+     bilmiyor. Agresif deny "MyCL çalışmıyor" izlenimi yaratır
+     (CLAUDE.md captured rule "soft guidance over fail-fast" +
+     v13.1.3 STRICT kapı tasarım kararı: sadece 4 kapı, daha fazla
+     değil).
+
+### Değiştirilen / Changed
+
+- **`hooks/pre_tool.py` Aşama 1 guard**: DENY KALDIRILDI. Davranış
+  artık soft:
+  - `last_text` boş → no-op (transcript snapshot eski olabilir,
+    false-positive risk var).
+  - `last_text` var **ama** marker yok → tek seferlik (idempotent)
+    `intent-summary-format-missing` audit yaz; **askq ALLOW edilir**.
+  - `last_text` var ve marker var → no-op.
+- **`skills/mycl/asama01-niyet.md`**: "Hook enforcement (1.0.37)"
+  → "Hook enforcement (1.0.38 — soft guidance)" başlığı + gerekçe
+  TR + EN.
+- **`tests/test_phase37_intent_summary_guard.py::test_pre_tool_phase_1
+  _askq_denied_without_marker`** → `test_pre_tool_phase_1_askq_marker
+  _missing_soft_audit_only`: assertion'lar `decision != deny` + audit
+  emit. Diğer 12 test davranış değişikliğinden etkilenmedi
+  (regex işlevi + marker'lı allow + faz scope guard'ları).
+
+### Sözleşme korunumu / Boundary
+
+- **Aşama 4 spec format guard'ı (1.0.19) sıkı kalır** — orada gerçek
+  bypass riski var (Bash deny zinciri kapısı). Aşama 1 sadece
+  kontrat hatırlatma; gate-impact farkı asimetriyi haklı çıkarır.
+- **Visibility kanalı korundu**: marker eksikliği `intent-summary-
+  format-missing` audit'i olarak log'a düşer; Aşama 22 raporu
+  (1.0.33+ disiplin invariant kanalı gibi) ileride open issue olarak
+  yüzeye çıkarabilir.
+- **CLAUDE.md captured rule "soft guidance over fail-fast"** yeniden
+  uygulandı (1.0.31 Aşama 21 + 1.0.35 Plugin Kural B + 1.0.36
+  subagent_rubber_duck + 1.0.38 Aşama 1 — pattern istikrarlı).
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.37 → 1.0.38, `.claude-plugin/plugin.json` 1.0.38.
+- Test sayısı korundu: 808 (yeni test yok; 1 mevcut test davranışsal
+  olarak güncellendi).
+
 ## [1.0.37] — 2026-05-13
 
 ### Düzeltilen / Fixed
