@@ -1,4 +1,4 @@
-# MyCL — my-claude-lang 1.0.45
+# MyCL — my-claude-lang 1.0.46
 
 Claude Code üstüne anlam-doğrulama katmanı. MyCL 22 fazlı bir
 geliştirme boru hattı dayatır, audit zincirleriyle disiplini sıkar

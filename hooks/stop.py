@@ -385,6 +385,24 @@ def _detect_phase_complete_trigger(
         int(n_str) for n_str in matches if n_str.isdigit()
     })
     wrote = False
+    # 1.0.46: Rate-limit — bir turn'de en fazla 1 YENİ advance.
+    # Canlı bug: model `asama-5-complete asama-6-complete
+    # asama-7-complete asama-8-complete` chain'ini kafasına göre yazıp
+    # 4 fazı atlatıyor; gerçek iş kanıtı yok. CLAUDE.md captured rule
+    # "sequential advance" tek-tek geçişi zorunlu kılıyor. Rate-limit:
+    #   - İlk yeni audit normal emit + lokal cp ilerletilir.
+    #   - Sonraki yeni audit girişimleri `phase-chain-skip-attempt`
+    #     audit'i ile kaydedilir (görünür sinyal); advance YOK.
+    #   - Idempotent skip (audit zaten var) sayılmaz — eski faz
+    #     advance'lerini etkilemez. Sadece bir tur içinde birden çok
+    #     YENİ audit emit'ini engeller. Bir sonraki turn'de model
+    #     gerçek faz işini yapmak zorunda.
+    # Legitimate akış etkisi:
+    #   - `_spec_approve_flow` Aşama 4 onayı sonrası chain'i DOĞRUDAN
+    #     audit.log_event ile yazıyor (bu fonksiyon kullanılmıyor) —
+    #     rate-limit etkilemez.
+    #   - Silent_phase auto-emit completeness loop'ta — etkilemez.
+    new_advances_this_call = 0
     for n in unique_nums:
         # 1.0.32: Aşama 22 kontrat ihlali koruması — `asama-22-complete`
         # **yalnızca hook** tarafından yazılır (skill kontratı). Model
@@ -409,6 +427,22 @@ def _detect_phase_complete_trigger(
                 # ilerlet ki zincirdeki sonraki trigger'lar düşmesin.
                 cp = n + 1
                 continue
+            # 1.0.46: Rate-limit — bu çağrıda bir advance zaten yapıldıysa
+            # YENİ audit yazma. Faz atlama bypass'ını engeller.
+            if new_advances_this_call >= 1:
+                chain_audit = "phase-chain-skip-attempt"
+                # Idempotent — aynı denemede aynı audit tekrar yazılmasın
+                if chain_audit not in existing:
+                    audit.log_event(
+                        chain_audit, "stop.py",
+                        f"attempted_phase={n} current_phase={cp} "
+                        "reason=rate-limit-1-advance-per-turn",
+                        project_root=project_dir,
+                    )
+                    existing.add(chain_audit)
+                # Lokal cp ilerletilmez; bir sonraki advance bir sonraki
+                # turn'e bırakılır.
+                continue
             audit.log_event(
                 audit_name, "stop.py",
                 f"text-trigger-emit phase={n}",
@@ -416,6 +450,7 @@ def _detect_phase_complete_trigger(
             )
             existing.add(audit_name)
             wrote = True
+            new_advances_this_call += 1
             # 1.0.17: side_audits — fazın yan audit'leri hook paralel
             # emit eder (model yazmaz). Aşama 2 için `precision-audit`
             # gibi. Generic feature; gate_spec'te `side_audits` listesi
@@ -428,6 +463,15 @@ def _detect_phase_complete_trigger(
             for side_name in side_audits:
                 if side_name in existing:
                     continue
+                # 1.0.46: Aşama 5 `pattern-summary-stored` side_audit
+                # KOŞULLU — text'te `pattern-summary: <özet>` satırı
+                # YOKSA emit etme. Eski auto-emit her zaman fire ediyordu;
+                # model `asama-5-complete` yazıp özet yazmadan gate'i
+                # geçebiliyordu (canlı bug). Şimdi gerçek özet kanıtı
+                # zorunlu.
+                if n == 5 and side_name == "pattern-summary-stored":
+                    if not _PATTERN_SUMMARY_RE.search(text):
+                        continue  # özet yok → side_audit emit YOK
                 audit.log_event(
                     side_name, "stop.py",
                     f"side-audit-emit phase={n}",

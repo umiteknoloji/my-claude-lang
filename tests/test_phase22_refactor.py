@@ -65,7 +65,7 @@ def _seed_full_pipeline_audits(project_root: str) -> None:
         ("precision-audit", "side"),
         ("asama-3-complete", "engineering brief"),
         ("asama-4-complete", "spec approved"),
-        ("asama-5-complete", "pattern summary"),
+        ("pattern-summary-stored", "phase=5 side_audit"),
         ("pattern-summary-stored", "side"),
         ("asama-6-end", "ui not applicable"),
         ("asama-7-skipped", "no ui"),

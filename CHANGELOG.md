@@ -5,6 +5,89 @@ All notable changes to MyCL.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.46] — 2026-05-13
+
+### Düzeltilen / Fixed
+
+- **Aşama 5-8 chain bypass: model 4 fazı tek mesajda atlattı** —
+  Canlı kullanıcı raporu: spec onayı sonrası model `asama-5-complete
+  asama-6-complete asama-7-complete asama-8-complete` chain'ini tek
+  mesajda yazdı, "standart REST+JWT projesi, bilinen riskler yok"
+  geçiştirmesiyle 4 fazı bypassa çalıştı. Gate `_any` (OR) mantığı +
+  side_audit auto-emit + generic `asama-N-complete` kombinasyonu
+  bypass'a izin veriyordu.
+- Kullanıcı net teşhis: "model davranışlarını %100 ikna etmek mümkün
+  değil. başka bi yol bulmalıyız." → Hook layer'da skill prompt'a
+  güvenmek yerine sistemik enforcement.
+
+### Eklenen / Added (üç katmanlı savunma)
+
+**Katman 1 — Rate-limit (`_detect_phase_complete_trigger`)**:
+- Bir hook çağrısında en fazla **1 yeni advance**. İkincisi
+  `phase-chain-skip-attempt` audit'i ile kaydedilir, advance YOK.
+- Idempotent skip etkilenmez (audit zaten varsa eski cp ilerletme
+  korunur).
+- CLAUDE.md captured rule "sequential advance" pattern'iyle uyumlu.
+
+**Katman 2 — Side_audit text-driven (Aşama 5)**:
+- `pattern-summary-stored` side_audit'i artık koşullu emit:
+  text'te `pattern-summary: <özet>` satırı VARSA hook yazar.
+  YOKSA emit YOK. Önceki davranış: `asama-5-complete` yazılınca
+  her zaman otomatik fire (bypass).
+- `data/gate_spec.json` Aşama 5 `side_audits: ["pattern-summary-
+  stored"]` korundu (liste işaretçi); emit koşulu `_detect_phase_
+  complete_trigger`'da text regex'ine bağlandı.
+
+**Katman 3 — Gate sıkılaştırma (Aşama 5/6/8)**:
+- Aşama 5 `required_audits_any`: `["pattern-summary-stored",
+  "asama-5-skipped"]` (önce `asama-5-complete` da vardı — kaldırıldı).
+- Aşama 6: `["asama-6-skipped", "asama-6-end"]` (`asama-6-complete`
+  kaldırıldı).
+- Aşama 8: `["asama-8-end", "asama-8-not-applicable"]`
+  (`asama-8-complete` kaldırıldı).
+- Bu fazlar artık `asama-N-complete` audit'ini tek başına kabul
+  etmiyor; gerçek iş kanıtı (skip reason, end signal, side_audit)
+  zorunlu.
+
+### Birleşik davranış
+
+Model chain `asama-5-complete asama-6-complete asama-7-complete
+asama-8-complete` yazınca:
+1. Rate-limit: sadece ilk audit yazılır (`asama-5-complete`); chain-
+   skip-attempt audit kalanı için.
+2. Side_audit `pattern-summary-stored`: text'te `pattern-summary:`
+   satırı yoksa emit YOK.
+3. Gate Aşama 5: `pattern-summary-stored` + `asama-5-skipped` yok
+   → gate geçmez → cp=5'te takılı.
+4. Model gerçek iş yapmak zorunda: pattern özeti yazsın veya skip
+   beyanı versin → side_audit veya skip audit → gate geçer.
+
+### Değiştirilen / Changed
+
+- **`hooks/stop.py::_detect_phase_complete_trigger`**: rate-limit
+  + side_audit koşullu emit (Aşama 5 için `pattern-summary-stored`
+  text-driven).
+- **`data/gate_spec.json`**: Aşama 5/6/8 `required_audits_any`
+  sıkılaştırma.
+- **`tests/test_phase22_refactor.py::_seed_full_pipeline_audits`**:
+  fixture'da `("asama-5-complete", "pattern summary")` →
+  `("pattern-summary-stored", "phase=5 side_audit")` (yeni gate
+  kontratına uyum).
+
+### Sözleşme korunumu / Boundary
+
+- `_spec_approve_flow` (askq classifier zinciri) `asama-1-complete..
+  asama-4-complete` audit chain'i **doğrudan** yazar (bu fonksiyon
+  kullanılmıyor) → rate-limit etkilemez. Aşama 4 spec onayı zinciri
+  korunur.
+- Silent_phase auto-emit (Aşama 3) completeness loop'ta — etkilemez.
+- Aşama 7 askq classifier ile (deferred phase) — etkilemez.
+- Aşama 1, 2, 4, 9, 10-22: değişiklik yok.
+
+### Sürüm bilgisi / Version
+
+- `VERSION` 1.0.45 → 1.0.46, `.claude-plugin/plugin.json` 1.0.46.
+
 ## [1.0.45] — 2026-05-13
 
 ### Düzeltilen / Fixed

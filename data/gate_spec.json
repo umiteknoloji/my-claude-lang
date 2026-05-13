@@ -77,7 +77,7 @@
       "name_en": "Pattern Matching",
       "allowed_tools": [],
       "denied_paths": [],
-      "required_audits_any": ["asama-5-complete", "pattern-summary-stored", "asama-5-skipped"],
+      "required_audits_any": ["pattern-summary-stored", "asama-5-skipped"],
       "side_audits": ["pattern-summary-stored"],
       "fail_open": false,
       "self_critique_required": false,
@@ -101,7 +101,6 @@
         "db/**"
       ],
       "required_audits_any": [
-        "asama-6-complete",
         "asama-6-skipped",
         "asama-6-end"
       ],
@@ -133,8 +132,7 @@
       "denied_paths": ["src/components/**", "src/pages/**", "ui/**"],
       "required_audits_any": [
         "asama-8-end",
-        "asama-8-not-applicable",
-        "asama-8-complete"
+        "asama-8-not-applicable"
       ],
       "fail_open": false,
       "self_critique_required": true,
